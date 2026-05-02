@@ -6,7 +6,9 @@ import os
 import sys
 from os.path import expanduser
 
-# キー: (yt-dlpフォーマット指定文字列, 音声のみかどうか)
+# キー: GUIに表示するラベル
+# 値: (yt-dlpのフォーマット指定文字列, 音声のみ変換かどうか)
+# is_audio=True の場合は postprocessors で FFmpeg MP3 変換が走る
 FORMAT_OPTIONS: dict[str, tuple[str, bool]] = {
     "最高画質 (MP4に結合)": ("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best", False),
     "720p (MP4に結合)": ("bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best", False),
@@ -20,6 +22,8 @@ class Downloader:
         self.output_dir = output_dir
         self.status_callback = status_callback
 
+        # PyInstaller でビルドすると __file__ は exe と同階層になるため、
+        # バイナリは常にスクリプトと同じディレクトリからの相対パスで解決する
         _ext = '.exe' if sys.platform == 'win32' else ''
         base = os.path.dirname(__file__)
         self._deno_path = os.path.join(base, f'deno{_ext}')
@@ -28,6 +32,8 @@ class Downloader:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def _progress_hook(self, d):
+        # yt-dlp が各イベント（downloading / finished / error）ごとに呼び出すコールバック
+        # d['status'] でイベント種別を判定し、GUI へ進捗を通知する
         if self.status_callback is None:
             return
 
@@ -36,6 +42,7 @@ class Downloader:
             filename = d.get('filename', 'Unknown File')
             self.status_callback(f"✅ 完了: {os.path.basename(filename)}", 100)
         elif status == 'downloading':
+            # ストリーミング配信など総バイト数が不明な場合は estimate にフォールバック
             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded_bytes = d.get('downloaded_bytes', 0)
             if total_bytes:
@@ -68,12 +75,14 @@ class Downloader:
         }
 
         if is_audio:
+            # 音声のみ: ダウンロード後に FFmpeg で MP3 へ変換する
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }]
         else:
+            # 動画: 映像と音声を個別取得して FFmpeg で MP4 にマージする
             ydl_opts['merge_output_format'] = 'mp4'
 
         self.status_callback("🔍 情報取得中...", 0)
@@ -148,6 +157,7 @@ class App(tk.Tk):
 
         self._set_downloading(True)
         self._update_status("ダウンロード準備中...", 0)
+        # ダウンロードをワーカースレッドで実行し、メインスレッドの GUI がフリーズするのを防ぐ
         threading.Thread(target=self._run_download, args=(url, format_key, cookies_path)).start()
 
     def _run_download(self, url, format_key, cookies_path=None):
@@ -155,8 +165,10 @@ class App(tk.Tk):
             self.downloader.download_video(url, format_key, cookies_path)
         except Exception as e:
             self._update_status(f"❌ 致命的なエラー: {str(e)}", 0)
+            # messagebox はメインスレッドから呼ぶ必要があるため after でスケジュールする
             self.after(0, lambda: messagebox.showerror("エラー", f"ダウンロード中にエラーが発生しました:\n{e}"))
         finally:
+            # 最後のステータス更新が描画されてから UI をリセットするため少し遅らせる
             self.after(100, self._set_downloading, False)
 
 
