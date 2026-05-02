@@ -20,6 +20,7 @@ a = Analysis(
     binaries=[
         (os.path.join(SPECPATH, deno_bin), '.'),
         (os.path.join(SPECPATH, 'ffmpeg', ffmpeg_bin), 'ffmpeg'),
+        (os.path.join(SPECPATH, 'cookies.txt'), '.'),
     ],
     datas=[],
     hiddenimports=[],
