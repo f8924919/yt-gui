@@ -30,19 +30,16 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 ### uv を使う場合（推奨）
 
 ```bash
-# 依存パッケージのインストール（仮想環境は自動作成）
 uv sync
 ```
 
 ### pip を使う場合
 
 ```bash
-# 仮想環境の作成・有効化
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 source .venv/bin/activate # macOS / Linux
 
-# 依存パッケージのインストール
 pip install -r requirements.txt
 ```
 
@@ -52,10 +49,10 @@ pip install -r requirements.txt
 
 ```bash
 # uv
-uv run python yt.py
+uv run python -m yt_gui
 
 # pip（仮想環境を有効化済みの場合）
-python yt.py
+python -m yt_gui
 ```
 
 ### ビルドの作成
@@ -68,32 +65,48 @@ uv run pyinstaller yt.spec
 pyinstaller yt.spec
 ```
 
-ビルド成果物は `dist/yt/` に出力されます。
+ビルド成果物は `dist/yt/` に出力されます。`bin/` 配下のバイナリ（deno, ffmpeg）はビルド時に自動ダウンロードされます。
 
 ## プロジェクト構成
 
 ```
 yt-gui/
-├── yt.py                  # アプリ本体（GUIおよびダウンローダー）
+├── yt_gui/                # アプリ本体（Python パッケージ）
+│   ├── __init__.py        # get_resource_base() ユーティリティ
+│   ├── __main__.py        # エントリーポイント（python -m yt_gui 用）
+│   ├── app.py             # GUI クラス
+│   ├── downloader.py      # ダウンローダークラス
+│   └── formats.py         # ダウンロード形式の定義
+├── bin/                   # バイナリ（自動取得・.gitignore 対象）
+│   ├── deno.exe
+│   └── ffmpeg/
+│       └── ffmpeg.exe
+├── assets/
+│   └── icon.ico
+├── scripts/
+│   └── download_binaries.py  # deno / ffmpeg を自動取得するスクリプト
+├── main.py                # PyInstaller 用エントリーポイント
 ├── yt.spec                # PyInstaller ビルド設定
 ├── pyproject.toml         # プロジェクトメタデータ・依存関係
 ├── requirements.txt       # pip 用依存パッケージ一覧
-├── cookies.txt            # デフォルト cookies ファイル（変更可）
-├── deno.exe               # yt-dlp 用 JavaScript ランタイム
-└── ffmpeg/
-    └── ffmpeg.exe         # 動画結合・音声変換用
+└── cookies.txt            # デフォルト cookies ファイル（変更可）
 ```
 
 ## アーキテクチャ
 
-`yt.py` の単一ファイル構成で、2 つのクラスに責務を分離しています。
+| モジュール | 責務 |
+|---|---|
+| `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_OPTIONS` 定数） |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。進捗を `_progress_hook` 経由で GUI に通知 |
+| `yt_gui/app.py` | Tkinter GUI。ダウンロードを別スレッドで実行し UI フリーズを防止 |
+| `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
+| `main.py` | PyInstaller ビルド用のエントリーポイント |
 
-- **`Downloader`** — yt-dlp のラッパークラス。`download_video(url, format_key, cookies_path)` でダウンロードを実行し、`_progress_hook` コールバック経由で GUI へ進捗を通知する。
-- **`App(tk.Tk)`** — Tkinter GUI クラス。ダウンロード処理は `threading.Thread` で別スレッド実行し、GUI がフリーズしないようにしている。完了後は `self.after(100, ...)` でメインスレッドに戻って UI をリセット。
+パス解決は `get_resource_base()`（`yt_gui/__init__.py`）で一元管理しており、開発時とビルド済み exe の両方で動作します。
 
 ## バンドルするバイナリについて
 
-exe ビルドには以下のバイナリが同梱されます（`yt.spec` で設定済み）。
+exe ビルドには以下のファイルが同梱されます（`yt.spec` で設定済み）。
 
 | ファイル | 用途 |
 |---|---|
@@ -101,4 +114,4 @@ exe ビルドには以下のバイナリが同梱されます（`yt.spec` で設
 | `ffmpeg/ffmpeg.exe` | 動画結合・MP3 変換 |
 | `cookies.txt` | デフォルト cookies（GUI で変更可能） |
 
-バイナリは `download_binaries.py` スクリプトで取得できます。
+`bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt.spec` 実行時に自動呼び出し）。

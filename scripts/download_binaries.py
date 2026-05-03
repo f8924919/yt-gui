@@ -11,7 +11,8 @@ import shutil
 import urllib.request
 import stat
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+BIN_DIR = os.path.join(os.path.dirname(_SCRIPTS_DIR), 'bin')
 
 
 def _make_executable(path):
@@ -43,19 +44,20 @@ def _deno_asset():
 
 def download_deno():
     asset, binary = _deno_asset()
-    out_path = os.path.join(SCRIPT_DIR, binary)
+    os.makedirs(BIN_DIR, exist_ok=True)
+    out_path = os.path.join(BIN_DIR, binary)
 
     if os.path.exists(out_path):
         print(f'[deno] {binary} は既に存在します。スキップします。')
         return
 
     url = f'https://github.com/denoland/deno/releases/latest/download/{asset}'
-    tmp = os.path.join(SCRIPT_DIR, '_deno_tmp.zip')
+    tmp = os.path.join(BIN_DIR, '_deno_tmp.zip')
     print(f'[deno] ダウンロード中...')
     _download(url, tmp)
 
     with zipfile.ZipFile(tmp) as z:
-        z.extract(binary, SCRIPT_DIR)
+        z.extract(binary, BIN_DIR)
     os.remove(tmp)
     _make_executable(out_path)
     print(f'[deno] 保存完了: {out_path}')
@@ -67,7 +69,7 @@ def download_deno():
 
 def download_ffmpeg():
     machine = platform.machine().lower()
-    ffmpeg_dir = os.path.join(SCRIPT_DIR, 'ffmpeg')
+    ffmpeg_dir = os.path.join(BIN_DIR, 'ffmpeg')
     os.makedirs(ffmpeg_dir, exist_ok=True)
 
     binary = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
@@ -90,7 +92,7 @@ def download_ffmpeg():
 def _download_ffmpeg_windows(out_path):
     url = ('https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/'
            'ffmpeg-master-latest-win64-gpl.zip')
-    tmp = os.path.join(SCRIPT_DIR, '_ffmpeg_tmp.zip')
+    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
     print('[ffmpeg] ダウンロード中 (Windows)...')
     _download(url, tmp)
 
@@ -108,7 +110,7 @@ def _download_ffmpeg_windows(out_path):
 
 def _download_ffmpeg_macos(ffmpeg_dir, out_path):
     url = 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip'
-    tmp = os.path.join(SCRIPT_DIR, '_ffmpeg_tmp.zip')
+    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
     print('[ffmpeg] ダウンロード中 (macOS)...')
     _download(url, tmp)
 
@@ -126,7 +128,7 @@ def _download_ffmpeg_macos(ffmpeg_dir, out_path):
 def _download_ffmpeg_linux(machine, ffmpeg_dir, out_path):
     arch = 'arm64' if machine in ('arm64', 'aarch64') else 'amd64'
     url = f'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-{arch}-static.tar.xz'
-    tmp = os.path.join(SCRIPT_DIR, '_ffmpeg_tmp.tar.xz')
+    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.tar.xz')
     print(f'[ffmpeg] ダウンロード中 (Linux {arch})...')
     _download(url, tmp)
 
