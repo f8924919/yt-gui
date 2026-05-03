@@ -14,14 +14,15 @@ _ext = '.exe' if sys.platform == 'win32' else ''
 deno_bin = f'deno{_ext}'
 ffmpeg_bin = f'ffmpeg{_ext}'
 
+_cookies_path = os.path.join(SPECPATH, 'cookies.txt')
+_extra_binaries = [(os.path.join(SPECPATH, deno_bin), '.'), (os.path.join(SPECPATH, 'ffmpeg', ffmpeg_bin), 'ffmpeg')]
+if os.path.isfile(_cookies_path):
+    _extra_binaries.append((_cookies_path, '.'))
+
 a = Analysis(
     ['yt.py'],
     pathex=[],
-    binaries=[
-        (os.path.join(SPECPATH, deno_bin), '.'),
-        (os.path.join(SPECPATH, 'ffmpeg', ffmpeg_bin), 'ffmpeg'),
-        (os.path.join(SPECPATH, 'cookies.txt'), '.'),
-    ],
+    binaries=_extra_binaries,
     datas=[],
     hiddenimports=[],
     hookspath=[],

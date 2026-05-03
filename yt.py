@@ -155,6 +155,13 @@ class App(tk.Tk):
             messagebox.showwarning("警告", "ダウンロードするURLを入力してください。")
             return
 
+        if cookies_path and not os.path.isfile(cookies_path):
+            messagebox.showwarning(
+                "警告",
+                f"Cookiesファイルが見つかりません:\n{cookies_path}\n\nCookiesなしでダウンロードを続行します。"
+            )
+            cookies_path = None
+
         self._set_downloading(True)
         self._update_status("ダウンロード準備中...", 0)
         # ダウンロードをワーカースレッドで実行し、メインスレッドの GUI がフリーズするのを防ぐ
