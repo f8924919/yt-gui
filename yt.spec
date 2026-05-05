@@ -14,11 +14,8 @@ _ext = '.exe' if sys.platform == 'win32' else ''
 deno_bin = f'deno{_ext}'
 ffmpeg_bin = f'ffmpeg{_ext}'
 
-_cookies_path = os.path.join(SPECPATH, 'cookies.txt')
 _bin_dir = os.path.join(SPECPATH, 'bin')
 _extra_binaries = [(os.path.join(_bin_dir, deno_bin), '.'), (os.path.join(_bin_dir, 'ffmpeg', ffmpeg_bin), 'ffmpeg')]
-if os.path.isfile(_cookies_path):
-    _extra_binaries.append((_cookies_path, '.'))
 
 # Tcl/Tk データを明示的に収集する（PyInstaller の自動検出が失敗する場合の保険）
 def _collect_tcltk_datas():

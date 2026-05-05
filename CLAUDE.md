@@ -45,9 +45,8 @@ pyinstaller yt.spec
 
 - `bin/deno.exe` — yt-dlpのJavaScriptランタイム（`js_runtimes`オプションで指定）
 - `bin/ffmpeg/ffmpeg.exe` — 動画結合・音声変換に使用（`ffmpeg_location`で指定）
-- `cookies.txt` — デフォルトのCookiesファイル（任意・GUIで変更可能）
 
-`yt.spec` の `binaries` でこれらをexeに同梱するよう設定済み。`cookies.txt` はビルド時に存在すれば同梱、なければスキップする（オプション扱い）。
+`yt.spec` の `binaries` でこれらをexeに同梱するよう設定済み。CookiesファイルはGUIの設定画面でユーザーが任意に指定する（ビルド成果物には含まない）。
 
 バイナリは `scripts/download_binaries.py` で自動取得し `bin/` に配置する（`yt.spec` ビルド時に自動呼び出し）。
 
