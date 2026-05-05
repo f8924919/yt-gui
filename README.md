@@ -14,8 +14,14 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   | MP3 (音声のみ・192kbps) | 音声のみを 192kbps の MP3 として抽出 |
   | オリジナルの形式 | yt-dlp のデフォルト形式でそのままダウンロード |
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
-- cookies.txt によるログイン済みセッションのサポート
-- ダウンロード先は `~/Downloads` フォルダ（固定）
+- メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
+- 設定画面で以下を変更・保存できる
+  - 保存フォルダ（未設定時は `~/Downloads`）
+  - Cookies ファイルのパス
+- 設定は OS 標準の設定ディレクトリに JSON で永続保存
+  - Windows: `%APPDATA%\yt-gui\settings.json`
+  - macOS: `~/Library/Application Support/yt-gui/settings.json`
+  - Linux: `~/.config/yt-gui/settings.json`
 
 ## 必要環境
 
@@ -71,25 +77,27 @@ pyinstaller yt.spec
 
 ```
 yt-gui/
-├── yt_gui/                # アプリ本体（Python パッケージ）
-│   ├── __init__.py        # get_resource_base() ユーティリティ
-│   ├── __main__.py        # エントリーポイント（python -m yt_gui 用）
-│   ├── app.py             # GUI クラス
-│   ├── downloader.py      # ダウンローダークラス
-│   └── formats.py         # ダウンロード形式の定義
-├── bin/                   # バイナリ（自動取得・.gitignore 対象）
+├── yt_gui/                    # アプリ本体（Python パッケージ）
+│   ├── __init__.py            # get_resource_base() ユーティリティ
+│   ├── __main__.py            # エントリーポイント（python -m yt_gui 用）
+│   ├── app.py                 # GUI クラス
+│   ├── downloader.py          # ダウンローダークラス
+│   ├── formats.py             # ダウンロード形式の定義
+│   ├── settings.py            # Settings dataclass / SettingsManager
+│   └── settings_dialog.py     # 設定ダイアログ（モーダル）
+├── bin/                       # バイナリ（自動取得・.gitignore 対象）
 │   ├── deno.exe
 │   └── ffmpeg/
 │       └── ffmpeg.exe
 ├── assets/
-│   └── icon.ico
+│   └── icon.png               # アプリアイコン（ビルド時に .ico へ変換）
 ├── scripts/
-│   └── download_binaries.py  # deno / ffmpeg を自動取得するスクリプト
-├── main.py                # PyInstaller 用エントリーポイント
-├── yt.spec                # PyInstaller ビルド設定
-├── pyproject.toml         # プロジェクトメタデータ・依存関係
-├── requirements.txt       # pip 用依存パッケージ一覧
-└── cookies.txt            # デフォルト cookies ファイル（変更可）
+│   └── download_binaries.py   # deno / ffmpeg を自動取得するスクリプト
+├── main.py                    # PyInstaller 用エントリーポイント
+├── yt.spec                    # PyInstaller ビルド設定
+├── pyproject.toml             # プロジェクトメタデータ・依存関係
+├── requirements.txt           # pip 用依存パッケージ一覧
+└── cookies.txt                # デフォルト cookies ファイル（開発時参照用）
 ```
 
 ## アーキテクチャ
@@ -98,7 +106,9 @@ yt-gui/
 |---|---|
 | `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_OPTIONS` 定数） |
 | `yt_gui/downloader.py` | yt-dlp のラッパー。進捗を `_progress_hook` 経由で GUI に通知 |
-| `yt_gui/app.py` | Tkinter GUI。ダウンロードを別スレッドで実行し UI フリーズを防止 |
+| `yt_gui/settings.py` | `Settings` dataclass と `SettingsManager`。設定を JSON ファイルに読み書き |
+| `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面 |
+| `yt_gui/app.py` | Tkinter GUI。メニューバーを持ち、ダウンロードを別スレッドで実行 |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
@@ -112,6 +122,8 @@ exe ビルドには以下のファイルが同梱されます（`yt.spec` で設
 |---|---|
 | `deno.exe` | yt-dlp の JavaScript ランタイム |
 | `ffmpeg/ffmpeg.exe` | 動画結合・MP3 変換 |
-| `cookies.txt` | デフォルト cookies（GUI で変更可能） |
+| `assets/icon.png` | アプリアイコン |
 
 `bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt.spec` 実行時に自動呼び出し）。
+
+Cookies ファイルはビルド成果物に含まれません。アプリ起動後、設定画面（ファイル > 設定...）からパスを指定してください。
