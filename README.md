@@ -131,6 +131,10 @@ exe ビルドには以下のファイルが同梱されます（`yt.spec` で設
 | `ffmpeg/ffmpeg.exe` | 動画結合・MP3 変換 |
 | `assets/icon.png` | アプリアイコン |
 
-`bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt.spec` 実行時に自動呼び出し）。
+`bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt.spec` 実行時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードします。
+
+```bash
+python scripts/download_binaries.py --update
+```
 
 Cookies ファイルはビルド成果物に含まれません。アプリ起動後、設定画面（ファイル > 設定...）からパスを指定してください。

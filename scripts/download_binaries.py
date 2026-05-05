@@ -42,12 +42,12 @@ def _deno_asset():
         return f'deno-{arch}-unknown-linux-gnu.zip', 'deno'
 
 
-def download_deno():
+def download_deno(force=False):
     asset, binary = _deno_asset()
     os.makedirs(BIN_DIR, exist_ok=True)
     out_path = os.path.join(BIN_DIR, binary)
 
-    if os.path.exists(out_path):
+    if os.path.exists(out_path) and not force:
         print(f'[deno] {binary} は既に存在します。スキップします。')
         return
 
@@ -67,7 +67,7 @@ def download_deno():
 # ffmpeg
 # ---------------------------------------------------------------------------
 
-def download_ffmpeg():
+def download_ffmpeg(force=False):
     machine = platform.machine().lower()
     ffmpeg_dir = os.path.join(BIN_DIR, 'ffmpeg')
     os.makedirs(ffmpeg_dir, exist_ok=True)
@@ -75,7 +75,7 @@ def download_ffmpeg():
     binary = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
     out_path = os.path.join(ffmpeg_dir, binary)
 
-    if os.path.exists(out_path):
+    if os.path.exists(out_path) and not force:
         print(f'[ffmpeg] {binary} は既に存在します。スキップします。')
         return
 
@@ -147,5 +147,10 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, out_path):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    download_deno()
-    download_ffmpeg()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--update', action='store_true', help='既存のバイナリを強制的に再ダウンロードする')
+    args = parser.parse_args()
+
+    download_deno(force=args.update)
+    download_ffmpeg(force=args.update)
