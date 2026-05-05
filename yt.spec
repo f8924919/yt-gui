@@ -44,7 +44,33 @@ def _png_to_ico(png_path: str) -> str:
     return ico_path
 
 
-_ico_path = _png_to_ico(_png_path) if os.path.isfile(_png_path) else None
+def _png_to_icns(png_path: str) -> str:
+    """PNG から .icns を生成して返す（macOS 専用、sips + iconutil を使用）"""
+    import tempfile, shutil
+    iconset_dir = tempfile.mkdtemp(suffix='.iconset')
+    try:
+        sizes = [16, 32, 64, 128, 256, 512]
+        for s in sizes:
+            subprocess.run(['sips', '-z', str(s), str(s), png_path,
+                            '--out', os.path.join(iconset_dir, f'icon_{s}x{s}.png')],
+                           check=True, capture_output=True)
+            subprocess.run(['sips', '-z', str(s*2), str(s*2), png_path,
+                            '--out', os.path.join(iconset_dir, f'icon_{s}x{s}@2x.png')],
+                           check=True, capture_output=True)
+        icns_path = png_path.replace('.png', '_generated.icns')
+        subprocess.run(['iconutil', '-c', 'icns', iconset_dir, '-o', icns_path],
+                       check=True, capture_output=True)
+        return icns_path
+    finally:
+        shutil.rmtree(iconset_dir, ignore_errors=True)
+
+
+if sys.platform == 'darwin':
+    _icon_path = _png_to_icns(_png_path) if os.path.isfile(_png_path) else None
+elif sys.platform == 'win32':
+    _icon_path = _png_to_ico(_png_path) if os.path.isfile(_png_path) else None
+else:
+    _icon_path = None
 
 
 # Tcl/Tk データを明示的に収集する（PyInstaller の自動検出が失敗する場合の保険）
@@ -91,7 +117,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='yt',
-    icon=_ico_path,
+    icon=_icon_path,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -112,3 +138,16 @@ coll = COLLECT(
     upx_exclude=[],
     name='yt',
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='yt.app',
+        icon=_icon_path,
+        bundle_identifier='com.example.yt-gui',
+        info_plist={
+            'NSPrincipalClass': 'NSApplication',
+            'NSHighResolutionCapable': True,
+            'CFBundleShortVersionString': '1.0.0',
+        },
+    )
