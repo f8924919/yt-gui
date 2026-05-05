@@ -34,15 +34,24 @@ class SettingsDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="キャンセル", command=self.destroy).pack(side="right")
 
     def _build_general_tab(self, parent: ttk.Frame):
-        ttk.Label(parent, text="Cookiesファイル:").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(parent, text="保存フォルダ:").grid(row=0, column=0, sticky="w", pady=5)
+
+        self._download_var = tk.StringVar(value=self._settings.download_path)
+        ttk.Entry(parent, textvariable=self._download_var, width=45).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(parent, text="参照...", command=self._browse_download).grid(row=0, column=2, pady=5)
+
+        ttk.Label(parent, text="Cookiesファイル:").grid(row=1, column=0, sticky="w", pady=5)
 
         self._cookies_var = tk.StringVar(value=self._settings.cookies_path)
-        entry = ttk.Entry(parent, textvariable=self._cookies_var, width=45)
-        entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
-        ttk.Button(parent, text="参照...", command=self._browse_cookies).grid(row=0, column=2, pady=5)
+        ttk.Entry(parent, textvariable=self._cookies_var, width=45).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(parent, text="参照...", command=self._browse_cookies).grid(row=1, column=2, pady=5)
 
         parent.grid_columnconfigure(1, weight=1)
+
+    def _browse_download(self):
+        path = filedialog.askdirectory(title="保存フォルダを選択")
+        if path:
+            self._download_var.set(path)
 
     def _browse_cookies(self):
         path = filedialog.askopenfilename(
@@ -53,6 +62,7 @@ class SettingsDialog(tk.Toplevel):
             self._cookies_var.set(path)
 
     def _save(self):
+        self._settings.download_path = self._download_var.get().strip()
         self._settings.cookies_path = self._cookies_var.get().strip()
         self._manager.save(self._settings)
         self.destroy()

@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict
 @dataclass
 class Settings:
     cookies_path: str = ""
+    download_path: str = ""  # 空文字のときは ~/Downloads を使用
 
 
 def _get_config_dir() -> str:

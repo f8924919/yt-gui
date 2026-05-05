@@ -38,8 +38,11 @@ class App(tk.Tk):
         self._create_menu()
         self._create_widgets()
 
-        download_path = os.path.join(expanduser("~"), "Downloads")
-        self.downloader = Downloader(download_path, status_callback=self._update_status)
+        self.downloader = Downloader(self._resolve_download_path(), status_callback=self._update_status)
+
+    def _resolve_download_path(self) -> str:
+        path = self._settings.download_path
+        return path if path else os.path.join(expanduser("~"), "Downloads")
 
     def _create_menu(self):
         menubar = tk.Menu(self)
@@ -91,9 +94,10 @@ class App(tk.Tk):
         main_frame.grid_columnconfigure(1, weight=1)
 
     def _open_settings(self):
-        SettingsDialog(self, self._settings_manager)
-        # ダイアログ閉幕後に最新設定を反映
+        dialog = SettingsDialog(self, self._settings_manager)
+        self.wait_window(dialog)  # ダイアログが閉じるまで待機
         self._settings = self._settings_manager.load()
+        self.downloader.output_dir = self._resolve_download_path()
 
     def _update_status(self, text, percent):
         self.status_label.config(text=text)
