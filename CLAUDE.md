@@ -35,7 +35,9 @@ pyinstaller yt.spec
 
 - **`yt_gui/formats.py`** — `FORMAT_OPTIONS` 定数。キーがGUI表示テキスト、値が `(yt-dlpフォーマット文字列, 音声のみフラグ)` のタプル。
 - **`yt_gui/downloader.py`** — `Downloader` クラス。yt-dlpのラッパー。`download_video(url, format_key, cookies_path)` でダウンロードを実行し、`_progress_hook` でコールバック経由にGUIへ進捗を通知する。
-- **`yt_gui/app.py`** — `App(tk.Tk)` クラス。Tkinter GUIクラス。ダウンロード処理は `threading.Thread` で別スレッド実行し、GUIがフリーズしないようにしている。完了後は `self.after(100, ...)` でメインスレッドに戻ってUIをリセット。
+- **`yt_gui/settings.py`** — `Settings` dataclassと `SettingsManager` クラス。設定をJSONファイルに読み書きする。保存先はOS標準のconfigディレクトリ（Windows: `%APPDATA%/yt-gui/`、macOS: `~/Library/Application Support/yt-gui/`、Linux: `~/.config/yt-gui/`）。
+- **`yt_gui/settings_dialog.py`** — `SettingsDialog(tk.Toplevel)` クラス。モーダルの設定画面。`ttk.Notebook` によるタブ構成で今後の設定項目追加に対応。
+- **`yt_gui/app.py`** — `App(tk.Tk)` クラス。Tkinter GUIクラス。メニューバー（ファイル > 設定.../終了）を持つ。ダウンロード処理は `threading.Thread` で別スレッド実行し、GUIがフリーズしないようにしている。完了後は `self.after(100, ...)` でメインスレッドに戻ってUIをリセット。
 - **`yt_gui/__main__.py`** — エントリーポイント。`python -m yt_gui` で起動。
 - **`yt_gui/__init__.py`** — `get_resource_base()` ユーティリティ。PyInstallerバンドル時は `sys._MEIPASS`、開発時はプロジェクトルートを返す。
 
