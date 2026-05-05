@@ -10,3 +10,4 @@ wheels/
 .venv
 bin/
 /assets/icon_generated.ico
+assets/icon_generated.icns
