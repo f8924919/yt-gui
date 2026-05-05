@@ -16,9 +16,10 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 
 - **オリジナルの形式** を選択すると詳細設定パネルが展開される
   1. 「形式を取得」ボタンで URL の動画情報を取得
-  2. 利用可能な映像トラック・音声トラックがコンボボックスに一覧表示される（解像度/ビットレート/コーデック付き）
-  3. 映像・音声をそれぞれ選択、または「自動 (最良を選択)」のまま使用
+  2. 利用可能な映像/音声/字幕トラックがコンボボックスに一覧表示される（解像度/ビットレート/コーデック/言語付き）
+  3. 映像・音声・字幕をそれぞれ選択、または「自動 (最良を選択)」のまま使用
   4. 複合フォーマット（★印）を映像に選択した場合は音声選択が自動的に無効化される
+  5. 字幕は手動字幕・自動生成字幕を選択可能。字幕フォーマット（srt / vtt / best）と MP4 への埋め込みオプションあり
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
@@ -118,10 +119,10 @@ yt-gui/
 | `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。新言語追加時はこのファイルを追加する |
 | `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_SPECS` / `FORMAT_KEYS`）。表示名は `t()` で取得 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_formats()` で形式一覧を取得、`download_video()` でダウンロード実行。進捗を `_progress_hook` 経由で GUI に通知 |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_formats()` で映像/音声/字幕の一覧を取得、`download_video()` でダウンロード実行。字幕は `subtitle_opts` dict で制御し、`embed=True` 時は ffmpeg で MP4 に埋め込む。進捗を `_progress_hook` 経由で GUI に通知 |
 | `yt_gui/settings.py` | `Settings` dataclass と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面（言語選択含む） |
-| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示。「オリジナルの形式」選択時は詳細パネルを展開し、形式取得・映像/音声選択・フォーマット spec 生成を管理 |
+| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示。「オリジナルの形式」選択時は詳細パネルを展開し、映像/音声/字幕の選択・フォーマット spec 生成・字幕オプション dict 生成を管理 |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 

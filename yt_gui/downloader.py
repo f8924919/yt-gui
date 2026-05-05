@@ -6,6 +6,9 @@ from .formats import FORMAT_SPECS
 from .i18n import t
 from . import get_resource_base
 
+_DISPLAY_SUB_EXTS = frozenset({'srt', 'vtt', 'ttml', 'ass', 'ssa'})
+_SKIP_AUTO_LANGS = frozenset({'live_chat'})
+
 
 class Downloader:
     def __init__(self, output_dir="downloads", status_callback=None):
@@ -93,9 +96,41 @@ class Downloader:
                 label = f"{acodec} ({ext}) [{fid}]{brate}"
                 audio_formats.append((label, fid))
 
-        return {"video": video_formats, "audio": audio_formats}
+        # Subtitle extraction
+        subtitles_raw = info.get('subtitles') or {}
+        auto_captions_raw = info.get('automatic_captions') or {}
+        primary_lang = (info.get('language') or '').lower()
+        manual_langs = frozenset(subtitles_raw.keys())
 
-    def download_video(self, url, format_id, cookies_path=None, format_spec=None):
+        subtitle_list: list[tuple[str, str, bool]] = []
+
+        for lang, formats in sorted(subtitles_raw.items()):
+            if not formats:
+                continue
+            exts = ', '.join(dict.fromkeys(
+                f['ext'] for f in formats if f.get('ext') in _DISPLAY_SUB_EXTS
+            )) or 'best'
+            name = next((f.get('name') for f in formats if f.get('name')), lang)
+            subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
+
+        for lang, formats in sorted(auto_captions_raw.items()):
+            if not formats or lang in _SKIP_AUTO_LANGS:
+                continue
+            # When primary language is known, limit auto captions to that language family
+            if primary_lang:
+                lang_base = lang.split('-')[0].lower()
+                if lang_base != primary_lang.split('-')[0] and lang not in manual_langs:
+                    continue
+            exts = ', '.join(dict.fromkeys(
+                f['ext'] for f in formats if f.get('ext') in _DISPLAY_SUB_EXTS
+            )) or 'best'
+            name = next((f.get('name') for f in formats if f.get('name')), lang)
+            label = f"{lang} – {name} {t('orig_sub_auto_marker')} [{exts}]"
+            subtitle_list.append((label, lang, True))
+
+        return {"video": video_formats, "audio": audio_formats, "subtitles": subtitle_list}
+
+    def download_video(self, url, format_id, cookies_path=None, format_spec=None, subtitle_opts=None):
         if format_spec is not None:
             spec, is_audio = format_spec, False
         else:
@@ -120,6 +155,16 @@ class Downloader:
             }]
         else:
             ydl_opts['merge_output_format'] = 'mp4'
+
+        if subtitle_opts:
+            embed = subtitle_opts.get('embed', False)
+            for key in ('writesubtitles', 'writeautomaticsub', 'subtitleslangs', 'subtitlesformat'):
+                if key in subtitle_opts:
+                    ydl_opts[key] = subtitle_opts[key]
+            if embed:
+                ydl_opts.setdefault('postprocessors', []).append(
+                    {'key': 'FFmpegEmbedSubtitle', 'already_have_subtitle': False}
+                )
 
         self.status_callback(t("dl_fetching"), 0)
         with YoutubeDL(ydl_opts) as ydl:
