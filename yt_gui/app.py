@@ -109,11 +109,17 @@ class App(tk.Tk):
         self._original_frame = ttk.LabelFrame(main_frame, text=t("label_original_detail"), padding="5")
         self._create_original_format_widgets()
 
-        # Row 3: Add to queue button
+        # Row 3: Action buttons
+        _action_frame = ttk.Frame(main_frame)
+        _action_frame.grid(row=3, column=0, columnspan=2, pady=(10, 5))
         self.add_queue_button = ttk.Button(
-            main_frame, text=t("btn_add_to_queue"), command=self._add_to_queue,
+            _action_frame, text=t("btn_add_to_queue"), command=self._add_to_queue,
         )
-        self.add_queue_button.grid(row=3, column=0, columnspan=2, pady=(10, 5))
+        self.add_queue_button.pack(side="left", padx=(0, 5))
+        self.add_playlist_button = ttk.Button(
+            _action_frame, text=t("btn_add_playlist"), command=self._add_playlist_to_queue,
+        )
+        self.add_playlist_button.pack(side="left")
 
         # Row 4: Queue panel (expands vertically)
         queue_frame = ttk.LabelFrame(main_frame, text=t("queue_title"), padding="5")
@@ -444,6 +450,78 @@ class App(tk.Tk):
             values=(self._item_counter, short_url, selected, t("queue_status_waiting")),
         )
         item.tree_iid = iid
+
+    def _add_playlist_to_queue(self):
+        url = self.url_entry.get().strip()
+        if not url:
+            messagebox.showwarning(t("warn_title"), t("warn_no_url"))
+            return
+
+        selected = self.format_var.get()
+        format_id = FORMAT_KEYS[self._format_display.index(selected)]
+
+        if format_id == _ORIGINAL_KEY:
+            messagebox.showwarning(t("warn_title"), t("warn_playlist_original_fmt"))
+            return
+
+        cookies_path = self._settings.cookies_path or None
+        if cookies_path and not os.path.isfile(cookies_path):
+            cookies_path = None
+
+        self.add_playlist_button.config(state=tk.DISABLED, text=t("btn_adding_playlist"))
+        self._update_status(t("status_fetching_playlist"), 0)
+
+        threading.Thread(
+            target=self._run_fetch_playlist,
+            args=(url, cookies_path, format_id, selected),
+            daemon=True,
+        ).start()
+
+    def _run_fetch_playlist(self, url, cookies_path, format_id, format_label):
+        try:
+            entries = self.downloader.fetch_playlist_entries(url, cookies_path)
+            self.after(0, self._on_playlist_fetched, entries, format_id, format_label)
+        except Exception as e:
+            self.after(0, self._update_status, f"❌ {e}", 0)
+            self.after(0, lambda err=e: messagebox.showerror(
+                t("err_title"), t("err_fetch_playlist").format(error=err),
+            ))
+        finally:
+            self.after(0, lambda: self.add_playlist_button.config(
+                state=tk.NORMAL, text=t("btn_add_playlist"),
+            ))
+
+    def _on_playlist_fetched(self, entries, format_id, format_label):
+        if not entries:
+            messagebox.showwarning(t("warn_title"), t("warn_playlist_empty"))
+            self._update_status(t("status_ready"), 0)
+            return
+
+        batch: list[tuple[int, _QueueItem, str]] = []
+        for entry in entries:
+            self._item_counter += 1
+            item = _QueueItem(
+                url=entry['url'],
+                format_id=format_id,
+                format_label=format_label,
+                format_spec=None,
+                subtitle_opts=None,
+            )
+            batch.append((self._item_counter, item, entry['title']))
+
+        with self._queue_lock:
+            for _, item, _ in batch:
+                self._queue_items.append(item)
+
+        for no, item, title in batch:
+            short = title if len(title) <= 45 else title[:42] + "..."
+            iid = self._queue_tree.insert(
+                "", "end",
+                values=(no, short, format_label, t("queue_status_waiting")),
+            )
+            item.tree_iid = iid
+
+        self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
 
     def _start_queue(self):
         with self._queue_lock:

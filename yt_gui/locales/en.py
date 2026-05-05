@@ -62,6 +62,13 @@ STRINGS: dict[str, str] = {
     "queue_status_downloading": "Downloading",
     "queue_status_done": "✅ Done",
     "queue_status_error": "❌ Error",
+    "btn_add_playlist": "Add Playlist",
+    "btn_adding_playlist": "Fetching...",
+    "status_fetching_playlist": "🔍 Fetching playlist...",
+    "status_playlist_added": "✅ Added {count} videos to queue",
+    "err_fetch_playlist": "An error occurred while fetching playlist:\n{error}",
+    "warn_playlist_original_fmt": "\"Original format\" is not supported for playlist batch-add.\nPlease select a different format.",
+    "warn_playlist_empty": "No videos found in the playlist. Please check the URL.",
     "warn_queue_empty": "Queue is empty. Add items with URL and format selection.",
     # downloader status
     "dl_fetching": "🔍 Fetching info...",

@@ -53,6 +53,35 @@ class Downloader:
         else:
             self.status_callback(t("dl_status").format(status=status), 0)
 
+    def fetch_playlist_entries(self, url, cookies_path=None) -> list[dict]:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': 'in_playlist',
+            'js_runtimes': {'deno': {'path': self._deno_path}},
+            'ffmpeg_location': self._ffmpeg_path,
+            'remote_components': ['ejs:github'],
+            'cookies': cookies_path,
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        if not info:
+            return []
+
+        result = []
+        for entry in (info.get('entries') or []):
+            if not entry:
+                continue
+            entry_url = entry.get('webpage_url') or entry.get('url')
+            if not entry_url:
+                continue
+            result.append({
+                'url': entry_url,
+                'title': entry.get('title') or entry_url,
+            })
+        return result
+
     def fetch_formats(self, url, cookies_path=None):
         ydl_opts = {
             'quiet': True,

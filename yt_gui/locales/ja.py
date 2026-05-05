@@ -62,6 +62,13 @@ STRINGS: dict[str, str] = {
     "queue_status_downloading": "ダウンロード中",
     "queue_status_done": "✅ 完了",
     "queue_status_error": "❌ エラー",
+    "btn_add_playlist": "プレイリストを追加",
+    "btn_adding_playlist": "取得中...",
+    "status_fetching_playlist": "🔍 プレイリストを取得中...",
+    "status_playlist_added": "✅ {count} 件の動画をキューに追加しました",
+    "err_fetch_playlist": "プレイリストの取得中にエラーが発生しました:\n{error}",
+    "warn_playlist_original_fmt": "「オリジナルの形式」はプレイリスト一括追加に対応していません。\n別の形式を選択してください。",
+    "warn_playlist_empty": "再生リストに動画が見つかりませんでした。プレイリストのURLを確認してください。",
     "warn_queue_empty": "キューにアイテムがありません。URLと形式を選んで追加してください。",
     # downloader status
     "dl_fetching": "🔍 情報取得中...",
