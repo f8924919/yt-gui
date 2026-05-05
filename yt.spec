@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
+import struct
 import subprocess
 
 # ビルド前にプラットフォーム向けのバイナリを自動取得する
@@ -15,7 +16,36 @@ deno_bin = f'deno{_ext}'
 ffmpeg_bin = f'ffmpeg{_ext}'
 
 _bin_dir = os.path.join(SPECPATH, 'bin')
+_png_path = os.path.join(SPECPATH, 'assets', 'icon.png')
 _extra_binaries = [(os.path.join(_bin_dir, deno_bin), '.'), (os.path.join(_bin_dir, 'ffmpeg', ffmpeg_bin), 'ffmpeg')]
+
+
+def _png_to_ico(png_path: str) -> str:
+    """PNG ファイルから ICO ファイルを生成してパスを返す。
+    Windows Vista+ は ICO 内に PNG データをそのまま埋め込める形式をサポートしている。
+    """
+    with open(png_path, 'rb') as f:
+        png_data = f.read()
+
+    width = struct.unpack('>I', png_data[16:20])[0]
+    height = struct.unpack('>I', png_data[20:24])[0]
+    # ICO では 256 を 0 で表現する
+    w = 0 if width >= 256 else width
+    h = 0 if height >= 256 else height
+
+    ico_header = struct.pack('<HHH', 0, 1, 1)           # reserved / type=1 / count=1
+    entry_offset = 6 + 16                                # ヘッダ(6) + ICONDIRENTRY(16)
+    ico_entry = struct.pack('<BBBBHHII',
+        w, h, 0, 0, 1, 32, len(png_data), entry_offset)
+
+    ico_path = png_path.replace('.png', '_generated.ico')
+    with open(ico_path, 'wb') as f:
+        f.write(ico_header + ico_entry + png_data)
+    return ico_path
+
+
+_ico_path = _png_to_ico(_png_path) if os.path.isfile(_png_path) else None
+
 
 # Tcl/Tk データを明示的に収集する（PyInstaller の自動検出が失敗する場合の保険）
 def _collect_tcltk_datas():
@@ -38,11 +68,13 @@ def _collect_tcltk_datas():
 
 _tcltk_datas = _collect_tcltk_datas()
 
+_extra_datas = _tcltk_datas + [(_png_path, 'assets')] if os.path.isfile(_png_path) else _tcltk_datas
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=_extra_binaries,
-    datas=_tcltk_datas,
+    datas=_extra_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -59,6 +91,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='yt',
+    icon=_ico_path,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

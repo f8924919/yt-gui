@@ -18,6 +18,14 @@ class App(tk.Tk):
         self.title("yt-dlp GUI ダウンローダー")
         self.geometry("500x200")
 
+        icon_path = os.path.join(get_resource_base(), "assets", "icon.png")
+        if os.path.isfile(icon_path):
+            try:
+                img = tk.PhotoImage(file=icon_path)
+                self.iconphoto(True, img)
+            except Exception:
+                pass
+
         self._settings_manager = SettingsManager()
         self._settings = self._settings_manager.load()
 
