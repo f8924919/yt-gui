@@ -18,6 +18,7 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 - 設定画面で以下を変更・保存できる
   - 保存フォルダ（未設定時は `~/Downloads`）
   - Cookies ファイルのパス
+  - 表示言語（日本語 / English）— 再起動後に反映
 - 設定は OS 標準の設定ディレクトリに JSON で永続保存
   - Windows: `%APPDATA%\yt-gui\settings.json`
   - macOS: `~/Library/Application Support/yt-gui/settings.json`
@@ -78,11 +79,15 @@ pyinstaller yt.spec
 ```
 yt-gui/
 ├── yt_gui/                    # アプリ本体（Python パッケージ）
+│   ├── locales/               # 多言語対応 — 言語ごとの文字列辞書
+│   │   ├── ja.py              # 日本語
+│   │   └── en.py              # English
 │   ├── __init__.py            # get_resource_base() ユーティリティ
 │   ├── __main__.py            # エントリーポイント（python -m yt_gui 用）
 │   ├── app.py                 # GUI クラス
 │   ├── downloader.py          # ダウンローダークラス
-│   ├── formats.py             # ダウンロード形式の定義
+│   ├── formats.py             # ダウンロード形式の定義（内部キー → フォーマット文字列）
+│   ├── i18n.py                # 翻訳関数 t() / set_language()
 │   ├── settings.py            # Settings dataclass / SettingsManager
 │   └── settings_dialog.py     # 設定ダイアログ（モーダル）
 ├── bin/                       # バイナリ（自動取得・.gitignore 対象）
@@ -104,11 +109,13 @@ yt-gui/
 
 | モジュール | 責務 |
 |---|---|
-| `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_OPTIONS` 定数） |
+| `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
+| `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。新言語追加時はこのファイルを追加する |
+| `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_SPECS` / `FORMAT_KEYS`）。表示名は `t()` で取得 |
 | `yt_gui/downloader.py` | yt-dlp のラッパー。進捗を `_progress_hook` 経由で GUI に通知 |
 | `yt_gui/settings.py` | `Settings` dataclass と `SettingsManager`。設定を JSON ファイルに読み書き |
-| `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面 |
-| `yt_gui/app.py` | Tkinter GUI。メニューバーを持ち、ダウンロードを別スレッドで実行 |
+| `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面（言語選択含む） |
+| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示 |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
