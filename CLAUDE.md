@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tkinter製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/720p）またはMP3（音声のみ）でダウンロードできるWindows向けデスクトップアプリ。PyInstallerでスタンドアロンexeとしてビルドする。
+Tkinter製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/720p）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows向けデスクトップアプリ。PyInstallerでスタンドアロンexeとしてビルドする。
 
 ## 環境セットアップ
 
@@ -36,10 +36,10 @@ pyinstaller yt.spec
 - **`yt_gui/i18n.py`** — 多言語対応モジュール。`set_language(lang)` で言語を切り替え、`t(key)` で翻訳文字列を返す。キーが見つからない場合は日本語にフォールバックし、それもなければキー名をそのまま返す。
 - **`yt_gui/locales/ja.py`** / **`yt_gui/locales/en.py`** — 各言語の文字列辞書（`STRINGS: dict[str, str]`）。新言語追加時はこのパターンで `xx.py` を追加し、`i18n.py` の `_LANGUAGES` に登録する。
 - **`yt_gui/formats.py`** — `FORMAT_SPECS` 定数。内部キー（`"fmt_best_mp4"` など）が辞書のキーで、値が `(yt-dlpフォーマット文字列, 音声のみフラグ)` のタプル。GUI表示名は `i18n.t(key)` で取得する。`FORMAT_KEYS` は表示順を保持したキーのリスト。
-- **`yt_gui/downloader.py`** — `Downloader` クラス。yt-dlpのラッパー。`download_video(url, format_id, cookies_path)` でダウンロードを実行し、`_progress_hook` でコールバック経由にGUIへ進捗を通知する。ステータス文字列は `t()` 経由で多言語対応済み。
+- **`yt_gui/downloader.py`** — `Downloader` クラス。yt-dlpのラッパー。`fetch_formats(url, cookies_path)` で動画の映像/音声フォーマット一覧を取得（`extract_info(download=False)` 使用）し、`{"video": [...], "audio": [...]}` を返す。`download_video(url, format_id, cookies_path, format_spec=None)` でダウンロードを実行。`format_spec` を渡した場合は `FORMAT_SPECS` のルックアップより優先される。`_progress_hook` でコールバック経由にGUIへ進捗を通知する。ステータス文字列は `t()` 経由で多言語対応済み。
 - **`yt_gui/settings.py`** — `Settings` dataclassと `SettingsManager` クラス。設定をJSONファイルに読み書きする。保存先はOS標準のconfigディレクトリ（Windows: `%APPDATA%/yt-gui/`、macOS: `~/Library/Application Support/yt-gui/`、Linux: `~/.config/yt-gui/`）。`Settings.language`（デフォルト `"ja"`）で使用言語を保存する。
 - **`yt_gui/settings_dialog.py`** — `SettingsDialog(tk.Toplevel)` クラス。モーダルの設定画面。`ttk.Notebook` によるタブ構成。一般タブに保存フォルダ・Cookiesファイル・言語選択を配置。言語変更時は再起動を促すダイアログを表示。
-- **`yt_gui/app.py`** — `App(tk.Tk)` クラス。Tkinter GUIクラス。`__init__` で設定を読み込んだ直後に `i18n.set_language()` を呼び、以降の全UI文字列は `t()` 経由で取得する。メニューバー（ファイル > 設定.../終了）を持つ。ダウンロード処理は `threading.Thread` で別スレッド実行し、GUIがフリーズしないようにしている。完了後は `self.after(100, ...)` でメインスレッドに戻ってUIをリセット。
+- **`yt_gui/app.py`** — `App(tk.Tk)` クラス。Tkinter GUIクラス。`__init__` で設定を読み込んだ直後に `i18n.set_language()` を呼び、以降の全UI文字列は `t()` 経由で取得する。メニューバー（ファイル > 設定.../終了）を持つ。ダウンロード処理は `threading.Thread` で別スレッド実行し、GUIがフリーズしないようにしている。完了後は `self.after(100, ...)` でメインスレッドに戻ってUIをリセット。「オリジナルの形式」選択時は `_original_frame`（LabelFrame）を `grid` で表示し、ウィンドウ高さを拡張する。`_start_fetch_formats_thread` / `_populate_format_combos` で映像/音声コンボを非同期に更新し、`_build_original_format_spec` で選択状態から yt-dlp フォーマット spec（例: `"137+140"`）を生成してダウンロードに渡す。
 - **`yt_gui/__main__.py`** — エントリーポイント。`python -m yt_gui` で起動。
 - **`yt_gui/__init__.py`** — `get_resource_base()` ユーティリティ。PyInstallerバンドル時は `sys._MEIPASS`、開発時はプロジェクトルートを返す。
 

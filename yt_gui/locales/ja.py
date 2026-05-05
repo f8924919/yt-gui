@@ -28,6 +28,17 @@ STRINGS: dict[str, str] = {
     "filetype_text": "テキストファイル",
     "filetype_all": "すべてのファイル",
     "restart_required": "言語の変更は再起動後に反映されます。",
+    # original format detail panel
+    "label_original_detail": "オリジナル形式の詳細設定",
+    "label_orig_video": "映像:",
+    "label_orig_audio": "音声:",
+    "btn_fetch_formats": "形式を取得",
+    "btn_fetching": "取得中...",
+    "orig_auto": "自動 (最良を選択)",
+    "orig_audio_included": "映像に含まれます",
+    "status_fetching_formats": "🔍 利用可能な形式を取得中...",
+    "status_formats_loaded": "✅ 映像 {video} 件 / 音声 {audio} 件の形式を取得しました",
+    "err_fetch_formats": "形式の取得中にエラーが発生しました:\n{error}",
     # format options
     "fmt_best_mp4": "最高画質 (MP4に結合)",
     "fmt_720p": "720p (MP4に結合)",

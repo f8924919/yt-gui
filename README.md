@@ -1,7 +1,7 @@
 # yt-dlp GUI ダウンローダー
 
 YouTube などの動画を GUI 操作でかんたんにダウンロードできる Windows / macOS 向けデスクトップアプリです。  
-[yt-dlp](https://github.com/yt-dlp/yt-dlp) をバックエンドに使用し、MP4（最高画質 / 720p）または MP3（音声のみ）でのダウンロードに対応しています。
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) をバックエンドに使用し、MP4（最高画質 / 720p）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でのダウンロードに対応しています。
 
 ## 機能
 
@@ -12,7 +12,13 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   | 最高画質 (MP4に結合) | 最高品質の映像＋音声を MP4 にマージ |
   | 720p (MP4に結合) | 720p 以下の映像＋音声を MP4 にマージ |
   | MP3 (音声のみ・192kbps) | 音声のみを 192kbps の MP3 として抽出 |
-  | オリジナルの形式 | yt-dlp のデフォルト形式でそのままダウンロード |
+  | オリジナルの形式 | 動画から取得した映像/音声トラックを個別に選択してダウンロード |
+
+- **オリジナルの形式** を選択すると詳細設定パネルが展開される
+  1. 「形式を取得」ボタンで URL の動画情報を取得
+  2. 利用可能な映像トラック・音声トラックがコンボボックスに一覧表示される（解像度/ビットレート/コーデック付き）
+  3. 映像・音声をそれぞれ選択、または「自動 (最良を選択)」のまま使用
+  4. 複合フォーマット（★印）を映像に選択した場合は音声選択が自動的に無効化される
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
@@ -112,10 +118,10 @@ yt-gui/
 | `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。新言語追加時はこのファイルを追加する |
 | `yt_gui/formats.py` | ダウンロード形式の定義（`FORMAT_SPECS` / `FORMAT_KEYS`）。表示名は `t()` で取得 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。進捗を `_progress_hook` 経由で GUI に通知 |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_formats()` で形式一覧を取得、`download_video()` でダウンロード実行。進捗を `_progress_hook` 経由で GUI に通知 |
 | `yt_gui/settings.py` | `Settings` dataclass と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面（言語選択含む） |
-| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示 |
+| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示。「オリジナルの形式」選択時は詳細パネルを展開し、形式取得・映像/音声選択・フォーマット spec 生成を管理 |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 

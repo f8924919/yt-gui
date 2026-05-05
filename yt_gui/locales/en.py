@@ -28,6 +28,17 @@ STRINGS: dict[str, str] = {
     "filetype_text": "Text files",
     "filetype_all": "All files",
     "restart_required": "Language change will take effect after restart.",
+    # original format detail panel
+    "label_original_detail": "Original format details",
+    "label_orig_video": "Video:",
+    "label_orig_audio": "Audio:",
+    "btn_fetch_formats": "Fetch formats",
+    "btn_fetching": "Fetching...",
+    "orig_auto": "Auto (best available)",
+    "orig_audio_included": "Included in video",
+    "status_fetching_formats": "🔍 Fetching available formats...",
+    "status_formats_loaded": "✅ Found {video} video / {audio} audio formats",
+    "err_fetch_formats": "An error occurred while fetching formats:\n{error}",
     # format options
     "fmt_best_mp4": "Best quality (MP4)",
     "fmt_720p": "720p (MP4)",

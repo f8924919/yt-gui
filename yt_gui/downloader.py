@@ -50,11 +50,59 @@ class Downloader:
         else:
             self.status_callback(t("dl_status").format(status=status), 0)
 
-    def download_video(self, url, format_id, cookies_path=None):
-        format_spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
+    def fetch_formats(self, url, cookies_path=None):
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'js_runtimes': {'deno': {'path': self._deno_path}},
+            'ffmpeg_location': self._ffmpeg_path,
+            'remote_components': ['ejs:github'],
+            'cookies': cookies_path,
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        raw = sorted(
+            info.get('formats', []),
+            key=lambda f: (f.get('height') or 0, f.get('tbr') or 0),
+            reverse=True,
+        )
+
+        video_formats: list[tuple[str, str, bool]] = []
+        audio_formats: list[tuple[str, str]] = []
+        for f in raw:
+            fid = f.get('format_id', '?')
+            ext = f.get('ext', '?')
+            vcodec = f.get('vcodec') or 'none'
+            acodec = f.get('acodec') or 'none'
+            has_video = vcodec != 'none'
+            has_audio = acodec != 'none'
+
+            if has_video:
+                height = f.get('height')
+                res = f"{height}p" if height else "?"
+                tbr = f.get('tbr') or f.get('vbr')
+                brate = f" – {tbr:.0f}kbps" if tbr else ""
+                marker = " ★" if has_audio else ""
+                label = f"{res} {vcodec} ({ext}) [{fid}]{brate}{marker}"
+                video_formats.append((label, fid, has_audio))
+            elif has_audio:
+                abr = f.get('abr') or f.get('tbr')
+                brate = f" – {abr:.0f}kbps" if abr else ""
+                label = f"{acodec} ({ext}) [{fid}]{brate}"
+                audio_formats.append((label, fid))
+
+        return {"video": video_formats, "audio": audio_formats}
+
+    def download_video(self, url, format_id, cookies_path=None, format_spec=None):
+        if format_spec is not None:
+            spec, is_audio = format_spec, False
+        else:
+            spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
 
         ydl_opts = {
-            'format': format_spec,
+            'format': spec,
             'outtmpl': os.path.join(self.output_dir, '%(title)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [self._progress_hook],
