@@ -116,7 +116,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='yt',
+    name='yt-gui',
     icon=_icon_path,
     debug=False,
     bootloader_ignore_signals=False,
@@ -136,13 +136,13 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='yt',
+    name='yt-gui',
 )
 
 if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
-        name='yt.app',
+        name='yt-gui.app',
         icon=_icon_path,
         bundle_identifier='com.example.yt-gui',
         info_plist={

@@ -77,13 +77,20 @@ python -m yt_gui
 
 ```bash
 # uv
-uv run pyinstaller yt.spec
+uv run pyinstaller yt-gui.spec
 
 # pip（仮想環境を有効化済みの場合）
-pyinstaller yt.spec
+pyinstaller yt-gui.spec
 ```
 
-ビルド成果物は `dist/yt/` に出力されます。`bin/` 配下のバイナリ（deno, ffmpeg）はビルド時に自動ダウンロードされます。
+ビルド成果物の出力先：
+
+| プラットフォーム | 出力先 |
+|---|---|
+| Windows | `dist/yt-gui/yt-gui.exe` |
+| macOS | `dist/yt-gui.app`（通常の .app バンドル） |
+
+`bin/` 配下のバイナリ（deno, ffmpeg）はビルド時に自動ダウンロードされます。
 
 ## プロジェクト構成
 
@@ -106,11 +113,11 @@ yt-gui/
 │   └── ffmpeg/
 │       └── ffmpeg.exe
 ├── assets/
-│   └── icon.png               # アプリアイコン（ビルド時に .ico へ変換）
+│   └── icon.png               # アプリアイコン（Windows: .ico、macOS: .icns に変換）
 ├── scripts/
 │   └── download_binaries.py   # deno / ffmpeg を自動取得するスクリプト
 ├── main.py                    # PyInstaller 用エントリーポイント
-├── yt.spec                    # PyInstaller ビルド設定
+├── yt-gui.spec                # PyInstaller ビルド設定
 ├── pyproject.toml             # プロジェクトメタデータ・依存関係
 ├── requirements.txt           # pip 用依存パッケージ一覧
 └── cookies.txt                # デフォルト cookies ファイル（開発時参照用）
@@ -134,15 +141,15 @@ yt-gui/
 
 ## バンドルするバイナリについて
 
-exe ビルドには以下のファイルが同梱されます（`yt.spec` で設定済み）。
+ビルドには以下のファイルが同梱されます（`yt-gui.spec` で設定済み）。
 
 | ファイル | 用途 |
 |---|---|
-| `deno.exe` | yt-dlp の JavaScript ランタイム |
-| `ffmpeg/ffmpeg.exe` | 動画結合・MP3 変換 |
+| `deno` / `deno.exe` | yt-dlp の JavaScript ランタイム |
+| `ffmpeg/ffmpeg` / `ffmpeg/ffmpeg.exe` | 動画結合・MP3 変換 |
 | `assets/icon.png` | アプリアイコン |
 
-`bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt.spec` 実行時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードします。
+`bin/` 配下のバイナリは `scripts/download_binaries.py` で取得できます（`pyinstaller yt-gui.spec` 実行時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードします。
 
 ```bash
 python scripts/download_binaries.py --update

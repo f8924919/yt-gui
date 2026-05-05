@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tkinter製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/720p）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows向けデスクトップアプリ。PyInstallerでスタンドアロンexeとしてビルドする。
+Tkinter製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/720p）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows / macOS向けデスクトップアプリ。PyInstallerでスタンドアロンバイナリとしてビルドする。
 
 ダウンロードキューを持ち、URLと形式を複数登録してからまとめて実行できる。一時停止・再開にも対応。
 
@@ -25,10 +25,10 @@ pip install -r requirements.txt
 # アプリの起動（開発時）
 python -m yt_gui
 
-# exeビルド（PyInstaller）
-pyinstaller yt.spec
+# ビルド（PyInstaller）
+pyinstaller yt-gui.spec
 
-# ビルド成果物は dist/yt/ に出力される
+# ビルド成果物は dist/yt-gui/ に出力される（macOS は dist/yt-gui.app/）
 ```
 
 ## アーキテクチャ
@@ -56,9 +56,9 @@ pyinstaller yt.spec
 - `bin/deno.exe` — yt-dlpのJavaScriptランタイム（`js_runtimes`オプションで指定）
 - `bin/ffmpeg/ffmpeg.exe` — 動画結合・音声変換に使用（`ffmpeg_location`で指定）
 
-`yt.spec` の `binaries` でこれらをexeに同梱するよう設定済み。CookiesファイルはGUIの設定画面でユーザーが任意に指定する（ビルド成果物には含まない）。
+`yt-gui.spec` の `binaries` でこれらをexeに同梱するよう設定済み。CookiesファイルはGUIの設定画面でユーザーが任意に指定する（ビルド成果物には含まない）。
 
-バイナリは `scripts/download_binaries.py` で自動取得し `bin/` に配置する（`yt.spec` ビルド時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードする。
+バイナリは `scripts/download_binaries.py` で自動取得し `bin/` に配置する（`yt-gui.spec` ビルド時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードする。
 
 ```bash
 python scripts/download_binaries.py --update
