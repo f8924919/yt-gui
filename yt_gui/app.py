@@ -4,6 +4,7 @@ from tkinter import ttk, messagebox
 import threading
 import os
 from os.path import expanduser
+from dataclasses import dataclass
 
 from .formats import FORMAT_KEYS
 from .downloader import Downloader
@@ -14,9 +15,20 @@ from . import i18n
 from .i18n import t
 
 _ORIGINAL_KEY = "fmt_original"
-_WIN_H_DEFAULT = 200
-_WIN_H_EXPANDED = 370
+_WIN_H_DEFAULT = 480
+_WIN_H_EXPANDED = 650
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
+
+
+@dataclass
+class _QueueItem:
+    url: str
+    format_id: str
+    format_label: str
+    format_spec: str | None
+    subtitle_opts: dict | None
+    status: str = "waiting"  # waiting | downloading | done | error
+    tree_iid: str = ""
 
 
 class App(tk.Tk):
@@ -28,7 +40,9 @@ class App(tk.Tk):
         i18n.set_language(self._settings.language)
 
         self.title(t("app_title"))
-        self.geometry(f"500x{_WIN_H_DEFAULT}")
+        self.geometry(f"520x{_WIN_H_DEFAULT}")
+        self.minsize(520, 380)
+        self.resizable(True, True)
 
         icon_path = os.path.join(get_resource_base(), "assets", "icon.png")
         if os.path.isfile(icon_path):
@@ -42,6 +56,13 @@ class App(tk.Tk):
             default = os.path.join(get_resource_base(), "cookies.txt")
             if os.path.isfile(default):
                 self._settings.cookies_path = default
+
+        self._queue_items: list[_QueueItem] = []
+        self._queue_lock = threading.Lock()
+        self._worker_running = False
+        self._paused = False
+        self._showing_pause_button = False
+        self._item_counter = 0
 
         self._create_menu()
         self._create_widgets()
@@ -88,20 +109,65 @@ class App(tk.Tk):
         self._original_frame = ttk.LabelFrame(main_frame, text=t("label_original_detail"), padding="5")
         self._create_original_format_widgets()
 
-        self.download_button = ttk.Button(
-            main_frame, text=t("btn_download"), command=self._start_download_thread,
+        # Row 3: Add to queue button
+        self.add_queue_button = ttk.Button(
+            main_frame, text=t("btn_add_to_queue"), command=self._add_to_queue,
         )
-        self.download_button.grid(row=3, column=0, columnspan=2, pady=10)
+        self.add_queue_button.grid(row=3, column=0, columnspan=2, pady=(10, 5))
 
+        # Row 4: Queue panel (expands vertically)
+        queue_frame = ttk.LabelFrame(main_frame, text=t("queue_title"), padding="5")
+        queue_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=5)
+
+        cols = ("no", "url", "format", "status")
+        self._queue_tree = ttk.Treeview(queue_frame, columns=cols, show="headings", height=5)
+        self._queue_tree.heading("no", text="#")
+        self._queue_tree.heading("url", text=t("queue_col_url"))
+        self._queue_tree.heading("format", text=t("queue_col_format"))
+        self._queue_tree.heading("status", text=t("queue_col_status"))
+        self._queue_tree.column("no", width=32, minwidth=32, stretch=False)
+        self._queue_tree.column("url", width=230, stretch=True)
+        self._queue_tree.column("format", width=130, minwidth=100, stretch=False)
+        self._queue_tree.column("status", width=110, minwidth=80, stretch=False)
+
+        self._queue_tree.tag_configure("downloading", foreground="#1565c0")
+        self._queue_tree.tag_configure("done", foreground="#2e7d32")
+        self._queue_tree.tag_configure("error", foreground="#c62828")
+
+        vsb = ttk.Scrollbar(queue_frame, orient="vertical", command=self._queue_tree.yview)
+        self._queue_tree.configure(yscrollcommand=vsb.set)
+        self._queue_tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        queue_frame.grid_columnconfigure(0, weight=1)
+        queue_frame.grid_rowconfigure(0, weight=1)
+
+        btn_frame = ttk.Frame(queue_frame)
+        btn_frame.grid(row=1, column=0, columnspan=2, sticky="w", pady=(5, 0))
+        self.start_queue_button = ttk.Button(
+            btn_frame, text=t("btn_start_queue"), command=self._start_queue,
+        )
+        self.start_queue_button.pack(side="left", padx=(0, 5))
+        self.pause_queue_button = ttk.Button(
+            btn_frame, text=t("btn_pause_queue"), command=self._pause_queue,
+        )
+        # pause button is not packed initially; shown only while worker is running
+        self.remove_item_button = ttk.Button(
+            btn_frame, text=t("btn_remove_item"), command=self._remove_selected,
+        )
+        self.remove_item_button.pack(side="left")
+
+        # Row 5: Status label
         self.status_label = ttk.Label(
             main_frame, text=t("status_ready"), relief="sunken", anchor="w",
         )
-        self.status_label.grid(row=4, column=0, columnspan=2, sticky="ew", pady=5)
+        self.status_label.grid(row=5, column=0, columnspan=2, sticky="ew", pady=5)
 
+        # Row 6: Progress bar
         self.progress_bar = ttk.Progressbar(main_frame, orient="horizontal", mode="determinate")
-        self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="ew")
+        self.progress_bar.grid(row=6, column=0, columnspan=2, sticky="ew")
 
         main_frame.grid_columnconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(4, weight=1)
 
     def _create_original_format_widgets(self):
         f = self._original_frame
@@ -162,10 +228,10 @@ class App(tk.Tk):
         format_id = FORMAT_KEYS[self._format_display.index(selected)]
         if format_id == _ORIGINAL_KEY:
             self._original_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
-            self.geometry(f"500x{_WIN_H_EXPANDED}")
+            self.geometry(f"520x{_WIN_H_EXPANDED}")
         else:
             self._original_frame.grid_remove()
-            self.geometry(f"500x{_WIN_H_DEFAULT}")
+            self.geometry(f"520x{_WIN_H_DEFAULT}")
 
     def _on_video_format_changed(self, event=None):
         auto_label = t("orig_auto")
@@ -343,6 +409,154 @@ class App(tk.Tk):
             'embed': self._orig_embed_var.get(),
         }
 
+    # ---------------------------------------------------------- queue
+
+    def _add_to_queue(self):
+        url = self.url_entry.get().strip()
+        if not url:
+            messagebox.showwarning(t("warn_title"), t("warn_no_url"))
+            return
+
+        selected = self.format_var.get()
+        format_id = FORMAT_KEYS[self._format_display.index(selected)]
+
+        format_spec = None
+        subtitle_opts = None
+        if format_id == _ORIGINAL_KEY:
+            format_spec = self._build_original_format_spec()
+            subtitle_opts = self._build_original_subtitle_opts()
+
+        self._item_counter += 1
+        item = _QueueItem(
+            url=url,
+            format_id=format_id,
+            format_label=selected,
+            format_spec=format_spec,
+            subtitle_opts=subtitle_opts,
+        )
+
+        with self._queue_lock:
+            self._queue_items.append(item)
+
+        short_url = url if len(url) <= 45 else url[:42] + "..."
+        iid = self._queue_tree.insert(
+            "", "end",
+            values=(self._item_counter, short_url, selected, t("queue_status_waiting")),
+        )
+        item.tree_iid = iid
+
+    def _start_queue(self):
+        with self._queue_lock:
+            has_waiting = any(i.status == "waiting" for i in self._queue_items)
+
+        if not has_waiting:
+            messagebox.showwarning(t("warn_title"), t("warn_queue_empty"))
+            return
+
+        if self._worker_running:
+            return
+
+        self._paused = False
+        self._worker_running = True
+        self._swap_to_pause_button()
+        threading.Thread(target=self._worker, daemon=True).start()
+
+    def _worker(self):
+        while True:
+            with self._queue_lock:
+                if self._paused:
+                    self._worker_running = False
+                    self.after(0, self._on_worker_paused)
+                    return
+                item = next((i for i in self._queue_items if i.status == "waiting"), None)
+                if item is None:
+                    self._worker_running = False
+                    self.after(0, self._on_worker_done)
+                    return
+                item.status = "downloading"
+
+            self.after(0, self._refresh_tree_item, item)
+
+            def make_cb(qi):
+                def cb(text, percent):
+                    self._update_status(text, percent)
+                    self.after(0, self._refresh_tree_item, qi)
+                return cb
+
+            self.downloader.status_callback = make_cb(item)
+
+            cookies_path = self._settings.cookies_path or None
+            if cookies_path and not os.path.isfile(cookies_path):
+                self.after(0, lambda p=cookies_path: messagebox.showwarning(
+                    t("warn_title"), t("warn_cookies_not_found").format(path=p),
+                ))
+                cookies_path = None
+
+            try:
+                self.downloader.download_video(
+                    item.url, item.format_id, cookies_path, item.format_spec, item.subtitle_opts,
+                )
+                with self._queue_lock:
+                    item.status = "done"
+            except Exception as e:
+                with self._queue_lock:
+                    item.status = "error"
+                self.after(0, lambda err=e: messagebox.showerror(
+                    t("err_title"), t("err_download").format(error=err),
+                ))
+
+            self.after(0, self._refresh_tree_item, item)
+
+    def _refresh_tree_item(self, item: _QueueItem):
+        if not item.tree_iid or not self._queue_tree.exists(item.tree_iid):
+            return
+        status_map = {
+            "waiting": t("queue_status_waiting"),
+            "downloading": t("queue_status_downloading"),
+            "done": t("queue_status_done"),
+            "error": t("queue_status_error"),
+        }
+        status_text = status_map.get(item.status, item.status)
+        vals = self._queue_tree.item(item.tree_iid, "values")
+        tags = (item.status,) if item.status in ("downloading", "done", "error") else ()
+        self._queue_tree.item(item.tree_iid, values=(vals[0], vals[1], vals[2], status_text), tags=tags)
+
+    def _pause_queue(self):
+        self._paused = True
+        self._swap_to_start_button()
+
+    def _on_worker_done(self):
+        self._swap_to_start_button()
+        self._update_status(t("status_ready"), 0)
+
+    def _on_worker_paused(self):
+        # Button already swapped by _pause_queue; nothing else needed
+        pass
+
+    def _swap_to_pause_button(self):
+        if not self._showing_pause_button:
+            self.start_queue_button.pack_forget()
+            self.pause_queue_button.pack(side="left", padx=(0, 5), before=self.remove_item_button)
+            self._showing_pause_button = True
+
+    def _swap_to_start_button(self):
+        if self._showing_pause_button:
+            self.pause_queue_button.pack_forget()
+            self.start_queue_button.pack(side="left", padx=(0, 5), before=self.remove_item_button)
+            self._showing_pause_button = False
+
+    def _remove_selected(self):
+        sel = self._queue_tree.selection()
+        if not sel:
+            return
+        iid = sel[0]
+        with self._queue_lock:
+            item = next((i for i in self._queue_items if i.tree_iid == iid), None)
+            if item is None or item.status == "downloading":
+                return
+            self._queue_items.remove(item)
+        self._queue_tree.delete(iid)
+
     # ----------------------------------------------------------- settings/misc
 
     def _open_settings(self):
@@ -354,70 +568,3 @@ class App(tk.Tk):
     def _update_status(self, text, percent):
         self.status_label.config(text=text)
         self.progress_bar["value"] = percent
-
-    def _set_downloading(self, downloading: bool):
-        if downloading:
-            self.download_button.config(state=tk.DISABLED, text=t("btn_downloading"))
-            self.url_entry.config(state=tk.DISABLED)
-            self.format_combo.config(state=tk.DISABLED)
-            self._fetch_button.config(state=tk.DISABLED)
-            self._orig_video_combo.config(state=tk.DISABLED)
-            self._orig_audio_combo.config(state=tk.DISABLED)
-            self._orig_subtitle_combo.config(state=tk.DISABLED)
-            self._orig_subtitle_fmt_combo.config(state=tk.DISABLED)
-            self._orig_embed_check.config(state=tk.DISABLED)
-        else:
-            self.download_button.config(state=tk.NORMAL, text=t("btn_download"))
-            self.url_entry.config(state=tk.NORMAL)
-            self.format_combo.config(state="readonly")
-            self._fetch_button.config(state=tk.NORMAL)
-            if self._orig_video_formats:
-                self._orig_video_combo.config(state="readonly")
-                self._on_video_format_changed()
-            if self._orig_subtitle_formats:
-                self._orig_subtitle_combo.config(state="readonly")
-                self._on_subtitle_changed()
-
-    # ------------------------------------------------------------ downloading
-
-    def _start_download_thread(self):
-        url = self.url_entry.get().strip()
-        cookies_path = self._settings.cookies_path or None
-
-        selected = self.format_var.get()
-        format_id = FORMAT_KEYS[self._format_display.index(selected)]
-
-        format_spec = None
-        subtitle_opts = None
-        if format_id == _ORIGINAL_KEY:
-            format_spec = self._build_original_format_spec()
-            subtitle_opts = self._build_original_subtitle_opts()
-
-        if not url:
-            messagebox.showwarning(t("warn_title"), t("warn_no_url"))
-            return
-
-        if cookies_path and not os.path.isfile(cookies_path):
-            messagebox.showwarning(
-                t("warn_title"),
-                t("warn_cookies_not_found").format(path=cookies_path),
-            )
-            cookies_path = None
-
-        self._set_downloading(True)
-        self._update_status(t("status_preparing"), 0)
-        threading.Thread(
-            target=self._run_download, args=(url, format_id, cookies_path, format_spec, subtitle_opts),
-        ).start()
-
-    def _run_download(self, url, format_id, cookies_path=None, format_spec=None, subtitle_opts=None):
-        try:
-            self.downloader.download_video(url, format_id, cookies_path, format_spec, subtitle_opts)
-        except Exception as e:
-            self._update_status(f"❌ {e}", 0)
-            self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"),
-                t("err_download").format(error=err),
-            ))
-        finally:
-            self.after(100, self._set_downloading, False)

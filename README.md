@@ -5,7 +5,10 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 
 ## 機能
 
-- 動画 URL を入力するだけでダウンロード開始
+- URL と形式を選んで **ダウンロードキューに追加** し、まとめて実行
+  - 実行中でも新しいアイテムをキューに追加できる
+  - **一時停止 / 再開** に対応（現在処理中のダウンロードは最後まで続き、次のアイテムから停止）
+  - 待機中・完了・エラーのアイテムをキューから削除可能
 - 以下の形式を選択可能
   | 表示名 | 内容 |
   |---|---|
@@ -122,7 +125,7 @@ yt-gui/
 | `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_formats()` で映像/音声/字幕の一覧を取得、`download_video()` でダウンロード実行。字幕は `subtitle_opts` dict で制御し、`embed=True` 時は ffmpeg で MP4 に埋め込む。進捗を `_progress_hook` 経由で GUI に通知 |
 | `yt_gui/settings.py` | `Settings` dataclass と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。タブ構成のモーダル設定画面（言語選択含む） |
-| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示。「オリジナルの形式」選択時は詳細パネルを展開し、映像/音声/字幕の選択・フォーマット spec 生成・字幕オプション dict 生成を管理 |
+| `yt_gui/app.py` | Tkinter GUI。起動時に `set_language()` を呼び、以降全 UI を `t()` 経由で表示。「オリジナルの形式」選択時は詳細パネルを展開し、映像/音声/字幕の選択・フォーマット spec 生成・字幕オプション dict 生成を管理。`_QueueItem` dataclass と `threading.Lock` でキューを管理し、常駐ワーカースレッドがアイテムを逐次処理する。一時停止は `_paused` フラグで制御し、現在のダウンロード完了後にワーカーが停止する |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
