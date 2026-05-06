@@ -133,7 +133,9 @@ class Downloader:
             elif has_audio:
                 abr = f.get('abr') or f.get('tbr')
                 brate = f" – {abr:.0f}kbps" if abr else ""
-                label = f"{acodec} ({ext}) [{fid}]{brate}"
+                lang = f.get('language') or ''
+                lang_tag = f" [{lang}]" if lang else ""
+                label = f"{acodec} ({ext}) [{fid}]{brate}{lang_tag}"
                 audio_formats.append((label, fid))
 
         # Subtitle extraction

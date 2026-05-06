@@ -16,7 +16,7 @@ from .i18n import t
 
 _ORIGINAL_KEY = "fmt_original"
 _WIN_H_DEFAULT = 480
-_WIN_H_EXPANDED = 650
+_WIN_H_EXPANDED = 700
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 
 
@@ -218,27 +218,36 @@ class App(tk.Tk):
         )
         self._orig_audio_combo.grid(row=1, column=1, columnspan=2, padx=5, pady=3, sticky="ew")
 
-        # --- Row 2: Subtitle (combo at col 1, format combo at col 2, embed check at col 3) ---
-        ttk.Label(f, text=t("label_orig_subtitle")).grid(row=2, column=0, sticky="w", pady=3)
-        self._orig_subtitle_var = tk.StringVar(value=t("orig_sub_none"))
-        self._orig_subtitle_combo = ttk.Combobox(
-            f, textvariable=self._orig_subtitle_var, state="disabled", width=22,
-        )
-        self._orig_subtitle_combo.grid(row=2, column=1, padx=5, pady=3, sticky="ew")
-        self._orig_subtitle_combo.bind("<<ComboboxSelected>>", self._on_subtitle_changed)
+        # --- Row 2: Subtitle - multi-select Listbox at col 1-2, fmt/embed stacked at col 3 ---
+        ttk.Label(f, text=t("label_orig_subtitle")).grid(row=2, column=0, sticky="nw", pady=3)
 
+        sub_list_frame = ttk.Frame(f)
+        sub_list_frame.grid(row=2, column=1, columnspan=2, padx=5, pady=3, sticky="ew")
+        self._orig_subtitle_listbox = tk.Listbox(
+            sub_list_frame, selectmode=tk.MULTIPLE, height=3, exportselection=False,
+            state=tk.DISABLED,
+        )
+        _sub_vsb = ttk.Scrollbar(sub_list_frame, orient="vertical",
+                                 command=self._orig_subtitle_listbox.yview)
+        self._orig_subtitle_listbox.configure(yscrollcommand=_sub_vsb.set)
+        self._orig_subtitle_listbox.pack(side="left", fill="both", expand=True)
+        _sub_vsb.pack(side="right", fill="y")
+        self._orig_subtitle_listbox.bind("<<ListboxSelect>>", self._on_subtitle_changed)
+
+        sub_right_frame = ttk.Frame(f)
+        sub_right_frame.grid(row=2, column=3, padx=5, pady=3, sticky="nw")
         self._orig_subtitle_fmt_var = tk.StringVar(value="srt")
         self._orig_subtitle_fmt_combo = ttk.Combobox(
-            f, textvariable=self._orig_subtitle_fmt_var,
+            sub_right_frame, textvariable=self._orig_subtitle_fmt_var,
             values=_SUBTITLE_FORMATS, state=tk.DISABLED, width=5,
         )
-        self._orig_subtitle_fmt_combo.grid(row=2, column=2, padx=(0, 5), pady=3)
-
+        self._orig_subtitle_fmt_combo.pack(anchor="w")
         self._orig_embed_var = tk.BooleanVar(value=False)
         self._orig_embed_check = ttk.Checkbutton(
-            f, text=t("orig_sub_embed"), variable=self._orig_embed_var, state=tk.DISABLED,
+            sub_right_frame, text=t("orig_sub_embed"), variable=self._orig_embed_var,
+            state=tk.DISABLED,
         )
-        self._orig_embed_check.grid(row=2, column=3, padx=5, pady=3, sticky="w")
+        self._orig_embed_check.pack(anchor="w", pady=(4, 0))
 
         f.grid_columnconfigure(1, weight=1)
 
@@ -282,10 +291,8 @@ class App(tk.Tk):
                 self._orig_audio_combo.config(state="readonly")
 
     def _on_subtitle_changed(self, event=None):
-        none_label = t("orig_sub_none")
-        unavail_label = t("orig_sub_unavailable")
-        selected = self._orig_subtitle_var.get()
-        has_sub = selected not in (none_label, unavail_label) and bool(self._orig_subtitle_formats)
+        sel = self._orig_subtitle_listbox.curselection()
+        has_sub = bool(sel) and bool(self._orig_subtitle_formats)
         state = "readonly" if has_sub else tk.DISABLED
         self._orig_subtitle_fmt_combo.config(state=state)
         self._orig_embed_check.config(state=tk.NORMAL if has_sub else tk.DISABLED)
@@ -307,7 +314,7 @@ class App(tk.Tk):
         self._fetch_button.config(state=tk.DISABLED, text=t("btn_fetching"))
         self._orig_video_combo.config(state=tk.DISABLED)
         self._orig_audio_combo.config(state=tk.DISABLED)
-        self._orig_subtitle_combo.config(state=tk.DISABLED)
+        self._orig_subtitle_listbox.config(state=tk.DISABLED)
         self._orig_subtitle_fmt_combo.config(state=tk.DISABLED)
         self._orig_embed_check.config(state=tk.DISABLED)
         self._update_status(t("status_fetching_formats"), 0)
@@ -346,15 +353,14 @@ class App(tk.Tk):
         self._orig_audio_combo.config(values=audio_labels, state="readonly")
         self._orig_audio_var.set(auto_label)
 
-        none_label = t("orig_sub_none")
+        self._orig_subtitle_listbox.config(state=tk.NORMAL)
+        self._orig_subtitle_listbox.delete(0, tk.END)
         if self._orig_subtitle_formats:
-            sub_labels = [none_label] + [lbl for lbl, _, _ in self._orig_subtitle_formats]
-            self._orig_subtitle_combo.config(values=sub_labels, state="readonly")
-            self._orig_subtitle_var.set(none_label)
+            for lbl, _, _ in self._orig_subtitle_formats:
+                self._orig_subtitle_listbox.insert(tk.END, lbl)
         else:
-            unavail = t("orig_sub_unavailable")
-            self._orig_subtitle_combo.config(values=[unavail], state=tk.DISABLED)
-            self._orig_subtitle_var.set(unavail)
+            self._orig_subtitle_listbox.insert(tk.END, t("orig_sub_unavailable"))
+            self._orig_subtitle_listbox.config(state=tk.DISABLED)
         # fmt combo and embed check stay disabled until a subtitle is selected
         self._orig_subtitle_fmt_combo.config(state=tk.DISABLED)
         self._orig_embed_check.config(state=tk.DISABLED)
@@ -407,26 +413,29 @@ class App(tk.Tk):
         return "bestvideo+bestaudio/best"
 
     def _build_original_subtitle_opts(self) -> dict | None:
-        none_label = t("orig_sub_none")
-        unavail_label = t("orig_sub_unavailable")
-        selected = self._orig_subtitle_var.get()
-
-        if selected in (none_label, unavail_label) or not self._orig_subtitle_formats:
+        sel = self._orig_subtitle_listbox.curselection()
+        if not sel or not self._orig_subtitle_formats:
             return None
 
-        values = list(self._orig_subtitle_combo["values"])
-        try:
-            idx = values.index(selected) - 1
-            if idx < 0 or idx >= len(self._orig_subtitle_formats):
-                return None
-            _, lang_code, is_auto = self._orig_subtitle_formats[idx]
-        except ValueError:
+        lang_codes: list[str] = []
+        has_manual = False
+        has_auto = False
+        for idx in sel:
+            if 0 <= idx < len(self._orig_subtitle_formats):
+                _, lang_code, is_auto = self._orig_subtitle_formats[idx]
+                lang_codes.append(lang_code)
+                if is_auto:
+                    has_auto = True
+                else:
+                    has_manual = True
+
+        if not lang_codes:
             return None
 
         return {
-            'writesubtitles': not is_auto,
-            'writeautomaticsub': is_auto,
-            'subtitleslangs': [lang_code],
+            'writesubtitles': has_manual,
+            'writeautomaticsub': has_auto,
+            'subtitleslangs': lang_codes,
             'subtitlesformat': self._orig_subtitle_fmt_var.get(),
             'embed': self._orig_embed_var.get(),
         }
