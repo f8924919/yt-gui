@@ -178,7 +178,7 @@ class Downloader:
         }
 
     def download_video(self, url, format_id, cookies_path=None, format_spec=None,
-                       subtitle_opts=None, mp3_bitrate_override=None):
+                       subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False):
         if format_spec is not None:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
@@ -205,6 +205,9 @@ class Downloader:
                 'preferredcodec': 'mp3',
                 'preferredquality': mp3_bitrate_override or self.mp3_bitrate,
             }]
+            if embed_thumbnail:
+                ydl_opts['writethumbnail'] = True
+                ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
         else:
             ydl_opts['merge_output_format'] = 'mp4'
 

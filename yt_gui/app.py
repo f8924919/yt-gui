@@ -15,6 +15,7 @@ from . import i18n
 from .i18n import t
 
 _ORIGINAL_KEY = "fmt_original"
+_MP3_KEY = "fmt_mp3"
 _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
@@ -29,6 +30,7 @@ class _QueueItem:
     subtitle_opts: dict | None
     title: str = ""
     mp3_bitrate: str | None = None  # snapshotted at add time for fmt_mp3
+    mp3_thumbnail: bool = False
     status: str = "waiting"  # waiting | downloading | done | error
     tree_iid: str = ""
 
@@ -127,6 +129,13 @@ class App(tk.Tk):
         # Row 2: original format detail panel (hidden initially)
         self._original_frame = ttk.LabelFrame(main_frame, text=t("label_original_detail"), padding="5")
         self._create_original_format_widgets()
+
+        # Row 2: MP3 options (hidden initially, shown when MP3 format selected)
+        self._mp3_frame = ttk.Frame(main_frame)
+        self._mp3_thumb_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            self._mp3_frame, text=t("mp3_embed_thumbnail"), variable=self._mp3_thumb_var,
+        ).pack(side="left", padx=(5, 0))
 
         # Row 3: Action buttons
         _action_frame = ttk.Frame(main_frame)
@@ -258,9 +267,15 @@ class App(tk.Tk):
         format_id = FORMAT_KEYS[self._format_display.index(selected)]
         if format_id == _ORIGINAL_KEY:
             self._original_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+            self._mp3_frame.grid_remove()
             self.geometry(f"520x{_WIN_H_EXPANDED}")
+        elif format_id == _MP3_KEY:
+            self._original_frame.grid_remove()
+            self._mp3_frame.grid(row=2, column=1, sticky="w", pady=(0, 3))
+            self.geometry(f"520x{_WIN_H_DEFAULT}")
         else:
             self._original_frame.grid_remove()
+            self._mp3_frame.grid_remove()
             self.geometry(f"520x{_WIN_H_DEFAULT}")
 
     def _on_video_format_changed(self, event=None):
@@ -482,23 +497,24 @@ class App(tk.Tk):
                 self.url_entry.delete(0, tk.END)
                 return
             # Formats not yet fetched — snapshot current (auto) spec and fetch title in background
-            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts)
+            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts, False)
         else:
-            self._start_add_thread(url, cookies_path, format_id, selected, None, None)
+            mp3_thumbnail = self._mp3_thumb_var.get() if format_id == _MP3_KEY else False
+            self._start_add_thread(url, cookies_path, format_id, selected, None, None, mp3_thumbnail)
 
-    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts):
+    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
         self.add_button.config(state=tk.DISABLED, text=t("btn_adding"))
         self._update_status(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts),
+            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail),
             daemon=True,
         ).start()
 
-    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts):
+    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
         try:
             result = self.downloader.fetch_title_or_entries(url, cookies_path)
-            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts)
+            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail)
         except Exception as e:
             self.after(0, self._update_status, f"❌ {e}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
@@ -507,10 +523,10 @@ class App(tk.Tk):
         finally:
             self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
 
-    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts):
+    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
         if result['type'] == 'single':
             self._enqueue_single(
-                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'],
+                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'], mp3_thumbnail,
             )
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_title_added"), 0)
@@ -543,6 +559,7 @@ class App(tk.Tk):
                     subtitle_opts=None,
                     title=entry['title'],
                     mp3_bitrate=snap_bitrate,
+                    mp3_thumbnail=mp3_thumbnail,
                 )
                 batch.append((self._item_counter, item))
 
@@ -561,7 +578,7 @@ class App(tk.Tk):
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
 
-    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title):
+    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title, mp3_thumbnail=False):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = (
                 f"bestvideo[height<={self._settings.video_resolution}]"
@@ -578,6 +595,7 @@ class App(tk.Tk):
             subtitle_opts=subtitle_opts,
             title=title,
             mp3_bitrate=mp3_bitrate,
+            mp3_thumbnail=mp3_thumbnail,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -640,6 +658,7 @@ class App(tk.Tk):
                 self.downloader.download_video(
                     item.url, item.format_id, cookies_path, item.format_spec, item.subtitle_opts,
                     mp3_bitrate_override=item.mp3_bitrate,
+                    embed_thumbnail=item.mp3_thumbnail,
                 )
                 with self._queue_lock:
                     item.status = "done"

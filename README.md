@@ -15,15 +15,17 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   |---|---|
   | 最高画質 (MP4に結合) | 最高品質の映像＋音声を MP4 にマージ |
   | *N*p (MP4に結合) | 指定解像度以下の映像＋音声を MP4 にマージ（デフォルト 720p） |
-  | MP3 (音声のみ・*N*kbps) | 音声のみを MP3 として抽出（デフォルト 192kbps） |
+  | MP3 (音声のみ・*N*kbps) | 音声のみを MP3 として抽出（デフォルト 192kbps）。サムネイルの ID3 タグ埋め込みオプションあり |
   | オリジナルの形式 | 動画から取得した映像/音声トラックを個別に選択してダウンロード |
 
+- **MP3 形式** 選択時は「サムネイルを埋め込む」チェックボックスが表示される。有効にすると動画のサムネイル画像を MP3 の ID3 タグ（APIC）に埋め込む（`mutagen` 使用）
 - **オリジナルの形式** を選択すると詳細設定パネルが展開される
   1. 「形式を取得」ボタンで URL の動画情報を取得
-  2. 利用可能な映像/音声/字幕トラックがコンボボックスに一覧表示される（解像度/ビットレート/コーデック/言語付き）
-  3. 映像・音声・字幕をそれぞれ選択、または「自動 (最良を選択)」のまま使用
+  2. 利用可能な映像/音声/字幕トラックが一覧表示される。音声には言語コードも表示（例: `opus (webm) [251] – 129kbps [ja]`）
+  3. 映像・音声それぞれに「自動 (最良を選択)」「**ダウンロードしない**」と個別フォーマットから選択可能。「ダウンロードしない」を使うと映像のみ / 音声のみのダウンロードが可能（両方同時にスキップは不可）
   4. 複合フォーマット（★印）を映像に選択した場合は音声選択が自動的に無効化される
-  5. 字幕は手動字幕・自動生成字幕を選択可能。字幕フォーマット（srt / vtt / best）と MP4 への埋め込みオプションあり
+  5. 字幕は複数言語を同時選択可能（Ctrl+クリック / Shift+クリック）。手動字幕・自動生成字幕に対応。字幕フォーマット（srt / vtt / best）と MP4 への埋め込みオプションあり
+- **ファイル名の重複回避**: ダウンロード先に同名ファイルが既に存在する場合、`タイトル (1).mp4` のように連番サフィックスを付けて保存する（上書きしない）
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
@@ -129,10 +131,10 @@ yt-gui/
 | `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
 | `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES`（設定画面の選択肢）を定義 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別してタイトルを取得、`fetch_formats()` で映像/音声/字幕一覧とタイトルを取得、`download_video()` でダウンロード実行。`fmt_720p` の spec は `video_resolution` 属性から動的に組み立て、MP3 ビットレートは `mp3_bitrate_override` 引数または `mp3_bitrate` 属性を使用。字幕は `subtitle_opts` dict で制御し、`embed=True` 時は ffmpeg で MP4 に埋め込む |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別してタイトルを取得、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧とタイトルを取得、`download_video()` でダウンロード実行。ダウンロード前に `prepare_filename()` で出力先ファイルの存在を確認し、重複時は `(N)` サフィックスを付与。`embed_thumbnail=True` 時は `writethumbnail` + `EmbedThumbnail` ポストプロセッサーで MP3 にサムネイルを埋め込む |
 | `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `download_path` / `language` / `video_resolution` / `mp3_bitrate`）と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・MP3ビットレート）を持つモーダル設定画面 |
-| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。キューアイテムには追加時点の `format_spec`（`fmt_720p`）と `mp3_bitrate`（`fmt_mp3`）をスナップショットし、その後の設定変更が既存アイテムに影響しないようにする。設定保存後は `_build_format_display()` でフォーマット表示名を再構築し、`Downloader` の属性も更新する |
+| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。キューアイテム（`_QueueItem`）には `format_spec`・`mp3_bitrate`・`mp3_thumbnail` を追加時にスナップショットし、設定変更が既存アイテムに影響しないようにする。オリジナル形式パネルでは映像/音声コンボに「ダウンロードしない」選択肢を追加し映像のみ/音声のみのダウンロードに対応。字幕は `Listbox(MULTIPLE)` で複数言語を同時選択可能。MP3 選択時はサムネイル埋め込みチェックボックスを表示 |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
