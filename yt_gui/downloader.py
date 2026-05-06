@@ -219,5 +219,24 @@ class Downloader:
                 )
 
         self.status_callback(t("dl_fetching"), 0)
+
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            raw_path = ydl.prepare_filename(info)
+
+        stem, raw_ext = os.path.splitext(raw_path)
+        if is_audio:
+            final_ext = '.mp3'
+        elif '+' in spec:
+            final_ext = '.mp4'
+        else:
+            final_ext = raw_ext
+
+        if os.path.exists(stem + final_ext):
+            n = 1
+            while os.path.exists(f"{stem} ({n}){final_ext}"):
+                n += 1
+            ydl_opts['outtmpl'] = f"{stem} ({n}).%(ext)s"
+
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
