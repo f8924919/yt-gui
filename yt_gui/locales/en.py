@@ -37,6 +37,8 @@ STRINGS: dict[str, str] = {
     "status_formats_loaded": "✅ Found {video} video / {audio} audio / {subtitle} subtitle formats",
     "err_fetch_formats": "An error occurred while fetching formats:\n{error}",
     "label_orig_subtitle": "Subtitle:",
+    "orig_skip": "Skip (don't download)",
+    "warn_skip_both": "Cannot skip both video and audio.",
     "orig_sub_none": "None (skip)",
     "orig_sub_auto_marker": "(auto-generated)",
     "orig_sub_embed": "Embed in MP4",

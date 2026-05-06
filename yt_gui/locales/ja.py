@@ -37,6 +37,8 @@ STRINGS: dict[str, str] = {
     "status_formats_loaded": "✅ 映像 {video} 件 / 音声 {audio} 件 / 字幕 {subtitle} 件の形式を取得しました",
     "err_fetch_formats": "形式の取得中にエラーが発生しました:\n{error}",
     "label_orig_subtitle": "字幕:",
+    "orig_skip": "ダウンロードしない",
+    "warn_skip_both": "映像と音声の両方を「ダウンロードしない」にすることはできません。",
     "orig_sub_none": "なし (ダウンロードしない)",
     "orig_sub_auto_marker": "(自動生成)",
     "orig_sub_embed": "MP4に埋め込む",

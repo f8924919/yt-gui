@@ -265,9 +265,10 @@ class App(tk.Tk):
 
     def _on_video_format_changed(self, event=None):
         auto_label = t("orig_auto")
+        skip_label = t("orig_skip")
         selected = self._orig_video_var.get()
 
-        if selected == auto_label or not self._orig_video_formats:
+        if selected in (auto_label, skip_label) or not self._orig_video_formats:
             if self._orig_audio_var.get() == t("orig_audio_included"):
                 self._orig_audio_var.set(auto_label)
             if self._orig_audio_formats:
@@ -276,7 +277,7 @@ class App(tk.Tk):
 
         values = list(self._orig_video_combo["values"])
         try:
-            idx = values.index(selected) - 1  # offset for leading auto entry
+            idx = values.index(selected) - 2  # offset for auto + skip entries
         except ValueError:
             return
 
@@ -339,14 +340,15 @@ class App(tk.Tk):
 
     def _populate_format_combos(self, result):
         auto_label = t("orig_auto")
+        skip_label = t("orig_skip")
 
         self._fetched_title = result.get("title", "")
         self._orig_video_formats = result["video"]
         self._orig_audio_formats = result["audio"]
         self._orig_subtitle_formats = result["subtitles"]
 
-        video_labels = [auto_label] + [lbl for lbl, _, _ in self._orig_video_formats]
-        audio_labels = [auto_label] + [lbl for lbl, _ in self._orig_audio_formats]
+        video_labels = [auto_label, skip_label] + [lbl for lbl, _, _ in self._orig_video_formats]
+        audio_labels = [auto_label, skip_label] + [lbl for lbl, _ in self._orig_audio_formats]
 
         self._orig_video_combo.config(values=video_labels, state="readonly")
         self._orig_video_var.set(auto_label)
@@ -376,34 +378,46 @@ class App(tk.Tk):
 
     def _build_original_format_spec(self) -> str:
         auto_label = t("orig_auto")
+        skip_label = t("orig_skip")
         video_sel = self._orig_video_var.get()
         audio_sel = self._orig_audio_var.get()
+
+        video_skip = video_sel == skip_label
+        audio_skip = audio_sel == skip_label
 
         video_id = None
         is_combined = False
         audio_id = None
 
-        if video_sel != auto_label and self._orig_video_formats:
+        if video_sel not in (auto_label, skip_label) and self._orig_video_formats:
             values = list(self._orig_video_combo["values"])
             try:
-                idx = values.index(video_sel) - 1
+                idx = values.index(video_sel) - 2  # offset for auto + skip entries
                 if 0 <= idx < len(self._orig_video_formats):
                     _, video_id, is_combined = self._orig_video_formats[idx]
             except ValueError:
                 pass
 
-        if not is_combined and audio_sel not in (auto_label, t("orig_audio_included")):
+        if not is_combined and audio_sel not in (auto_label, skip_label, t("orig_audio_included")):
             if self._orig_audio_formats:
                 values = list(self._orig_audio_combo["values"])
                 try:
-                    idx = values.index(audio_sel) - 1
+                    idx = values.index(audio_sel) - 2  # offset for auto + skip entries
                     if 0 <= idx < len(self._orig_audio_formats):
                         _, audio_id = self._orig_audio_formats[idx]
                 except ValueError:
                     pass
 
+        # Combined stream: return video_id as-is (audio already embedded)
         if is_combined:
             return video_id
+        # Audio-only download
+        if video_skip:
+            return audio_id if audio_id else "bestaudio/best"
+        # Video-only download
+        if audio_skip:
+            return video_id if video_id else "bestvideo/best"
+        # Normal: merge video + audio
         if video_id and audio_id:
             return f"{video_id}+{audio_id}"
         if video_id:
@@ -456,6 +470,10 @@ class App(tk.Tk):
             cookies_path = None
 
         if format_id == _ORIGINAL_KEY:
+            skip_label = t("orig_skip")
+            if self._orig_video_var.get() == skip_label and self._orig_audio_var.get() == skip_label:
+                messagebox.showwarning(t("warn_title"), t("warn_skip_both"))
+                return
             format_spec = self._build_original_format_spec()
             subtitle_opts = self._build_original_subtitle_opts()
             if self._orig_video_combo["state"] == "readonly" and self._fetched_title:
