@@ -43,9 +43,14 @@ STRINGS: dict[str, str] = {
     "orig_sub_unavailable": "(字幕なし)",
     # format options
     "fmt_best_mp4": "最高画質 (MP4に結合)",
-    "fmt_720p": "720p (MP4に結合)",
-    "fmt_mp3": "MP3 (音声のみ・192kbps)",
+    "fmt_720p": "{resolution}p (MP4に結合)",
+    "fmt_mp3": "MP3 (音声のみ・{bitrate}kbps)",
     "fmt_original": "オリジナルの形式",
+    # quality settings tab
+    "tab_quality": "画質・音質",
+    "label_video_resolution": "解像度上限:",
+    "label_mp3_bitrate": "MP3ビットレート:",
+    "quality_note": "「最高画質」と「オリジナルの形式」には影響しません",
     # download queue
     "btn_add": "追加",
     "btn_adding": "取得中...",

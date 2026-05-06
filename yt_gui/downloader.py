@@ -11,9 +11,12 @@ _SKIP_AUTO_LANGS = frozenset({'live_chat'})
 
 
 class Downloader:
-    def __init__(self, output_dir="downloads", status_callback=None):
+    def __init__(self, output_dir="downloads", status_callback=None,
+                 video_resolution="720", mp3_bitrate="192"):
         self.output_dir = output_dir
         self.status_callback = status_callback
+        self.video_resolution = video_resolution
+        self.mp3_bitrate = mp3_bitrate
 
         _ext = '.exe' if sys.platform == 'win32' else ''
         base = get_resource_base()
@@ -172,9 +175,14 @@ class Downloader:
             "subtitles": subtitle_list,
         }
 
-    def download_video(self, url, format_id, cookies_path=None, format_spec=None, subtitle_opts=None):
+    def download_video(self, url, format_id, cookies_path=None, format_spec=None,
+                       subtitle_opts=None, mp3_bitrate_override=None):
         if format_spec is not None:
-            spec, is_audio = format_spec, False
+            spec = format_spec
+            _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
+        elif format_id == "fmt_720p":
+            spec = f"bestvideo[height<={self.video_resolution}][ext=mp4]+bestaudio[ext=m4a]/best"
+            is_audio = False
         else:
             spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
 
@@ -193,7 +201,7 @@ class Downloader:
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredquality': mp3_bitrate_override or self.mp3_bitrate,
             }]
         else:
             ydl_opts['merge_output_format'] = 'mp4'

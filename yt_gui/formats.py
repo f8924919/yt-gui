@@ -1,4 +1,8 @@
+VIDEO_RESOLUTIONS: tuple[str, ...] = ("480", "720", "1080", "1440", "2160")
+MP3_BITRATES: tuple[str, ...] = ("128", "192", "256", "320")
+
 # Internal key → (yt-dlp format spec, is_audio)
+# fmt_720p spec and fmt_mp3 bitrate are overridden at runtime from Settings.
 FORMAT_SPECS: dict[str, tuple[str, bool]] = {
     "fmt_best_mp4": ("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best", False),
     "fmt_720p": ("bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best", False),

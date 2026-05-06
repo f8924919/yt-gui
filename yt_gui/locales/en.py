@@ -43,9 +43,14 @@ STRINGS: dict[str, str] = {
     "orig_sub_unavailable": "(no subtitles)",
     # format options
     "fmt_best_mp4": "Best quality (MP4)",
-    "fmt_720p": "720p (MP4)",
-    "fmt_mp3": "MP3 (audio only · 192kbps)",
+    "fmt_720p": "{resolution}p (MP4)",
+    "fmt_mp3": "MP3 (audio only · {bitrate}kbps)",
     "fmt_original": "Original format",
+    # quality settings tab
+    "tab_quality": "Quality",
+    "label_video_resolution": "Resolution limit:",
+    "label_mp3_bitrate": "MP3 bitrate:",
+    "quality_note": "Does not affect \"Best quality\" and \"Original format\"",
     # download queue
     "btn_add": "Add",
     "btn_adding": "Fetching...",

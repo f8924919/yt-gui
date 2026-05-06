@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from .settings import Settings, SettingsManager
+from .formats import VIDEO_RESOLUTIONS, MP3_BITRATES
 from .i18n import t, AVAILABLE_LANGUAGES
 
 
@@ -25,6 +26,10 @@ class SettingsDialog(tk.Toplevel):
         general_frame = ttk.Frame(notebook, padding=10)
         notebook.add(general_frame, text=t("tab_general"))
         self._build_general_tab(general_frame)
+
+        quality_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(quality_frame, text=t("tab_quality"))
+        self._build_quality_tab(quality_frame)
 
         btn_frame = ttk.Frame(self)
         btn_frame.pack(fill="x", padx=10, pady=(0, 10))
@@ -57,6 +62,27 @@ class SettingsDialog(tk.Toplevel):
 
         parent.grid_columnconfigure(1, weight=1)
 
+    def _build_quality_tab(self, parent: ttk.Frame):
+        ttk.Label(parent, text=t("label_video_resolution")).grid(row=0, column=0, sticky="w", pady=5)
+        res_values = [f"{r}p" for r in VIDEO_RESOLUTIONS]
+        self._res_var = tk.StringVar(value=f"{self._settings.video_resolution}p")
+        ttk.Combobox(
+            parent, textvariable=self._res_var, values=res_values,
+            state="readonly", width=10,
+        ).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        ttk.Label(parent, text=t("label_mp3_bitrate")).grid(row=1, column=0, sticky="w", pady=5)
+        bitrate_values = [f"{b}kbps" for b in MP3_BITRATES]
+        self._bitrate_var = tk.StringVar(value=f"{self._settings.mp3_bitrate}kbps")
+        ttk.Combobox(
+            parent, textvariable=self._bitrate_var, values=bitrate_values,
+            state="readonly", width=10,
+        ).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        ttk.Label(parent, text=t("quality_note"), foreground="gray").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(10, 0),
+        )
+
     def _browse_download(self):
         path = filedialog.askdirectory(title=t("dialog_select_folder"))
         if path:
@@ -81,6 +107,8 @@ class SettingsDialog(tk.Toplevel):
         self._settings.download_path = self._download_var.get().strip()
         self._settings.cookies_path = self._cookies_var.get().strip()
         self._settings.language = new_lang
+        self._settings.video_resolution = self._res_var.get().removesuffix("p")
+        self._settings.mp3_bitrate = self._bitrate_var.get().removesuffix("kbps")
         self._manager.save(self._settings)
 
         if new_lang != old_lang:

@@ -28,6 +28,7 @@ class _QueueItem:
     format_spec: str | None
     subtitle_opts: dict | None
     title: str = ""
+    mp3_bitrate: str | None = None  # snapshotted at add time for fmt_mp3
     status: str = "waiting"  # waiting | downloading | done | error
     tree_iid: str = ""
 
@@ -69,11 +70,27 @@ class App(tk.Tk):
         self._create_menu()
         self._create_widgets()
 
-        self.downloader = Downloader(self._resolve_download_path(), status_callback=self._update_status)
+        self.downloader = Downloader(
+            self._resolve_download_path(),
+            status_callback=self._update_status,
+            video_resolution=self._settings.video_resolution,
+            mp3_bitrate=self._settings.mp3_bitrate,
+        )
 
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path
         return path if path else os.path.join(expanduser("~"), "Downloads")
+
+    def _build_format_display(self) -> list[str]:
+        result = []
+        for k in FORMAT_KEYS:
+            if k == "fmt_720p":
+                result.append(t("fmt_720p").format(resolution=self._settings.video_resolution))
+            elif k == "fmt_mp3":
+                result.append(t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate))
+            else:
+                result.append(t(k))
+        return result
 
     def _create_menu(self):
         menubar = tk.Menu(self)
@@ -98,7 +115,7 @@ class App(tk.Tk):
         self.url_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
         ttk.Label(main_frame, text=t("label_format")).grid(row=1, column=0, sticky="w", pady=5)
-        self._format_display = [t(k) for k in FORMAT_KEYS]
+        self._format_display = self._build_format_display()
         self.format_var = tk.StringVar(self, value=self._format_display[0])
         self.format_combo = ttk.Combobox(
             main_frame, textvariable=self.format_var, values=self._format_display,
@@ -481,6 +498,13 @@ class App(tk.Tk):
                 self._update_status(t("status_ready"), 0)
                 return
 
+            snap_spec = (
+                f"bestvideo[height<={self._settings.video_resolution}]"
+                "[ext=mp4]+bestaudio[ext=m4a]/best"
+                if format_id == "fmt_720p" else None
+            )
+            snap_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+
             batch: list[tuple[int, _QueueItem]] = []
             for entry in entries:
                 self._item_counter += 1
@@ -488,9 +512,10 @@ class App(tk.Tk):
                     url=entry['url'],
                     format_id=format_id,
                     format_label=format_label,
-                    format_spec=None,
+                    format_spec=snap_spec,
                     subtitle_opts=None,
                     title=entry['title'],
+                    mp3_bitrate=snap_bitrate,
                 )
                 batch.append((self._item_counter, item))
 
@@ -510,6 +535,13 @@ class App(tk.Tk):
             self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
 
     def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title):
+        if format_id == "fmt_720p" and format_spec is None:
+            format_spec = (
+                f"bestvideo[height<={self._settings.video_resolution}]"
+                "[ext=mp4]+bestaudio[ext=m4a]/best"
+            )
+        mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+
         self._item_counter += 1
         item = _QueueItem(
             url=url,
@@ -518,6 +550,7 @@ class App(tk.Tk):
             format_spec=format_spec,
             subtitle_opts=subtitle_opts,
             title=title,
+            mp3_bitrate=mp3_bitrate,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -579,6 +612,7 @@ class App(tk.Tk):
             try:
                 self.downloader.download_video(
                     item.url, item.format_id, cookies_path, item.format_spec, item.subtitle_opts,
+                    mp3_bitrate_override=item.mp3_bitrate,
                 )
                 with self._queue_lock:
                     item.status = "done"
@@ -648,6 +682,13 @@ class App(tk.Tk):
         self.wait_window(dialog)
         self._settings = self._settings_manager.load()
         self.downloader.output_dir = self._resolve_download_path()
+        self.downloader.video_resolution = self._settings.video_resolution
+        self.downloader.mp3_bitrate = self._settings.mp3_bitrate
+        # Rebuild format dropdown labels to reflect updated quality settings
+        old_idx = self._format_display.index(self.format_var.get())
+        self._format_display = self._build_format_display()
+        self.format_combo.config(values=self._format_display)
+        self.format_var.set(self._format_display[old_idx])
 
     def _update_status(self, text, percent):
         self.status_label.config(text=text)

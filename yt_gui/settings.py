@@ -9,6 +9,8 @@ class Settings:
     cookies_path: str = ""
     download_path: str = ""  # 空文字のときは ~/Downloads を使用
     language: str = "ja"
+    video_resolution: str = "720"
+    mp3_bitrate: str = "192"
 
 
 def _get_config_dir() -> str:
