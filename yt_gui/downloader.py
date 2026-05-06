@@ -53,7 +53,9 @@ class Downloader:
         else:
             self.status_callback(t("dl_status").format(status=status), 0)
 
-    def fetch_playlist_entries(self, url, cookies_path=None) -> list[dict]:
+    def fetch_title_or_entries(self, url, cookies_path=None) -> dict:
+        """Return {'type': 'single', 'url': str, 'title': str} or
+                  {'type': 'playlist', 'entries': [{'url': str, 'title': str}, ...]}"""
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -67,20 +69,26 @@ class Downloader:
             info = ydl.extract_info(url, download=False)
 
         if not info:
-            return []
+            return {'type': 'single', 'url': url, 'title': url}
 
-        result = []
-        for entry in (info.get('entries') or []):
-            if not entry:
-                continue
-            entry_url = entry.get('webpage_url') or entry.get('url')
-            if not entry_url:
-                continue
-            result.append({
-                'url': entry_url,
-                'title': entry.get('title') or entry_url,
-            })
-        return result
+        entries = info.get('entries')
+        if entries is not None:
+            result = []
+            for entry in entries:
+                if not entry:
+                    continue
+                entry_url = entry.get('webpage_url') or entry.get('url')
+                if not entry_url:
+                    continue
+                result.append({
+                    'url': entry_url,
+                    'title': entry.get('title') or entry_url,
+                })
+            return {'type': 'playlist', 'entries': result}
+
+        title = info.get('title') or url
+        actual_url = info.get('webpage_url') or url
+        return {'type': 'single', 'url': actual_url, 'title': title}
 
     def fetch_formats(self, url, cookies_path=None):
         ydl_opts = {
@@ -157,7 +165,12 @@ class Downloader:
             label = f"{lang} – {name} {t('orig_sub_auto_marker')} [{exts}]"
             subtitle_list.append((label, lang, True))
 
-        return {"video": video_formats, "audio": audio_formats, "subtitles": subtitle_list}
+        return {
+            "title": info.get('title', ''),
+            "video": video_formats,
+            "audio": audio_formats,
+            "subtitles": subtitle_list,
+        }
 
     def download_video(self, url, format_id, cookies_path=None, format_spec=None, subtitle_opts=None):
         if format_spec is not None:

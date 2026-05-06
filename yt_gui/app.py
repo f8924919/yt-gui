@@ -27,6 +27,7 @@ class _QueueItem:
     format_label: str
     format_spec: str | None
     subtitle_opts: dict | None
+    title: str = ""
     status: str = "waiting"  # waiting | downloading | done | error
     tree_iid: str = ""
 
@@ -63,6 +64,7 @@ class App(tk.Tk):
         self._paused = False
         self._showing_pause_button = False
         self._item_counter = 0
+        self._fetched_title: str = ""
 
         self._create_menu()
         self._create_widgets()
@@ -112,14 +114,10 @@ class App(tk.Tk):
         # Row 3: Action buttons
         _action_frame = ttk.Frame(main_frame)
         _action_frame.grid(row=3, column=0, columnspan=2, pady=(10, 5))
-        self.add_queue_button = ttk.Button(
-            _action_frame, text=t("btn_add_to_queue"), command=self._add_to_queue,
+        self.add_button = ttk.Button(
+            _action_frame, text=t("btn_add"), command=self._add_url,
         )
-        self.add_queue_button.pack(side="left", padx=(0, 5))
-        self.add_playlist_button = ttk.Button(
-            _action_frame, text=t("btn_add_playlist"), command=self._add_playlist_to_queue,
-        )
-        self.add_playlist_button.pack(side="left")
+        self.add_button.pack(side="left")
 
         # Row 4: Queue panel (expands vertically)
         queue_frame = ttk.LabelFrame(main_frame, text=t("queue_title"), padding="5")
@@ -128,7 +126,7 @@ class App(tk.Tk):
         cols = ("no", "url", "format", "status")
         self._queue_tree = ttk.Treeview(queue_frame, columns=cols, show="headings", height=5)
         self._queue_tree.heading("no", text="#")
-        self._queue_tree.heading("url", text=t("queue_col_url"))
+        self._queue_tree.heading("url", text=t("queue_col_title"))
         self._queue_tree.heading("format", text=t("queue_col_format"))
         self._queue_tree.heading("status", text=t("queue_col_status"))
         self._queue_tree.column("no", width=32, minwidth=32, stretch=False)
@@ -318,6 +316,7 @@ class App(tk.Tk):
     def _populate_format_combos(self, result):
         auto_label = t("orig_auto")
 
+        self._fetched_title = result.get("title", "")
         self._orig_video_formats = result["video"]
         self._orig_audio_formats = result["audio"]
         self._orig_subtitle_formats = result["subtitles"]
@@ -417,7 +416,7 @@ class App(tk.Tk):
 
     # ---------------------------------------------------------- queue
 
-    def _add_to_queue(self):
+    def _add_url(self):
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning(t("warn_title"), t("warn_no_url"))
@@ -425,103 +424,110 @@ class App(tk.Tk):
 
         selected = self.format_var.get()
         format_id = FORMAT_KEYS[self._format_display.index(selected)]
-
-        format_spec = None
-        subtitle_opts = None
-        if format_id == _ORIGINAL_KEY:
-            format_spec = self._build_original_format_spec()
-            subtitle_opts = self._build_original_subtitle_opts()
-
-        self._item_counter += 1
-        item = _QueueItem(
-            url=url,
-            format_id=format_id,
-            format_label=selected,
-            format_spec=format_spec,
-            subtitle_opts=subtitle_opts,
-        )
-
-        with self._queue_lock:
-            self._queue_items.append(item)
-
-        short_url = url if len(url) <= 45 else url[:42] + "..."
-        iid = self._queue_tree.insert(
-            "", "end",
-            values=(self._item_counter, short_url, selected, t("queue_status_waiting")),
-        )
-        item.tree_iid = iid
-
-    def _add_playlist_to_queue(self):
-        url = self.url_entry.get().strip()
-        if not url:
-            messagebox.showwarning(t("warn_title"), t("warn_no_url"))
-            return
-
-        selected = self.format_var.get()
-        format_id = FORMAT_KEYS[self._format_display.index(selected)]
-
-        if format_id == _ORIGINAL_KEY:
-            messagebox.showwarning(t("warn_title"), t("warn_playlist_original_fmt"))
-            return
 
         cookies_path = self._settings.cookies_path or None
         if cookies_path and not os.path.isfile(cookies_path):
             cookies_path = None
 
-        self.add_playlist_button.config(state=tk.DISABLED, text=t("btn_adding_playlist"))
-        self._update_status(t("status_fetching_playlist"), 0)
+        if format_id == _ORIGINAL_KEY:
+            format_spec = self._build_original_format_spec()
+            subtitle_opts = self._build_original_subtitle_opts()
+            if self._orig_video_combo["state"] == "readonly" and self._fetched_title:
+                # Formats already fetched — use cached title, add immediately
+                self._enqueue_single(url, format_id, selected, format_spec, subtitle_opts, self._fetched_title)
+                self.url_entry.delete(0, tk.END)
+                return
+            # Formats not yet fetched — snapshot current (auto) spec and fetch title in background
+            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts)
+        else:
+            self._start_add_thread(url, cookies_path, format_id, selected, None, None)
 
+    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts):
+        self.add_button.config(state=tk.DISABLED, text=t("btn_adding"))
+        self._update_status(t("status_fetching_title"), 0)
         threading.Thread(
-            target=self._run_fetch_playlist,
-            args=(url, cookies_path, format_id, selected),
+            target=self._run_fetch_for_add,
+            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts),
             daemon=True,
         ).start()
 
-    def _run_fetch_playlist(self, url, cookies_path, format_id, format_label):
+    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts):
         try:
-            entries = self.downloader.fetch_playlist_entries(url, cookies_path)
-            self.after(0, self._on_playlist_fetched, entries, format_id, format_label)
+            result = self.downloader.fetch_title_or_entries(url, cookies_path)
+            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts)
         except Exception as e:
             self.after(0, self._update_status, f"❌ {e}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_playlist").format(error=err),
+                t("err_title"), t("err_fetch_title").format(error=err),
             ))
         finally:
-            self.after(0, lambda: self.add_playlist_button.config(
-                state=tk.NORMAL, text=t("btn_add_playlist"),
-            ))
+            self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
 
-    def _on_playlist_fetched(self, entries, format_id, format_label):
-        if not entries:
-            messagebox.showwarning(t("warn_title"), t("warn_playlist_empty"))
-            self._update_status(t("status_ready"), 0)
-            return
-
-        batch: list[tuple[int, _QueueItem, str]] = []
-        for entry in entries:
-            self._item_counter += 1
-            item = _QueueItem(
-                url=entry['url'],
-                format_id=format_id,
-                format_label=format_label,
-                format_spec=None,
-                subtitle_opts=None,
+    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts):
+        if result['type'] == 'single':
+            self._enqueue_single(
+                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'],
             )
-            batch.append((self._item_counter, item, entry['title']))
+            self.url_entry.delete(0, tk.END)
+            self._update_status(t("status_title_added"), 0)
+        else:
+            if format_id == _ORIGINAL_KEY:
+                messagebox.showwarning(t("warn_title"), t("warn_playlist_original_fmt"))
+                self._update_status(t("status_ready"), 0)
+                return
+            entries = result['entries']
+            if not entries:
+                messagebox.showwarning(t("warn_title"), t("warn_playlist_empty"))
+                self._update_status(t("status_ready"), 0)
+                return
 
+            batch: list[tuple[int, _QueueItem]] = []
+            for entry in entries:
+                self._item_counter += 1
+                item = _QueueItem(
+                    url=entry['url'],
+                    format_id=format_id,
+                    format_label=format_label,
+                    format_spec=None,
+                    subtitle_opts=None,
+                    title=entry['title'],
+                )
+                batch.append((self._item_counter, item))
+
+            with self._queue_lock:
+                for _, item in batch:
+                    self._queue_items.append(item)
+
+            for no, item in batch:
+                short = item.title if len(item.title) <= 45 else item.title[:42] + "..."
+                iid = self._queue_tree.insert(
+                    "", "end",
+                    values=(no, short, format_label, t("queue_status_waiting")),
+                )
+                item.tree_iid = iid
+
+            self.url_entry.delete(0, tk.END)
+            self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
+
+    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title):
+        self._item_counter += 1
+        item = _QueueItem(
+            url=url,
+            format_id=format_id,
+            format_label=format_label,
+            format_spec=format_spec,
+            subtitle_opts=subtitle_opts,
+            title=title,
+        )
         with self._queue_lock:
-            for _, item, _ in batch:
-                self._queue_items.append(item)
+            self._queue_items.append(item)
 
-        for no, item, title in batch:
-            short = title if len(title) <= 45 else title[:42] + "..."
-            iid = self._queue_tree.insert(
-                "", "end",
-                values=(no, short, format_label, t("queue_status_waiting")),
-            )
-            item.tree_iid = iid
-
-        self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
+        short = title if len(title) <= 45 else title[:42] + "..."
+        iid = self._queue_tree.insert(
+            "", "end",
+            values=(self._item_counter, short, format_label, t("queue_status_waiting")),
+        )
+        item.tree_iid = iid
 
     def _start_queue(self):
         with self._queue_lock:
