@@ -7,7 +7,7 @@ import os
 from os.path import expanduser
 from dataclasses import dataclass
 
-from .formats import FORMAT_KEYS
+from .formats import FORMAT_KEYS, build_720p_spec
 from .downloader import Downloader
 from .settings import SettingsManager
 from .settings_dialog import SettingsDialog
@@ -50,6 +50,13 @@ class _QueueItem:
 
 
 class App(tk.Tk):
+    _STATUS_KEY_MAP: dict[str, str] = {
+        "waiting": "queue_status_waiting",
+        "downloading": "queue_status_downloading",
+        "done": "queue_status_done",
+        "error": "queue_status_error",
+    }
+
     def __init__(self):
         super().__init__()
 
@@ -326,10 +333,8 @@ class App(tk.Tk):
                 self._orig_audio_combo.config(state="readonly")
             return
 
-        values = list(self._orig_video_combo["values"])
-        try:
-            idx = values.index(selected) - 2  # offset for auto + skip entries
-        except ValueError:
+        idx = self._combo_format_index(self._orig_video_combo, selected)
+        if idx is None:
             return
 
         if 0 <= idx < len(self._orig_video_formats):
@@ -341,6 +346,13 @@ class App(tk.Tk):
                 if self._orig_audio_var.get() == t("orig_audio_included"):
                     self._orig_audio_var.set(auto_label)
                 self._orig_audio_combo.config(state="readonly")
+
+    def _combo_format_index(self, combo, selected: str) -> int | None:
+        """コンボボックスの選択値から「自動」「スキップ」2件分のオフセットを除いたインデックスを返す。"""
+        try:
+            return list(combo["values"]).index(selected) - 2
+        except ValueError:
+            return None
 
     def _on_subtitle_changed(self, event=None):
         sel = self._orig_subtitle_listbox.curselection()
@@ -439,23 +451,15 @@ class App(tk.Tk):
         audio_id = None
 
         if video_sel not in (auto_label, skip_label) and self._orig_video_formats:
-            values = list(self._orig_video_combo["values"])
-            try:
-                idx = values.index(video_sel) - 2  # offset for auto + skip entries
-                if 0 <= idx < len(self._orig_video_formats):
-                    _, video_id, is_combined = self._orig_video_formats[idx]
-            except ValueError:
-                pass
+            idx = self._combo_format_index(self._orig_video_combo, video_sel)
+            if idx is not None and 0 <= idx < len(self._orig_video_formats):
+                _, video_id, is_combined = self._orig_video_formats[idx]
 
         if not is_combined and audio_sel not in (auto_label, skip_label, t("orig_audio_included")):
             if self._orig_audio_formats:
-                values = list(self._orig_audio_combo["values"])
-                try:
-                    idx = values.index(audio_sel) - 2  # offset for auto + skip entries
-                    if 0 <= idx < len(self._orig_audio_formats):
-                        _, audio_id = self._orig_audio_formats[idx]
-                except ValueError:
-                    pass
+                idx = self._combo_format_index(self._orig_audio_combo, audio_sel)
+                if idx is not None and 0 <= idx < len(self._orig_audio_formats):
+                    _, audio_id = self._orig_audio_formats[idx]
 
         # Combined stream: return video_id as-is (audio already embedded)
         if is_combined:
@@ -577,8 +581,7 @@ class App(tk.Tk):
             playlist_folder = _sanitize_folder_name(result.get('title', ''))
 
             snap_spec = (
-                f"bestvideo[height<={self._settings.video_resolution}]"
-                "[ext=mp4]+bestaudio[ext=m4a]/best"
+                build_720p_spec(self._settings.video_resolution)
                 if format_id == "fmt_720p" else None
             )
             snap_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
@@ -616,10 +619,7 @@ class App(tk.Tk):
 
     def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title, mp3_thumbnail=False, remux_only=False):
         if format_id == "fmt_720p" and format_spec is None:
-            format_spec = (
-                f"bestvideo[height<={self._settings.video_resolution}]"
-                "[ext=mp4]+bestaudio[ext=m4a]/best"
-            )
+            format_spec = build_720p_spec(self._settings.video_resolution)
         mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
 
         self._item_counter += 1
@@ -657,7 +657,7 @@ class App(tk.Tk):
 
         self._paused = False
         self._worker_running = True
-        self._swap_to_pause_button()
+        self._set_queue_running(True)
         threading.Thread(target=self._worker, daemon=True).start()
 
     def _worker(self):
@@ -723,40 +723,33 @@ class App(tk.Tk):
     def _refresh_tree_item(self, item: _QueueItem):
         if not item.tree_iid or not self._queue_tree.exists(item.tree_iid):
             return
-        status_map = {
-            "waiting": t("queue_status_waiting"),
-            "downloading": t("queue_status_downloading"),
-            "done": t("queue_status_done"),
-            "error": t("queue_status_error"),
-        }
-        status_text = status_map.get(item.status, item.status)
+        status_text = t(self._STATUS_KEY_MAP[item.status]) if item.status in self._STATUS_KEY_MAP else item.status
         vals = self._queue_tree.item(item.tree_iid, "values")
         tags = (item.status,) if item.status in ("downloading", "done", "error") else ()
         self._queue_tree.item(item.tree_iid, values=(vals[0], vals[1], vals[2], status_text), tags=tags)
 
     def _pause_queue(self):
         self._paused = True
-        self._swap_to_start_button()
+        self._set_queue_running(False)
 
     def _on_worker_done(self):
-        self._swap_to_start_button()
+        self._set_queue_running(False)
         self._update_status(t("status_ready"), 0)
 
     def _on_worker_paused(self):
         # Button already swapped by _pause_queue; nothing else needed
         pass
 
-    def _swap_to_pause_button(self):
-        if not self._showing_pause_button:
+    def _set_queue_running(self, running: bool):
+        if running == self._showing_pause_button:
+            return
+        if running:
             self.start_queue_button.pack_forget()
             self.pause_queue_button.pack(side="left", padx=(0, 5), before=self.remove_item_button)
-            self._showing_pause_button = True
-
-    def _swap_to_start_button(self):
-        if self._showing_pause_button:
+        else:
             self.pause_queue_button.pack_forget()
             self.start_queue_button.pack(side="left", padx=(0, 5), before=self.remove_item_button)
-            self._showing_pause_button = False
+        self._showing_pause_button = running
 
     def _remove_selected(self):
         sel = self._queue_tree.selection()

@@ -3,7 +3,7 @@ import re
 import sys
 from yt_dlp import YoutubeDL
 
-from .formats import FORMAT_SPECS
+from .formats import FORMAT_SPECS, build_720p_spec
 from .i18n import t
 from . import get_resource_base
 
@@ -65,6 +65,14 @@ class Downloader:
             return {'cookies': cookies_path}
         return {}
 
+    def _base_ydl_opts(self, cookies_path=None, cookies_browser=None) -> dict:
+        return {
+            'js_runtimes': {'deno': {'path': self._deno_path}},
+            'ffmpeg_location': self._ffmpeg_path,
+            'remote_components': ['ejs:github'],
+            **self._cookies_opts(cookies_path, cookies_browser),
+        }
+
     def fetch_title_or_entries(self, url, cookies_path=None, cookies_browser=None) -> dict:
         """Return {'type': 'single', 'url': str, 'title': str} or
                   {'type': 'playlist', 'entries': [{'url': str, 'title': str}, ...]}"""
@@ -72,10 +80,7 @@ class Downloader:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': 'in_playlist',
-            'js_runtimes': {'deno': {'path': self._deno_path}},
-            'ffmpeg_location': self._ffmpeg_path,
-            'remote_components': ['ejs:github'],
-            **self._cookies_opts(cookies_path, cookies_browser),
+            **self._base_ydl_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -107,10 +112,7 @@ class Downloader:
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
-            'js_runtimes': {'deno': {'path': self._deno_path}},
-            'ffmpeg_location': self._ffmpeg_path,
-            'remote_components': ['ejs:github'],
-            **self._cookies_opts(cookies_path, cookies_browser),
+            **self._base_ydl_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -193,7 +195,7 @@ class Downloader:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
         elif format_id == "fmt_720p":
-            spec = f"bestvideo[height<={self.video_resolution}][ext=mp4]+bestaudio[ext=m4a]/best"
+            spec = build_720p_spec(self.video_resolution)
             is_audio = False
         else:
             spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
@@ -206,11 +208,8 @@ class Downloader:
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [self._progress_hook],
-            'js_runtimes': {'deno': {'path': self._deno_path}},
-            'ffmpeg_location': self._ffmpeg_path,
-            'remote_components': ['ejs:github'],
             'color': 'no_color',
-            **self._cookies_opts(cookies_path, cookies_browser),
+            **self._base_ydl_opts(cookies_path, cookies_browser),
         }
 
         if is_audio:
