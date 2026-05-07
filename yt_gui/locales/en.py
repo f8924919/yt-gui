@@ -44,6 +44,9 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(auto-generated)",
     "orig_sub_embed": "Embed in MP4",
     "orig_sub_unavailable": "(no subtitles)",
+    "label_orig_output": "Output:",
+    "orig_output_mp4": "Merge to MP4",
+    "orig_output_remux": "Remux only (keep original container)",
     # format options
     "fmt_best_mp4": "Best quality (MP4)",
     "fmt_720p": "{resolution}p (MP4)",

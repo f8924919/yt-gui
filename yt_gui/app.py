@@ -1,3 +1,4 @@
+import re
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -19,6 +20,12 @@ _MP3_KEY = "fmt_mp3"
 _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
+_INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _sanitize_folder_name(name: str) -> str:
+    name = _INVALID_PATH_CHARS.sub('_', name)
+    return name[:100].strip() or "playlist"
 
 
 @dataclass
@@ -31,6 +38,8 @@ class _QueueItem:
     title: str = ""
     mp3_bitrate: str | None = None  # snapshotted at add time for fmt_mp3
     mp3_thumbnail: bool = False
+    remux_only: bool = False
+    playlist_folder: str | None = None  # サブフォルダ名（プレイリスト時のみ）
     status: str = "waiting"  # waiting | downloading | done | error
     tree_iid: str = ""
 
@@ -257,6 +266,18 @@ class App(tk.Tk):
             state=tk.DISABLED,
         )
         self._orig_embed_check.pack(anchor="w", pady=(4, 0))
+
+        # --- Row 3: Output format (radio buttons) ---
+        ttk.Label(f, text=t("label_orig_output")).grid(row=3, column=0, sticky="w", pady=3)
+        self._orig_remux_var = tk.BooleanVar(value=False)
+        out_frame = ttk.Frame(f)
+        out_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=3, sticky="w")
+        ttk.Radiobutton(
+            out_frame, text=t("orig_output_mp4"), variable=self._orig_remux_var, value=False,
+        ).pack(side="left", padx=(0, 12))
+        ttk.Radiobutton(
+            out_frame, text=t("orig_output_remux"), variable=self._orig_remux_var, value=True,
+        ).pack(side="left")
 
         f.grid_columnconfigure(1, weight=1)
 
@@ -491,30 +512,31 @@ class App(tk.Tk):
                 return
             format_spec = self._build_original_format_spec()
             subtitle_opts = self._build_original_subtitle_opts()
+            remux_only = self._orig_remux_var.get()
             if self._orig_video_combo["state"] == "readonly" and self._fetched_title:
                 # Formats already fetched — use cached title, add immediately
-                self._enqueue_single(url, format_id, selected, format_spec, subtitle_opts, self._fetched_title)
+                self._enqueue_single(url, format_id, selected, format_spec, subtitle_opts, self._fetched_title, remux_only=remux_only)
                 self.url_entry.delete(0, tk.END)
                 return
             # Formats not yet fetched — snapshot current (auto) spec and fetch title in background
-            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts, False)
+            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts, False, remux_only=remux_only)
         else:
             mp3_thumbnail = self._mp3_thumb_var.get() if format_id == _MP3_KEY else False
             self._start_add_thread(url, cookies_path, format_id, selected, None, None, mp3_thumbnail)
 
-    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
+    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         self.add_button.config(state=tk.DISABLED, text=t("btn_adding"))
         self._update_status(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail),
+            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only),
             daemon=True,
         ).start()
 
-    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
+    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         try:
             result = self.downloader.fetch_title_or_entries(url, cookies_path)
-            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail)
+            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only)
         except Exception as e:
             self.after(0, self._update_status, f"❌ {e}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
@@ -523,10 +545,10 @@ class App(tk.Tk):
         finally:
             self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
 
-    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False):
+    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         if result['type'] == 'single':
             self._enqueue_single(
-                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'], mp3_thumbnail,
+                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'], mp3_thumbnail, remux_only=remux_only,
             )
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_title_added"), 0)
@@ -540,6 +562,8 @@ class App(tk.Tk):
                 messagebox.showwarning(t("warn_title"), t("warn_playlist_empty"))
                 self._update_status(t("status_ready"), 0)
                 return
+
+            playlist_folder = _sanitize_folder_name(result.get('title', ''))
 
             snap_spec = (
                 f"bestvideo[height<={self._settings.video_resolution}]"
@@ -560,6 +584,7 @@ class App(tk.Tk):
                     title=entry['title'],
                     mp3_bitrate=snap_bitrate,
                     mp3_thumbnail=mp3_thumbnail,
+                    playlist_folder=playlist_folder,
                 )
                 batch.append((self._item_counter, item))
 
@@ -578,7 +603,7 @@ class App(tk.Tk):
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
 
-    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title, mp3_thumbnail=False):
+    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title, mp3_thumbnail=False, remux_only=False):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = (
                 f"bestvideo[height<={self._settings.video_resolution}]"
@@ -596,6 +621,7 @@ class App(tk.Tk):
             title=title,
             mp3_bitrate=mp3_bitrate,
             mp3_thumbnail=mp3_thumbnail,
+            remux_only=remux_only,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -655,10 +681,17 @@ class App(tk.Tk):
                 cookies_path = None
 
             try:
+                output_dir_override = None
+                if item.playlist_folder:
+                    output_dir_override = os.path.join(
+                        self._resolve_download_path(), item.playlist_folder,
+                    )
                 self.downloader.download_video(
                     item.url, item.format_id, cookies_path, item.format_spec, item.subtitle_opts,
                     mp3_bitrate_override=item.mp3_bitrate,
                     embed_thumbnail=item.mp3_thumbnail,
+                    remux_only=item.remux_only,
+                    output_dir_override=output_dir_override,
                 )
                 with self._queue_lock:
                     item.status = "done"

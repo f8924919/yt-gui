@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from yt_dlp import YoutubeDL
 
@@ -87,7 +88,7 @@ class Downloader:
                     'url': entry_url,
                     'title': entry.get('title') or entry_url,
                 })
-            return {'type': 'playlist', 'entries': result}
+            return {'type': 'playlist', 'entries': result, 'title': info.get('title', '')}
 
         title = info.get('title') or url
         actual_url = info.get('webpage_url') or url
@@ -178,7 +179,8 @@ class Downloader:
         }
 
     def download_video(self, url, format_id, cookies_path=None, format_spec=None,
-                       subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False):
+                       subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
+                       remux_only=False, output_dir_override=None):
         if format_spec is not None:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
@@ -188,15 +190,19 @@ class Downloader:
         else:
             spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
 
+        out_dir = output_dir_override or self.output_dir
+        os.makedirs(out_dir, exist_ok=True)
+
         ydl_opts = {
             'format': spec,
-            'outtmpl': os.path.join(self.output_dir, '%(title)s.%(ext)s'),
+            'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [self._progress_hook],
             'js_runtimes': {'deno': {'path': self._deno_path}},
             'ffmpeg_location': self._ffmpeg_path,
             'remote_components': ['ejs:github'],
             'cookies': cookies_path,
+            'color': 'no_color',
         }
 
         if is_audio:
@@ -208,7 +214,7 @@ class Downloader:
             if embed_thumbnail:
                 ydl_opts['writethumbnail'] = True
                 ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
-        else:
+        elif not remux_only:
             ydl_opts['merge_output_format'] = 'mp4'
 
         if subtitle_opts:

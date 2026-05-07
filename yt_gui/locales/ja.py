@@ -44,6 +44,9 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(自動生成)",
     "orig_sub_embed": "MP4に埋め込む",
     "orig_sub_unavailable": "(字幕なし)",
+    "label_orig_output": "出力形式:",
+    "orig_output_mp4": "MP4 に結合",
+    "orig_output_remux": "remux のみ (元のコンテナを維持)",
     # format options
     "fmt_best_mp4": "最高画質 (MP4に結合)",
     "fmt_720p": "{resolution}p (MP4に結合)",
