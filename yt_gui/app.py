@@ -21,6 +21,11 @@ _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 _INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
+_ANSI_ESC = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_ESC.sub('', text)
 
 
 def _sanitize_folder_name(name: str) -> str:
@@ -373,9 +378,9 @@ class App(tk.Tk):
             result = self.downloader.fetch_formats(url, cookies_path, cookies_browser)
             self.after(0, self._populate_format_combos, result)
         except Exception as e:
-            self.after(0, self._update_status, f"❌ {e}", 0)
+            self.after(0, self._update_status, f"❌ {_strip_ansi(str(e))}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_formats").format(error=err),
+                t("err_title"), t("err_fetch_formats").format(error=_strip_ansi(str(err))),
             ))
         finally:
             self.after(0, lambda: self._fetch_button.config(
@@ -544,9 +549,9 @@ class App(tk.Tk):
             result = self.downloader.fetch_title_or_entries(url, cookies_path, cookies_browser)
             self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only)
         except Exception as e:
-            self.after(0, self._update_status, f"❌ {e}", 0)
+            self.after(0, self._update_status, f"❌ {_strip_ansi(str(e))}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_title").format(error=err),
+                t("err_title"), t("err_fetch_title").format(error=_strip_ansi(str(err))),
             ))
         finally:
             self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
@@ -710,7 +715,7 @@ class App(tk.Tk):
                 with self._queue_lock:
                     item.status = "error"
                 self.after(0, lambda err=e: messagebox.showerror(
-                    t("err_title"), t("err_download").format(error=err),
+                    t("err_title"), t("err_download").format(error=_strip_ansi(str(err))),
                 ))
 
             self.after(0, self._refresh_tree_item, item)
