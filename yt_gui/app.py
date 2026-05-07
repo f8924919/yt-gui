@@ -9,23 +9,19 @@ from dataclasses import dataclass
 
 from .formats import FORMAT_KEYS, build_720p_spec
 from .downloader import Downloader
+from .original_format_panel import OriginalFormatPanel
 from .settings import SettingsManager
 from .settings_dialog import SettingsDialog
 from . import get_resource_base
 from . import i18n
 from .i18n import t
+from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
 _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
-_SUBTITLE_FORMATS = ("srt", "vtt", "best")
 _INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
-_ANSI_ESC = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
-
-
-def _strip_ansi(text: str) -> str:
-    return _ANSI_ESC.sub('', text)
 
 
 def _sanitize_folder_name(name: str) -> str:
@@ -88,17 +84,17 @@ class App(tk.Tk):
         self._paused = False
         self._showing_pause_button = False
         self._item_counter = 0
-        self._fetched_title: str = ""
 
-        self._create_menu()
-        self._create_widgets()
-
+        # Downloader はパネル構築より先に生成する
         self.downloader = Downloader(
             self._resolve_download_path(),
             status_callback=self._update_status,
             video_resolution=self._settings.video_resolution,
             mp3_bitrate=self._settings.mp3_bitrate,
         )
+
+        self._create_menu()
+        self._create_widgets()
 
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path
@@ -158,8 +154,13 @@ class App(tk.Tk):
         self.format_combo.bind("<<ComboboxSelected>>", self._on_format_changed)
 
         # Row 2: original format detail panel (hidden initially)
-        self._original_frame = ttk.LabelFrame(main_frame, text=t("label_original_detail"), padding="5")
-        self._create_original_format_widgets()
+        self._original_panel = OriginalFormatPanel(
+            main_frame,
+            downloader=self.downloader,
+            get_url=lambda: self.url_entry.get().strip(),
+            get_cookies=self._resolve_cookies,
+            update_status=self._update_status,
+        )
 
         # Row 2: MP3 options (hidden initially, shown when MP3 format selected)
         self._mp3_frame = ttk.Frame(main_frame)
@@ -230,282 +231,23 @@ class App(tk.Tk):
         main_frame.grid_columnconfigure(1, weight=1)
         main_frame.grid_rowconfigure(4, weight=1)
 
-    def _create_original_format_widgets(self):
-        f = self._original_frame
-        self._orig_video_formats: list[tuple[str, str, bool]] = []
-        self._orig_audio_formats: list[tuple[str, str]] = []
-        self._orig_subtitle_formats: list[tuple[str, str, bool]] = []
-
-        # --- Row 0: Video (combo spans cols 1-2, fetch button at col 3) ---
-        ttk.Label(f, text=t("label_orig_video")).grid(row=0, column=0, sticky="w", pady=3)
-        self._orig_video_var = tk.StringVar(value=t("orig_auto"))
-        self._orig_video_combo = ttk.Combobox(
-            f, textvariable=self._orig_video_var, state="disabled", width=30,
-        )
-        self._orig_video_combo.grid(row=0, column=1, columnspan=2, padx=5, pady=3, sticky="ew")
-        self._orig_video_combo.bind("<<ComboboxSelected>>", self._on_video_format_changed)
-
-        self._fetch_button = ttk.Button(
-            f, text=t("btn_fetch_formats"), command=self._start_fetch_formats_thread,
-        )
-        self._fetch_button.grid(row=0, column=3, padx=5, pady=3)
-
-        # --- Row 1: Audio (combo spans cols 1-2) ---
-        ttk.Label(f, text=t("label_orig_audio")).grid(row=1, column=0, sticky="w", pady=3)
-        self._orig_audio_var = tk.StringVar(value=t("orig_auto"))
-        self._orig_audio_combo = ttk.Combobox(
-            f, textvariable=self._orig_audio_var, state="disabled", width=30,
-        )
-        self._orig_audio_combo.grid(row=1, column=1, columnspan=2, padx=5, pady=3, sticky="ew")
-
-        # --- Row 2: Subtitle - multi-select Listbox at col 1-2, fmt/embed stacked at col 3 ---
-        ttk.Label(f, text=t("label_orig_subtitle")).grid(row=2, column=0, sticky="nw", pady=3)
-
-        sub_list_frame = ttk.Frame(f)
-        sub_list_frame.grid(row=2, column=1, columnspan=2, padx=5, pady=3, sticky="ew")
-        self._orig_subtitle_listbox = tk.Listbox(
-            sub_list_frame, selectmode=tk.MULTIPLE, height=3, exportselection=False,
-            state=tk.DISABLED,
-        )
-        _sub_vsb = ttk.Scrollbar(sub_list_frame, orient="vertical",
-                                 command=self._orig_subtitle_listbox.yview)
-        self._orig_subtitle_listbox.configure(yscrollcommand=_sub_vsb.set)
-        self._orig_subtitle_listbox.pack(side="left", fill="both", expand=True)
-        _sub_vsb.pack(side="right", fill="y")
-        self._orig_subtitle_listbox.bind("<<ListboxSelect>>", self._on_subtitle_changed)
-
-        sub_right_frame = ttk.Frame(f)
-        sub_right_frame.grid(row=2, column=3, padx=5, pady=3, sticky="nw")
-        self._orig_subtitle_fmt_var = tk.StringVar(value="srt")
-        self._orig_subtitle_fmt_combo = ttk.Combobox(
-            sub_right_frame, textvariable=self._orig_subtitle_fmt_var,
-            values=_SUBTITLE_FORMATS, state=tk.DISABLED, width=5,
-        )
-        self._orig_subtitle_fmt_combo.pack(anchor="w")
-        self._orig_embed_var = tk.BooleanVar(value=False)
-        self._orig_embed_check = ttk.Checkbutton(
-            sub_right_frame, text=t("orig_sub_embed"), variable=self._orig_embed_var,
-            state=tk.DISABLED,
-        )
-        self._orig_embed_check.pack(anchor="w", pady=(4, 0))
-
-        # --- Row 3: Output format (radio buttons) ---
-        ttk.Label(f, text=t("label_orig_output")).grid(row=3, column=0, sticky="w", pady=3)
-        self._orig_remux_var = tk.BooleanVar(value=False)
-        out_frame = ttk.Frame(f)
-        out_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=3, sticky="w")
-        ttk.Radiobutton(
-            out_frame, text=t("orig_output_mp4"), variable=self._orig_remux_var, value=False,
-        ).pack(side="left", padx=(0, 12))
-        ttk.Radiobutton(
-            out_frame, text=t("orig_output_remux"), variable=self._orig_remux_var, value=True,
-        ).pack(side="left")
-
-        f.grid_columnconfigure(1, weight=1)
-
     # ------------------------------------------------------------------ events
 
     def _on_format_changed(self, event=None):
         selected = self.format_var.get()
         format_id = FORMAT_KEYS[self._format_display.index(selected)]
         if format_id == _ORIGINAL_KEY:
-            self._original_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+            self._original_panel.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 5))
             self._mp3_frame.grid_remove()
             self.geometry(f"520x{_WIN_H_EXPANDED}")
         elif format_id == _MP3_KEY:
-            self._original_frame.grid_remove()
+            self._original_panel.grid_remove()
             self._mp3_frame.grid(row=2, column=1, sticky="w", pady=(0, 3))
             self.geometry(f"520x{_WIN_H_DEFAULT}")
         else:
-            self._original_frame.grid_remove()
+            self._original_panel.grid_remove()
             self._mp3_frame.grid_remove()
             self.geometry(f"520x{_WIN_H_DEFAULT}")
-
-    def _on_video_format_changed(self, event=None):
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-        selected = self._orig_video_var.get()
-
-        if selected in (auto_label, skip_label) or not self._orig_video_formats:
-            if self._orig_audio_var.get() == t("orig_audio_included"):
-                self._orig_audio_var.set(auto_label)
-            if self._orig_audio_formats:
-                self._orig_audio_combo.config(state="readonly")
-            return
-
-        idx = self._combo_format_index(self._orig_video_combo, selected)
-        if idx is None:
-            return
-
-        if 0 <= idx < len(self._orig_video_formats):
-            _, _, is_combined = self._orig_video_formats[idx]
-            if is_combined:
-                self._orig_audio_var.set(t("orig_audio_included"))
-                self._orig_audio_combo.config(state=tk.DISABLED)
-            else:
-                if self._orig_audio_var.get() == t("orig_audio_included"):
-                    self._orig_audio_var.set(auto_label)
-                self._orig_audio_combo.config(state="readonly")
-
-    def _combo_format_index(self, combo, selected: str) -> int | None:
-        """コンボボックスの選択値から「自動」「スキップ」2件分のオフセットを除いたインデックスを返す。"""
-        try:
-            return list(combo["values"]).index(selected) - 2
-        except ValueError:
-            return None
-
-    def _on_subtitle_changed(self, event=None):
-        sel = self._orig_subtitle_listbox.curselection()
-        has_sub = bool(sel) and bool(self._orig_subtitle_formats)
-        state = "readonly" if has_sub else tk.DISABLED
-        self._orig_subtitle_fmt_combo.config(state=state)
-        self._orig_embed_check.config(state=tk.NORMAL if has_sub else tk.DISABLED)
-        if not has_sub:
-            self._orig_embed_var.set(False)
-
-    # --------------------------------------------------------- format fetching
-
-    def _start_fetch_formats_thread(self):
-        url = self.url_entry.get().strip()
-        if not url:
-            messagebox.showwarning(t("warn_title"), t("warn_no_url"))
-            return
-
-        cookies_path, cookies_browser = self._resolve_cookies()
-
-        self._fetch_button.config(state=tk.DISABLED, text=t("btn_fetching"))
-        self._orig_video_combo.config(state=tk.DISABLED)
-        self._orig_audio_combo.config(state=tk.DISABLED)
-        self._orig_subtitle_listbox.config(state=tk.DISABLED)
-        self._orig_subtitle_fmt_combo.config(state=tk.DISABLED)
-        self._orig_embed_check.config(state=tk.DISABLED)
-        self._update_status(t("status_fetching_formats"), 0)
-
-        threading.Thread(
-            target=self._run_fetch_formats, args=(url, cookies_path, cookies_browser), daemon=True,
-        ).start()
-
-    def _run_fetch_formats(self, url, cookies_path, cookies_browser=None):
-        try:
-            result = self.downloader.fetch_formats(url, cookies_path, cookies_browser)
-            self.after(0, self._populate_format_combos, result)
-        except Exception as e:
-            self.after(0, self._update_status, f"❌ {_strip_ansi(str(e))}", 0)
-            self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_formats").format(error=_strip_ansi(str(err))),
-            ))
-        finally:
-            self.after(0, lambda: self._fetch_button.config(
-                state=tk.NORMAL, text=t("btn_fetch_formats"),
-            ))
-
-    def _populate_format_combos(self, result):
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-
-        self._fetched_title = result.get("title", "")
-        self._orig_video_formats = result["video"]
-        self._orig_audio_formats = result["audio"]
-        self._orig_subtitle_formats = result["subtitles"]
-
-        video_labels = [auto_label, skip_label] + [lbl for lbl, _, _ in self._orig_video_formats]
-        audio_labels = [auto_label, skip_label] + [lbl for lbl, _ in self._orig_audio_formats]
-
-        self._orig_video_combo.config(values=video_labels, state="readonly")
-        self._orig_video_var.set(auto_label)
-        self._orig_audio_combo.config(values=audio_labels, state="readonly")
-        self._orig_audio_var.set(auto_label)
-
-        self._orig_subtitle_listbox.config(state=tk.NORMAL)
-        self._orig_subtitle_listbox.delete(0, tk.END)
-        if self._orig_subtitle_formats:
-            for lbl, _, _ in self._orig_subtitle_formats:
-                self._orig_subtitle_listbox.insert(tk.END, lbl)
-        else:
-            self._orig_subtitle_listbox.insert(tk.END, t("orig_sub_unavailable"))
-            self._orig_subtitle_listbox.config(state=tk.DISABLED)
-        # fmt combo and embed check stay disabled until a subtitle is selected
-        self._orig_subtitle_fmt_combo.config(state=tk.DISABLED)
-        self._orig_embed_check.config(state=tk.DISABLED)
-
-        self._update_status(
-            t("status_formats_loaded").format(
-                video=len(self._orig_video_formats),
-                audio=len(self._orig_audio_formats),
-                subtitle=len(self._orig_subtitle_formats),
-            ),
-            0,
-        )
-
-    def _build_original_format_spec(self) -> str:
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-        video_sel = self._orig_video_var.get()
-        audio_sel = self._orig_audio_var.get()
-
-        video_skip = video_sel == skip_label
-        audio_skip = audio_sel == skip_label
-
-        video_id = None
-        is_combined = False
-        audio_id = None
-
-        if video_sel not in (auto_label, skip_label) and self._orig_video_formats:
-            idx = self._combo_format_index(self._orig_video_combo, video_sel)
-            if idx is not None and 0 <= idx < len(self._orig_video_formats):
-                _, video_id, is_combined = self._orig_video_formats[idx]
-
-        if not is_combined and audio_sel not in (auto_label, skip_label, t("orig_audio_included")):
-            if self._orig_audio_formats:
-                idx = self._combo_format_index(self._orig_audio_combo, audio_sel)
-                if idx is not None and 0 <= idx < len(self._orig_audio_formats):
-                    _, audio_id = self._orig_audio_formats[idx]
-
-        # Combined stream: return video_id as-is (audio already embedded)
-        if is_combined:
-            return video_id
-        # Audio-only download
-        if video_skip:
-            return audio_id if audio_id else "bestaudio/best"
-        # Video-only download
-        if audio_skip:
-            return video_id if video_id else "bestvideo/best"
-        # Normal: merge video + audio
-        if video_id and audio_id:
-            return f"{video_id}+{audio_id}"
-        if video_id:
-            return f"{video_id}+bestaudio"
-        if audio_id:
-            return f"bestvideo+{audio_id}"
-        return "bestvideo+bestaudio/best"
-
-    def _build_original_subtitle_opts(self) -> dict | None:
-        sel = self._orig_subtitle_listbox.curselection()
-        if not sel or not self._orig_subtitle_formats:
-            return None
-
-        lang_codes: list[str] = []
-        has_manual = False
-        has_auto = False
-        for idx in sel:
-            if 0 <= idx < len(self._orig_subtitle_formats):
-                _, lang_code, is_auto = self._orig_subtitle_formats[idx]
-                lang_codes.append(lang_code)
-                if is_auto:
-                    has_auto = True
-                else:
-                    has_manual = True
-
-        if not lang_codes:
-            return None
-
-        return {
-            'writesubtitles': has_manual,
-            'writeautomaticsub': has_auto,
-            'subtitleslangs': lang_codes,
-            'subtitlesformat': self._orig_subtitle_fmt_var.get(),
-            'embed': self._orig_embed_var.get(),
-        }
 
     # ---------------------------------------------------------- queue
 
@@ -521,49 +263,57 @@ class App(tk.Tk):
         cookies_path, cookies_browser = self._resolve_cookies()
 
         if format_id == _ORIGINAL_KEY:
-            skip_label = t("orig_skip")
-            if self._orig_video_var.get() == skip_label and self._orig_audio_var.get() == skip_label:
+            if self._original_panel.is_both_skipped():
                 messagebox.showwarning(t("warn_title"), t("warn_skip_both"))
                 return
-            format_spec = self._build_original_format_spec()
-            subtitle_opts = self._build_original_subtitle_opts()
-            remux_only = self._orig_remux_var.get()
-            if self._orig_video_combo["state"] == "readonly" and self._fetched_title:
+            format_spec = self._original_panel.get_format_spec()
+            subtitle_opts = self._original_panel.get_subtitle_opts()
+            remux_only = self._original_panel.get_remux_only()
+            if self._original_panel.has_formats_loaded():
                 # Formats already fetched — use cached title, add immediately
-                self._enqueue_single(url, format_id, selected, format_spec, subtitle_opts, self._fetched_title, remux_only=remux_only)
+                self._enqueue_single(url, format_id, selected, format_spec, subtitle_opts,
+                                     self._original_panel.get_fetched_title(), remux_only=remux_only)
                 self.url_entry.delete(0, tk.END)
                 return
             # Formats not yet fetched — snapshot current (auto) spec and fetch title in background
-            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected, format_spec, subtitle_opts, False, remux_only=remux_only)
+            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected,
+                                   format_spec, subtitle_opts, False, remux_only=remux_only)
         else:
             mp3_thumbnail = self._mp3_thumb_var.get() if format_id == _MP3_KEY else False
-            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected, None, None, mp3_thumbnail)
+            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected,
+                                   None, None, mp3_thumbnail)
 
-    def _start_add_thread(self, url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _start_add_thread(self, url, cookies_path, cookies_browser, format_id, format_label,
+                          format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         self.add_button.config(state=tk.DISABLED, text=t("btn_adding"))
         self._update_status(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only),
+            args=(url, cookies_path, cookies_browser, format_id, format_label,
+                  format_spec, subtitle_opts, mp3_thumbnail, remux_only),
             daemon=True,
         ).start()
 
-    def _run_fetch_for_add(self, url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _run_fetch_for_add(self, url, cookies_path, cookies_browser, format_id, format_label,
+                           format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         try:
             result = self.downloader.fetch_title_or_entries(url, cookies_path, cookies_browser)
-            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only)
+            self.after(0, self._on_fetch_for_add_done, result, format_id, format_label,
+                       format_spec, subtitle_opts, mp3_thumbnail, remux_only)
         except Exception as e:
-            self.after(0, self._update_status, f"❌ {_strip_ansi(str(e))}", 0)
+            self.after(0, self._update_status, f"❌ {strip_ansi(str(e))}", 0)
             self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_title").format(error=_strip_ansi(str(err))),
+                t("err_title"), t("err_fetch_title").format(error=strip_ansi(str(err))),
             ))
         finally:
             self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
 
-    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _on_fetch_for_add_done(self, result, format_id, format_label, format_spec, subtitle_opts,
+                               mp3_thumbnail=False, remux_only=False):
         if result['type'] == 'single':
             self._enqueue_single(
-                result['url'], format_id, format_label, format_spec, subtitle_opts, result['title'], mp3_thumbnail, remux_only=remux_only,
+                result['url'], format_id, format_label, format_spec, subtitle_opts,
+                result['title'], mp3_thumbnail, remux_only=remux_only,
             )
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_title_added"), 0)
@@ -617,7 +367,8 @@ class App(tk.Tk):
             self.url_entry.delete(0, tk.END)
             self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
 
-    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title, mp3_thumbnail=False, remux_only=False):
+    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title,
+                        mp3_thumbnail=False, remux_only=False):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = build_720p_spec(self._settings.video_resolution)
         mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
@@ -715,7 +466,7 @@ class App(tk.Tk):
                 with self._queue_lock:
                     item.status = "error"
                 self.after(0, lambda err=e: messagebox.showerror(
-                    t("err_title"), t("err_download").format(error=_strip_ansi(str(err))),
+                    t("err_title"), t("err_download").format(error=strip_ansi(str(err))),
                 ))
 
             self.after(0, self._refresh_tree_item, item)
