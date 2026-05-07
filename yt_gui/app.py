@@ -506,13 +506,13 @@ class App(tk.Tk):
         sel = self._queue_tree.selection()
         if not sel:
             return
-        iid = sel[0]
-        with self._queue_lock:
-            item = next((i for i in self._queue_items if i.tree_iid == iid), None)
-            if item is None or item.status == "downloading":
-                return
-            self._queue_items.remove(item)
-        self._queue_tree.delete(iid)
+        for iid in sel:
+            with self._queue_lock:
+                item = next((i for i in self._queue_items if i.tree_iid == iid), None)
+                if item is None or item.status == "downloading":
+                    continue
+                self._queue_items.remove(item)
+            self._queue_tree.delete(iid)
 
     # ----------------------------------------------------------- settings/misc
 
