@@ -42,6 +42,8 @@ STRINGS: dict[str, str] = {
     "status_fetching_formats": "🔍 利用可能な形式を取得中...",
     "status_formats_loaded": "✅ 映像 {video} 件 / 音声 {audio} 件 / 字幕 {subtitle} 件の形式を取得しました",
     "err_fetch_formats": "形式の取得中にエラーが発生しました:\n{error}",
+    "warn_fetch_formats_playlist": "プレイリストURLからは形式を取得できません。\n単独の動画URLを入力してください。",
+    "status_fetch_formats_no_formats": "⚠️ 映像・音声の形式が見つかりませんでした。URLを確認してください。",
     "label_orig_subtitle": "字幕:",
     "mp3_embed_thumbnail": "サムネイルを埋め込む",
     "orig_skip": "ダウンロードしない",

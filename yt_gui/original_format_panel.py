@@ -263,10 +263,17 @@ class OriginalFormatPanel(ttk.LabelFrame):
             result = self._downloader.fetch_formats(url, cookies_path, cookies_browser)
             self.after(0, self._on_fetch_done, result)
         except Exception as e:
-            self.after(0, self._update_status, f"❌ {strip_ansi(str(e))}", 0)
-            self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_formats").format(error=strip_ansi(str(err))),
-            ))
+            err_str = strip_ansi(str(e))
+            if 'playlist' in err_str.lower():
+                self.after(0, self._update_status, f"⚠️ {t('warn_fetch_formats_playlist').splitlines()[0]}", 0)
+                self.after(0, lambda: messagebox.showwarning(
+                    t("warn_title"), t("warn_fetch_formats_playlist"),
+                ))
+            else:
+                self.after(0, self._update_status, f"❌ {err_str}", 0)
+                self.after(0, lambda msg=err_str: messagebox.showerror(
+                    t("err_title"), t("err_fetch_formats").format(error=msg),
+                ))
         finally:
             self.after(0, lambda: self._fetch_button.config(
                 state=tk.NORMAL, text=t("btn_fetch_formats"),
@@ -299,6 +306,11 @@ class OriginalFormatPanel(ttk.LabelFrame):
             self._subtitle_listbox.config(state=tk.DISABLED)
         self._subtitle_fmt_combo.config(state=tk.DISABLED)
         self._embed_check.config(state=tk.DISABLED)
+
+        if not self._video_formats and not self._audio_formats:
+            self._update_status(t("status_fetch_formats_no_formats"), 0)
+            messagebox.showwarning(t("warn_title"), t("warn_fetch_formats_playlist"))
+            return
 
         self._update_status(
             t("status_formats_loaded").format(
