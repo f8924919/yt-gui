@@ -7,6 +7,7 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 
 - URL と形式を選んで **ダウンロードキューに追加** し、まとめて実行
   - **「追加」ボタン 1 つ** で単独 URL・再生リスト URL を自動判別してキューに登録。タイトルをバックグラウンドで取得してからキューに表示する
+  - **プレイリスト** を追加すると、ダウンロード先フォルダ内にプレイリスト名のサブフォルダが自動作成され、その中にファイルが保存される
   - 実行中でも新しいアイテムをキューに追加できる
   - **一時停止 / 再開** に対応（現在処理中のダウンロードは最後まで続き、次のアイテムから停止）
   - 待機中・完了・エラーのアイテムをキューから削除可能
@@ -20,7 +21,7 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 
 - **MP3 形式** 選択時は「サムネイルを埋め込む」チェックボックスが表示される。有効にすると動画のサムネイル画像を MP3 の ID3 タグ（APIC）に埋め込む（`mutagen` 使用）
 - **オリジナルの形式** を選択すると詳細設定パネルが展開される
-  1. 「形式を取得」ボタンで URL の動画情報を取得
+  1. 「形式を取得」ボタンで URL の動画情報を取得（プレイリスト URL を入力した場合は分かりやすいエラーメッセージを表示）
   2. 利用可能な映像/音声/字幕トラックが一覧表示される。音声には言語コードも表示（例: `opus (webm) [251] – 129kbps [ja]`）
   3. 映像・音声それぞれに「自動 (最良を選択)」「**ダウンロードしない**」と個別フォーマットから選択可能。「ダウンロードしない」を使うと映像のみ / 音声のみのダウンロードが可能（両方同時にスキップは不可）
   4. 複合フォーマット（★印）を映像に選択した場合は音声選択が自動的に無効化される
@@ -29,7 +30,7 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
-  - **一般タブ**: 保存フォルダ（未設定時は `~/Downloads`）・Cookies ファイルのパス・表示言語（日本語 / English）— 言語変更は再起動後に反映
+  - **一般タブ**: 保存フォルダ（未設定時は `~/Downloads`）・Cookies（使用しない / ファイル指定 / ブラウザから取得の 3 択）・表示言語（日本語 / English）— 言語変更は再起動後に反映
   - **画質・音質タブ**: 解像度上限（480p / 720p / 1080p / 1440p / 2160p）・MP3ビットレート（128 / 192 / 256 / 320 kbps）— 「最高画質」と「オリジナルの形式」には影響しない
 - 設定は OS 標準の設定ディレクトリに JSON で永続保存
   - Windows: `%APPDATA%\yt-gui\settings.json`
@@ -107,8 +108,10 @@ yt-gui/
 │   ├── downloader.py          # ダウンローダークラス
 │   ├── formats.py             # ダウンロード形式の定義・解像度/ビットレート選択肢
 │   ├── i18n.py                # 翻訳関数 t() / set_language()
+│   ├── original_format_panel.py  # オリジナル形式詳細設定パネル（ttk.LabelFrame サブクラス）
 │   ├── settings.py            # Settings dataclass / SettingsManager
-│   └── settings_dialog.py     # 設定ダイアログ（モーダル）
+│   ├── settings_dialog.py     # 設定ダイアログ（モーダル）
+│   └── utils.py               # 共通ユーティリティ（strip_ansi など）
 ├── bin/                       # バイナリ（自動取得・.gitignore 対象）
 │   ├── deno.exe
 │   └── ffmpeg/
@@ -131,10 +134,12 @@ yt-gui/
 | `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
 | `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES`（設定画面の選択肢）を定義 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別してタイトルを取得、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧とタイトルを取得、`download_video()` でダウンロード実行。ダウンロード前に `prepare_filename()` で出力先ファイルの存在を確認し、重複時は `(N)` サフィックスを付与。`embed_thumbnail=True` 時は `writethumbnail` + `EmbedThumbnail` ポストプロセッサーで MP3 にサムネイルを埋め込む |
-| `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `download_path` / `language` / `video_resolution` / `mp3_bitrate`）と `SettingsManager`。設定を JSON ファイルに読み書き |
-| `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・MP3ビットレート）を持つモーダル設定画面 |
-| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。キューアイテム（`_QueueItem`）には `format_spec`・`mp3_bitrate`・`mp3_thumbnail` を追加時にスナップショットし、設定変更が既存アイテムに影響しないようにする。オリジナル形式パネルでは映像/音声コンボに「ダウンロードしない」選択肢を追加し映像のみ/音声のみのダウンロードに対応。字幕は `Listbox(MULTIPLE)` で複数言語を同時選択可能。MP3 選択時はサムネイル埋め込みチェックボックスを表示 |
+| `yt_gui/utils.py` | `strip_ansi(text)` — ANSI エスケープコードを除去するユーティリティ。ステータス表示・エラーダイアログで使用 |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力 |
+| `yt_gui/original_format_panel.py` | `OriginalFormatPanel(ttk.LabelFrame)` — オリジナル形式の詳細設定パネル。形式取得・映像/音声コンボ・字幕リストボックス・出力形式ラジオボタンの状態とロジックをすべて内包。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()` |
+| `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `cookies_browser` / `download_path` / `language` / `video_resolution` / `mp3_bitrate`）と `SettingsManager`。設定を JSON ファイルに読み書き |
+| `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・MP3ビットレート）を持つモーダル設定画面。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタン切り替えで、ファイルとブラウザは排他 |
+| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。プレイリスト追加時はプレイリスト名からサブフォルダ名を生成し `_QueueItem.playlist_folder` にセット。`OriginalFormatPanel` を row 2 に `grid` / `grid_remove` で切り替え表示する |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
