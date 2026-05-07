@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict
 @dataclass
 class Settings:
     cookies_path: str = ""
+    cookies_browser: str = ""   # ブラウザ名（空 = ブラウザ未使用）
     download_path: str = ""  # 空文字のときは ~/Downloads を使用
     language: str = "ja"
     video_resolution: str = "720"

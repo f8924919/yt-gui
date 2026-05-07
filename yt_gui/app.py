@@ -65,7 +65,7 @@ class App(tk.Tk):
             except Exception:
                 pass
 
-        if not self._settings.cookies_path:
+        if not self._settings.cookies_path and not self._settings.cookies_browser:
             default = os.path.join(get_resource_base(), "cookies.txt")
             if os.path.isfile(default):
                 self._settings.cookies_path = default
@@ -91,6 +91,16 @@ class App(tk.Tk):
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path
         return path if path else os.path.join(expanduser("~"), "Downloads")
+
+    def _resolve_cookies(self) -> tuple[str | None, str | None]:
+        """(cookies_path, cookies_browser) のタプルを返す。存在しないファイルは None に変換。"""
+        browser = self._settings.cookies_browser or None
+        if browser:
+            return None, browser
+        path = self._settings.cookies_path or None
+        if path and not os.path.isfile(path):
+            path = None
+        return path, None
 
     def _build_format_display(self) -> list[str]:
         result = []
@@ -344,9 +354,7 @@ class App(tk.Tk):
             messagebox.showwarning(t("warn_title"), t("warn_no_url"))
             return
 
-        cookies_path = self._settings.cookies_path or None
-        if cookies_path and not os.path.isfile(cookies_path):
-            cookies_path = None
+        cookies_path, cookies_browser = self._resolve_cookies()
 
         self._fetch_button.config(state=tk.DISABLED, text=t("btn_fetching"))
         self._orig_video_combo.config(state=tk.DISABLED)
@@ -357,12 +365,12 @@ class App(tk.Tk):
         self._update_status(t("status_fetching_formats"), 0)
 
         threading.Thread(
-            target=self._run_fetch_formats, args=(url, cookies_path), daemon=True,
+            target=self._run_fetch_formats, args=(url, cookies_path, cookies_browser), daemon=True,
         ).start()
 
-    def _run_fetch_formats(self, url, cookies_path):
+    def _run_fetch_formats(self, url, cookies_path, cookies_browser=None):
         try:
-            result = self.downloader.fetch_formats(url, cookies_path)
+            result = self.downloader.fetch_formats(url, cookies_path, cookies_browser)
             self.after(0, self._populate_format_combos, result)
         except Exception as e:
             self.after(0, self._update_status, f"❌ {e}", 0)
@@ -501,9 +509,7 @@ class App(tk.Tk):
         selected = self.format_var.get()
         format_id = FORMAT_KEYS[self._format_display.index(selected)]
 
-        cookies_path = self._settings.cookies_path or None
-        if cookies_path and not os.path.isfile(cookies_path):
-            cookies_path = None
+        cookies_path, cookies_browser = self._resolve_cookies()
 
         if format_id == _ORIGINAL_KEY:
             skip_label = t("orig_skip")
@@ -519,23 +525,23 @@ class App(tk.Tk):
                 self.url_entry.delete(0, tk.END)
                 return
             # Formats not yet fetched — snapshot current (auto) spec and fetch title in background
-            self._start_add_thread(url, cookies_path, format_id, selected, format_spec, subtitle_opts, False, remux_only=remux_only)
+            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected, format_spec, subtitle_opts, False, remux_only=remux_only)
         else:
             mp3_thumbnail = self._mp3_thumb_var.get() if format_id == _MP3_KEY else False
-            self._start_add_thread(url, cookies_path, format_id, selected, None, None, mp3_thumbnail)
+            self._start_add_thread(url, cookies_path, cookies_browser, format_id, selected, None, None, mp3_thumbnail)
 
-    def _start_add_thread(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _start_add_thread(self, url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         self.add_button.config(state=tk.DISABLED, text=t("btn_adding"))
         self._update_status(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only),
+            args=(url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only),
             daemon=True,
         ).start()
 
-    def _run_fetch_for_add(self, url, cookies_path, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _run_fetch_for_add(self, url, cookies_path, cookies_browser, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
         try:
-            result = self.downloader.fetch_title_or_entries(url, cookies_path)
+            result = self.downloader.fetch_title_or_entries(url, cookies_path, cookies_browser)
             self.after(0, self._on_fetch_for_add_done, result, format_id, format_label, format_spec, subtitle_opts, mp3_thumbnail, remux_only)
         except Exception as e:
             self.after(0, self._update_status, f"❌ {e}", 0)
@@ -673,12 +679,16 @@ class App(tk.Tk):
 
             self.downloader.status_callback = make_cb(item)
 
-            cookies_path = self._settings.cookies_path or None
-            if cookies_path and not os.path.isfile(cookies_path):
-                self.after(0, lambda p=cookies_path: messagebox.showwarning(
-                    t("warn_title"), t("warn_cookies_not_found").format(path=p),
-                ))
+            cookies_browser = self._settings.cookies_browser or None
+            if cookies_browser:
                 cookies_path = None
+            else:
+                cookies_path = self._settings.cookies_path or None
+                if cookies_path and not os.path.isfile(cookies_path):
+                    self.after(0, lambda p=cookies_path: messagebox.showwarning(
+                        t("warn_title"), t("warn_cookies_not_found").format(path=p),
+                    ))
+                    cookies_path = None
 
             try:
                 output_dir_override = None
@@ -692,6 +702,7 @@ class App(tk.Tk):
                     embed_thumbnail=item.mp3_thumbnail,
                     remux_only=item.remux_only,
                     output_dir_override=output_dir_override,
+                    cookies_browser=cookies_browser,
                 )
                 with self._queue_lock:
                     item.status = "done"

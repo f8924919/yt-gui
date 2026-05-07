@@ -57,7 +57,15 @@ class Downloader:
         else:
             self.status_callback(t("dl_status").format(status=status), 0)
 
-    def fetch_title_or_entries(self, url, cookies_path=None) -> dict:
+    @staticmethod
+    def _cookies_opts(cookies_path=None, cookies_browser=None) -> dict:
+        if cookies_browser:
+            return {'cookiesfrombrowser': (cookies_browser,)}
+        if cookies_path:
+            return {'cookies': cookies_path}
+        return {}
+
+    def fetch_title_or_entries(self, url, cookies_path=None, cookies_browser=None) -> dict:
         """Return {'type': 'single', 'url': str, 'title': str} or
                   {'type': 'playlist', 'entries': [{'url': str, 'title': str}, ...]}"""
         ydl_opts = {
@@ -67,7 +75,7 @@ class Downloader:
             'js_runtimes': {'deno': {'path': self._deno_path}},
             'ffmpeg_location': self._ffmpeg_path,
             'remote_components': ['ejs:github'],
-            'cookies': cookies_path,
+            **self._cookies_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -94,7 +102,7 @@ class Downloader:
         actual_url = info.get('webpage_url') or url
         return {'type': 'single', 'url': actual_url, 'title': title}
 
-    def fetch_formats(self, url, cookies_path=None):
+    def fetch_formats(self, url, cookies_path=None, cookies_browser=None):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -102,7 +110,7 @@ class Downloader:
             'js_runtimes': {'deno': {'path': self._deno_path}},
             'ffmpeg_location': self._ffmpeg_path,
             'remote_components': ['ejs:github'],
-            'cookies': cookies_path,
+            **self._cookies_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -180,7 +188,7 @@ class Downloader:
 
     def download_video(self, url, format_id, cookies_path=None, format_spec=None,
                        subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
-                       remux_only=False, output_dir_override=None):
+                       remux_only=False, output_dir_override=None, cookies_browser=None):
         if format_spec is not None:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
@@ -201,8 +209,8 @@ class Downloader:
             'js_runtimes': {'deno': {'path': self._deno_path}},
             'ffmpeg_location': self._ffmpeg_path,
             'remote_components': ['ejs:github'],
-            'cookies': cookies_path,
             'color': 'no_color',
+            **self._cookies_opts(cookies_path, cookies_browser),
         }
 
         if is_audio:
