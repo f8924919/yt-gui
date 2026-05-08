@@ -88,6 +88,9 @@ class App(tk.Tk):
         self._item_counter = 0
         self._log_entries: list[str] = []
         self._log_dialog: LogDialog | None = None
+        self._tooltip_win: tk.Toplevel | None = None
+        self._tooltip_after_id: str | None = None
+        self._tooltip_iid: str | None = None
 
         # Downloader はパネル構築より先に生成する
         self.downloader = Downloader(
@@ -201,6 +204,15 @@ class App(tk.Tk):
         self._queue_tree.tag_configure("downloading", foreground="#1565c0")
         self._queue_tree.tag_configure("done", foreground="#2e7d32")
         self._queue_tree.tag_configure("error", foreground="#c62828")
+
+        self._queue_tree_click_iid: str | None = None
+        self._queue_tree.bind("<ButtonPress-1>", self._on_queue_tree_press)
+        self._queue_tree.bind("<ButtonRelease-1>", self._on_queue_tree_release)
+        self._queue_tree.bind("<Motion>", self._on_queue_tree_motion)
+        self._queue_tree.bind("<Leave>", self._on_queue_tree_leave)
+        self._queue_tree.bind("<MouseWheel>", self._on_queue_tree_scroll)
+        self._queue_tree.bind("<Button-4>", self._on_queue_tree_scroll)
+        self._queue_tree.bind("<Button-5>", self._on_queue_tree_scroll)
 
         vsb = ttk.Scrollbar(queue_frame, orient="vertical", command=self._queue_tree.yview)
         self._queue_tree.configure(yscrollcommand=vsb.set)
@@ -518,6 +530,106 @@ class App(tk.Tk):
             self.pause_queue_button.pack_forget()
             self.start_queue_button.pack(side="left", padx=(0, 5), before=self.remove_item_button)
         self._showing_pause_button = running
+
+    def _on_queue_tree_press(self, event: tk.Event) -> None:
+        iid = self._queue_tree.identify_row(event.y)
+        sel = self._queue_tree.selection()
+        self._queue_tree_click_iid = iid if (iid and iid in sel) else None
+
+    def _on_queue_tree_release(self, event: tk.Event) -> None:
+        if self._queue_tree_click_iid is None:
+            return
+        iid = self._queue_tree.identify_row(event.y)
+        if iid == self._queue_tree_click_iid:
+            self._queue_tree.selection_remove(iid)
+        self._queue_tree_click_iid = None
+
+    # ---- tooltip --------------------------------------------------------
+
+    def _on_queue_tree_motion(self, event: tk.Event) -> None:
+        iid = self._queue_tree.identify_row(event.y)
+        if iid == self._tooltip_iid:
+            return
+        self._hide_queue_tooltip()
+        self._tooltip_iid = iid
+        if iid:
+            self._tooltip_after_id = self.after(
+                500, self._show_queue_tooltip, iid, event.x_root, event.y_root,
+            )
+
+    def _on_queue_tree_leave(self, event: tk.Event) -> None:
+        self._hide_queue_tooltip()
+        self._tooltip_iid = None
+
+    def _on_queue_tree_scroll(self, event: tk.Event) -> None:
+        self._hide_queue_tooltip()
+        self._tooltip_iid = None
+
+    def _hide_queue_tooltip(self) -> None:
+        if self._tooltip_after_id is not None:
+            self.after_cancel(self._tooltip_after_id)
+            self._tooltip_after_id = None
+        if self._tooltip_win is not None:
+            self._tooltip_win.destroy()
+            self._tooltip_win = None
+
+    def _show_queue_tooltip(self, iid: str, rx: int, ry: int) -> None:
+        self._tooltip_after_id = None
+        if not self._queue_tree.exists(iid):
+            return
+        with self._queue_lock:
+            item = next((i for i in self._queue_items if i.tree_iid == iid), None)
+        if item is None:
+            return
+
+        lines: list[tuple[str, str]] = [
+            (t("tooltip_title"), item.title or item.url),
+            (t("tooltip_url"), item.url),
+        ]
+        if item.playlist_folder:
+            lines.append((t("tooltip_playlist"), item.playlist_folder))
+        if item.subtitle_opts:
+            langs = ", ".join(item.subtitle_opts.get("subtitleslangs", []))
+            fmt = item.subtitle_opts.get("subtitlesformat", "")
+            embed_label = t("orig_sub_embed") if item.subtitle_opts.get("embed") else t("tooltip_sub_file")
+            lines.append((t("tooltip_subtitle"), f"{langs}  {fmt}  {embed_label}"))
+        if item.format_id == _ORIGINAL_KEY and item.format_spec:
+            lines.append((t("tooltip_format_spec"), item.format_spec))
+
+        win = tk.Toplevel(self)
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+
+        border = tk.Frame(win, background="#888888", padx=1, pady=1)
+        border.pack()
+        inner = tk.Frame(border, background="#ffffcc", padx=8, pady=5)
+        inner.pack()
+
+        for label, value in lines:
+            row = tk.Frame(inner, background="#ffffcc")
+            row.pack(anchor="w", fill="x", pady=1)
+            tk.Label(
+                row, text=f"{label}: ", background="#ffffcc",
+                font=("", 9, "bold"), anchor="w",
+            ).pack(side="left")
+            tk.Label(
+                row, text=value, background="#ffffcc",
+                font=("", 9), anchor="w", wraplength=380, justify="left",
+            ).pack(side="left", fill="x")
+
+        win.update_idletasks()
+        w = win.winfo_reqwidth()
+        h = win.winfo_reqheight()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = rx + 14
+        y = ry + 14
+        if x + w > sw:
+            x = rx - w - 6
+        if y + h > sh:
+            y = ry - h - 6
+        win.geometry(f"+{x}+{y}")
+        self._tooltip_win = win
 
     def _remove_selected(self):
         sel = self._queue_tree.selection()

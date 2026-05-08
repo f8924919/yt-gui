@@ -101,6 +101,13 @@ STRINGS: dict[str, str] = {
     "log_queue_started": "▶ キュー開始",
     "log_queue_paused": "⏸ 一時停止",
     "log_queue_done": "✅ キュー完了",
+    # queue tooltip
+    "tooltip_title": "タイトル",
+    "tooltip_url": "URL",
+    "tooltip_playlist": "プレイリスト",
+    "tooltip_subtitle": "字幕",
+    "tooltip_sub_file": "ファイル保存",
+    "tooltip_format_spec": "形式仕様",
     # language display names
     "lang_ja": "日本語",
     "lang_en": "English",
