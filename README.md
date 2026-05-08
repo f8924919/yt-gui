@@ -28,6 +28,7 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   5. 字幕は複数言語を同時選択可能（Ctrl+クリック / Shift+クリック）。手動字幕・自動生成字幕に対応。字幕フォーマット（srt / vtt / best）と MP4 への埋め込みオプションあり
 - **ファイル名の重複回避**: ダウンロード先に同名ファイルが既に存在する場合、`タイトル (1).mp4` のように連番サフィックスを付けて保存する（上書きしない）
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
+- **ログ表示**（ファイル > ログ表示）: セッション中の動作ログをダイアログで確認できる。キューへの追加・ダウンロード開始/完了・yt-dlp の処理メッセージ・エラーをタイムスタンプ付きで記録。非モーダルで開いたまま操作可能
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
   - **一般タブ**: 保存フォルダ（未設定時は `~/Downloads`）・Cookies（使用しない / ファイル指定 / ブラウザから取得の 3 択）・表示言語（日本語 / English）— 言語変更は再起動後に反映
@@ -111,6 +112,7 @@ yt-gui/
 │   ├── original_format_panel.py  # オリジナル形式詳細設定パネル（ttk.LabelFrame サブクラス）
 │   ├── settings.py            # Settings dataclass / SettingsManager
 │   ├── settings_dialog.py     # 設定ダイアログ（モーダル）
+│   ├── log_dialog.py          # 動作ログダイアログ（非モーダル）
 │   └── utils.py               # 共通ユーティリティ（strip_ansi など）
 ├── bin/                       # バイナリ（自動取得・.gitignore 対象）
 │   ├── deno.exe
@@ -135,11 +137,12 @@ yt-gui/
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
 | `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES`（設定画面の選択肢）を定義 |
 | `yt_gui/utils.py` | `strip_ansi(text)` — ANSI エスケープコードを除去するユーティリティ。ステータス表示・エラーダイアログで使用 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力 |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力。`log_callback` が設定されている場合は `_YtdlpLogger` 経由で yt-dlp の処理メッセージ・警告・エラーをアプリのログに転送する |
 | `yt_gui/original_format_panel.py` | `OriginalFormatPanel(ttk.LabelFrame)` — オリジナル形式の詳細設定パネル。形式取得・映像/音声コンボ・字幕リストボックス・出力形式ラジオボタンの状態とロジックをすべて内包。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()` |
 | `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `cookies_browser` / `download_path` / `language` / `video_resolution` / `mp3_bitrate`）と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(tk.Toplevel)`。「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・MP3ビットレート）を持つモーダル設定画面。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタン切り替えで、ファイルとブラウザは排他 |
-| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。プレイリスト追加時はプレイリスト名からサブフォルダ名を生成し `_QueueItem.playlist_folder` にセット。`OriginalFormatPanel` を row 2 に `grid` / `grid_remove` で切り替え表示する |
+| `yt_gui/log_dialog.py` | `LogDialog(tk.Toplevel)` — 非モーダルの動作ログダイアログ。ダーク背景の等幅フォントテキストエリアにタイムスタンプ付きログを表示。最下部にいれば自動スクロール、スクロールアップ中は追従しない。クリア / 閉じるボタン付き |
+| `yt_gui/app.py` | Tkinter GUI。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。プレイリスト追加時はプレイリスト名からサブフォルダ名を生成し `_QueueItem.playlist_folder` にセット。`OriginalFormatPanel` を row 2 に `grid` / `grid_remove` で切り替え表示する。`_log_entries` にセッション中のログを保持し、「ファイル > ログ表示」で `LogDialog` を開く |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
