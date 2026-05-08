@@ -6,8 +6,37 @@ from yt_dlp import YoutubeDL
 from .formats import FORMAT_SPECS, build_720p_spec
 from .i18n import t
 from . import get_resource_base
+from .utils import strip_ansi
 
 _DISPLAY_SUB_EXTS = frozenset({'srt', 'vtt', 'ttml', 'ass', 'ssa'})
+_DOWNLOAD_PROGRESS_RE = re.compile(r'\[download\]\s+\d')
+
+
+class _YtdlpLogger:
+    """yt-dlp logger that routes significant messages to app's log_callback.
+
+    yt-dlp sends info-level messages through debug() without a '[debug] ' prefix.
+    We skip actual debug messages (prefixed '[debug] ') and download progress lines
+    (e.g. '[download]  45.2% of ...') so only meaningful events reach the log.
+    """
+
+    def __init__(self, callback):
+        self._cb = callback
+
+    def debug(self, msg):
+        if msg.startswith('[debug] ') or _DOWNLOAD_PROGRESS_RE.match(msg):
+            return
+        self._cb(strip_ansi(msg))
+
+    def info(self, msg):
+        if msg:
+            self._cb(strip_ansi(msg))
+
+    def warning(self, msg):
+        self._cb(f"⚠️ {strip_ansi(msg)}")
+
+    def error(self, msg):
+        self._cb(f"❌ {strip_ansi(msg)}")
 _SKIP_AUTO_LANGS = frozenset({'live_chat'})
 
 
@@ -73,19 +102,21 @@ class Downloader:
         return {}
 
     def _base_ydl_opts(self, cookies_path=None, cookies_browser=None) -> dict:
-        return {
+        opts = {
             'js_runtimes': {'deno': {'path': self._deno_path}},
             'ffmpeg_location': self._ffmpeg_path,
             'remote_components': ['ejs:github'],
             **self._cookies_opts(cookies_path, cookies_browser),
         }
+        if self.log_callback:
+            opts['logger'] = _YtdlpLogger(self.log_callback)
+        return opts
 
     def fetch_title_or_entries(self, url, cookies_path=None, cookies_browser=None) -> dict:
         """Return {'type': 'single', 'url': str, 'title': str} or
                   {'type': 'playlist', 'entries': [{'url': str, 'title': str}, ...]}"""
         ydl_opts = {
             'quiet': True,
-            'no_warnings': True,
             'extract_flat': 'in_playlist',
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
@@ -117,7 +148,6 @@ class Downloader:
     def fetch_formats(self, url, cookies_path=None, cookies_browser=None):
         ydl_opts = {
             'quiet': True,
-            'no_warnings': True,
             'noplaylist': True,
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
