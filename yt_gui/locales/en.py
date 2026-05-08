@@ -93,6 +93,14 @@ STRINGS: dict[str, str] = {
     "dl_processing": "Processing... {percent}",
     "dl_error": "❌ An error occurred",
     "dl_status": "Status: {status}...",
+    # log dialog
+    "menu_log": "Show Log",
+    "log_dialog_title": "Activity Log",
+    "btn_clear_log": "Clear",
+    "btn_close": "Close",
+    "log_queue_started": "▶ Queue started",
+    "log_queue_paused": "⏸ Paused",
+    "log_queue_done": "✅ Queue complete",
     # language display names
     "lang_ja": "日本語",
     "lang_en": "English",

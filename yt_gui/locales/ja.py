@@ -93,6 +93,14 @@ STRINGS: dict[str, str] = {
     "dl_processing": "処理中... {percent}",
     "dl_error": "❌ エラーが発生しました",
     "dl_status": "状態: {status}...",
+    # log dialog
+    "menu_log": "ログ表示",
+    "log_dialog_title": "動作ログ",
+    "btn_clear_log": "クリア",
+    "btn_close": "閉じる",
+    "log_queue_started": "▶ キュー開始",
+    "log_queue_paused": "⏸ 一時停止",
+    "log_queue_done": "✅ キュー完了",
     # language display names
     "lang_ja": "日本語",
     "lang_en": "English",

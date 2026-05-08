@@ -6,12 +6,14 @@ import threading
 import os
 from os.path import expanduser
 from dataclasses import dataclass
+from datetime import datetime
 
 from .formats import FORMAT_KEYS, build_720p_spec
 from .downloader import Downloader
 from .original_format_panel import OriginalFormatPanel
 from .settings import SettingsManager
 from .settings_dialog import SettingsDialog
+from .log_dialog import LogDialog
 from . import get_resource_base
 from . import i18n
 from .i18n import t
@@ -84,6 +86,8 @@ class App(tk.Tk):
         self._paused = False
         self._showing_pause_button = False
         self._item_counter = 0
+        self._log_entries: list[str] = []
+        self._log_dialog: LogDialog | None = None
 
         # Downloader はパネル構築より先に生成する
         self.downloader = Downloader(
@@ -91,6 +95,7 @@ class App(tk.Tk):
             status_callback=self._update_status,
             video_resolution=self._settings.video_resolution,
             mp3_bitrate=self._settings.mp3_bitrate,
+            log_callback=self._on_downloader_log,
         )
 
         self._create_menu()
@@ -127,6 +132,7 @@ class App(tk.Tk):
         file_menu = tk.Menu(menubar, tearoff=False)
         file_menu.add_command(label=t("menu_settings"), accelerator="Ctrl+,", command=self._open_settings)
         self.bind_all("<Control-comma>", lambda _: self._open_settings())
+        file_menu.add_command(label=t("menu_log"), command=self._open_log_dialog)
 
         if sys.platform != "darwin":
             file_menu.add_separator()
@@ -301,9 +307,11 @@ class App(tk.Tk):
             self.after(0, self._on_fetch_for_add_done, result, format_id, format_label,
                        format_spec, subtitle_opts, mp3_thumbnail, remux_only)
         except Exception as e:
-            self.after(0, self._update_status, f"❌ {strip_ansi(str(e))}", 0)
-            self.after(0, lambda err=e: messagebox.showerror(
-                t("err_title"), t("err_fetch_title").format(error=strip_ansi(str(err))),
+            err_msg = strip_ansi(str(e))
+            self.after(0, self._update_status, f"❌ {err_msg}", 0)
+            self.after(0, self._log, f"❌ {err_msg}")
+            self.after(0, lambda m=err_msg: messagebox.showerror(
+                t("err_title"), t("err_fetch_title").format(error=m),
             ))
         finally:
             self.after(0, lambda: self.add_button.config(state=tk.NORMAL, text=t("btn_add")))
@@ -365,7 +373,9 @@ class App(tk.Tk):
                 item.tree_iid = iid
 
             self.url_entry.delete(0, tk.END)
-            self._update_status(t("status_playlist_added").format(count=len(batch)), 0)
+            msg = t("status_playlist_added").format(count=len(batch))
+            self._update_status(msg, 0)
+            self._log(msg)
 
     def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title,
                         mp3_thumbnail=False, remux_only=False):
@@ -394,6 +404,7 @@ class App(tk.Tk):
             values=(self._item_counter, short, format_label, t("queue_status_waiting")),
         )
         item.tree_iid = iid
+        self._log(f"📥 {title}  [{format_label}]")
 
     def _start_queue(self):
         with self._queue_lock:
@@ -409,6 +420,7 @@ class App(tk.Tk):
         self._paused = False
         self._worker_running = True
         self._set_queue_running(True)
+        self._log(t("log_queue_started"))
         threading.Thread(target=self._worker, daemon=True).start()
 
     def _worker(self):
@@ -426,6 +438,7 @@ class App(tk.Tk):
                 item.status = "downloading"
 
             self.after(0, self._refresh_tree_item, item)
+            self.after(0, self._log, f"⬇️ {item.title}  [{item.format_label}]")
 
             def make_cb(qi):
                 def cb(text, percent):
@@ -465,8 +478,10 @@ class App(tk.Tk):
             except Exception as e:
                 with self._queue_lock:
                     item.status = "error"
-                self.after(0, lambda err=e: messagebox.showerror(
-                    t("err_title"), t("err_download").format(error=strip_ansi(str(err))),
+                err_msg = strip_ansi(str(e))
+                self.after(0, self._log, f"❌ {err_msg}")
+                self.after(0, lambda m=err_msg: messagebox.showerror(
+                    t("err_title"), t("err_download").format(error=m),
                 ))
 
             self.after(0, self._refresh_tree_item, item)
@@ -481,11 +496,13 @@ class App(tk.Tk):
 
     def _pause_queue(self):
         self._paused = True
+        self._log(t("log_queue_paused"))
         self._set_queue_running(False)
 
     def _on_worker_done(self):
         self._set_queue_running(False)
         self._update_status(t("status_ready"), 0)
+        self._log(t("log_queue_done"))
 
     def _on_worker_paused(self):
         # Button already swapped by _pause_queue; nothing else needed
@@ -532,3 +549,27 @@ class App(tk.Tk):
     def _update_status(self, text, percent):
         self.status_label.config(text=text)
         self.progress_bar["value"] = percent
+
+    # ----------------------------------------------------------- log
+
+    def _on_downloader_log(self, msg: str):
+        self.after(0, self._log, msg)
+
+    def _log(self, msg: str):
+        entry = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
+        self._log_entries.append(entry)
+        if len(self._log_entries) > 2000:
+            self._log_entries = self._log_entries[-2000:]
+        if self._log_dialog is not None and self._log_dialog.winfo_exists():
+            self._log_dialog.append(entry)
+
+    def _open_log_dialog(self):
+        if self._log_dialog is not None and self._log_dialog.winfo_exists():
+            self._log_dialog.lift()
+            self._log_dialog.focus()
+            return
+        self._log_dialog = LogDialog(self, on_close=self._on_log_dialog_close)
+        self._log_dialog.load(self._log_entries)
+
+    def _on_log_dialog_close(self):
+        self._log_dialog = None

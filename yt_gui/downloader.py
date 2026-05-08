@@ -13,9 +13,10 @@ _SKIP_AUTO_LANGS = frozenset({'live_chat'})
 
 class Downloader:
     def __init__(self, output_dir="downloads", status_callback=None,
-                 video_resolution="720", mp3_bitrate="192"):
+                 video_resolution="720", mp3_bitrate="192", log_callback=None):
         self.output_dir = output_dir
         self.status_callback = status_callback
+        self.log_callback = log_callback
         self.video_resolution = video_resolution
         self.mp3_bitrate = mp3_bitrate
 
@@ -34,7 +35,10 @@ class Downloader:
         status = d['status']
         if status == 'finished':
             filename = d.get('filename', 'Unknown File')
-            self.status_callback(t("dl_done").format(filename=os.path.basename(filename)), 100)
+            msg = t("dl_done").format(filename=os.path.basename(filename))
+            self.status_callback(msg, 100)
+            if self.log_callback:
+                self.log_callback(msg)
         elif status == 'downloading':
             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded_bytes = d.get('downloaded_bytes', 0)
@@ -53,7 +57,10 @@ class Downloader:
             else:
                 self.status_callback(t("dl_processing").format(percent=d.get('_percent_str', '')), 0)
         elif status == 'error':
-            self.status_callback(t("dl_error"), 0)
+            msg = t("dl_error")
+            self.status_callback(msg, 0)
+            if self.log_callback:
+                self.log_callback(msg)
         else:
             self.status_callback(t("dl_status").format(status=status), 0)
 
@@ -234,7 +241,10 @@ class Downloader:
                     {'key': 'FFmpegEmbedSubtitle', 'already_have_subtitle': False}
                 )
 
-        self.status_callback(t("dl_fetching"), 0)
+        msg = t("dl_fetching")
+        self.status_callback(msg, 0)
+        if self.log_callback:
+            self.log_callback(msg)
 
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
