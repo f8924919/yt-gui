@@ -4,49 +4,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tkinter製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/解像度指定）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows / macOS向けデスクトップアプリ。PyInstallerでスタンドアロンバイナリとしてビルドする。
+PySide6製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/解像度指定）・MP3（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows / macOS向けデスクトップアプリ。PyInstallerでスタンドアロンバイナリとしてビルドする。
 
 ダウンロードキューを持ち、URLと形式を複数登録してからまとめて実行できる。一時停止・再開にも対応。キューにはURLではなく動画タイトルを表示する。プレイリストURLを追加すると、プレイリスト名のサブフォルダを自動作成してそこへ保存する。
 
 ## 環境セットアップ
 
 ```bash
+# 依存パッケージのインストール・仮想環境構築
+uv sync
+
 # 仮想環境の有効化
 .venv\Scripts\activate   # Windows
 source .venv/bin/activate # Linux/Mac
-
-# 依存パッケージのインストール
-pip install -r requirements.txt
 ```
 
 ## 主要コマンド
 
 ```bash
 # アプリの起動（開発時）
-python -m yt_gui
+uv run python -m yt_gui
 
 # ビルド（PyInstaller）
-pyinstaller yt-gui.spec
+uv run pyinstaller yt-gui.spec
 
 # ビルド成果物は dist/yt-gui/ に出力される（macOS は dist/yt-gui.app/）
+
+# 依存パッケージの追加
+uv add {パッケージ}
+
+# 依存パッケージの削除
+uv remove {パッケージ}
 ```
+
+## スレッド間通信パターン
+
+バックグラウンドスレッドからGUIを安全に更新するため、`Signal` / `Slot` を使用する。Qt のシグナルは別スレッドからemitしても自動的にメインスレッドへキューイングされる（`Qt.QueuedConnection`）ため、Tkinterの `self.after(0, callback)` と同等の安全なGUI更新が実現できる。
+
+- `App` は `_AppSignals(QObject)` 内部クラスを持ち、`status_update(str, float)`・`log_message(str)`・`queue_item_refresh(object)` 等のシグナルを定義する。バックグラウンドワーカーはこれらをemitし、メインスレッドのスロットが受け取る。
+- `OriginalFormatPanel` は `_PanelSignals(QObject)` 内部クラスを持ち、フォーマット取得スレッドの成功・失敗をシグナルでメインスレッドへ渡す。
 
 ## アーキテクチャ
 
 `yt_gui/` パッケージ構成。各ファイルの責務：
 
-- **`yt_gui/i18n.py`** — 多言語対応モジュール。`set_language(lang)` で言語を切り替え、`t(key)` で翻訳文字列を返す。キーが見つからない場合は日本語にフォールバックし、それもなければキー名をそのまま返す。
-- **`yt_gui/locales/ja.py`** / **`yt_gui/locales/en.py`** — 各言語の文字列辞書（`STRINGS: dict[str, str]`）。新言語追加時はこのパターンで `xx.py` を追加し、`i18n.py` の `_LANGUAGES` に登録する。`fmt_720p` / `fmt_mp3` の値はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダーを含む）になっており、`App._build_format_display()` が設定値を埋めて表示名を生成する。
-- **`yt_gui/formats.py`** — `FORMAT_SPECS` 定数（内部キー → `(yt-dlpフォーマット文字列, 音声のみフラグ)` のタプル）と `FORMAT_KEYS`（表示順リスト）。また `VIDEO_RESOLUTIONS`（`"480"` 〜 `"2160"` のタプル）と `MP3_BITRATES`（`"128"` 〜 `"320"` のタプル）を定義し、設定ダイアログの選択肢として使用する。`fmt_720p` の spec と `fmt_mp3` のビットレートは実行時に設定値から動的に決定されるため、`FORMAT_SPECS` の値はデフォルトの参考値に過ぎない。
-- **`yt_gui/utils.py`** — `strip_ansi(text: str) -> str`。ANSI エスケープコードを正規表現で除去する共通ユーティリティ。yt-dlp の進捗文字列やエラーメッセージから色付けコードを取り除くために `app.py` と `original_format_panel.py` で使用する。
-- **`yt_gui/downloader.py`** — `Downloader` クラス。yt-dlpのラッパー。`__init__` で `video_resolution`（デフォルト `"720"`）と `mp3_bitrate`（デフォルト `"192"`）、`log_callback`（省略可）を受け取り属性として保持する。`_cookies_opts(cookies_path, cookies_browser) -> dict` でCookies設定を構築（ブラウザ優先）し、`_base_ydl_opts()` で全メソッド共通のyt-dlp基底オプション（JSランタイム・ffmpeg・Cookies・loggerオブジェクト）を返す。`log_callback` が設定されている場合、`_base_ydl_opts()` は内部クラス `_YtdlpLogger` のインスタンスを `logger` オプションに渡す。`_YtdlpLogger` の `debug()` は `[debug] ` prefix と `[download] XX%` 形式の進捗行を除外し、残りのyt-dlp処理メッセージ（`[youtube]`, `[download] Destination: ...`, `[ffmpeg] ...` 等）を転送する。`warning()` / `error()` もそれぞれ `⚠️` / `❌` prefix を付けて転送する。`fetch_title_or_entries(url, cookies_path, cookies_browser)` で URL が単独動画かプレイリストかを自動判別し、単独の場合は `{'type': 'single', 'url': ..., 'title': ...}`、プレイリストの場合は `{'type': 'playlist', 'entries': [...], 'title': str}` を返す（`extract_flat='in_playlist'` で高速取得）。`fetch_formats(url, cookies_path, cookies_browser)` で `extract_info(download=False)` を呼び、映像/音声/字幕フォーマットと動画タイトルを `{"title": ..., "video": [...], "audio": [...], "subtitles": [...]}` で返す（`noplaylist: True` のためプレイリストURLではエラーになる）。音声フォーマットのラベルには言語コードを `[ja]` 形式で付加する（情報がある場合のみ）。字幕は手動字幕を先に列挙し、自動生成字幕は動画の主言語に合致するものだけに絞る。`download_video(url, format_id, cookies_path, format_spec, subtitle_opts, mp3_bitrate_override, embed_thumbnail, remux_only, output_dir_override, cookies_browser)` でダウンロードを実行。`output_dir_override` を渡すとプレイリストのサブフォルダ等に出力先を切り替えられる。ダウンロード前に `prepare_filename()` で期待出力パスを確認し、重複時は `(N)` サフィックスを付与。`'color': 'no_color'` オプションでyt-dlpの進捗文字列からANSIコードを排除する。`_progress_hook` でコールバック経由にGUIへ進捗を通知し、`dl_fetching`（ダウンロード開始時）・`dl_done`（完了時）・`dl_error`（エラー時）の3タイミングで `log_callback` も呼び出す。
-- **`yt_gui/original_format_panel.py`** — `OriginalFormatPanel(ttk.LabelFrame)` クラス。オリジナル形式の詳細設定パネル。映像コンボ・音声コンボ・字幕リストボックス・出力形式ラジオボタンの構築・状態管理・ロジックをすべて内包し、`App` 側は公開メソッド経由で結果だけを受け取る。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()`。形式取得は `_start_fetch_thread()` でバックグラウンドスレッドを起動し、`self.after(0, callback)` でGUIを安全に更新する。プレイリストURLを入力して形式取得を試みた場合（エラー文字列に `"playlist"` が含まれる場合）は、エラーダイアログではなく分かりやすい警告ダイアログを表示する。映像/音声コンボには `[自動, スキップ, フォーマット1, ...]` の順で値を設定し、`_format_index()` がオフセット -2 でフォーマットリストのインデックスに変換する。複合フォーマット（★印）選択時は音声コンボを自動無効化する。
-- **`yt_gui/settings.py`** — `Settings` dataclassと `SettingsManager` クラス。設定をJSONファイルに読み書きする。保存先はOS標準のconfigディレクトリ（Windows: `%APPDATA%/yt-gui/`、macOS: `~/Library/Application Support/yt-gui/`、Linux: `~/.config/yt-gui/`）。フィールド: `cookies_path`、`cookies_browser`（ブラウザ名、空文字のとき未使用）、`download_path`（空文字のとき `~/Downloads`）、`language`（デフォルト `"ja"`）、`video_resolution`（デフォルト `"720"`）、`mp3_bitrate`（デフォルト `"192"`）。
-- **`yt_gui/settings_dialog.py`** — `SettingsDialog(tk.Toplevel)` クラス。モーダルの設定画面。`ttk.Notebook` によるタブ構成。「一般」タブに保存フォルダ・Cookies・言語選択を配置。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタンで切り替え、選択に応じてファイルパス入力欄またはブラウザ選択コンボを表示する（排他）。保存時は非選択側のフィールドを空文字にリセットする。「画質・音質」タブに解像度上限コンボ（480p〜2160p）と MP3ビットレートコンボ（128〜320kbps）を配置し、「最高画質」と「オリジナルの形式」には影響しない旨を注記する。言語変更時は再起動を促すダイアログを表示。
-- **`yt_gui/log_dialog.py`** — `LogDialog(tk.Toplevel)` クラス。非モーダルのログ表示ダイアログ。`scrolledtext.ScrolledText` をダーク背景・等幅フォントで配置し、タイムスタンプ付きログエントリを表示する。`load(entries)` で既存ログを一括ロード、`append(text)` で逐次追記。最下部にいれば自動スクロール（`yview()[1] >= 0.99` で判定）、上にスクロール中は追従しない。クリアボタンはテキストエリアのみを消去し `App._log_entries` は変更しない。`WM_DELETE_WINDOW` プロトコルに `_on_close` をセットし、クローズ時に `on_close` コールバックで `App._log_dialog` を `None` にリセットする。
-- **`yt_gui/app.py`** — `App(tk.Tk)` クラス。Tkinter GUIクラス。`__init__` で設定を読み込んだ直後に `i18n.set_language()` を呼び、以降の全UI文字列は `t()` 経由で取得する。`Downloader` の生成はウィジェット構築より先に行う（`OriginalFormatPanel` がコンストラクタで受け取るため）。`_resolve_cookies() -> (cookies_path, cookies_browser)` で設定値をチェックし、ブラウザ設定を優先して返す（ファイルが存在しない場合は `None` に変換）。`_sanitize_folder_name()` モジュール関数でプレイリスト名をフォルダ名として安全な文字列に変換（無効文字を `_` 置換・100文字截断）。`_QueueItem` dataclass に `playlist_folder`（プレイリスト時のサブフォルダ名）と `remux_only` フィールドを持つ。`_STATUS_KEY_MAP` クラス定数でキュー状態文字列 → ロケールキーのマッピングを管理する。`_set_queue_running(running: bool)` で開始/一時停止ボタンの表示切り替えを一元管理する。`_build_format_display()` が `fmt_720p` / `fmt_mp3` のラベルを `Settings.video_resolution` / `Settings.mp3_bitrate` の現在値から生成し、設定保存後にフォーマットコンボボックスを再描画する。`_on_format_changed` で `OriginalFormatPanel` を `grid` / `grid_remove` で切り替え表示する。プレイリスト追加時は `_sanitize_folder_name(playlist_title)` をサブフォルダ名として各 `_QueueItem.playlist_folder` にセットし、ダウンローダー呼び出し時に `output_dir_override` として渡す。Treeviewの更新は全て `self.after(0, self._refresh_tree_item, item)` 経由でメインスレッドに委譲する。ログ機能: `_log_entries: list[str]`（最大2000件）にセッション中の全ログを保持し、`_log(msg)` がタイムスタンプを付与してリストと開いている `LogDialog` の両方に追記する。ダウンローダーからのログは `_on_downloader_log()` が `self.after(0, self._log, msg)` でメインスレッドに委譲する。明示的な `_log()` 呼び出しポイント: キュー追加・プレイリスト一括追加・キュー開始/一時停止/完了・ダウンロード開始（タイトルと形式）・エラー発生時。ファイルメニューに「ログ表示」を追加し、`_open_log_dialog()` がダイアログの重複起動を防いで既存ウィンドウを `lift()` する。
-- **`yt_gui/__main__.py`** — エントリーポイント。`python -m yt_gui` で起動。
-- **`yt_gui/__init__.py`** — `get_resource_base()` ユーティリティ。PyInstallerバンドル時は `sys._MEIPASS`、開発時はプロジェクトルートを返す。
+- **`yt_gui/i18n.py`** — 多言語対応モジュール。`set_language(lang)` で言語を切り替え、`t(key)` で翻訳文字列を返す。キーが見つからない場合は日本語にフォールバックし、それもなければキー名をそのまま返す。（変更なし）
+- **`yt_gui/locales/ja.py`** / **`yt_gui/locales/en.py`** — 各言語の文字列辞書（`STRINGS: dict[str, str]`）。新言語追加時はこのパターンで `xx.py` を追加し、`i18n.py` の `_LANGUAGES` に登録する。`fmt_720p` / `fmt_mp3` の値はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダーを含む）になっており、`App._build_format_display()` が設定値を埋めて表示名を生成する。（変更なし）
+- **`yt_gui/formats.py`** — `FORMAT_SPECS` 定数（内部キー → `(yt-dlpフォーマット文字列, 音声のみフラグ)` のタプル）と `FORMAT_KEYS`（表示順リスト）。また `VIDEO_RESOLUTIONS`（`"480"` 〜 `"2160"` のタプル）と `MP3_BITRATES`（`"128"` 〜 `"320"` のタプル）を定義する。（変更なし）
+- **`yt_gui/utils.py`** — `strip_ansi(text: str) -> str`。ANSIエスケープコードを除去する共通ユーティリティ。（変更なし）
+- **`yt_gui/downloader.py`** — `Downloader` クラス。yt-dlpのラッパー。`__init__` で `video_resolution`・`mp3_bitrate`・`log_callback`・`status_callback` を受け取る。`fetch_title_or_entries()` でURL種別判別、`fetch_formats()` でフォーマット一覧取得、`download_video()` でダウンロード実行。UIに依存しないため変更なし。
+- **`yt_gui/settings.py`** — `Settings` dataclassと `SettingsManager` クラス。設定をJSONファイルに読み書きする。保存先はOS標準のconfigディレクトリ（Windows: `%APPDATA%/yt-gui/`、macOS: `~/Library/Application Support/yt-gui/`）。（変更なし）
+- **`yt_gui/settings_dialog.py`** — `SettingsDialog(QDialog)` クラス。モーダルの設定画面。`QTabWidget` によるタブ構成（「一般」・「画質・音質」）。「一般」タブに保存フォルダ・Cookies・言語選択を配置。Cookiesは「使用しない / ファイルを指定 / ブラウザから取得」の `QRadioButton` グループで切り替え、選択に応じてファイルパス入力欄（`QLineEdit` + `QFileDialog`）またはブラウザ選択コンボ（`QComboBox`）を `setVisible()` で排他表示する。保存時は非選択側のフィールドを空文字にリセット。言語変更時は `QMessageBox.information()` で再起動を促す。「画質・音質」タブに解像度上限コンボ（480p〜2160p）とMP3ビットレートコンボ（128〜320kbps）を配置。
+- **`yt_gui/log_dialog.py`** — `LogDialog(QDialog)` クラス。非モーダルのログ表示ダイアログ。`QPlainTextEdit`（`setReadOnly(True)`、ダーク背景・等幅フォント）でログを表示する。`load(entries)` で既存ログを一括ロード、`append(text)` で逐次追記。最下部にいれば自動スクロール（`verticalScrollBar().value() == verticalScrollBar().maximum()` で判定）、上にスクロール中は追従しない。クリアボタンはテキストエリアのみを消去し `App._log_entries` は変更しない。ウィンドウクローズ時に `on_close` コールバックで `App._log_dialog` を `None` にリセットする。
+- **`yt_gui/original_format_panel.py`** — `OriginalFormatPanel(QGroupBox)` クラス。オリジナル形式の詳細設定パネル。内部に `_PanelSignals(QObject)` を持ち、フォーマット取得スレッドの成功（`formats_fetched(dict)`）・失敗（`fetch_failed(str, bool)`）をシグナル経由でメインスレッドへ安全に渡す。映像コンボ（`QComboBox`）・音声コンボ（`QComboBox`）・字幕リスト（`QListWidget`、`ExtendedSelection`）・字幕フォーマットコンボ（`QComboBox`）・埋め込みチェック（`QCheckBox`）・出力形式ラジオボタン（`QRadioButton` グループ）の構築・状態管理・ロジックを内包する。複合フォーマット（★印）選択時は音声コンボを `setEnabled(False)` で自動無効化。公開API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()`。
+- **`yt_gui/app.py`** — `App(QMainWindow)` クラス。PySide6メインウィンドウ。内部クラス `_AppSignals(QObject)` に `status_update(str, float)`・`log_message(str)`・`queue_item_refresh(object)` シグナルを定義し、バックグラウンドスレッドからemitしてメインスレッドのスロットで受け取る。`Downloader` の生成はウィジェット構築より先に行う（`OriginalFormatPanel` がコンストラクタで受け取るため）。`_resolve_cookies() -> (cookies_path, cookies_browser)` で設定値をチェックし、ブラウザ設定を優先して返す。`_sanitize_folder_name()` でプレイリスト名をフォルダ名として安全な文字列に変換（無効文字を `_` 置換・100文字截断）。`_QueueItem` dataclassに `playlist_folder`・`remux_only` フィールドを保持。`_STATUS_KEY_MAP` クラス定数でキュー状態文字列 → ロケールキーのマッピングを管理。`_set_queue_running(running: bool)` で開始/一時停止ボタンの表示切り替えを一元管理（`setVisible()` を使用）。`_build_format_display()` が `fmt_720p` / `fmt_mp3` のラベルを設定値から生成。`_on_format_changed` で `OriginalFormatPanel` / `_mp3_frame` を `setVisible()` で切り替え、ウィンドウ高さを `resize()` で調整。プレイリスト追加時は `_sanitize_folder_name(playlist_title)` をサブフォルダ名として各 `_QueueItem.playlist_folder` にセット。キューは `QTreeWidget`、カラム色付けはアイテムの `setForeground()` で設定。ツールチップは `QTreeWidget` をサブクラス化（または `viewportEvent` オーバーライド）してホバーアイテムのURL・タイトル・プレイリスト・字幕情報を `QToolTip.showText()` で動的表示。ログ機能: `_log_entries: list[str]`（最大2000件）にセッション中の全ログを保持し、`_log(msg)` がタイムスタンプを付与して追記。ダウンローダーからのログは `log_message` シグナル経由でメインスレッドの `_log` スロットに委譲。
+- **`yt_gui/__main__.py`** — エントリーポイント。`QApplication` を起動し `App` (QMainWindow) を表示。致命的エラーは `QMessageBox.critical()` で表示。
+- **`yt_gui/__init__.py`** — `get_resource_base()` ユーティリティ。PyInstallerバンドル時は `sys._MEIPASS`、開発時はプロジェクトルートを返す。（変更なし）
 
 ## 新しい言語を追加する手順
 
@@ -65,6 +78,12 @@ pyinstaller yt-gui.spec
 
 ```bash
 python scripts/download_binaries.py --update
+```
+
+`yt-gui.spec` はTkinter/Tcl-Tk関連のデータ収集コードを削除し、PySide6向けに更新する。`pyinstaller-hooks-contrib` がPySide6プラグイン・データを自動検出するため追加設定は最小限。macOS向けビルドでは従来と同様に `BUNDLE` ブロックで `.app` バンドルを自動生成する。
+
+```bash
+uv run pyinstaller yt-gui.spec
 ```
 
 実行時にCookiesフィールドのパスが指すファイルが存在しない場合は警告ダイアログを表示し、Cookiesなしでダウンロードを続行する。

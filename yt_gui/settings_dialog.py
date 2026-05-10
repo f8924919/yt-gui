@@ -1,12 +1,16 @@
 import sys
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QTabWidget, QWidget, QLabel, QLineEdit, QPushButton,
+    QComboBox, QRadioButton, QButtonGroup, QFileDialog, QMessageBox,
+    QFrame,
+)
+from PySide6.QtCore import Qt
 
 from .settings import Settings, SettingsManager
 from .formats import VIDEO_RESOLUTIONS, MP3_BITRATES
 from .i18n import t, AVAILABLE_LANGUAGES
 
-# yt-dlp がサポートするブラウザ（表示名, 内部名）
 _BROWSERS = [
     ("Brave", "brave"),
     ("Chrome", "chrome"),
@@ -24,12 +28,12 @@ _BROWSER_DISPLAY = [label for label, _ in _BROWSERS]
 _BROWSER_INTERNAL = [name for _, name in _BROWSERS]
 
 
-class SettingsDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Tk, manager: SettingsManager):
+class SettingsDialog(QDialog):
+    def __init__(self, parent, manager: SettingsManager):
         super().__init__(parent)
-        self.title(t("settings_title"))
-        self.resizable(False, False)
-        self.grab_set()
+        self.setWindowTitle(t("settings_title"))
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setFixedSize(480, 300)
 
         self._manager = manager
         self._settings = manager.load()
@@ -38,146 +42,171 @@ class SettingsDialog(tk.Toplevel):
         self._center_on_parent(parent)
 
     def _build_ui(self):
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
 
-        general_frame = ttk.Frame(notebook, padding=10)
-        notebook.add(general_frame, text=t("tab_general"))
-        self._build_general_tab(general_frame)
+        self._tabs = QTabWidget()
+        root.addWidget(self._tabs)
 
-        quality_frame = ttk.Frame(notebook, padding=10)
-        notebook.add(quality_frame, text=t("tab_quality"))
-        self._build_quality_tab(quality_frame)
+        general_widget = QWidget()
+        self._build_general_tab(general_widget)
+        self._tabs.addTab(general_widget, t("tab_general"))
 
-        btn_frame = ttk.Frame(self)
-        btn_frame.pack(fill="x", padx=10, pady=(0, 10))
+        quality_widget = QWidget()
+        self._build_quality_tab(quality_widget)
+        self._tabs.addTab(quality_widget, t("tab_quality"))
 
-        ttk.Button(btn_frame, text=t("btn_save"), command=self._save).pack(side="right", padx=(5, 0))
-        ttk.Button(btn_frame, text=t("btn_cancel"), command=self.destroy).pack(side="right")
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_cancel = QPushButton(t("btn_cancel"))
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancel)
+        btn_save = QPushButton(t("btn_save"))
+        btn_save.setDefault(True)
+        btn_save.clicked.connect(self._save)
+        btn_layout.addWidget(btn_save)
+        root.addLayout(btn_layout)
 
-    def _build_general_tab(self, parent: ttk.Frame):
-        # Row 0: Download folder
-        ttk.Label(parent, text=t("label_download_folder")).grid(row=0, column=0, sticky="w", pady=5)
-        self._download_var = tk.StringVar(value=self._settings.download_path)
-        ttk.Entry(parent, textvariable=self._download_var, width=45).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        ttk.Button(parent, text=t("btn_browse"), command=self._browse_download).grid(row=0, column=2, pady=5)
+    def _build_general_tab(self, parent: QWidget):
+        layout = QGridLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        layout.setColumnStretch(1, 1)
 
-        # Row 1: Cookies source radio buttons
-        ttk.Label(parent, text=t("label_cookies_source")).grid(row=1, column=0, sticky="w", pady=5)
+        # Download folder
+        layout.addWidget(QLabel(t("label_download_folder")), 0, 0, Qt.AlignmentFlag.AlignRight)
+        self._download_edit = QLineEdit(self._settings.download_path)
+        layout.addWidget(self._download_edit, 0, 1)
+        btn_browse_dl = QPushButton(t("btn_browse"))
+        btn_browse_dl.clicked.connect(self._browse_download)
+        layout.addWidget(btn_browse_dl, 0, 2)
 
-        if self._settings.cookies_browser:
-            initial_source = "browser"
-        elif self._settings.cookies_path:
-            initial_source = "file"
-        else:
-            initial_source = "none"
-        self._cookies_source_var = tk.StringVar(value=initial_source)
+        # Cookies source
+        layout.addWidget(QLabel(t("label_cookies_source")), 1, 0, Qt.AlignmentFlag.AlignRight)
+        radio_widget = QWidget()
+        radio_layout = QHBoxLayout(radio_widget)
+        radio_layout.setContentsMargins(0, 0, 0, 0)
 
-        radio_frame = ttk.Frame(parent)
-        radio_frame.grid(row=1, column=1, columnspan=2, sticky="w", pady=5)
-        for value, key in (("none", "cookies_source_none"), ("file", "cookies_source_file"), ("browser", "cookies_source_browser")):
-            ttk.Radiobutton(
-                radio_frame, text=t(key),
-                variable=self._cookies_source_var, value=value,
-                command=self._on_cookies_source_changed,
-            ).pack(side="left", padx=(0, 10))
+        self._cookies_btn_group = QButtonGroup(self)
+        self._radio_none = QRadioButton(t("cookies_source_none"))
+        self._radio_file = QRadioButton(t("cookies_source_file"))
+        self._radio_browser = QRadioButton(t("cookies_source_browser"))
+        for rb in (self._radio_none, self._radio_file, self._radio_browser):
+            self._cookies_btn_group.addButton(rb)
+            radio_layout.addWidget(rb)
+        radio_layout.addStretch()
+        layout.addWidget(radio_widget, 1, 1, 1, 2)
 
-        # Row 2: File detail frame (shown when source=file)
-        self._file_frame = ttk.Frame(parent)
-        self._cookies_var = tk.StringVar(value=self._settings.cookies_path)
-        ttk.Entry(self._file_frame, textvariable=self._cookies_var, width=40).pack(side="left", padx=(0, 5))
-        ttk.Button(self._file_frame, text=t("btn_browse"), command=self._browse_cookies).pack(side="left")
+        # File detail row
+        self._file_widget = QWidget()
+        file_layout = QHBoxLayout(self._file_widget)
+        file_layout.setContentsMargins(0, 0, 0, 0)
+        self._cookies_edit = QLineEdit(self._settings.cookies_path)
+        file_layout.addWidget(self._cookies_edit)
+        btn_browse_ck = QPushButton(t("btn_browse"))
+        btn_browse_ck.clicked.connect(self._browse_cookies)
+        file_layout.addWidget(btn_browse_ck)
+        layout.addWidget(self._file_widget, 2, 1, 1, 2)
 
-        # Row 2: Browser detail frame (shown when source=browser)
-        self._browser_frame = ttk.Frame(parent)
+        # Browser detail row
+        self._browser_widget = QWidget()
+        browser_layout = QHBoxLayout(self._browser_widget)
+        browser_layout.setContentsMargins(0, 0, 0, 0)
         current_browser_display = ""
         if self._settings.cookies_browser in _BROWSER_INTERNAL:
-            current_browser_display = _BROWSER_DISPLAY[_BROWSER_INTERNAL.index(self._settings.cookies_browser)]
-        self._browser_var = tk.StringVar(value=current_browser_display)
-        ttk.Combobox(
-            self._browser_frame, textvariable=self._browser_var,
-            values=_BROWSER_DISPLAY, state="readonly", width=20,
-        ).pack(side="left")
+            current_browser_display = _BROWSER_DISPLAY[
+                _BROWSER_INTERNAL.index(self._settings.cookies_browser)]
+        self._browser_combo = QComboBox()
+        self._browser_combo.addItems(_BROWSER_DISPLAY)
+        if current_browser_display:
+            self._browser_combo.setCurrentText(current_browser_display)
+        browser_layout.addWidget(self._browser_combo)
+        browser_layout.addStretch()
+        layout.addWidget(self._browser_widget, 2, 1, 1, 2)
 
-        # Row 3: Language
-        ttk.Label(parent, text=t("label_language")).grid(row=3, column=0, sticky="w", pady=5)
+        # Language
+        layout.addWidget(QLabel(t("label_language")), 3, 0, Qt.AlignmentFlag.AlignRight)
         self._lang_display = [t(f"lang_{lang}") for lang in AVAILABLE_LANGUAGES]
         current_display = t(f"lang_{self._settings.language}")
-        self._lang_var = tk.StringVar(value=current_display)
-        ttk.Combobox(
-            parent, textvariable=self._lang_var, values=self._lang_display,
-            state="readonly", width=20,
-        ).grid(row=3, column=1, padx=5, pady=5, sticky="w")
+        self._lang_combo = QComboBox()
+        self._lang_combo.addItems(self._lang_display)
+        self._lang_combo.setCurrentText(current_display)
+        layout.addWidget(self._lang_combo, 3, 1, 1, 2)
 
-        parent.grid_columnconfigure(1, weight=1)
+        # Set initial state
+        if self._settings.cookies_browser:
+            self._radio_browser.setChecked(True)
+        elif self._settings.cookies_path:
+            self._radio_file.setChecked(True)
+        else:
+            self._radio_none.setChecked(True)
 
-        # Show the appropriate detail frame based on initial source
+        self._cookies_btn_group.buttonClicked.connect(self._on_cookies_source_changed)
         self._on_cookies_source_changed()
 
     def _on_cookies_source_changed(self):
-        self._file_frame.grid_remove()
-        self._browser_frame.grid_remove()
-        source = self._cookies_source_var.get()
-        if source == "file":
-            self._file_frame.grid(row=2, column=1, columnspan=2, sticky="w", pady=(0, 5))
-        elif source == "browser":
-            self._browser_frame.grid(row=2, column=1, columnspan=2, sticky="w", pady=(0, 5))
+        is_file = self._radio_file.isChecked()
+        is_browser = self._radio_browser.isChecked()
+        self._file_widget.setVisible(is_file)
+        self._browser_widget.setVisible(is_browser)
 
-    def _build_quality_tab(self, parent: ttk.Frame):
-        ttk.Label(parent, text=t("label_video_resolution")).grid(row=0, column=0, sticky="w", pady=5)
+    def _build_quality_tab(self, parent: QWidget):
+        layout = QGridLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        layout.setColumnStretch(1, 1)
+
+        layout.addWidget(QLabel(t("label_video_resolution")), 0, 0, Qt.AlignmentFlag.AlignRight)
         res_values = [f"{r}p" for r in VIDEO_RESOLUTIONS]
-        self._res_var = tk.StringVar(value=f"{self._settings.video_resolution}p")
-        ttk.Combobox(
-            parent, textvariable=self._res_var, values=res_values,
-            state="readonly", width=10,
-        ).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self._res_combo = QComboBox()
+        self._res_combo.addItems(res_values)
+        self._res_combo.setCurrentText(f"{self._settings.video_resolution}p")
+        layout.addWidget(self._res_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
-        ttk.Label(parent, text=t("label_mp3_bitrate")).grid(row=1, column=0, sticky="w", pady=5)
+        layout.addWidget(QLabel(t("label_mp3_bitrate")), 1, 0, Qt.AlignmentFlag.AlignRight)
         bitrate_values = [f"{b}kbps" for b in MP3_BITRATES]
-        self._bitrate_var = tk.StringVar(value=f"{self._settings.mp3_bitrate}kbps")
-        ttk.Combobox(
-            parent, textvariable=self._bitrate_var, values=bitrate_values,
-            state="readonly", width=10,
-        ).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self._bitrate_combo = QComboBox()
+        self._bitrate_combo.addItems(bitrate_values)
+        self._bitrate_combo.setCurrentText(f"{self._settings.mp3_bitrate}kbps")
+        layout.addWidget(self._bitrate_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
-        ttk.Label(parent, text=t("quality_note"), foreground="gray").grid(
-            row=2, column=0, columnspan=2, sticky="w", pady=(10, 0),
-        )
+        note = QLabel(t("quality_note"))
+        note.setStyleSheet("color: gray;")
+        note.setWordWrap(True)
+        layout.addWidget(note, 2, 0, 1, 2)
+        layout.setRowStretch(3, 1)
 
     def _browse_download(self):
-        path = filedialog.askdirectory(title=t("dialog_select_folder"))
+        path = QFileDialog.getExistingDirectory(self, t("dialog_select_folder"))
         if path:
-            self._download_var.set(path)
+            self._download_edit.setText(path)
 
     def _browse_cookies(self):
-        path = filedialog.askopenfilename(
-            title=t("label_cookies_file"),
-            filetypes=[
-                (t("filetype_text"), "*.txt"),
-                (t("filetype_all"), "*.*"),
-            ],
+        path, _ = QFileDialog.getOpenFileName(
+            self, t("label_cookies_file"), "",
+            f"{t('filetype_text')} (*.txt);;{t('filetype_all')} (*.*)",
         )
         if path:
-            self._cookies_var.set(path)
+            self._cookies_edit.setText(path)
 
     def _save(self):
         old_lang = self._settings.language
-        selected_idx = self._lang_display.index(self._lang_var.get())
-        new_lang = AVAILABLE_LANGUAGES[selected_idx]
+        lang_idx = self._lang_display.index(self._lang_combo.currentText())
+        new_lang = AVAILABLE_LANGUAGES[lang_idx]
 
-        self._settings.download_path = self._download_var.get().strip()
+        self._settings.download_path = self._download_edit.text().strip()
         self._settings.language = new_lang
-        self._settings.video_resolution = self._res_var.get().removesuffix("p")
-        self._settings.mp3_bitrate = self._bitrate_var.get().removesuffix("kbps")
+        self._settings.video_resolution = self._res_combo.currentText().removesuffix("p")
+        self._settings.mp3_bitrate = self._bitrate_combo.currentText().removesuffix("kbps")
 
-        source = self._cookies_source_var.get()
-        if source == "file":
-            self._settings.cookies_path = self._cookies_var.get().strip()
+        if self._radio_file.isChecked():
+            self._settings.cookies_path = self._cookies_edit.text().strip()
             self._settings.cookies_browser = ""
-        elif source == "browser":
-            selected_display = self._browser_var.get()
-            if selected_display in _BROWSER_DISPLAY:
-                self._settings.cookies_browser = _BROWSER_INTERNAL[_BROWSER_DISPLAY.index(selected_display)]
+        elif self._radio_browser.isChecked():
+            disp = self._browser_combo.currentText()
+            if disp in _BROWSER_DISPLAY:
+                self._settings.cookies_browser = _BROWSER_INTERNAL[_BROWSER_DISPLAY.index(disp)]
             else:
                 self._settings.cookies_browser = ""
             self._settings.cookies_path = ""
@@ -188,18 +217,15 @@ class SettingsDialog(tk.Toplevel):
         self._manager.save(self._settings)
 
         if new_lang != old_lang:
-            messagebox.showinfo(t("settings_title"), t("restart_required"))
+            QMessageBox.information(self, t("settings_title"), t("restart_required"))
 
-        self.destroy()
+        self.accept()
 
-    def _center_on_parent(self, parent: tk.Tk):
-        self.update_idletasks()
-        pw = parent.winfo_width()
-        ph = parent.winfo_height()
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        dw = self.winfo_width()
-        dh = self.winfo_height()
-        x = px + (pw - dw) // 2
-        y = py + (ph - dh) // 2
-        self.geometry(f"+{x}+{y}")
+    def _center_on_parent(self, parent):
+        if parent is None:
+            return
+        pg = parent.geometry()
+        dg = self.geometry()
+        x = pg.x() + (pg.width() - dg.width()) // 2
+        y = pg.y() + (pg.height() - dg.height()) // 2
+        self.move(x, y)

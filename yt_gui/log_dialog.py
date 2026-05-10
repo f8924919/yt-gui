@@ -1,53 +1,64 @@
-import tkinter as tk
-from tkinter import ttk, scrolledtext
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QPushButton,
+)
+from PySide6.QtGui import QFont, QPalette, QColor
+from PySide6.QtCore import Qt
 
 from .i18n import t
 
 
-class LogDialog(tk.Toplevel):
-    def __init__(self, parent, on_close=None):
+class LogDialog(QDialog):
+    def __init__(self, parent=None, on_close=None):
         super().__init__(parent)
-        self.title(t("log_dialog_title"))
-        self.geometry("640x420")
-        self.minsize(400, 200)
-        self.resizable(True, True)
+        self.setWindowTitle(t("log_dialog_title"))
+        self.resize(640, 420)
+        self.setMinimumSize(400, 200)
         self._on_close_cb = on_close
 
-        self._text = scrolledtext.ScrolledText(
-            self, state=tk.DISABLED, wrap=tk.WORD,
-            font=("Courier New", 9), bg="#1e1e1e", fg="#d4d4d4",
-        )
-        self._text.pack(fill="both", expand=True, padx=5, pady=(5, 0))
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
 
-        btn_frame = ttk.Frame(self)
-        btn_frame.pack(fill="x", padx=5, pady=5)
-        ttk.Button(btn_frame, text=t("btn_clear_log"), command=self._clear).pack(side="left")
-        ttk.Button(btn_frame, text=t("btn_close"), command=self._on_close).pack(side="right")
+        self._text = QPlainTextEdit()
+        self._text.setReadOnly(True)
+        self._text.setFont(QFont("Courier New", 9))
+        palette = self._text.palette()
+        palette.setColor(QPalette.ColorRole.Base, QColor("#1e1e1e"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#d4d4d4"))
+        self._text.setPalette(palette)
+        self._text.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self._text)
 
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        btn_layout = QHBoxLayout()
+        btn_clear = QPushButton(t("btn_clear_log"))
+        btn_clear.clicked.connect(self._clear)
+        btn_layout.addWidget(btn_clear)
+        btn_layout.addStretch()
+        btn_close = QPushButton(t("btn_close"))
+        btn_close.clicked.connect(self._on_close)
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)
 
     def load(self, entries: list[str]):
-        self._text.config(state=tk.NORMAL)
-        self._text.delete("1.0", tk.END)
-        if entries:
-            self._text.insert(tk.END, "\n".join(entries) + "\n")
-        self._text.config(state=tk.DISABLED)
-        self._text.see(tk.END)
+        self._text.setPlainText("\n".join(entries) + ("\n" if entries else ""))
+        self._text.verticalScrollBar().setValue(self._text.verticalScrollBar().maximum())
 
     def append(self, text: str):
-        at_bottom = self._text.yview()[1] >= 0.99
-        self._text.config(state=tk.NORMAL)
-        self._text.insert(tk.END, text + "\n")
-        self._text.config(state=tk.DISABLED)
+        sb = self._text.verticalScrollBar()
+        at_bottom = sb.value() >= sb.maximum()
+        self._text.appendPlainText(text)
         if at_bottom:
-            self._text.see(tk.END)
+            sb.setValue(sb.maximum())
 
     def _clear(self):
-        self._text.config(state=tk.NORMAL)
-        self._text.delete("1.0", tk.END)
-        self._text.config(state=tk.DISABLED)
+        self._text.clear()
 
     def _on_close(self):
         if self._on_close_cb:
             self._on_close_cb()
-        self.destroy()
+        self.close()
+
+    def closeEvent(self, event):
+        if self._on_close_cb:
+            self._on_close_cb()
+        super().closeEvent(event)

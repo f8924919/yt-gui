@@ -1,7 +1,7 @@
 [project]
 name = "yt-gui"
 version = "0.1.0"
-description = "Tkinter製のyt-dlp GUIダウンローダー"
+description = "PySide6製のyt-dlp GUIダウンローダー"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -12,6 +12,7 @@ dependencies = [
     "pillow>=12.2.0",
     "pyinstaller==6.20.0",
     "pyinstaller-hooks-contrib==2026.4",
+    "pyside6>=6.11.0",
     "setuptools==82.0.1",
     "yt-dlp==2026.3.17",
     "yt-dlp-ejs==0.8.0",

@@ -17,26 +17,25 @@ ffmpeg_bin = f'ffmpeg{_ext}'
 
 _bin_dir = os.path.join(SPECPATH, 'bin')
 _png_path = os.path.join(SPECPATH, 'assets', 'icon.png')
-_extra_binaries = [(os.path.join(_bin_dir, deno_bin), '.'), (os.path.join(_bin_dir, 'ffmpeg', ffmpeg_bin), 'ffmpeg')]
+_extra_binaries = [
+    (os.path.join(_bin_dir, deno_bin), '.'),
+    (os.path.join(_bin_dir, 'ffmpeg', ffmpeg_bin), 'ffmpeg'),
+]
 
 
 def _png_to_ico(png_path: str) -> str:
-    """PNG ファイルから ICO ファイルを生成してパスを返す。
-    Windows Vista+ は ICO 内に PNG データをそのまま埋め込める形式をサポートしている。
-    """
+    """PNG ファイルから ICO ファイルを生成してパスを返す。"""
     with open(png_path, 'rb') as f:
         png_data = f.read()
 
     width = struct.unpack('>I', png_data[16:20])[0]
     height = struct.unpack('>I', png_data[20:24])[0]
-    # ICO では 256 を 0 で表現する
     w = 0 if width >= 256 else width
     h = 0 if height >= 256 else height
 
-    ico_header = struct.pack('<HHH', 0, 1, 1)           # reserved / type=1 / count=1
-    entry_offset = 6 + 16                                # ヘッダ(6) + ICONDIRENTRY(16)
-    ico_entry = struct.pack('<BBBBHHII',
-        w, h, 0, 0, 1, 32, len(png_data), entry_offset)
+    ico_header = struct.pack('<HHH', 0, 1, 1)
+    entry_offset = 6 + 16
+    ico_entry = struct.pack('<BBBBHHII', w, h, 0, 0, 1, 32, len(png_data), entry_offset)
 
     ico_path = png_path.replace('.png', '_generated.ico')
     with open(ico_path, 'wb') as f:
@@ -45,7 +44,7 @@ def _png_to_ico(png_path: str) -> str:
 
 
 def _png_to_icns(png_path: str) -> str:
-    """PNG から .icns を生成して返す（macOS 専用、sips + iconutil を使用）"""
+    """PNG から .icns を生成して返す（macOS 専用）"""
     import tempfile, shutil
     iconset_dir = tempfile.mkdtemp(suffix='.iconset')
     try:
@@ -72,29 +71,7 @@ elif sys.platform == 'win32':
 else:
     _icon_path = None
 
-
-# Tcl/Tk データを明示的に収集する（PyInstaller の自動検出が失敗する場合の保険）
-def _collect_tcltk_datas():
-    try:
-        import tkinter
-        import _tkinter
-        tcl = tkinter.Tcl()
-        tcl_data_dir = tcl.eval("info library")
-        tk_ver = _tkinter.TK_VERSION  # e.g. "8.6" or "9.0"
-        tk_data_dir = os.path.join(os.path.dirname(tcl_data_dir), f"tk{tk_ver}")
-        result = []
-        if os.path.isdir(tcl_data_dir):
-            result.append((tcl_data_dir, '_tcl_data'))
-        if os.path.isdir(tk_data_dir):
-            result.append((tk_data_dir, '_tk_data'))
-        return result
-    except Exception as e:
-        print(f"[WARNING] Tcl/Tk data collection failed: {e}")
-        return []
-
-_tcltk_datas = _collect_tcltk_datas()
-
-_extra_datas = _tcltk_datas + [(_png_path, 'assets')] if os.path.isfile(_png_path) else _tcltk_datas
+_extra_datas = [(_png_path, 'assets')] if os.path.isfile(_png_path) else []
 
 a = Analysis(
     ['main.py'],
@@ -105,7 +82,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['tkinter', '_tkinter'],
     noarchive=False,
     optimize=0,
 )
