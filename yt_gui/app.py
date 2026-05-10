@@ -632,7 +632,7 @@ class App(QMainWindow):
                 tree_item.setForeground(col, c)
         else:
             for col in range(4):
-                tree_item.setForeground(col, QColor())
+                tree_item.setData(col, Qt.ItemDataRole.ForegroundRole, None)
 
     # ── edit mode ─────────────────────────────────────────────────────────────
 
