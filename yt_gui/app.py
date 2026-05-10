@@ -195,6 +195,17 @@ class App(QMainWindow):
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
+    def _set_original_format_enabled(self, enabled: bool):
+        if _ORIGINAL_KEY not in FORMAT_KEYS:
+            return
+        item = self.format_combo.model().item(FORMAT_KEYS.index(_ORIGINAL_KEY))
+        if item is None:
+            return
+        if enabled:
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEnabled)
+        else:
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+
     def _check_dependencies(self):
         missing = []
         if not os.path.isfile(self.downloader._ffmpeg_path):
@@ -227,6 +238,8 @@ class App(QMainWindow):
         self.format_combo.addItems(self._format_display)
         self.format_combo.setCurrentIndex(old_idx)
         self.format_combo.blockSignals(False)
+        if self._edit_mode and len(self._editing_items) > 1:
+            self._set_original_format_enabled(False)
 
         self._mp3_thumb_check.setText(t("mp3_embed_thumbnail"))
 
@@ -645,14 +658,20 @@ class App(QMainWindow):
         self.url_entry.setReadOnly(True)
 
         first = items[0]
-        if first.format_id in FORMAT_KEYS:
-            idx = FORMAT_KEYS.index(first.format_id)
+        target_format_id = first.format_id
+        if len(items) > 1:
+            self._set_original_format_enabled(False)
+            if target_format_id == _ORIGINAL_KEY:
+                target_format_id = FORMAT_KEYS[0]
+
+        if target_format_id in FORMAT_KEYS:
+            idx = FORMAT_KEYS.index(target_format_id)
             self.format_combo.blockSignals(True)
             self.format_combo.setCurrentIndex(idx)
             self.format_combo.blockSignals(False)
             self._on_format_changed(idx)
 
-        if first.format_id == _MP3_KEY:
+        if target_format_id == _MP3_KEY:
             self._mp3_thumb_check.setChecked(first.mp3_thumbnail)
 
         self.add_button.setText(t("btn_apply_edit"))
@@ -747,6 +766,8 @@ class App(QMainWindow):
 
         self.add_button.setText(t("btn_add"))
         self._cancel_edit_button.setVisible(False)
+
+        self._set_original_format_enabled(True)
 
         if not self._worker_running:
             self.start_queue_button.setEnabled(True)
@@ -877,6 +898,8 @@ class App(QMainWindow):
             self.format_combo.addItems(self._format_display)
             self.format_combo.setCurrentIndex(old_idx)
             self.format_combo.blockSignals(False)
+            if self._edit_mode and len(self._editing_items) > 1:
+                self._set_original_format_enabled(False)
 
     # ── status / log ──────────────────────────────────────────────────────────
 
