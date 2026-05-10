@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QStatusBar, QToolTip, QMessageBox,
     QAbstractItemView,
 )
-from PySide6.QtCore import QObject, Signal, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Signal, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QColor
 
 from .formats import FORMAT_KEYS, build_720p_spec
@@ -68,20 +68,17 @@ class _AppSignals(QObject):
 
 
 class _QueueTree(QTreeWidget):
-    """QTreeWidget that shows hover tooltips for queue items."""
+    """QTreeWidget that shows persistent hover tooltips for queue items."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._get_item_cb = None  # set by App: (QTreeWidgetItem) -> _QueueItem | None
-        self._hovered_tree_item: QTreeWidgetItem | None = None
-        self.setMouseTracking(True)
 
-    def mouseMoveEvent(self, event):
-        tree_item = self.itemAt(event.pos())
-        if tree_item != self._hovered_tree_item:
-            self._hovered_tree_item = tree_item
-            if tree_item is not None and self._get_item_cb is not None:
-                qi = self._get_item_cb(tree_item)
+    def viewportEvent(self, event):
+        if event.type() == QEvent.Type.ToolTip:
+            item = self.itemAt(event.pos())
+            if item is not None and self._get_item_cb is not None:
+                qi = self._get_item_cb(item)
                 if qi is not None:
                     lines = [
                         f"<b>{t('tooltip_title')}:</b> {qi.title or qi.url}",
@@ -97,16 +94,16 @@ class _QueueTree(QTreeWidget):
                         lines.append(f"<b>{t('tooltip_subtitle')}:</b> {langs}  {fmt}  {embed_lbl}")
                     if qi.format_id == _ORIGINAL_KEY and qi.format_spec:
                         lines.append(f"<b>{t('tooltip_format_spec')}:</b> {qi.format_spec}")
-                    QToolTip.showText(event.globalPosition().toPoint(), "<br>".join(lines), self)
-                    super().mouseMoveEvent(event)
-                    return
+                    QToolTip.showText(
+                        event.globalPos(),
+                        "<br>".join(lines),
+                        self.viewport(),
+                        self.visualItemRect(item),
+                    )
+                    return True
             QToolTip.hideText()
-        super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event):
-        self._hovered_tree_item = None
-        QToolTip.hideText()
-        super().leaveEvent(event)
+            return True
+        return super().viewportEvent(event)
 
 
 class App(QMainWindow):
