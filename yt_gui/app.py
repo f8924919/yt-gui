@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QLineEdit, QComboBox, QPushButton, QProgressBar,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame,
-    QCheckBox, QStatusBar, QToolTip, QMessageBox,
+    QCheckBox, QStatusBar, QToolTip, QMessageBox, QMenu,
     QAbstractItemView,
 )
 from PySide6.QtCore import QEvent, QObject, Signal, Qt, QTimer
@@ -68,11 +68,28 @@ class _AppSignals(QObject):
 
 
 class _QueueTree(QTreeWidget):
-    """QTreeWidget that shows persistent hover tooltips for queue items."""
+    """QTreeWidget with hover tooltips and a context menu for queue items."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._get_item_cb = None  # set by App: (QTreeWidgetItem) -> _QueueItem | None
+        self._get_item_cb = None      # (QTreeWidgetItem) -> _QueueItem | None
+        self._context_menu_cb = None  # (items: list[_QueueItem]) -> None
+        self._is_editing = False
+
+    def contextMenuEvent(self, event):
+        if self._context_menu_cb is None or self._get_item_cb is None:
+            return
+        selected = self.selectedItems()
+        if not selected:
+            return
+        items = [qi for ti in selected
+                 if (qi := self._get_item_cb(ti)) is not None]
+        waiting = [qi for qi in items if qi.status == "waiting"]
+        menu = QMenu(self)
+        act = menu.addAction(t("ctx_edit_format"))
+        act.setEnabled(bool(waiting) and not self._is_editing)
+        if menu.exec(event.globalPos()) == act and waiting and not self._is_editing:
+            self._context_menu_cb(waiting)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.Type.ToolTip:
@@ -112,11 +129,13 @@ class App(QMainWindow):
         "downloading": "queue_status_downloading",
         "done": "queue_status_done",
         "error": "queue_status_error",
+        "editing": "queue_status_editing",
     }
     _STATUS_COLORS: dict[str, str] = {
         "downloading": "#1565c0",
         "done": "#2e7d32",
         "error": "#c62828",
+        "editing": "#e65100",
     }
 
     def __init__(self):
@@ -147,6 +166,8 @@ class App(QMainWindow):
         self._item_counter = 0
         self._log_entries: list[str] = []
         self._log_dialog: LogDialog | None = None
+        self._edit_mode = False
+        self._editing_items: list[_QueueItem] = []
 
         self._signals = _AppSignals()
         self._signals.status_update.connect(self._update_status)
@@ -213,7 +234,8 @@ class App(QMainWindow):
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
 
-        self.add_button.setText(t("btn_add"))
+        self.add_button.setText(t("btn_apply_edit") if self._edit_mode else t("btn_add"))
+        self._cancel_edit_button.setText(t("btn_cancel_edit"))
         self.start_queue_button.setText(t("btn_start_queue"))
         self.pause_queue_button.setText(t("btn_pause_queue"))
         self.remove_item_button.setText(t("btn_remove_item"))
@@ -224,7 +246,8 @@ class App(QMainWindow):
             self._refresh_tree_item(item)
 
         if not self._worker_running:
-            self.status_label.setText(t("status_ready"))
+            self.status_label.setText(
+                t("status_edit_mode") if self._edit_mode else t("status_ready"))
 
         self._original_panel.retranslate()
 
@@ -320,13 +343,17 @@ class App(QMainWindow):
         self._mp3_frame.setVisible(False)
         layout.addWidget(self._mp3_frame, 2, 1, 1, 2)
 
-        # Row 3: Add button
+        # Row 3: Add / Apply-edit button + Cancel-edit button
         add_frame = QWidget()
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(0, 8, 0, 2)
         self.add_button = QPushButton(t("btn_add"))
         self.add_button.clicked.connect(self._add_url)
         add_layout.addWidget(self.add_button)
+        self._cancel_edit_button = QPushButton(t("btn_cancel_edit"))
+        self._cancel_edit_button.clicked.connect(self._cancel_edit)
+        self._cancel_edit_button.setVisible(False)
+        add_layout.addWidget(self._cancel_edit_button)
         add_layout.addStretch()
         layout.addWidget(add_frame, 3, 0, 1, 3)
 
@@ -342,6 +369,7 @@ class App(QMainWindow):
 
         self._queue_tree = _QueueTree()
         self._queue_tree._get_item_cb = self._get_queue_item_for_tree_item
+        self._queue_tree._context_menu_cb = self._enter_edit_mode
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
@@ -411,6 +439,9 @@ class App(QMainWindow):
     # ── queue operations ──────────────────────────────────────────────────────
 
     def _add_url(self):
+        if self._edit_mode:
+            self._apply_edit()
+            return
         url = self.url_entry.text().strip()
         if not url:
             QMessageBox.warning(self, t("warn_title"), t("warn_no_url"))
@@ -476,7 +507,7 @@ class App(QMainWindow):
 
     def _reset_add_button(self):
         self.add_button.setEnabled(True)
-        self.add_button.setText(t("btn_add"))
+        self.add_button.setText(t("btn_apply_edit") if self._edit_mode else t("btn_add"))
 
     def _on_fetch_for_add_done(self, payload: dict):
         result = payload['result']
@@ -590,6 +621,139 @@ class App(QMainWindow):
             for col in range(4):
                 tree_item.setForeground(col, QColor())
 
+    # ── edit mode ─────────────────────────────────────────────────────────────
+
+    def _enter_edit_mode(self, items: list[_QueueItem]):
+        with self._queue_lock:
+            for item in items:
+                if item.status != "waiting":
+                    return
+            for item in items:
+                item.status = "editing"
+
+        self._edit_mode = True
+        self._editing_items = items
+        self._queue_tree._is_editing = True
+
+        for item in items:
+            self._refresh_tree_item(item)
+
+        if len(items) == 1:
+            self.url_entry.setText(items[0].url)
+        else:
+            self.url_entry.setText(t("edit_multiple_selected").format(count=len(items)))
+        self.url_entry.setReadOnly(True)
+
+        first = items[0]
+        if first.format_id in FORMAT_KEYS:
+            idx = FORMAT_KEYS.index(first.format_id)
+            self.format_combo.blockSignals(True)
+            self.format_combo.setCurrentIndex(idx)
+            self.format_combo.blockSignals(False)
+            self._on_format_changed(idx)
+
+        if first.format_id == _MP3_KEY:
+            self._mp3_thumb_check.setChecked(first.mp3_thumbnail)
+
+        self.add_button.setText(t("btn_apply_edit"))
+        self._cancel_edit_button.setVisible(True)
+
+        if not self._worker_running:
+            self.start_queue_button.setEnabled(False)
+
+        self._update_status(t("status_edit_mode"), 0)
+
+        if len(items) == 1 and first.format_id == _ORIGINAL_KEY:
+            self._original_panel.trigger_fetch()
+
+    def _apply_edit(self):
+        idx = self.format_combo.currentIndex()
+        if idx < 0 or idx >= len(FORMAT_KEYS):
+            return
+        format_id = FORMAT_KEYS[idx]
+        format_label = self.format_combo.currentText()
+
+        if len(self._editing_items) > 1 and format_id == _ORIGINAL_KEY:
+            QMessageBox.warning(self, t("warn_title"), t("warn_edit_original_multi"))
+            return
+
+        if format_id == _ORIGINAL_KEY:
+            if not self._original_panel.has_formats_loaded():
+                QMessageBox.warning(self, t("warn_title"), t("warn_edit_formats_not_loaded"))
+                return
+            if self._original_panel.is_both_skipped():
+                QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
+                return
+            format_spec = self._original_panel.get_format_spec()
+            subtitle_opts = self._original_panel.get_subtitle_opts()
+            remux_only = self._original_panel.get_remux_only()
+            mp3_bitrate = None
+            mp3_thumbnail = False
+        elif format_id == _MP3_KEY:
+            format_spec = None
+            subtitle_opts = None
+            remux_only = False
+            mp3_bitrate = self._settings.mp3_bitrate
+            mp3_thumbnail = self._mp3_thumb_check.isChecked()
+        elif format_id == "fmt_720p":
+            format_spec = build_720p_spec(self._settings.video_resolution)
+            subtitle_opts = None
+            remux_only = False
+            mp3_bitrate = None
+            mp3_thumbnail = False
+        else:
+            format_spec = None
+            subtitle_opts = None
+            remux_only = False
+            mp3_bitrate = None
+            mp3_thumbnail = False
+
+        with self._queue_lock:
+            for item in self._editing_items:
+                item.format_id = format_id
+                item.format_label = format_label
+                item.format_spec = format_spec
+                item.subtitle_opts = subtitle_opts
+                item.remux_only = remux_only
+                item.mp3_bitrate = mp3_bitrate
+                item.mp3_thumbnail = mp3_thumbnail
+                item.status = "waiting"
+
+        for item in self._editing_items:
+            if item.tree_item is not None:
+                item.tree_item.setText(2, format_label)
+            self._refresh_tree_item(item)
+
+        self._log(t("log_edit_applied").format(
+            count=len(self._editing_items), fmt=format_label))
+        self._exit_edit_mode()
+
+    def _cancel_edit(self):
+        with self._queue_lock:
+            for item in self._editing_items:
+                if item.status == "editing":
+                    item.status = "waiting"
+        for item in self._editing_items:
+            self._refresh_tree_item(item)
+        self._exit_edit_mode()
+
+    def _exit_edit_mode(self):
+        self._edit_mode = False
+        self._editing_items = []
+        self._queue_tree._is_editing = False
+
+        self.url_entry.clear()
+        self.url_entry.setReadOnly(False)
+
+        self.add_button.setText(t("btn_add"))
+        self._cancel_edit_button.setVisible(False)
+
+        if not self._worker_running:
+            self.start_queue_button.setEnabled(True)
+
+        self._on_format_changed(self.format_combo.currentIndex())
+        self._update_status(t("status_ready"), 0)
+
     # ── queue control ─────────────────────────────────────────────────────────
 
     def _start_queue(self):
@@ -684,7 +848,7 @@ class App(QMainWindow):
         for tree_item in self._queue_tree.selectedItems():
             with self._queue_lock:
                 qi = next((i for i in self._queue_items if i.tree_item is tree_item), None)
-                if qi is None or qi.status == "downloading":
+                if qi is None or qi.status in ("downloading", "editing"):
                     continue
                 self._queue_items.remove(qi)
             idx = self._queue_tree.indexOfTopLevelItem(tree_item)

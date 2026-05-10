@@ -108,6 +108,16 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "字幕",
     "tooltip_sub_file": "ファイル保存",
     "tooltip_format_spec": "形式仕様",
+    # edit mode
+    "ctx_edit_format": "形式を変更...",
+    "btn_apply_edit": "変更",
+    "btn_cancel_edit": "キャンセル",
+    "status_edit_mode": "✏️ 編集モード — 形式を選んで「変更」を押してください",
+    "queue_status_editing": "✏️ 編集中",
+    "warn_edit_original_multi": "「オリジナルの形式」は複数アイテムの一括変更には対応していません。",
+    "warn_edit_formats_not_loaded": "形式が取得されていません。「形式を取得」ボタンを押してからお試しください。",
+    "edit_multiple_selected": "{count} 件を選択中",
+    "log_edit_applied": "✏️ {count} 件の形式を「{fmt}」に変更しました",
     # dependency check
     "warn_deps_missing_title": "依存ツールが見つかりません",
     "warn_deps_missing_ffmpeg": "• ffmpeg — 動画・音声の変換や結合ができない場合があります",

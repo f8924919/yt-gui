@@ -120,6 +120,9 @@ class OriginalFormatPanel(QGroupBox):
 
     # ── public interface ─────────────────────────────────────────────────────
 
+    def trigger_fetch(self):
+        self._start_fetch_thread()
+
     def retranslate(self):
         self.setTitle(t("label_original_detail"))
         self._video_label.setText(t("label_orig_video"))

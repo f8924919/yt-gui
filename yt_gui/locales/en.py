@@ -108,6 +108,16 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "Subtitle",
     "tooltip_sub_file": "Save to file",
     "tooltip_format_spec": "Format spec",
+    # edit mode
+    "ctx_edit_format": "Change format...",
+    "btn_apply_edit": "Apply",
+    "btn_cancel_edit": "Cancel",
+    "status_edit_mode": "✏️ Edit mode — select a format and click Apply",
+    "queue_status_editing": "✏️ Editing",
+    "warn_edit_original_multi": "\"Original format\" cannot be used for batch editing.",
+    "warn_edit_formats_not_loaded": "Formats have not been fetched. Please click \"Fetch formats\" first.",
+    "edit_multiple_selected": "{count} items selected",
+    "log_edit_applied": "✏️ Changed format of {count} item(s) to \"{fmt}\"",
     # dependency check
     "warn_deps_missing_title": "Missing dependencies",
     "warn_deps_missing_ffmpeg": "• ffmpeg — video/audio merging and conversion may not work",
