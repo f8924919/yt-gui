@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QLineEdit, QComboBox, QPushButton, QProgressBar,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame,
     QCheckBox, QStatusBar, QToolTip, QMessageBox, QMenu,
@@ -86,9 +86,15 @@ class _QueueTree(QTreeWidget):
                  if (qi := self._get_item_cb(ti)) is not None]
         waiting = [qi for qi in items if qi.status == "waiting"]
         menu = QMenu(self)
-        act = menu.addAction(t("ctx_edit_format"))
-        act.setEnabled(bool(waiting) and not self._is_editing)
-        if menu.exec(event.globalPos()) == act and waiting and not self._is_editing:
+        act_copy_url = menu.addAction(t("ctx_copy_url"))
+        menu.addSeparator()
+        act_edit = menu.addAction(t("ctx_edit_format"))
+        act_edit.setEnabled(bool(waiting) and not self._is_editing)
+        chosen = menu.exec(event.globalPos())
+        if chosen == act_copy_url:
+            urls = "\n".join(qi.url for qi in items)
+            QApplication.clipboard().setText(urls)
+        elif chosen == act_edit and waiting and not self._is_editing:
             self._context_menu_cb(waiting)
 
     def viewportEvent(self, event):

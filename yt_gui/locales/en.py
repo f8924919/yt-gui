@@ -109,6 +109,7 @@ STRINGS: dict[str, str] = {
     "tooltip_sub_file": "Save to file",
     "tooltip_format_spec": "Format spec",
     # edit mode
+    "ctx_copy_url": "Copy URL",
     "ctx_edit_format": "Change format...",
     "btn_apply_edit": "Apply",
     "btn_cancel_edit": "Cancel",

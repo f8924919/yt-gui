@@ -109,6 +109,7 @@ STRINGS: dict[str, str] = {
     "tooltip_sub_file": "ファイル保存",
     "tooltip_format_spec": "形式仕様",
     # edit mode
+    "ctx_copy_url": "URLをコピー",
     "ctx_edit_format": "形式を変更...",
     "btn_apply_edit": "変更",
     "btn_cancel_edit": "キャンセル",
