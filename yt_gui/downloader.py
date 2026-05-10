@@ -125,7 +125,7 @@ class Downloader:
             info = ydl.extract_info(url, download=False)
 
         if not info:
-            return {'type': 'single', 'url': url, 'title': url}
+            return {'type': 'single', 'url': url, 'title': url, 'thumbnail_url': None}
 
         entries = info.get('entries')
         if entries is not None:
@@ -139,12 +139,14 @@ class Downloader:
                 result.append({
                     'url': entry_url,
                     'title': entry.get('title') or entry_url,
+                    'thumbnail_url': entry.get('thumbnail'),
                 })
             return {'type': 'playlist', 'entries': result, 'title': info.get('title', '')}
 
         title = info.get('title') or url
         actual_url = info.get('webpage_url') or url
-        return {'type': 'single', 'url': actual_url, 'title': title}
+        return {'type': 'single', 'url': actual_url, 'title': title,
+                'thumbnail_url': info.get('thumbnail')}
 
     def fetch_formats(self, url, cookies_path=None, cookies_browser=None):
         ydl_opts = {

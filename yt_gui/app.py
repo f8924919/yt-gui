@@ -1,7 +1,9 @@
+import base64
 import re
 import sys
 import threading
 import os
+import urllib.request
 from os.path import expanduser
 from dataclasses import dataclass
 from datetime import datetime
@@ -52,6 +54,7 @@ class _QueueItem:
     mp3_thumbnail: bool = False
     remux_only: bool = False
     playlist_folder: str | None = None
+    thumbnail_url: str | None = None
     status: str = "waiting"
     tree_item: object = None  # QTreeWidgetItem
 
@@ -72,8 +75,9 @@ class _QueueTree(QTreeWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._get_item_cb = None      # (QTreeWidgetItem) -> _QueueItem | None
-        self._context_menu_cb = None  # (items: list[_QueueItem]) -> None
+        self._get_item_cb = None           # (QTreeWidgetItem) -> _QueueItem | None
+        self._context_menu_cb = None       # (items: list[_QueueItem]) -> None
+        self._get_thumbnail_b64_cb = None  # (url: str) -> str | None
         self._is_editing = False
 
     def contextMenuEvent(self, event):
@@ -103,7 +107,12 @@ class _QueueTree(QTreeWidget):
             if item is not None and self._get_item_cb is not None:
                 qi = self._get_item_cb(item)
                 if qi is not None:
-                    lines = [
+                    lines = []
+                    if qi.thumbnail_url and self._get_thumbnail_b64_cb is not None:
+                        b64 = self._get_thumbnail_b64_cb(qi.thumbnail_url)
+                        if b64:
+                            lines.append(f'<img src="{b64}" width="240" height="135">')
+                    lines += [
                         f"<b>{t('tooltip_title')}:</b> {qi.title or qi.url}",
                         f"<b>{t('tooltip_url')}:</b> {qi.url}",
                     ]
@@ -166,6 +175,9 @@ class App(QMainWindow):
 
         self._queue_items: list[_QueueItem] = []
         self._queue_lock = threading.Lock()
+        self._thumbnail_cache: dict[str, str] = {}   # thumbnail_url -> data URI
+        self._thumbnail_fetching: set[str] = set()
+        self._thumbnail_lock = threading.Lock()
         self._worker_running = False
         self._paused = False
         self._showing_pause_button = False
@@ -391,6 +403,7 @@ class App(QMainWindow):
         self._queue_tree = _QueueTree()
         self._queue_tree._get_item_cb = self._get_queue_item_for_tree_item
         self._queue_tree._context_menu_cb = self._enter_edit_mode
+        self._queue_tree._get_thumbnail_b64_cb = self._get_thumbnail_b64
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
@@ -543,6 +556,7 @@ class App(QMainWindow):
             self._enqueue_single(
                 result['url'], format_id, format_label, format_spec, subtitle_opts,
                 result['title'], mp3_thumbnail, remux_only=remux_only,
+                thumbnail_url=result.get('thumbnail_url'),
             )
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
@@ -575,6 +589,7 @@ class App(QMainWindow):
                     mp3_bitrate=snap_bitrate,
                     mp3_thumbnail=mp3_thumbnail,
                     playlist_folder=playlist_folder,
+                    thumbnail_url=entry.get('thumbnail_url'),
                 )
                 batch.append((self._item_counter, item))
 
@@ -589,13 +604,16 @@ class App(QMainWindow):
                 item.tree_item = tree_item
                 self._queue_tree.addTopLevelItem(tree_item)
 
+            for _, item in batch:
+                self._start_thumbnail_fetch(item.thumbnail_url)
+
             self.url_entry.clear()
             msg = t("status_playlist_added").format(count=len(batch))
             self._signals.status_update.emit(msg, 0)
             self._log(msg)
 
     def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title,
-                        mp3_thumbnail=False, remux_only=False):
+                        mp3_thumbnail=False, remux_only=False, thumbnail_url=None):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = build_720p_spec(self._settings.video_resolution)
         mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
@@ -611,6 +629,7 @@ class App(QMainWindow):
             mp3_bitrate=mp3_bitrate,
             mp3_thumbnail=mp3_thumbnail,
             remux_only=remux_only,
+            thumbnail_url=thumbnail_url,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -620,11 +639,49 @@ class App(QMainWindow):
             [str(self._item_counter), short, format_label, t("queue_status_waiting")])
         item.tree_item = tree_item
         self._queue_tree.addTopLevelItem(tree_item)
+        self._start_thumbnail_fetch(thumbnail_url)
         self._log(f"📥 {title}  [{format_label}]")
 
     def _get_queue_item_for_tree_item(self, tree_item: QTreeWidgetItem) -> '_QueueItem | None':
         with self._queue_lock:
             return next((i for i in self._queue_items if i.tree_item is tree_item), None)
+
+    # ── thumbnail cache ───────────────────────────────────────────────────────
+
+    def _get_thumbnail_b64(self, thumbnail_url: str) -> str | None:
+        with self._thumbnail_lock:
+            return self._thumbnail_cache.get(thumbnail_url)
+
+    def _start_thumbnail_fetch(self, thumbnail_url: str | None):
+        if not thumbnail_url:
+            return
+        with self._thumbnail_lock:
+            if thumbnail_url in self._thumbnail_cache or thumbnail_url in self._thumbnail_fetching:
+                return
+            self._thumbnail_fetching.add(thumbnail_url)
+        threading.Thread(
+            target=self._run_thumbnail_fetch,
+            args=(thumbnail_url,),
+            daemon=True,
+        ).start()
+
+    def _run_thumbnail_fetch(self, thumbnail_url: str):
+        try:
+            req = urllib.request.Request(
+                thumbnail_url,
+                headers={'User-Agent': 'Mozilla/5.0'},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = resp.read()
+                ct = resp.headers.get('Content-Type', 'image/jpeg')
+                content_type = ct.split(';')[0].strip() if ct else 'image/jpeg'
+            data_uri = f"data:{content_type};base64,{base64.b64encode(data).decode('ascii')}"
+            with self._thumbnail_lock:
+                self._thumbnail_cache[thumbnail_url] = data_uri
+                self._thumbnail_fetching.discard(thumbnail_url)
+        except Exception:
+            with self._thumbnail_lock:
+                self._thumbnail_fetching.discard(thumbnail_url)
 
     def _refresh_tree_item(self, item: _QueueItem):
         if item is None or item.tree_item is None:
