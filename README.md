@@ -11,7 +11,8 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   - 実行中でも新しいアイテムをキューに追加できる
   - **一時停止 / 再開** に対応（現在処理中のダウンロードは最後まで続き、次のアイテムから停止）
   - 待機中・完了・エラーのアイテムをキューから削除可能
-  - **キューアイテムを右クリック** してダウンロード形式を後から変更できる（編集モード）。複数アイテムを選択して一括変更も可能。「オリジナルの形式」は複数選択時はグレーアウトされ選択不可
+  - **キューアイテムを右クリック** でコンテキストメニューを表示。**「URL をコピー」**（複数選択時は改行区切り）と **「形式を変更」** によるダウンロード形式の変更（編集モード）が可能。複数アイテムを選択して一括変更も可能。「オリジナルの形式」は複数選択時はグレーアウトされ選択不可
+  - **キューアイテムにマウスを乗せると**ツールチップを表示。サムネイル画像（取得できた場合は 240×135px）・タイトル・URL・プレイリスト名・字幕設定・形式仕様を表示する
 - 以下の形式を選択可能（解像度・ビットレートは設定画面で変更できます）
   | 表示名 | 内容 |
   |---|---|
@@ -118,12 +119,12 @@ yt-gui/
 | `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
 | `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES`（設定画面の選択肢）を定義 |
 | `yt_gui/utils.py` | `strip_ansi(text)` — ANSI エスケープコードを除去するユーティリティ。ステータス表示・エラーダイアログで使用 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力。`log_callback` が設定されている場合は `_YtdlpLogger` 経由で yt-dlp の処理メッセージ・警告・エラーをアプリのログに転送する |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別し `thumbnail_url` も返す、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力。`log_callback` が設定されている場合は `_YtdlpLogger` 経由で yt-dlp の処理メッセージ・警告・エラーをアプリのログに転送する |
 | `yt_gui/original_format_panel.py` | `OriginalFormatPanel(QGroupBox)` — オリジナル形式の詳細設定パネル。内部の `_PanelSignals(QObject)` でフォーマット取得スレッドの結果をメインスレッドへ安全に渡す。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()` |
 | `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `cookies_browser` / `download_path` / `language` / `video_resolution` / `mp3_bitrate`）と `SettingsManager`。設定を JSON ファイルに読み書き |
 | `yt_gui/settings_dialog.py` | `SettingsDialog(QDialog)` — 「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・MP3ビットレート）を持つモーダル設定画面。`QTabWidget` を使用。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタン切り替えで、ファイルとブラウザは排他 |
 | `yt_gui/log_dialog.py` | `LogDialog(QDialog)` — 非モーダルの動作ログダイアログ。`QPlainTextEdit`（ダーク背景・等幅フォント）にタイムスタンプ付きログを表示。最下部にいれば自動スクロール、スクロールアップ中は追従しない。クリア / 閉じるボタン付き |
-| `yt_gui/app.py` | `App(QMainWindow)` — メインウィンドウ。内部の `_AppSignals(QObject)` に定義したシグナル経由でバックグラウンドスレッドからの GUI 更新を安全に処理する。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。プレイリスト追加時はプレイリスト名からサブフォルダ名を生成し `_QueueItem.playlist_folder` にセット。`_log_entries` にセッション中のログを保持し、「ファイル > ログ表示」で `LogDialog` を開く |
+| `yt_gui/app.py` | `App(QMainWindow)` — メインウィンドウ。内部の `_AppSignals(QObject)` に定義したシグナル経由でバックグラウンドスレッドからの GUI 更新を安全に処理する。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。プレイリスト追加時はプレイリスト名からサブフォルダ名を生成し `_QueueItem.playlist_folder` にセット。右クリックコンテキストメニューで「URL をコピー」（複数選択時は改行区切り）と形式変更（編集モード）を提供。キューアイテム追加時にサムネイルをバックグラウンドで非同期取得し `_thumbnail_cache` に base64 data URI としてキャッシュ、ツールチップに 240×135px の画像として表示する。`_log_entries` にセッション中のログを保持し、「ファイル > ログ表示」で `LogDialog` を開く |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント。`QApplication` を起動して `App` を表示する |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
