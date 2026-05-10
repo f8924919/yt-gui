@@ -56,7 +56,8 @@ class OriginalFormatPanel(QGroupBox):
         layout.setColumnStretch(1, 1)
 
         # Row 0: Video combo + fetch button
-        layout.addWidget(QLabel(t("label_orig_video")), 0, 0, Qt.AlignmentFlag.AlignRight)
+        self._video_label = QLabel(t("label_orig_video"))
+        layout.addWidget(self._video_label, 0, 0, Qt.AlignmentFlag.AlignRight)
         self._video_combo = QComboBox()
         self._video_combo.addItem(t("orig_auto"))
         self._video_combo.setEnabled(False)
@@ -68,14 +69,16 @@ class OriginalFormatPanel(QGroupBox):
         layout.addWidget(self._fetch_button, 0, 3)
 
         # Row 1: Audio combo
-        layout.addWidget(QLabel(t("label_orig_audio")), 1, 0, Qt.AlignmentFlag.AlignRight)
+        self._audio_label = QLabel(t("label_orig_audio"))
+        layout.addWidget(self._audio_label, 1, 0, Qt.AlignmentFlag.AlignRight)
         self._audio_combo = QComboBox()
         self._audio_combo.addItem(t("orig_auto"))
         self._audio_combo.setEnabled(False)
         layout.addWidget(self._audio_combo, 1, 1, 1, 2)
 
         # Row 2: Subtitle listbox + format/embed controls
-        layout.addWidget(QLabel(t("label_orig_subtitle")), 2, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        self._subtitle_label = QLabel(t("label_orig_subtitle"))
+        layout.addWidget(self._subtitle_label, 2, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
 
         self._subtitle_list = QListWidget()
         self._subtitle_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -99,7 +102,8 @@ class OriginalFormatPanel(QGroupBox):
         layout.addWidget(sub_right, 2, 3, Qt.AlignmentFlag.AlignTop)
 
         # Row 3: Output format radio buttons
-        layout.addWidget(QLabel(t("label_orig_output")), 3, 0, Qt.AlignmentFlag.AlignRight)
+        self._output_label = QLabel(t("label_orig_output"))
+        layout.addWidget(self._output_label, 3, 0, Qt.AlignmentFlag.AlignRight)
         out_widget = QWidget()
         out_layout = QHBoxLayout(out_widget)
         out_layout.setContentsMargins(0, 0, 0, 0)
@@ -115,6 +119,28 @@ class OriginalFormatPanel(QGroupBox):
         layout.addWidget(out_widget, 3, 1, 1, 3)
 
     # ── public interface ─────────────────────────────────────────────────────
+
+    def retranslate(self):
+        self.setTitle(t("label_original_detail"))
+        self._video_label.setText(t("label_orig_video"))
+        self._audio_label.setText(t("label_orig_audio"))
+        self._subtitle_label.setText(t("label_orig_subtitle"))
+        self._output_label.setText(t("label_orig_output"))
+
+        for combo in (self._video_combo, self._audio_combo):
+            combo.setItemText(0, t("orig_auto"))
+            if combo.count() >= 2:
+                combo.setItemText(1, t("orig_skip"))
+
+        if self._subtitle_list.count() == 1 and not self._subtitle_formats:
+            self._subtitle_list.item(0).setText(t("orig_sub_unavailable"))
+
+        if self._fetch_button.isEnabled():
+            self._fetch_button.setText(t("btn_fetch_formats"))
+
+        self._embed_check.setText(t("orig_sub_embed"))
+        self._radio_mp4.setText(t("orig_output_mp4"))
+        self._radio_remux.setText(t("orig_output_remux"))
 
     def has_formats_loaded(self) -> bool:
         return self._video_combo.isEnabled() and bool(self._fetched_title)

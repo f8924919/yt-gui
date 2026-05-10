@@ -190,6 +190,47 @@ class App(QMainWindow):
                 t("warn_deps_missing_body").format(tools="\n".join(missing)),
             )
 
+    def _retranslate_ui(self):
+        self.setWindowTitle(t("app_title"))
+
+        self._file_menu.setTitle(t("menu_file"))
+        self._act_settings.setText(t("menu_settings"))
+        self._act_log.setText(t("menu_log"))
+        if self._act_quit is not None:
+            self._act_quit.setText(t("menu_quit"))
+
+        self._lbl_url.setText(t("label_url"))
+        self._lbl_format.setText(t("label_format"))
+
+        old_idx = self.format_combo.currentIndex()
+        self._format_display = self._build_format_display()
+        self.format_combo.blockSignals(True)
+        self.format_combo.clear()
+        self.format_combo.addItems(self._format_display)
+        self.format_combo.setCurrentIndex(old_idx)
+        self.format_combo.blockSignals(False)
+
+        self._mp3_thumb_check.setText(t("mp3_embed_thumbnail"))
+
+        self._lbl_queue_title.setText(f"<b>{t('queue_title')}</b>")
+        self._queue_tree.setHeaderLabels(
+            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
+
+        self.add_button.setText(t("btn_add"))
+        self.start_queue_button.setText(t("btn_start_queue"))
+        self.pause_queue_button.setText(t("btn_pause_queue"))
+        self.remove_item_button.setText(t("btn_remove_item"))
+
+        with self._queue_lock:
+            items = list(self._queue_items)
+        for item in items:
+            self._refresh_tree_item(item)
+
+        if not self._worker_running:
+            self.status_label.setText(t("status_ready"))
+
+        self._original_panel.retranslate()
+
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path
         return path if path else os.path.join(expanduser("~"), "Downloads")
@@ -218,22 +259,23 @@ class App(QMainWindow):
 
     def _create_menu(self):
         menubar = self.menuBar()
-        file_menu = menubar.addMenu(t("menu_file"))
+        self._file_menu = menubar.addMenu(t("menu_file"))
 
-        act_settings = QAction(t("menu_settings"), self)
-        act_settings.setShortcut("Ctrl+,")
-        act_settings.triggered.connect(self._open_settings)
-        file_menu.addAction(act_settings)
+        self._act_settings = QAction(t("menu_settings"), self)
+        self._act_settings.setShortcut("Ctrl+,")
+        self._act_settings.triggered.connect(self._open_settings)
+        self._file_menu.addAction(self._act_settings)
 
-        act_log = QAction(t("menu_log"), self)
-        act_log.triggered.connect(self._open_log_dialog)
-        file_menu.addAction(act_log)
+        self._act_log = QAction(t("menu_log"), self)
+        self._act_log.triggered.connect(self._open_log_dialog)
+        self._file_menu.addAction(self._act_log)
 
+        self._act_quit: QAction | None = None
         if sys.platform != "darwin":
-            file_menu.addSeparator()
-            act_quit = QAction(t("menu_quit"), self)
-            act_quit.triggered.connect(self.close)
-            file_menu.addAction(act_quit)
+            self._file_menu.addSeparator()
+            self._act_quit = QAction(t("menu_quit"), self)
+            self._act_quit.triggered.connect(self.close)
+            self._file_menu.addAction(self._act_quit)
 
     # ── widgets ───────────────────────────────────────────────────────────────
 
@@ -246,12 +288,14 @@ class App(QMainWindow):
         layout.setColumnStretch(1, 1)
 
         # Row 0: URL
-        layout.addWidget(QLabel(t("label_url")), 0, 0, Qt.AlignmentFlag.AlignRight)
+        self._lbl_url = QLabel(t("label_url"))
+        layout.addWidget(self._lbl_url, 0, 0, Qt.AlignmentFlag.AlignRight)
         self.url_entry = QLineEdit()
         layout.addWidget(self.url_entry, 0, 1, 1, 2)
 
         # Row 1: Format combo
-        layout.addWidget(QLabel(t("label_format")), 1, 0, Qt.AlignmentFlag.AlignRight)
+        self._lbl_format = QLabel(t("label_format"))
+        layout.addWidget(self._lbl_format, 1, 0, Qt.AlignmentFlag.AlignRight)
         self._format_display = self._build_format_display()
         self.format_combo = QComboBox()
         self.format_combo.addItems(self._format_display)
@@ -296,7 +340,8 @@ class App(QMainWindow):
         qbl.setContentsMargins(6, 6, 6, 6)
         qbl.setSpacing(4)
 
-        qbl.addWidget(QLabel(f"<b>{t('queue_title')}</b>"))
+        self._lbl_queue_title = QLabel(f"<b>{t('queue_title')}</b>")
+        qbl.addWidget(self._lbl_queue_title)
 
         self._queue_tree = _QueueTree()
         self._queue_tree._get_item_cb = self._get_queue_item_for_tree_item
@@ -652,19 +697,25 @@ class App(QMainWindow):
     # ── settings ──────────────────────────────────────────────────────────────
 
     def _open_settings(self):
+        old_lang = self._settings.language
         dialog = SettingsDialog(self, self._settings_manager)
         dialog.exec()
         self._settings = self._settings_manager.load()
         self.downloader.output_dir = self._resolve_download_path()
         self.downloader.video_resolution = self._settings.video_resolution
         self.downloader.mp3_bitrate = self._settings.mp3_bitrate
-        old_idx = self.format_combo.currentIndex()
-        self._format_display = self._build_format_display()
-        self.format_combo.blockSignals(True)
-        self.format_combo.clear()
-        self.format_combo.addItems(self._format_display)
-        self.format_combo.setCurrentIndex(old_idx)
-        self.format_combo.blockSignals(False)
+
+        if self._settings.language != old_lang:
+            i18n.set_language(self._settings.language)
+            self._retranslate_ui()
+        else:
+            old_idx = self.format_combo.currentIndex()
+            self._format_display = self._build_format_display()
+            self.format_combo.blockSignals(True)
+            self.format_combo.clear()
+            self.format_combo.addItems(self._format_display)
+            self.format_combo.setCurrentIndex(old_idx)
+            self.format_combo.blockSignals(False)
 
     # ── status / log ──────────────────────────────────────────────────────────
 

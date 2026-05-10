@@ -216,9 +216,6 @@ class SettingsDialog(QDialog):
 
         self._manager.save(self._settings)
 
-        if new_lang != old_lang:
-            QMessageBox.information(self, t("settings_title"), t("restart_required"))
-
         self.accept()
 
     def _center_on_parent(self, parent):
