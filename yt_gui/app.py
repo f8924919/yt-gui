@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QStatusBar, QToolTip, QMessageBox,
     QAbstractItemView,
 )
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, Signal, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QColor
 
 from .formats import FORMAT_KEYS, build_720p_spec
@@ -173,8 +173,22 @@ class App(QMainWindow):
 
         self._create_menu()
         self._create_widgets()
+        QTimer.singleShot(0, self._check_dependencies)
 
     # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _check_dependencies(self):
+        missing = []
+        if not os.path.isfile(self.downloader._ffmpeg_path):
+            missing.append(t("warn_deps_missing_ffmpeg"))
+        if not os.path.isfile(self.downloader._deno_path):
+            missing.append(t("warn_deps_missing_deno"))
+        if missing:
+            QMessageBox.warning(
+                self,
+                t("warn_deps_missing_title"),
+                t("warn_deps_missing_body").format(tools="\n".join(missing)),
+            )
 
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path

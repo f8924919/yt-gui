@@ -108,6 +108,11 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "Subtitle",
     "tooltip_sub_file": "Save to file",
     "tooltip_format_spec": "Format spec",
+    # dependency check
+    "warn_deps_missing_title": "Missing dependencies",
+    "warn_deps_missing_ffmpeg": "• ffmpeg — video/audio merging and conversion may not work",
+    "warn_deps_missing_deno": "• deno — some sites may not be downloadable",
+    "warn_deps_missing_body": "The following tools were not found:\n\n{tools}\n\nDownloads can still proceed, but some features may be limited.",
     # language display names
     "lang_ja": "日本語",
     "lang_en": "English",

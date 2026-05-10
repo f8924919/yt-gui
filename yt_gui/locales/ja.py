@@ -108,6 +108,11 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "字幕",
     "tooltip_sub_file": "ファイル保存",
     "tooltip_format_spec": "形式仕様",
+    # dependency check
+    "warn_deps_missing_title": "依存ツールが見つかりません",
+    "warn_deps_missing_ffmpeg": "• ffmpeg — 動画・音声の変換や結合ができない場合があります",
+    "warn_deps_missing_deno": "• deno — 一部サイトのダウンロードができない場合があります",
+    "warn_deps_missing_body": "以下のツールが見つかりませんでした:\n\n{tools}\n\nダウンロードは続行できますが、一部機能が制限される場合があります。",
     # language display names
     "lang_ja": "日本語",
     "lang_en": "English",
