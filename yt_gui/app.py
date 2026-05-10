@@ -210,6 +210,8 @@ class App(QMainWindow):
         missing = []
         if not os.path.isfile(self.downloader._ffmpeg_path):
             missing.append(t("warn_deps_missing_ffmpeg"))
+        if not os.path.isfile(self.downloader._ffprobe_path):
+            missing.append(t("warn_deps_missing_ffprobe"))
         if not os.path.isfile(self.downloader._deno_path):
             missing.append(t("warn_deps_missing_deno"))
         if missing:

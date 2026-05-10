@@ -72,24 +72,25 @@ def download_ffmpeg(force=False):
     ffmpeg_dir = os.path.join(BIN_DIR, 'ffmpeg')
     os.makedirs(ffmpeg_dir, exist_ok=True)
 
-    binary = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
-    out_path = os.path.join(ffmpeg_dir, binary)
+    _ext = '.exe' if sys.platform == 'win32' else ''
+    ffmpeg_path = os.path.join(ffmpeg_dir, f'ffmpeg{_ext}')
+    ffprobe_path = os.path.join(ffmpeg_dir, f'ffprobe{_ext}')
 
-    if os.path.exists(out_path) and not force:
-        print(f'[ffmpeg] {binary} は既に存在します。スキップします。')
+    if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path) and not force:
+        print('[ffmpeg] ffmpeg / ffprobe は既に存在します。スキップします。')
         return
 
     if sys.platform == 'win32':
-        _download_ffmpeg_windows(out_path)
+        _download_ffmpeg_windows(ffmpeg_path, ffprobe_path)
     elif sys.platform == 'darwin':
-        _download_ffmpeg_macos(ffmpeg_dir, out_path)
+        _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path)
     else:
-        _download_ffmpeg_linux(machine, ffmpeg_dir, out_path)
+        _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path)
 
-    print(f'[ffmpeg] 保存完了: {out_path}')
+    print(f'[ffmpeg] 保存完了: {ffmpeg_dir}')
 
 
-def _download_ffmpeg_windows(out_path):
+def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
     url = ('https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/'
            'ffmpeg-master-latest-win64-gpl.zip')
     tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
@@ -97,51 +98,51 @@ def _download_ffmpeg_windows(out_path):
     _download(url, tmp)
 
     with zipfile.ZipFile(tmp) as z:
-        entry = next(
-            n for n in z.namelist()
-            if n.endswith('/bin/ffmpeg.exe')
-        )
-        data = z.read(entry)
+        for name, out in (('ffmpeg.exe', ffmpeg_path), ('ffprobe.exe', ffprobe_path)):
+            entry = next(n for n in z.namelist() if n.endswith(f'/bin/{name}'))
+            with open(out, 'wb') as f:
+                f.write(z.read(entry))
     os.remove(tmp)
 
-    with open(out_path, 'wb') as f:
-        f.write(data)
+
+def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
+    # evermeet.cx は ffmpeg / ffprobe を別 ZIP で配布している
+    for tool, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
+        url = f'https://evermeet.cx/ffmpeg/getrelease/{tool}/zip'
+        tmp = os.path.join(BIN_DIR, f'_{tool}_tmp.zip')
+        print(f'[ffmpeg] {tool} ダウンロード中 (macOS)...')
+        _download(url, tmp)
+        with zipfile.ZipFile(tmp) as z:
+            entry = next(n for n in z.namelist() if os.path.basename(n) == tool)
+            z.extract(entry, ffmpeg_dir)
+            extracted = os.path.join(ffmpeg_dir, entry)
+            if extracted != out_path:
+                os.replace(extracted, out_path)
+        os.remove(tmp)
+        _make_executable(out_path)
 
 
-def _download_ffmpeg_macos(ffmpeg_dir, out_path):
-    url = 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip'
-    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
-    print('[ffmpeg] ダウンロード中 (macOS)...')
-    _download(url, tmp)
-
-    with zipfile.ZipFile(tmp) as z:
-        # evermeet.cx の zip は root に 'ffmpeg' バイナリが1つ入っている
-        entry = next(n for n in z.namelist() if os.path.basename(n) == 'ffmpeg')
-        z.extract(entry, ffmpeg_dir)
-        extracted = os.path.join(ffmpeg_dir, entry)
-        if extracted != out_path:
-            os.replace(extracted, out_path)
-    os.remove(tmp)
-    _make_executable(out_path)
-
-
-def _download_ffmpeg_linux(machine, ffmpeg_dir, out_path):
+def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
     arch = 'arm64' if machine in ('arm64', 'aarch64') else 'amd64'
     url = f'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-{arch}-static.tar.xz'
     tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.tar.xz')
     print(f'[ffmpeg] ダウンロード中 (Linux {arch})...')
     _download(url, tmp)
 
+    # johnvansickle.com の tarball には ffmpeg と ffprobe が両方含まれる
     with tarfile.open(tmp, 'r:xz') as t:
-        member = next(
-            m for m in t.getmembers()
-            if os.path.basename(m.name) == 'ffmpeg' and m.isfile()
-        )
-        src = t.extractfile(member)
-        with open(out_path, 'wb') as dst:
-            shutil.copyfileobj(src, dst)
+        for binary, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
+            member = next(
+                (m for m in t.getmembers()
+                 if os.path.basename(m.name) == binary and m.isfile()),
+                None,
+            )
+            if member:
+                src = t.extractfile(member)
+                with open(out_path, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+                _make_executable(out_path)
     os.remove(tmp)
-    _make_executable(out_path)
 
 
 # ---------------------------------------------------------------------------

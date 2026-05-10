@@ -121,6 +121,7 @@ STRINGS: dict[str, str] = {
     # dependency check
     "warn_deps_missing_title": "依存ツールが見つかりません",
     "warn_deps_missing_ffmpeg": "• ffmpeg — 動画・音声の変換や結合ができない場合があります",
+    "warn_deps_missing_ffprobe": "• ffprobe — 動画のメタデータ取得ができない場合があります",
     "warn_deps_missing_deno": "• deno — 一部サイトのダウンロードができない場合があります",
     "warn_deps_missing_body": "以下のツールが見つかりませんでした:\n\n{tools}\n\nダウンロードは続行できますが、一部機能が制限される場合があります。",
     # language display names

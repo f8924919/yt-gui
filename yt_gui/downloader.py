@@ -54,6 +54,7 @@ class Downloader:
         bin_dir = base if getattr(sys, '_MEIPASS', None) else os.path.join(base, 'bin')
         self._deno_path = os.path.join(bin_dir, f'deno{_ext}')
         self._ffmpeg_path = os.path.join(bin_dir, 'ffmpeg', f'ffmpeg{_ext}')
+        self._ffprobe_path = os.path.join(bin_dir, 'ffmpeg', f'ffprobe{_ext}')
 
         os.makedirs(self.output_dir, exist_ok=True)
 
