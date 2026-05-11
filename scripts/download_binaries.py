@@ -147,11 +147,45 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
 
 # ---------------------------------------------------------------------------
 
+def _prompt_ffmpeg_consent() -> bool:
+    """Show ffmpeg license notice and prompt for consent. Returns True if accepted."""
+    print()
+    print("=" * 60)
+    print("ffmpeg License Notice")
+    print("=" * 60)
+    print("This script will download ffmpeg, which is licensed under")
+    print("the GNU General Public License (GPL) v2 or later.")
+    print()
+    print("You must comply with the GPL license when distributing")
+    print("any software that includes ffmpeg.")
+    print()
+    print("License details: https://ffmpeg.org/legal.html")
+    print("=" * 60)
+    try:
+        answer = input("Do you agree to download ffmpeg under the GPL license? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return answer in ('y', 'yes')
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--update', action='store_true', help='既存のバイナリを強制的に再ダウンロードする')
+    parser.add_argument('--yes', '-y', action='store_true', help='Skip all confirmation prompts (for CI/automated builds)')
     args = parser.parse_args()
 
     download_deno(force=args.update)
+
+    _ext = '.exe' if sys.platform == 'win32' else ''
+    _ffmpeg_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffmpeg{_ext}')
+    _ffprobe_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffprobe{_ext}')
+    _needs_ffmpeg = not (os.path.exists(_ffmpeg_path) and os.path.exists(_ffprobe_path)) or args.update
+
+    if _needs_ffmpeg and not args.yes:
+        if not _prompt_ffmpeg_consent():
+            print('[ffmpeg] Download cancelled.')
+            sys.exit(0)
+
     download_ffmpeg(force=args.update)
