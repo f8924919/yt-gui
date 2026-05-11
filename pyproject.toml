@@ -10,6 +10,7 @@ dependencies = [
     "mutagen>=1.47.0",
     "packaging==26.2",
     "pillow>=12.2.0",
+    "pycryptodomex>=3.23.0",
     "pyinstaller==6.20.0",
     "pyinstaller-hooks-contrib==2026.4",
     "pyside6>=6.11.0",
