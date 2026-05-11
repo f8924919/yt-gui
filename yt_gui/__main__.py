@@ -11,8 +11,8 @@ def main():
         window.show()
         sys.exit(app.exec())
     except Exception as e:
-        QMessageBox.critical(None, "致命的なエラー",
-                             f"アプリケーションの起動中にエラーが発生しました:\n{e}")
+        QMessageBox.critical(None, "Fatal Error",
+                             f"An error occurred during startup:\n{e}")
         sys.exit(1)
 
 
