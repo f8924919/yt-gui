@@ -71,7 +71,7 @@ class _QueueItem:
     playlist_folder: str | None = None
     thumbnail_url: str | None = None
     status: str = "waiting"
-    tree_item: object = None  # QTreeWidgetItem
+    tree_item: QTreeWidgetItem | None = None
 
 
 class _AppSignals(QObject):

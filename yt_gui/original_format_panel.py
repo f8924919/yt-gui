@@ -166,13 +166,13 @@ class OriginalFormatPanel(QGroupBox):
 
     def is_both_skipped(self) -> bool:
         skip = t("orig_skip")
-        return (
+        return bool(
             self._video_combo.currentText() == skip
             and self._audio_combo.currentText() == skip
         )
 
     def get_remux_only(self) -> bool:
-        return self._radio_remux.isChecked()
+        return bool(self._radio_remux.isChecked())
 
     def get_format_spec(self) -> str:
         auto_label = t("orig_auto")
@@ -201,7 +201,7 @@ class OriginalFormatPanel(QGroupBox):
                     _, audio_id = self._audio_formats[idx]
 
         if is_combined:
-            return video_id
+            return video_id or "bestvideo/best"
         if video_skip:
             return audio_id if audio_id else "bestaudio/best"
         if audio_skip:
