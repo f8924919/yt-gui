@@ -59,10 +59,14 @@ STRINGS: dict[str, str] = {
     "fmt_best_mp4": "Best quality (MP4)",
     "fmt_720p": "{resolution}p (MP4)",
     "fmt_mp3": "MP3 (audio only · {bitrate}kbps)",
+    "fmt_flac": "FLAC (audio only)",
     "fmt_original": "Original format",
     # quality settings tab
     "tab_quality": "Quality",
     "label_video_resolution": "Resolution limit:",
+    "label_audio_format": "Audio format:",
+    "audio_format_mp3": "MP3",
+    "audio_format_flac": "FLAC",
     "label_mp3_bitrate": "MP3 bitrate:",
     "quality_note": "Does not affect \"Best quality\" and \"Original format\"",
     # download queue

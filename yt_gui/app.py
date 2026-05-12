@@ -67,6 +67,7 @@ class _QueueItem:
     title: str = ""
     mp3_bitrate: str | None = None
     mp3_thumbnail: bool = False
+    audio_codec: str = "mp3"
     remux_only: bool = False
     playlist_folder: str | None = None
     thumbnail_url: str | None = None
@@ -284,6 +285,7 @@ class App(QMainWindow):
         self.format_combo.blockSignals(False)
         if self._edit_mode and len(self._editing_items) > 1:
             self._set_original_format_enabled(False)
+        self._on_format_changed(old_idx)
 
         self._mp3_thumb_check.setText(t("mp3_embed_thumbnail"))
 
@@ -329,7 +331,10 @@ class App(QMainWindow):
             if k == "fmt_720p":
                 result.append(t("fmt_720p").format(resolution=self._settings.video_resolution))
             elif k == "fmt_mp3":
-                result.append(t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate))
+                if self._settings.audio_format == "flac":
+                    result.append(t("fmt_flac"))
+                else:
+                    result.append(t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate))
             else:
                 result.append(t(k))
         return result
@@ -489,7 +494,7 @@ class App(QMainWindow):
             self.resize(_WIN_W, _WIN_H_EXPANDED)
         elif format_id == _MP3_KEY:
             self._original_panel.setVisible(False)
-            self._mp3_frame.setVisible(True)
+            self._mp3_frame.setVisible(self._settings.audio_format == "mp3")
             self.resize(_WIN_W, _WIN_H_DEFAULT)
         else:
             self._original_panel.setVisible(False)
@@ -531,17 +536,23 @@ class App(QMainWindow):
                 format_spec, subtitle_opts, False, remux_only=remux_only,
             )
         else:
+            audio_codec = (
+                self._settings.audio_format if format_id == _MP3_KEY else "mp3"
+            )
             mp3_thumbnail = (
-                self._mp3_thumb_check.isChecked() if format_id == _MP3_KEY else False
+                self._mp3_thumb_check.isChecked()
+                if format_id == _MP3_KEY and audio_codec == "mp3"
+                else False
             )
             self._start_add_thread(
                 url, cookies_path, cookies_browser, format_id, format_label,
-                None, None, mp3_thumbnail,
+                None, None, mp3_thumbnail, audio_codec=audio_codec,
             )
 
     def _start_add_thread(
         self, url, cookies_path, cookies_browser, format_id, format_label,
         format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+        audio_codec: str = "mp3",
     ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
@@ -549,13 +560,14 @@ class App(QMainWindow):
         threading.Thread(
             target=self._run_fetch_for_add,
             args=(url, cookies_path, cookies_browser, format_id, format_label,
-                  format_spec, subtitle_opts, mp3_thumbnail, remux_only),
+                  format_spec, subtitle_opts, mp3_thumbnail, remux_only, audio_codec),
             daemon=True,
         ).start()
 
     def _run_fetch_for_add(
         self, url, cookies_path, cookies_browser, format_id, format_label,
         format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+        audio_codec: str = "mp3",
     ):
         try:
             result = self.downloader.fetch_title_or_entries(
@@ -569,6 +581,7 @@ class App(QMainWindow):
                 'subtitle_opts': subtitle_opts,
                 'mp3_thumbnail': mp3_thumbnail,
                 'remux_only': remux_only,
+                'audio_codec': audio_codec,
             }
             self._signals.fetch_for_add_done.emit(payload)
         except Exception as e:
@@ -595,12 +608,13 @@ class App(QMainWindow):
         subtitle_opts = payload['subtitle_opts']
         mp3_thumbnail = payload['mp3_thumbnail']
         remux_only = payload['remux_only']
+        audio_codec = payload.get('audio_codec', 'mp3')
 
         if result['type'] == 'single':
             self._enqueue_single(
                 result['url'], format_id, format_label, format_spec, subtitle_opts,
                 result['title'], mp3_thumbnail, remux_only=remux_only,
-                thumbnail_url=result.get('thumbnail_url'),
+                thumbnail_url=result.get('thumbnail_url'), audio_codec=audio_codec,
             )
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
@@ -621,7 +635,8 @@ class App(QMainWindow):
             snap_spec = (build_720p_spec(self._settings.video_resolution)
                          if format_id == "fmt_720p" else None)
             snap_bitrate = (
-                self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+                self._settings.mp3_bitrate
+                if format_id == "fmt_mp3" and audio_codec == "mp3" else None
             )
 
             batch: list[tuple[int, _QueueItem]] = []
@@ -636,6 +651,7 @@ class App(QMainWindow):
                     title=entry['title'],
                     mp3_bitrate=snap_bitrate,
                     mp3_thumbnail=mp3_thumbnail,
+                    audio_codec=audio_codec,
                     playlist_folder=playlist_folder,
                     thumbnail_url=entry.get('thumbnail_url'),
                 )
@@ -663,10 +679,14 @@ class App(QMainWindow):
     def _enqueue_single(
         self, url, format_id, format_label, format_spec, subtitle_opts, title,
         mp3_thumbnail=False, remux_only=False, thumbnail_url=None,
+        audio_codec: str = "mp3",
     ):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = build_720p_spec(self._settings.video_resolution)
-        mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+        mp3_bitrate = (
+            self._settings.mp3_bitrate
+            if format_id == "fmt_mp3" and audio_codec == "mp3" else None
+        )
 
         self._item_counter += 1
         item = _QueueItem(
@@ -678,6 +698,7 @@ class App(QMainWindow):
             title=title,
             mp3_bitrate=mp3_bitrate,
             mp3_thumbnail=mp3_thumbnail,
+            audio_codec=audio_codec,
             remux_only=remux_only,
             thumbnail_url=thumbnail_url,
         )
@@ -829,24 +850,31 @@ class App(QMainWindow):
             format_spec = self._original_panel.get_format_spec()
             subtitle_opts = self._original_panel.get_subtitle_opts()
             remux_only = self._original_panel.get_remux_only()
+            audio_codec = "mp3"
             mp3_bitrate = None
             mp3_thumbnail = False
         elif format_id == _MP3_KEY:
             format_spec = None
             subtitle_opts = None
             remux_only = False
-            mp3_bitrate = self._settings.mp3_bitrate
-            mp3_thumbnail = self._mp3_thumb_check.isChecked()
+            audio_codec = self._settings.audio_format
+            mp3_bitrate = self._settings.mp3_bitrate if audio_codec == "mp3" else None
+            mp3_thumbnail = (
+                bool(self._mp3_thumb_check.isChecked())
+                if audio_codec == "mp3" else False
+            )
         elif format_id == "fmt_720p":
             format_spec = build_720p_spec(self._settings.video_resolution)
             subtitle_opts = None
             remux_only = False
+            audio_codec = "mp3"
             mp3_bitrate = None
             mp3_thumbnail = False
         else:
             format_spec = None
             subtitle_opts = None
             remux_only = False
+            audio_codec = "mp3"
             mp3_bitrate = None
             mp3_thumbnail = False
 
@@ -857,6 +885,7 @@ class App(QMainWindow):
                 item.format_spec = format_spec
                 item.subtitle_opts = subtitle_opts
                 item.remux_only = remux_only
+                item.audio_codec = audio_codec
                 item.mp3_bitrate = mp3_bitrate
                 item.mp3_thumbnail = mp3_thumbnail
                 item.status = "waiting"
@@ -968,6 +997,7 @@ class App(QMainWindow):
                     remux_only=item.remux_only,
                     output_dir_override=output_dir_override,
                     cookies_browser=cookies_browser,
+                    audio_codec=item.audio_codec,
                 )
                 with self._queue_lock:
                     item.status = "done"

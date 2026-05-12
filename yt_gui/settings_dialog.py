@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .formats import MP3_BITRATES, VIDEO_RESOLUTIONS
+from .formats import AUDIO_FORMATS, MP3_BITRATES, VIDEO_RESOLUTIONS
 from .i18n import AVAILABLE_LANGUAGES, t
 from .settings import SettingsManager
 
@@ -43,7 +43,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(t("settings_title"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setFixedSize(480, 300)
+        self.setFixedSize(480, 330)
 
         self._manager = manager
         self._settings = manager.load()
@@ -165,6 +165,11 @@ class SettingsDialog(QDialog):
         self._file_widget.setVisible(is_file)
         self._browser_widget.setVisible(is_browser)
 
+    def _on_audio_format_changed(self, index: int):
+        is_mp3 = AUDIO_FORMATS[index] == "mp3" if index < len(AUDIO_FORMATS) else True
+        self._bitrate_label.setVisible(is_mp3)
+        self._bitrate_combo.setVisible(is_mp3)
+
     def _build_quality_tab(self, parent: QWidget):
         layout = QGridLayout(parent)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -181,19 +186,33 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._res_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addWidget(
-            QLabel(t("label_mp3_bitrate")), 1, 0, Qt.AlignmentFlag.AlignRight
+            QLabel(t("label_audio_format")), 1, 0, Qt.AlignmentFlag.AlignRight
         )
+        self._audio_fmt_combo = QComboBox()
+        self._audio_fmt_combo.addItems([t("audio_format_mp3"), t("audio_format_flac")])
+        current_af_idx = (
+            list(AUDIO_FORMATS).index(self._settings.audio_format)
+            if self._settings.audio_format in AUDIO_FORMATS else 0
+        )
+        self._audio_fmt_combo.setCurrentIndex(current_af_idx)
+        self._audio_fmt_combo.currentIndexChanged.connect(self._on_audio_format_changed)
+        layout.addWidget(self._audio_fmt_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
+
+        self._bitrate_label = QLabel(t("label_mp3_bitrate"))
+        layout.addWidget(self._bitrate_label, 2, 0, Qt.AlignmentFlag.AlignRight)
         bitrate_values = [f"{b}kbps" for b in MP3_BITRATES]
         self._bitrate_combo = QComboBox()
         self._bitrate_combo.addItems(bitrate_values)
         self._bitrate_combo.setCurrentText(f"{self._settings.mp3_bitrate}kbps")
-        layout.addWidget(self._bitrate_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self._bitrate_combo, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         note = QLabel(t("quality_note"))
         note.setStyleSheet("color: gray;")
         note.setWordWrap(True)
-        layout.addWidget(note, 2, 0, 1, 2)
-        layout.setRowStretch(3, 1)
+        layout.addWidget(note, 3, 0, 1, 2)
+        layout.setRowStretch(4, 1)
+
+        self._on_audio_format_changed(current_af_idx)
 
     def _browse_download(self):
         path = QFileDialog.getExistingDirectory(self, t("dialog_select_folder"))
@@ -217,9 +236,14 @@ class SettingsDialog(QDialog):
         self._settings.video_resolution = (
             self._res_combo.currentText().removesuffix("p")
         )
-        self._settings.mp3_bitrate = (
-            self._bitrate_combo.currentText().removesuffix("kbps")
+        af_idx = self._audio_fmt_combo.currentIndex()
+        self._settings.audio_format = (
+            AUDIO_FORMATS[af_idx] if af_idx < len(AUDIO_FORMATS) else "mp3"
         )
+        if self._settings.audio_format == "mp3":
+            self._settings.mp3_bitrate = (
+                self._bitrate_combo.currentText().removesuffix("kbps")
+            )
 
         if self._radio_file.isChecked():
             self._settings.cookies_path = self._cookies_edit.text().strip()
