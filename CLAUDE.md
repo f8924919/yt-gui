@@ -19,6 +19,25 @@ uv sync
 source .venv/bin/activate # Linux/Mac
 ```
 
+## Lint / Format / 型チェック
+
+```bash
+# Lint（問題の検出）
+uv run ruff check yt_gui/
+
+# Lint + 自動修正
+uv run ruff check --fix yt_gui/
+
+# フォーマット（差分確認のみ）
+uv run ruff format --check yt_gui/
+
+# フォーマット（適用）
+uv run ruff format yt_gui/
+
+# 型チェック
+uv run mypy yt_gui/
+```
+
 ## 主要コマンド
 
 ```bash
