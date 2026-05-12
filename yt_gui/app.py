@@ -1058,6 +1058,7 @@ class App(QMainWindow):
             self.format_combo.addItems(self._format_display)
             self.format_combo.setCurrentIndex(old_idx)
             self.format_combo.blockSignals(False)
+            self._on_format_changed(old_idx)
             if self._edit_mode and len(self._editing_items) > 1:
                 self._set_original_format_enabled(False)
 
