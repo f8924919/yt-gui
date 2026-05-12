@@ -1,32 +1,47 @@
 import base64
+import os
 import re
 import sys
 import threading
-import os
 import urllib.request
-from os.path import expanduser
 from dataclasses import dataclass
 from datetime import datetime
+from os.path import expanduser
 
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QLineEdit, QComboBox, QPushButton, QProgressBar,
-    QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame,
-    QCheckBox, QStatusBar, QToolTip, QMessageBox, QMenu,
     QAbstractItemView,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QStatusBar,
+    QToolTip,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import QEvent, QObject, Signal, Qt, QTimer
-from PySide6.QtGui import QAction, QIcon, QColor
 
-from .formats import FORMAT_KEYS, build_720p_spec
+from . import get_resource_base, i18n
 from .downloader import Downloader
+from .formats import FORMAT_KEYS, build_720p_spec
+from .i18n import t
+from .log_dialog import LogDialog
 from .original_format_panel import OriginalFormatPanel
 from .settings import SettingsManager
 from .settings_dialog import SettingsDialog
-from .log_dialog import LogDialog
-from . import get_resource_base
-from . import i18n
-from .i18n import t
 from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
@@ -117,15 +132,24 @@ class _QueueTree(QTreeWidget):
                         f"<b>{t('tooltip_url')}:</b> {qi.url}",
                     ]
                     if qi.playlist_folder:
-                        lines.append(f"<b>{t('tooltip_playlist')}:</b> {qi.playlist_folder}")
+                        lines.append(
+                            f"<b>{t('tooltip_playlist')}:</b> {qi.playlist_folder}"
+                        )
                     if qi.subtitle_opts:
                         langs = ", ".join(qi.subtitle_opts.get("subtitleslangs", []))
                         fmt = qi.subtitle_opts.get("subtitlesformat", "")
-                        embed_lbl = (t("orig_sub_embed") if qi.subtitle_opts.get("embed")
-                                     else t("tooltip_sub_file"))
-                        lines.append(f"<b>{t('tooltip_subtitle')}:</b> {langs}  {fmt}  {embed_lbl}")
+                        embed_lbl = (
+                            t("orig_sub_embed") if qi.subtitle_opts.get("embed")
+                            else t("tooltip_sub_file")
+                        )
+                        sub_lbl = t("tooltip_subtitle")
+                        lines.append(
+                            f"<b>{sub_lbl}:</b> {langs}  {fmt}  {embed_lbl}"
+                        )
                     if qi.format_id == _ORIGINAL_KEY and qi.format_spec:
-                        lines.append(f"<b>{t('tooltip_format_spec')}:</b> {qi.format_spec}")
+                        lines.append(
+                            f"<b>{t('tooltip_format_spec')}:</b> {qi.format_spec}"
+                        )
                     QToolTip.showText(
                         event.globalPos(),
                         "<br>".join(lines),
@@ -267,7 +291,9 @@ class App(QMainWindow):
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
 
-        self.add_button.setText(t("btn_apply_edit") if self._edit_mode else t("btn_add"))
+        self.add_button.setText(
+            t("btn_apply_edit") if self._edit_mode else t("btn_add")
+        )
         self._cancel_edit_button.setText(t("btn_cancel_edit"))
         self.start_queue_button.setText(t("btn_start_queue"))
         self.pause_queue_button.setText(t("btn_pause_queue"))
@@ -494,19 +520,29 @@ class App(QMainWindow):
             subtitle_opts = self._original_panel.get_subtitle_opts()
             remux_only = self._original_panel.get_remux_only()
             if self._original_panel.has_formats_loaded():
-                self._enqueue_single(url, format_id, format_label, format_spec, subtitle_opts,
-                                     self._original_panel.get_fetched_title(), remux_only=remux_only)
+                self._enqueue_single(
+                    url, format_id, format_label, format_spec, subtitle_opts,
+                    self._original_panel.get_fetched_title(), remux_only=remux_only,
+                )
                 self.url_entry.clear()
                 return
-            self._start_add_thread(url, cookies_path, cookies_browser, format_id, format_label,
-                                   format_spec, subtitle_opts, False, remux_only=remux_only)
+            self._start_add_thread(
+                url, cookies_path, cookies_browser, format_id, format_label,
+                format_spec, subtitle_opts, False, remux_only=remux_only,
+            )
         else:
-            mp3_thumbnail = self._mp3_thumb_check.isChecked() if format_id == _MP3_KEY else False
-            self._start_add_thread(url, cookies_path, cookies_browser, format_id, format_label,
-                                   None, None, mp3_thumbnail)
+            mp3_thumbnail = (
+                self._mp3_thumb_check.isChecked() if format_id == _MP3_KEY else False
+            )
+            self._start_add_thread(
+                url, cookies_path, cookies_browser, format_id, format_label,
+                None, None, mp3_thumbnail,
+            )
 
-    def _start_add_thread(self, url, cookies_path, cookies_browser, format_id, format_label,
-                          format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _start_add_thread(
+        self, url, cookies_path, cookies_browser, format_id, format_label,
+        format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+    ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
         self._signals.status_update.emit(t("status_fetching_title"), 0)
@@ -517,10 +553,14 @@ class App(QMainWindow):
             daemon=True,
         ).start()
 
-    def _run_fetch_for_add(self, url, cookies_path, cookies_browser, format_id, format_label,
-                           format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False):
+    def _run_fetch_for_add(
+        self, url, cookies_path, cookies_browser, format_id, format_label,
+        format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+    ):
         try:
-            result = self.downloader.fetch_title_or_entries(url, cookies_path, cookies_browser)
+            result = self.downloader.fetch_title_or_entries(
+                url, cookies_path, cookies_browser
+            )
             payload = {
                 'result': result,
                 'format_id': format_id,
@@ -535,13 +575,17 @@ class App(QMainWindow):
             err_msg = strip_ansi(str(e))
             self._signals.status_update.emit(f"❌ {err_msg}", 0)
             self._signals.log_message.emit(f"❌ {err_msg}")
-            self._signals.show_error.emit(t("err_title"), t("err_fetch_title").format(error=err_msg))
+            self._signals.show_error.emit(
+                t("err_title"), t("err_fetch_title").format(error=err_msg)
+            )
         finally:
             self._signals.add_button_reset.emit()
 
     def _reset_add_button(self):
         self.add_button.setEnabled(True)
-        self.add_button.setText(t("btn_apply_edit") if self._edit_mode else t("btn_add"))
+        self.add_button.setText(
+            t("btn_apply_edit") if self._edit_mode else t("btn_add")
+        )
 
     def _on_fetch_for_add_done(self, payload: dict):
         result = payload['result']
@@ -562,7 +606,9 @@ class App(QMainWindow):
             self._signals.status_update.emit(t("status_title_added"), 0)
         else:
             if format_id == _ORIGINAL_KEY:
-                QMessageBox.warning(self, t("warn_title"), t("warn_playlist_original_fmt"))
+                QMessageBox.warning(
+                    self, t("warn_title"), t("warn_playlist_original_fmt")
+                )
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
             entries = result['entries']
@@ -574,7 +620,9 @@ class App(QMainWindow):
             playlist_folder = _sanitize_folder_name(result.get('title', ''))
             snap_spec = (build_720p_spec(self._settings.video_resolution)
                          if format_id == "fmt_720p" else None)
-            snap_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+            snap_bitrate = (
+                self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
+            )
 
             batch: list[tuple[int, _QueueItem]] = []
             for entry in entries:
@@ -612,8 +660,10 @@ class App(QMainWindow):
             self._signals.status_update.emit(msg, 0)
             self._log(msg)
 
-    def _enqueue_single(self, url, format_id, format_label, format_spec, subtitle_opts, title,
-                        mp3_thumbnail=False, remux_only=False, thumbnail_url=None):
+    def _enqueue_single(
+        self, url, format_id, format_label, format_spec, subtitle_opts, title,
+        mp3_thumbnail=False, remux_only=False, thumbnail_url=None,
+    ):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = build_720p_spec(self._settings.video_resolution)
         mp3_bitrate = self._settings.mp3_bitrate if format_id == "fmt_mp3" else None
@@ -642,9 +692,13 @@ class App(QMainWindow):
         self._start_thumbnail_fetch(thumbnail_url)
         self._log(f"📥 {title}  [{format_label}]")
 
-    def _get_queue_item_for_tree_item(self, tree_item: QTreeWidgetItem) -> '_QueueItem | None':
+    def _get_queue_item_for_tree_item(
+        self, tree_item: QTreeWidgetItem
+    ) -> _QueueItem | None:
         with self._queue_lock:
-            return next((i for i in self._queue_items if i.tree_item is tree_item), None)
+            return next(
+                (i for i in self._queue_items if i.tree_item is tree_item), None
+            )
 
     # ── thumbnail cache ───────────────────────────────────────────────────────
 
@@ -656,7 +710,8 @@ class App(QMainWindow):
         if not thumbnail_url:
             return
         with self._thumbnail_lock:
-            if thumbnail_url in self._thumbnail_cache or thumbnail_url in self._thumbnail_fetching:
+            if (thumbnail_url in self._thumbnail_cache
+                    or thumbnail_url in self._thumbnail_fetching):
                 return
             self._thumbnail_fetching.add(thumbnail_url)
         threading.Thread(
@@ -675,7 +730,8 @@ class App(QMainWindow):
                 data = resp.read()
                 ct = resp.headers.get('Content-Type', 'image/jpeg')
                 content_type = ct.split(';')[0].strip() if ct else 'image/jpeg'
-            data_uri = f"data:{content_type};base64,{base64.b64encode(data).decode('ascii')}"
+            b64 = base64.b64encode(data).decode('ascii')
+            data_uri = f"data:{content_type};base64,{b64}"
             with self._thumbnail_lock:
                 self._thumbnail_cache[thumbnail_url] = data_uri
                 self._thumbnail_fetching.discard(thumbnail_url)
@@ -763,7 +819,9 @@ class App(QMainWindow):
 
         if format_id == _ORIGINAL_KEY:
             if not self._original_panel.has_formats_loaded():
-                QMessageBox.warning(self, t("warn_title"), t("warn_edit_formats_not_loaded"))
+                QMessageBox.warning(
+                    self, t("warn_title"), t("warn_edit_formats_not_loaded")
+                )
                 return
             if self._original_panel.is_both_skipped():
                 QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
@@ -863,7 +921,9 @@ class App(QMainWindow):
                 if self._paused:
                     self._worker_running = False
                     return
-                item = next((i for i in self._queue_items if i.status == "waiting"), None)
+                item = next(
+                    (i for i in self._queue_items if i.status == "waiting"), None
+                )
                 if item is None:
                     self._worker_running = False
                     self._signals.status_update.emit(t("status_ready"), 0)
@@ -890,7 +950,9 @@ class App(QMainWindow):
                 cookies_path = self._settings.cookies_path or None
                 if cookies_path and not os.path.isfile(cookies_path):
                     self._signals.show_warning.emit(
-                        t("warn_title"), t("warn_cookies_not_found").format(path=cookies_path))
+                        t("warn_title"),
+                        t("warn_cookies_not_found").format(path=cookies_path),
+                    )
                     cookies_path = None
 
             try:
@@ -899,7 +961,8 @@ class App(QMainWindow):
                     output_dir_override = os.path.join(
                         self._resolve_download_path(), item.playlist_folder)
                 self.downloader.download_video(
-                    item.url, item.format_id, cookies_path, item.format_spec, item.subtitle_opts,
+                    item.url, item.format_id, cookies_path,
+                    item.format_spec, item.subtitle_opts,
                     mp3_bitrate_override=item.mp3_bitrate,
                     embed_thumbnail=item.mp3_thumbnail,
                     remux_only=item.remux_only,
@@ -933,7 +996,9 @@ class App(QMainWindow):
     def _remove_selected(self):
         for tree_item in self._queue_tree.selectedItems():
             with self._queue_lock:
-                qi = next((i for i in self._queue_items if i.tree_item is tree_item), None)
+                qi = next(
+                    (i for i in self._queue_items if i.tree_item is tree_item), None
+                )
                 if qi is None or qi.status in ("downloading", "editing"):
                     continue
                 self._queue_items.remove(qi)

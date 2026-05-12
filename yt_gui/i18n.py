@@ -1,4 +1,4 @@
-from .locales import ja, en
+from .locales import en, ja
 
 _LANGUAGES: dict[str, dict[str, str]] = {
     "ja": ja.STRINGS,

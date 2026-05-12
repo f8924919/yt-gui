@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 
 @dataclass
@@ -35,7 +35,9 @@ class SettingsManager:
         try:
             with open(self._config_file, encoding="utf-8") as f:
                 data = json.load(f)
-            return Settings(**{k: v for k, v in data.items() if k in Settings.__dataclass_fields__})
+            return Settings(
+                **{k: v for k, v in data.items() if k in Settings.__dataclass_fields__}
+            )
         except Exception:
             return Settings()
 

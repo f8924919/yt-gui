@@ -1,5 +1,7 @@
 import sys
+
 from PySide6.QtWidgets import QApplication, QMessageBox
+
 from .app import App
 
 

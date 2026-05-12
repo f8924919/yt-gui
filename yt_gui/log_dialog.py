@@ -1,8 +1,11 @@
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QPushButton,
+    QDialog,
+    QHBoxLayout,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
 )
-from PySide6.QtGui import QFont, QPalette, QColor
-from PySide6.QtCore import Qt
 
 from .i18n import t
 

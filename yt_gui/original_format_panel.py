@@ -1,12 +1,22 @@
 import threading
-from typing import Callable
+from collections.abc import Callable
 
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
-    QGroupBox, QGridLayout, QLabel, QComboBox, QListWidget, QPushButton,
-    QCheckBox, QRadioButton, QButtonGroup, QWidget, QHBoxLayout, QAbstractItemView,
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
     QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QWidget,
 )
-from PySide6.QtCore import QObject, Signal, Qt
 
 from .downloader import Downloader
 from .i18n import t
@@ -78,7 +88,10 @@ class OriginalFormatPanel(QGroupBox):
 
         # Row 2: Subtitle listbox + format/embed controls
         self._subtitle_label = QLabel(t("label_orig_subtitle"))
-        layout.addWidget(self._subtitle_label, 2, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(
+            self._subtitle_label, 2, 0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
+        )
 
         self._subtitle_list = QListWidget()
         self._subtitle_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -153,7 +166,10 @@ class OriginalFormatPanel(QGroupBox):
 
     def is_both_skipped(self) -> bool:
         skip = t("orig_skip")
-        return self._video_combo.currentText() == skip and self._audio_combo.currentText() == skip
+        return (
+            self._video_combo.currentText() == skip
+            and self._audio_combo.currentText() == skip
+        )
 
     def get_remux_only(self) -> bool:
         return self._radio_remux.isChecked()
@@ -176,7 +192,9 @@ class OriginalFormatPanel(QGroupBox):
             if idx is not None and 0 <= idx < len(self._video_formats):
                 _, video_id, is_combined = self._video_formats[idx]
 
-        if not is_combined and audio_sel not in (auto_label, skip_label, t("orig_audio_included")):
+        if not is_combined and audio_sel not in (
+            auto_label, skip_label, t("orig_audio_included")
+        ):
             if self._audio_formats:
                 idx = self._format_index(self._audio_combo, audio_sel)
                 if idx is not None and 0 <= idx < len(self._audio_formats):
@@ -253,7 +271,9 @@ class OriginalFormatPanel(QGroupBox):
                 self._audio_combo.setEnabled(True)
 
     def _on_subtitle_changed(self):
-        has_sub = bool(self._subtitle_list.selectedItems()) and bool(self._subtitle_formats)
+        has_sub = (
+            bool(self._subtitle_list.selectedItems()) and bool(self._subtitle_formats)
+        )
         self._subtitle_fmt_combo.setEnabled(has_sub)
         self._embed_check.setEnabled(has_sub)
         if not has_sub:
@@ -286,7 +306,9 @@ class OriginalFormatPanel(QGroupBox):
         self._update_status(t("status_fetching_formats"), 0)
 
         threading.Thread(
-            target=self._run_fetch, args=(url, cookies_path, cookies_browser), daemon=True,
+            target=self._run_fetch,
+            args=(url, cookies_path, cookies_browser),
+            daemon=True,
         ).start()
 
     def _run_fetch(self, url, cookies_path, cookies_browser):
@@ -309,8 +331,12 @@ class OriginalFormatPanel(QGroupBox):
         self._audio_formats = result["audio"]
         self._subtitle_formats = result["subtitles"]
 
-        video_labels = [auto_label, skip_label] + [lbl for lbl, _, _ in self._video_formats]
-        audio_labels = [auto_label, skip_label] + [lbl for lbl, _ in self._audio_formats]
+        video_labels = (
+            [auto_label, skip_label] + [lbl for lbl, _, _ in self._video_formats]
+        )
+        audio_labels = (
+            [auto_label, skip_label] + [lbl for lbl, _ in self._audio_formats]
+        )
 
         self._video_combo.blockSignals(True)
         self._video_combo.clear()
@@ -351,11 +377,15 @@ class OriginalFormatPanel(QGroupBox):
 
     def _on_fetch_failed(self, err_str: str, is_playlist: bool):
         if is_playlist:
-            self._update_status(f"⚠️ {t('warn_fetch_formats_playlist').splitlines()[0]}", 0)
+            self._update_status(
+                f"⚠️ {t('warn_fetch_formats_playlist').splitlines()[0]}", 0
+            )
             QMessageBox.warning(self, t("warn_title"), t("warn_fetch_formats_playlist"))
         else:
             self._update_status(f"❌ {err_str}", 0)
-            QMessageBox.critical(self, t("err_title"), t("err_fetch_formats").format(error=err_str))
+            QMessageBox.critical(
+                self, t("err_title"), t("err_fetch_formats").format(error=err_str)
+            )
 
     def _on_fetch_finished(self):
         self._fetch_button.setEnabled(True)

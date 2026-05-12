@@ -34,6 +34,9 @@ select = ["E", "F", "I", "UP"]
 ignore = []
 fixable = ["ALL"]
 
+[tool.ruff.lint.per-file-ignores]
+"yt_gui/locales/*.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

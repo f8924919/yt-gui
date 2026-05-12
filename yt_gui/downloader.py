@@ -1,11 +1,12 @@
 import os
 import re
 import sys
+
 from yt_dlp import YoutubeDL
 
+from . import get_resource_base
 from .formats import FORMAT_SPECS, build_720p_spec
 from .i18n import t
-from . import get_resource_base
 from .utils import strip_ansi
 
 _DISPLAY_SUB_EXTS = frozenset({'srt', 'vtt', 'ttml', 'ass', 'ssa'})
@@ -85,7 +86,9 @@ class Downloader:
                     percent,
                 )
             else:
-                self.status_callback(t("dl_processing").format(percent=d.get('_percent_str', '')), 0)
+                self.status_callback(
+                    t("dl_processing").format(percent=d.get('_percent_str', '')), 0
+                )
         elif status == 'error':
             msg = t("dl_error")
             self.status_callback(msg, 0)
@@ -113,7 +116,9 @@ class Downloader:
             opts['logger'] = _YtdlpLogger(self.log_callback)
         return opts
 
-    def fetch_title_or_entries(self, url, cookies_path=None, cookies_browser=None) -> dict:
+    def fetch_title_or_entries(
+        self, url, cookies_path=None, cookies_browser=None
+    ) -> dict:
         """Return {'type': 'single', 'url': str, 'title': str} or
                   {'type': 'playlist', 'entries': [{'url': str, 'title': str}, ...]}"""
         ydl_opts = {
@@ -141,7 +146,9 @@ class Downloader:
                     'title': entry.get('title') or entry_url,
                     'thumbnail_url': entry.get('thumbnail'),
                 })
-            return {'type': 'playlist', 'entries': result, 'title': info.get('title', '')}
+            return {
+                'type': 'playlist', 'entries': result, 'title': info.get('title', '')
+            }
 
         title = info.get('title') or url
         actual_url = info.get('webpage_url') or url
@@ -209,7 +216,7 @@ class Downloader:
         for lang, formats in sorted(auto_captions_raw.items()):
             if not formats or lang in _SKIP_AUTO_LANGS:
                 continue
-            # When primary language is known, limit auto captions to that language family
+            # Limit auto captions to primary language family when known
             if primary_lang:
                 lang_base = lang.split('-')[0].lower()
                 if lang_base != primary_lang.split('-')[0] and lang not in manual_langs:
@@ -228,9 +235,11 @@ class Downloader:
             "subtitles": subtitle_list,
         }
 
-    def download_video(self, url, format_id, cookies_path=None, format_spec=None,
-                       subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
-                       remux_only=False, output_dir_override=None, cookies_browser=None):
+    def download_video(
+        self, url, format_id, cookies_path=None, format_spec=None,
+        subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
+        remux_only=False, output_dir_override=None, cookies_browser=None,
+    ):
         if format_spec is not None:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
@@ -266,7 +275,10 @@ class Downloader:
 
         if subtitle_opts:
             embed = subtitle_opts.get('embed', False)
-            for key in ('writesubtitles', 'writeautomaticsub', 'subtitleslangs', 'subtitlesformat'):
+            for key in (
+                'writesubtitles', 'writeautomaticsub',
+                'subtitleslangs', 'subtitlesformat',
+            ):
                 if key in subtitle_opts:
                     ydl_opts[key] = subtitle_opts[key]
             if embed:

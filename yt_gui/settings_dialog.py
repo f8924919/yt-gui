@@ -1,15 +1,25 @@
 import sys
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QTabWidget, QWidget, QLabel, QLineEdit, QPushButton,
-    QComboBox, QRadioButton, QButtonGroup, QFileDialog, QMessageBox,
-    QFrame,
-)
-from PySide6.QtCore import Qt
 
-from .settings import Settings, SettingsManager
-from .formats import VIDEO_RESOLUTIONS, MP3_BITRATES
-from .i18n import t, AVAILABLE_LANGUAGES
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .formats import MP3_BITRATES, VIDEO_RESOLUTIONS
+from .i18n import AVAILABLE_LANGUAGES, t
+from .settings import SettingsManager
 
 _BROWSERS = [
     ("Brave", "brave"),
@@ -75,7 +85,9 @@ class SettingsDialog(QDialog):
         layout.setColumnStretch(1, 1)
 
         # Download folder
-        layout.addWidget(QLabel(t("label_download_folder")), 0, 0, Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(
+            QLabel(t("label_download_folder")), 0, 0, Qt.AlignmentFlag.AlignRight
+        )
         self._download_edit = QLineEdit(self._settings.download_path)
         layout.addWidget(self._download_edit, 0, 1)
         btn_browse_dl = QPushButton(t("btn_browse"))
@@ -83,7 +95,9 @@ class SettingsDialog(QDialog):
         layout.addWidget(btn_browse_dl, 0, 2)
 
         # Cookies source
-        layout.addWidget(QLabel(t("label_cookies_source")), 1, 0, Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(
+            QLabel(t("label_cookies_source")), 1, 0, Qt.AlignmentFlag.AlignRight
+        )
         radio_widget = QWidget()
         radio_layout = QHBoxLayout(radio_widget)
         radio_layout.setContentsMargins(0, 0, 0, 0)
@@ -157,14 +171,18 @@ class SettingsDialog(QDialog):
         layout.setSpacing(8)
         layout.setColumnStretch(1, 1)
 
-        layout.addWidget(QLabel(t("label_video_resolution")), 0, 0, Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(
+            QLabel(t("label_video_resolution")), 0, 0, Qt.AlignmentFlag.AlignRight
+        )
         res_values = [f"{r}p" for r in VIDEO_RESOLUTIONS]
         self._res_combo = QComboBox()
         self._res_combo.addItems(res_values)
         self._res_combo.setCurrentText(f"{self._settings.video_resolution}p")
         layout.addWidget(self._res_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
-        layout.addWidget(QLabel(t("label_mp3_bitrate")), 1, 0, Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(
+            QLabel(t("label_mp3_bitrate")), 1, 0, Qt.AlignmentFlag.AlignRight
+        )
         bitrate_values = [f"{b}kbps" for b in MP3_BITRATES]
         self._bitrate_combo = QComboBox()
         self._bitrate_combo.addItems(bitrate_values)
@@ -191,14 +209,17 @@ class SettingsDialog(QDialog):
             self._cookies_edit.setText(path)
 
     def _save(self):
-        old_lang = self._settings.language
         lang_idx = self._lang_display.index(self._lang_combo.currentText())
         new_lang = AVAILABLE_LANGUAGES[lang_idx]
 
         self._settings.download_path = self._download_edit.text().strip()
         self._settings.language = new_lang
-        self._settings.video_resolution = self._res_combo.currentText().removesuffix("p")
-        self._settings.mp3_bitrate = self._bitrate_combo.currentText().removesuffix("kbps")
+        self._settings.video_resolution = (
+            self._res_combo.currentText().removesuffix("p")
+        )
+        self._settings.mp3_bitrate = (
+            self._bitrate_combo.currentText().removesuffix("kbps")
+        )
 
         if self._radio_file.isChecked():
             self._settings.cookies_path = self._cookies_edit.text().strip()
@@ -206,7 +227,9 @@ class SettingsDialog(QDialog):
         elif self._radio_browser.isChecked():
             disp = self._browser_combo.currentText()
             if disp in _BROWSER_DISPLAY:
-                self._settings.cookies_browser = _BROWSER_INTERNAL[_BROWSER_DISPLAY.index(disp)]
+                self._settings.cookies_browser = (
+                    _BROWSER_INTERNAL[_BROWSER_DISPLAY.index(disp)]
+                )
             else:
                 self._settings.cookies_browser = ""
             self._settings.cookies_path = ""

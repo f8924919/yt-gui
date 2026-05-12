@@ -3,14 +3,14 @@ Script to fetch platform-specific binaries (deno, ffmpeg) before building.
 Called automatically when running: pyinstaller yt-gui.spec
 Can also be run manually.
 """
-import sys
 import os
 import platform
-import zipfile
-import tarfile
 import shutil
-import urllib.request
 import stat
+import sys
+import tarfile
+import urllib.request
+import zipfile
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(os.path.dirname(_SCRIPTS_DIR), 'bin')
@@ -163,7 +163,9 @@ def _prompt_ffmpeg_consent() -> bool:
     print("License details: https://ffmpeg.org/legal.html")
     print("=" * 60)
     try:
-        answer = input("Do you agree to download ffmpeg under the GPL license? [y/N] ").strip().lower()
+        answer = input(
+            "Do you agree to download ffmpeg under the GPL license? [y/N] "
+        ).strip().lower()
     except (EOFError, KeyboardInterrupt):
         print()
         return False
@@ -173,8 +175,13 @@ def _prompt_ffmpeg_consent() -> bool:
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--update', action='store_true', help='Force re-download of existing binaries')
-    parser.add_argument('--yes', '-y', action='store_true', help='Skip all confirmation prompts (for CI/automated builds)')
+    parser.add_argument(
+        '--update', action='store_true', help='Force re-download of existing binaries'
+    )
+    parser.add_argument(
+        '--yes', '-y', action='store_true',
+        help='Skip all confirmation prompts (for CI/automated builds)'
+    )
     args = parser.parse_args()
 
     download_deno(force=args.update)
@@ -182,7 +189,10 @@ if __name__ == '__main__':
     _ext = '.exe' if sys.platform == 'win32' else ''
     _ffmpeg_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffmpeg{_ext}')
     _ffprobe_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffprobe{_ext}')
-    _needs_ffmpeg = not (os.path.exists(_ffmpeg_path) and os.path.exists(_ffprobe_path)) or args.update
+    _needs_ffmpeg = (
+        not (os.path.exists(_ffmpeg_path) and os.path.exists(_ffprobe_path))
+        or args.update
+    )
 
     if _needs_ffmpeg and not args.yes:
         if not _prompt_ffmpeg_consent():
