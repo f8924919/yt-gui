@@ -66,7 +66,7 @@ class _QueueItem:
     subtitle_opts: dict | None
     title: str = ""
     mp3_bitrate: str | None = None
-    mp3_thumbnail: bool = False
+    embed_thumbnail: bool = False
     audio_codec: str = "mp3"
     remux_only: bool = False
     playlist_folder: str | None = None
@@ -524,34 +524,40 @@ class App(QMainWindow):
             format_spec = self._original_panel.get_format_spec()
             subtitle_opts = self._original_panel.get_subtitle_opts()
             remux_only = self._original_panel.get_remux_only()
+            embed_thumbnail = self._original_panel.get_embed_thumbnail()
             if self._original_panel.has_formats_loaded():
                 self._enqueue_single(
                     url, format_id, format_label, format_spec, subtitle_opts,
                     self._original_panel.get_fetched_title(), remux_only=remux_only,
+                    embed_thumbnail=embed_thumbnail,
                 )
                 self.url_entry.clear()
                 return
             self._start_add_thread(
                 url, cookies_path, cookies_browser, format_id, format_label,
-                format_spec, subtitle_opts, False, remux_only=remux_only,
+                format_spec, subtitle_opts, embed_thumbnail, remux_only=remux_only,
             )
         else:
             audio_codec = (
                 self._settings.audio_format if format_id == _MP3_KEY else "mp3"
             )
-            mp3_thumbnail = (
-                self._mp3_thumb_check.isChecked()
-                if format_id == _MP3_KEY and audio_codec == "mp3"
-                else False
-            )
+            if format_id == _MP3_KEY:
+                embed_thumbnail = (
+                    bool(self._mp3_thumb_check.isChecked())
+                    if audio_codec == "mp3" else False
+                )
+            elif format_id in ("fmt_best_mp4", "fmt_720p"):
+                embed_thumbnail = True
+            else:
+                embed_thumbnail = False
             self._start_add_thread(
                 url, cookies_path, cookies_browser, format_id, format_label,
-                None, None, mp3_thumbnail, audio_codec=audio_codec,
+                None, None, embed_thumbnail, audio_codec=audio_codec,
             )
 
     def _start_add_thread(
         self, url, cookies_path, cookies_browser, format_id, format_label,
-        format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+        format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
         audio_codec: str = "mp3",
     ):
         self.add_button.setEnabled(False)
@@ -560,13 +566,13 @@ class App(QMainWindow):
         threading.Thread(
             target=self._run_fetch_for_add,
             args=(url, cookies_path, cookies_browser, format_id, format_label,
-                  format_spec, subtitle_opts, mp3_thumbnail, remux_only, audio_codec),
+                  format_spec, subtitle_opts, embed_thumbnail, remux_only, audio_codec),
             daemon=True,
         ).start()
 
     def _run_fetch_for_add(
         self, url, cookies_path, cookies_browser, format_id, format_label,
-        format_spec, subtitle_opts, mp3_thumbnail=False, remux_only=False,
+        format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
         audio_codec: str = "mp3",
     ):
         try:
@@ -579,7 +585,7 @@ class App(QMainWindow):
                 'format_label': format_label,
                 'format_spec': format_spec,
                 'subtitle_opts': subtitle_opts,
-                'mp3_thumbnail': mp3_thumbnail,
+                'embed_thumbnail': embed_thumbnail,
                 'remux_only': remux_only,
                 'audio_codec': audio_codec,
             }
@@ -606,14 +612,14 @@ class App(QMainWindow):
         format_label = payload['format_label']
         format_spec = payload['format_spec']
         subtitle_opts = payload['subtitle_opts']
-        mp3_thumbnail = payload['mp3_thumbnail']
+        embed_thumbnail = payload['embed_thumbnail']
         remux_only = payload['remux_only']
         audio_codec = payload.get('audio_codec', 'mp3')
 
         if result['type'] == 'single':
             self._enqueue_single(
                 result['url'], format_id, format_label, format_spec, subtitle_opts,
-                result['title'], mp3_thumbnail, remux_only=remux_only,
+                result['title'], embed_thumbnail=embed_thumbnail, remux_only=remux_only,
                 thumbnail_url=result.get('thumbnail_url'), audio_codec=audio_codec,
             )
             self.url_entry.clear()
@@ -650,7 +656,7 @@ class App(QMainWindow):
                     subtitle_opts=None,
                     title=entry['title'],
                     mp3_bitrate=snap_bitrate,
-                    mp3_thumbnail=mp3_thumbnail,
+                    embed_thumbnail=embed_thumbnail,
                     audio_codec=audio_codec,
                     playlist_folder=playlist_folder,
                     thumbnail_url=entry.get('thumbnail_url'),
@@ -678,7 +684,7 @@ class App(QMainWindow):
 
     def _enqueue_single(
         self, url, format_id, format_label, format_spec, subtitle_opts, title,
-        mp3_thumbnail=False, remux_only=False, thumbnail_url=None,
+        embed_thumbnail=False, remux_only=False, thumbnail_url=None,
         audio_codec: str = "mp3",
     ):
         if format_id == "fmt_720p" and format_spec is None:
@@ -697,7 +703,7 @@ class App(QMainWindow):
             subtitle_opts=subtitle_opts,
             title=title,
             mp3_bitrate=mp3_bitrate,
-            mp3_thumbnail=mp3_thumbnail,
+            embed_thumbnail=embed_thumbnail,
             audio_codec=audio_codec,
             remux_only=remux_only,
             thumbnail_url=thumbnail_url,
@@ -814,7 +820,7 @@ class App(QMainWindow):
             self._on_format_changed(idx)
 
         if target_format_id == _MP3_KEY:
-            self._mp3_thumb_check.setChecked(first.mp3_thumbnail)
+            self._mp3_thumb_check.setChecked(first.embed_thumbnail)
 
         self.add_button.setText(t("btn_apply_edit"))
         self._cancel_edit_button.setVisible(True)
@@ -850,33 +856,36 @@ class App(QMainWindow):
             format_spec = self._original_panel.get_format_spec()
             subtitle_opts = self._original_panel.get_subtitle_opts()
             remux_only = self._original_panel.get_remux_only()
+            embed_thumbnail = self._original_panel.get_embed_thumbnail()
             audio_codec = "mp3"
             mp3_bitrate = None
-            mp3_thumbnail = False
         elif format_id == _MP3_KEY:
             format_spec = None
             subtitle_opts = None
             remux_only = False
             audio_codec = self._settings.audio_format
             mp3_bitrate = self._settings.mp3_bitrate if audio_codec == "mp3" else None
-            mp3_thumbnail = (
+            embed_thumbnail = (
                 bool(self._mp3_thumb_check.isChecked())
                 if audio_codec == "mp3" else False
             )
-        elif format_id == "fmt_720p":
-            format_spec = build_720p_spec(self._settings.video_resolution)
+        elif format_id in ("fmt_720p", "fmt_best_mp4"):
+            format_spec = (
+                build_720p_spec(self._settings.video_resolution)
+                if format_id == "fmt_720p" else None
+            )
             subtitle_opts = None
             remux_only = False
             audio_codec = "mp3"
             mp3_bitrate = None
-            mp3_thumbnail = False
+            embed_thumbnail = True
         else:
             format_spec = None
             subtitle_opts = None
             remux_only = False
             audio_codec = "mp3"
             mp3_bitrate = None
-            mp3_thumbnail = False
+            embed_thumbnail = False
 
         with self._queue_lock:
             for item in self._editing_items:
@@ -887,7 +896,7 @@ class App(QMainWindow):
                 item.remux_only = remux_only
                 item.audio_codec = audio_codec
                 item.mp3_bitrate = mp3_bitrate
-                item.mp3_thumbnail = mp3_thumbnail
+                item.embed_thumbnail = embed_thumbnail
                 item.status = "waiting"
 
         for item in self._editing_items:
@@ -993,7 +1002,7 @@ class App(QMainWindow):
                     item.url, item.format_id, cookies_path,
                     item.format_spec, item.subtitle_opts,
                     mp3_bitrate_override=item.mp3_bitrate,
-                    embed_thumbnail=item.mp3_thumbnail,
+                    embed_thumbnail=item.embed_thumbnail,
                     remux_only=item.remux_only,
                     output_dir_override=output_dir_override,
                     cookies_browser=cookies_browser,

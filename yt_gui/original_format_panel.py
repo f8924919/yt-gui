@@ -126,10 +126,15 @@ class OriginalFormatPanel(QGroupBox):
         self._radio_mp4.setChecked(True)
         self._remux_group.addButton(self._radio_mp4, 0)
         self._remux_group.addButton(self._radio_remux, 1)
+        self._radio_mp4.toggled.connect(self._on_output_format_changed)
         out_layout.addWidget(self._radio_mp4)
         out_layout.addWidget(self._radio_remux)
         out_layout.addStretch()
         layout.addWidget(out_widget, 3, 1, 1, 3)
+
+        # Row 4: Embed thumbnail checkbox
+        self._embed_thumbnail_check = QCheckBox(t("orig_embed_thumbnail"))
+        layout.addWidget(self._embed_thumbnail_check, 4, 1, 1, 3)
 
     # ── public interface ─────────────────────────────────────────────────────
 
@@ -157,6 +162,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setText(t("orig_sub_embed"))
         self._radio_mp4.setText(t("orig_output_mp4"))
         self._radio_remux.setText(t("orig_output_remux"))
+        self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
 
     def has_formats_loaded(self) -> bool:
         return self._video_combo.isEnabled() and bool(self._fetched_title)
@@ -173,6 +179,9 @@ class OriginalFormatPanel(QGroupBox):
 
     def get_remux_only(self) -> bool:
         return bool(self._radio_remux.isChecked())
+
+    def get_embed_thumbnail(self) -> bool:
+        return bool(self._embed_thumbnail_check.isChecked())
 
     def get_format_spec(self) -> str:
         auto_label = t("orig_auto")
@@ -269,6 +278,11 @@ class OriginalFormatPanel(QGroupBox):
                 if self._audio_combo.currentText() == t("orig_audio_included"):
                     self._audio_combo.setCurrentText(auto_label)
                 self._audio_combo.setEnabled(True)
+
+    def _on_output_format_changed(self, mp4_checked: bool):
+        if not mp4_checked:
+            self._embed_thumbnail_check.setChecked(False)
+        self._embed_thumbnail_check.setEnabled(mp4_checked)
 
     def _on_subtitle_changed(self):
         has_sub = (

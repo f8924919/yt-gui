@@ -275,6 +275,11 @@ class Downloader:
                 ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
         elif not remux_only:
             ydl_opts['merge_output_format'] = 'mp4'
+            if embed_thumbnail:
+                ydl_opts['writethumbnail'] = True
+                ydl_opts.setdefault('postprocessors', []).append(
+                    {'key': 'EmbedThumbnail'}
+                )
 
         if subtitle_opts:
             embed = subtitle_opts.get('embed', False)
