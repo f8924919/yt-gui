@@ -48,7 +48,7 @@ _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
 _WIN_W = 560
 _WIN_H_DEFAULT = 480
-_WIN_H_EXPANDED = 700
+_WIN_H_EXPANDED = 820
 _INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 
