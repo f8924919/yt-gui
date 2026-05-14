@@ -4,15 +4,24 @@
 
 PySide6 メインウィンドウ。アプリケーションのエントリーポイントから生成される。
 
+## スレッド間通信パターン
+
+バックグラウンドスレッドから Qt ウィジェットを直接操作してはならない。必ず `Signal` / `Slot` を経由してメインスレッドにキューイングする。Qt シグナルは別スレッドから emit しても自動的に `Qt.QueuedConnection` でメインスレッドへ配送される。
+
 ## シグナル（内部クラス `_AppSignals(QObject)`）
 
 | シグナル | 引数 | 用途 |
 |----------|------|------|
-| `status_update` | `str, float` | ステータスバー更新 |
+| `status_update` | `str, float` | ステータスバー更新（テキスト・進捗） |
 | `log_message` | `str` | ログ追記 |
-| `queue_item_refresh` | `object` | キューアイテムの表示更新 |
+| `queue_item_refresh` | `object (_QueueItem)` | キューアイテムの表示更新 |
+| `add_button_reset` | — | 「追加」ボタンを通常状態に戻す |
+| `fetch_for_add_done` | `object (dict)` | タイトル取得完了・エンキュー処理をメインスレッドで行う |
+| `worker_done` | — | ワーカースレッド終了通知 |
+| `show_error` | `str, str` | エラーダイアログ表示（title, message） |
+| `show_warning` | `str, str` | 警告ダイアログ表示（title, message） |
 
-バックグラウンドスレッドからこれらを emit し、メインスレッドのスロットで受け取る。
+`OriginalFormatPanel` も同様に内部クラス `_PanelSignals(QObject)` でシグナルを定義する（詳細は [original_format_panel.md](original_format_panel.md) 参照）。
 
 ## 初期化順序の注意
 
