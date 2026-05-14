@@ -122,7 +122,7 @@ class OriginalFormatPanel(QGroupBox):
         out_layout = QHBoxLayout(out_widget)
         out_layout.setContentsMargins(0, 0, 0, 0)
         self._remux_group = QButtonGroup(self)
-        self._radio_mp4 = QRadioButton(t("orig_output_mp4"))
+        self._radio_mp4 = QRadioButton(t("orig_output_mp4").format(container="MP4"))
         self._radio_remux = QRadioButton(t("orig_output_remux"))
         self._radio_mp4.setChecked(True)
         self._remux_group.addButton(self._radio_mp4, 0)
@@ -152,7 +152,7 @@ class OriginalFormatPanel(QGroupBox):
     def trigger_fetch(self):
         self._start_fetch_thread()
 
-    def retranslate(self):
+    def retranslate(self, video_container: str = "mp4"):
         self.setTitle(t("label_original_detail"))
         self._video_label.setText(t("label_orig_video"))
         self._audio_label.setText(t("label_orig_audio"))
@@ -171,7 +171,9 @@ class OriginalFormatPanel(QGroupBox):
             self._fetch_button.setText(t("btn_fetch_formats"))
 
         self._embed_check.setText(t("orig_sub_embed"))
-        self._radio_mp4.setText(t("orig_output_mp4"))
+        self._radio_mp4.setText(t("orig_output_mp4").format(
+            container=video_container.upper()
+        ))
         self._radio_remux.setText(t("orig_output_remux"))
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
         self._embed_metadata_check.setText(t("orig_embed_metadata"))

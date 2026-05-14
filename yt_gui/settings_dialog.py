@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .formats import AUDIO_FORMATS, MP3_BITRATES, VIDEO_RESOLUTIONS
+from .formats import AUDIO_FORMATS, MP3_BITRATES, VIDEO_CONTAINERS, VIDEO_RESOLUTIONS
 from .i18n import AVAILABLE_LANGUAGES, t
 from .settings import SettingsManager
 
@@ -43,7 +43,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(t("settings_title"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setFixedSize(480, 330)
+        self.setFixedSize(480, 355)
 
         self._manager = manager
         self._settings = manager.load()
@@ -186,7 +186,20 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._res_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addWidget(
-            QLabel(t("label_audio_format")), 1, 0, Qt.AlignmentFlag.AlignRight
+            QLabel(t("label_video_container")), 1, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._container_combo = QComboBox()
+        self._container_combo.addItems([c.upper() for c in VIDEO_CONTAINERS])
+        current_vc = self._settings.video_container
+        vc_idx = (
+            list(VIDEO_CONTAINERS).index(current_vc)
+            if current_vc in VIDEO_CONTAINERS else 0
+        )
+        self._container_combo.setCurrentIndex(vc_idx)
+        layout.addWidget(self._container_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
+
+        layout.addWidget(
+            QLabel(t("label_audio_format")), 2, 0, Qt.AlignmentFlag.AlignRight
         )
         self._audio_fmt_combo = QComboBox()
         self._audio_fmt_combo.addItems([t("audio_format_mp3"), t("audio_format_flac")])
@@ -196,21 +209,21 @@ class SettingsDialog(QDialog):
         )
         self._audio_fmt_combo.setCurrentIndex(current_af_idx)
         self._audio_fmt_combo.currentIndexChanged.connect(self._on_audio_format_changed)
-        layout.addWidget(self._audio_fmt_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self._audio_fmt_combo, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         self._bitrate_label = QLabel(t("label_mp3_bitrate"))
-        layout.addWidget(self._bitrate_label, 2, 0, Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self._bitrate_label, 3, 0, Qt.AlignmentFlag.AlignRight)
         bitrate_values = [f"{b}kbps" for b in MP3_BITRATES]
         self._bitrate_combo = QComboBox()
         self._bitrate_combo.addItems(bitrate_values)
         self._bitrate_combo.setCurrentText(f"{self._settings.mp3_bitrate}kbps")
-        layout.addWidget(self._bitrate_combo, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self._bitrate_combo, 3, 1, Qt.AlignmentFlag.AlignLeft)
 
         note = QLabel(t("quality_note"))
         note.setStyleSheet("color: gray;")
         note.setWordWrap(True)
-        layout.addWidget(note, 3, 0, 1, 2)
-        layout.setRowStretch(4, 1)
+        layout.addWidget(note, 4, 0, 1, 2)
+        layout.setRowStretch(5, 1)
 
         self._on_audio_format_changed(current_af_idx)
 
@@ -235,6 +248,10 @@ class SettingsDialog(QDialog):
         self._settings.language = new_lang
         self._settings.video_resolution = (
             self._res_combo.currentText().removesuffix("p")
+        )
+        vc_idx = self._container_combo.currentIndex()
+        self._settings.video_container = (
+            VIDEO_CONTAINERS[vc_idx] if vc_idx < len(VIDEO_CONTAINERS) else "mp4"
         )
         af_idx = self._audio_fmt_combo.currentIndex()
         self._settings.audio_format = (

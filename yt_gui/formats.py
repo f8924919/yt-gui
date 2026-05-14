@@ -27,3 +27,4 @@ FORMAT_SPECS: dict[str, tuple[str, bool]] = {
 FORMAT_KEYS: list[str] = list(FORMAT_SPECS.keys())
 
 AUDIO_FORMATS: tuple[str, ...] = ("mp3", "flac")
+VIDEO_CONTAINERS: tuple[str, ...] = ("mp4", "mkv", "webm")

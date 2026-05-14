@@ -240,7 +240,7 @@ class Downloader:
         subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
         remux_only=False, output_dir_override=None, cookies_browser=None,
         audio_codec: str = "mp3", embed_metadata: bool = False,
-        embed_chapters: bool = False,
+        embed_chapters: bool = False, video_container: str = "mp4",
     ):
         if format_spec is not None:
             spec = format_spec
@@ -282,7 +282,7 @@ class Downloader:
                 ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
         else:
             if not remux_only:
-                ydl_opts['merge_output_format'] = 'mp4'
+                ydl_opts['merge_output_format'] = video_container
             if embed_metadata or embed_chapters:
                 ydl_opts.setdefault('postprocessors', []).append({
                     'key': 'FFmpegMetadata',

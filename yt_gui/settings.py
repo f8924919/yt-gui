@@ -13,6 +13,7 @@ class Settings:
     video_resolution: str = "720"
     mp3_bitrate: str = "192"
     audio_format: str = "mp3"
+    video_container: str = "mp4"
 
 
 def _get_config_dir() -> str:
