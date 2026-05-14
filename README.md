@@ -13,11 +13,11 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   - 待機中・完了・エラーのアイテムをキューから削除可能
   - **キューアイテムを右クリック** でコンテキストメニューを表示。**「URL をコピー」**（複数選択時は改行区切り）と **「形式を変更」** によるダウンロード形式の変更（編集モード）が可能。複数アイテムを選択して一括変更も可能。「オリジナルの形式」は複数選択時はグレーアウトされ選択不可
   - **キューアイテムにマウスを乗せると**ツールチップを表示。サムネイル画像（取得できた場合は 240×135px）・タイトル・URL・プレイリスト名・字幕設定・形式仕様を表示する
-- 以下の形式を選択可能（解像度・音声形式・ビットレートは設定画面で変更できます）
+- 以下の形式を選択可能（解像度・コンテナ・音声形式・ビットレートは設定画面で変更できます）
   | 表示名 | 内容 |
   |---|---|
-  | 最高画質 (MP4に結合) | 最高品質の映像＋音声を MP4 にマージ |
-  | *N*p (MP4に結合) | 指定解像度以下の映像＋音声を MP4 にマージ（デフォルト 720p） |
+  | 最高画質 (*コンテナ*に結合) | 最高品質の映像＋音声を指定コンテナにマージ（デフォルト MP4） |
+  | *N*p (*コンテナ*に結合) | 指定解像度以下の映像＋音声を指定コンテナにマージ（デフォルト 720p / MP4） |
   | MP3 (音声のみ・*N*kbps) | 音声のみを MP3 として抽出（デフォルト 192kbps）。サムネイルの ID3 タグ埋め込みオプションあり |
   | FLAC (音声のみ) | 音声のみをロスレス FLAC として抽出。設定画面で音声形式を FLAC に変更すると表示される |
   | オリジナルの形式 | 動画から取得した映像/音声トラックを個別に選択してダウンロード |
@@ -29,14 +29,16 @@ YouTube などの動画を GUI 操作でかんたんにダウンロードでき�
   3. 映像・音声それぞれに「自動 (最良を選択)」「**ダウンロードしない**」と個別フォーマットから選択可能。「ダウンロードしない」を使うと映像のみ / 音声のみのダウンロードが可能（両方同時にスキップは不可）
   4. 複合フォーマット（★印）を映像に選択した場合は音声選択が自動的に無効化される
   5. 字幕は複数言語を同時選択可能（Ctrl+クリック / Shift+クリック）。手動字幕・自動生成字幕に対応。字幕フォーマット（srt / vtt / best）と MP4 への埋め込みオプションあり
-- **ファイル名の重複回避**: ダウンロード先に同名ファイルが既に存在する場合、`タイトル (1).mp4` のように連番サフィックスを付けて保存する（上書きしない）
+  6. 「メタデータを埋め込む」「チャプターを埋め込む」チェックボックスで動画ファイルへのメタデータ・チャプター埋め込みを制御できる（デフォルトは両方 ON）
+  7. キューアイテムを右クリックして「形式を変更」で編集モードに入ると、前回の設定（ラジオボタン・チェックボックスは即時、映像/音声/字幕は再取得後に）が自動復元される
+- **ファイル名の重複回避**: ダウンロード先に同名ファイルが既に存在する場合、`タイトル (1).mkv` のように連番サフィックスを付けて保存する（上書きしない）。MP4 / MKV / WebM すべてのコンテナに対応
 - **起動時に依存ツールの存在チェック**（ffmpeg・ffprobe・deno）を行い、見つからない場合は警告ダイアログを表示する。ダウンロード自体は続行可能
 - ダウンロード進捗をプログレスバーとステータスラベルでリアルタイム表示
 - **ログ表示**（ファイル > ログ表示）: セッション中の動作ログをダイアログで確認できる。キューへの追加・ダウンロード開始/完了・yt-dlp の処理メッセージ・エラーをタイムスタンプ付きで記録。非モーダルで開いたまま操作可能
 - メニューバー（ファイル > 設定... / Ctrl+,）から設定画面を呼び出し可能
 - 設定画面で以下を変更・保存できる
   - **一般タブ**: 保存フォルダ（未設定時は `~/Downloads`）・Cookies（使用しない / ファイル指定 / ブラウザから取得の 3 択）・表示言語（日本語 / English）— 言語変更は即座に反映（再起動不要）
-  - **画質・音質タブ**: 解像度上限（480p / 720p / 1080p / 1440p / 2160p）・音声形式（MP3 / FLAC）・MP3ビットレート（128 / 192 / 256 / 320 kbps、MP3選択時のみ表示）— 「最高画質」と「オリジナルの形式」には影響しない
+  - **画質・音質タブ**: 解像度上限（480p / 720p / 1080p / 1440p / 2160p）・映像コンテナ（MP4 / MKV / WebM）・音声形式（MP3 / FLAC）・MP3ビットレート（128 / 192 / 256 / 320 kbps、MP3選択時のみ表示）— 解像度とコンテナは「最高画質」「*N*p」「オリジナルの形式（コンテナ結合時）」に適用される
 - 設定は OS 標準の設定ディレクトリに JSON で永続保存
   - Windows: `%APPDATA%\yt-gui\settings.json`
   - macOS: `~/Library/Application Support/yt-gui/settings.json`
@@ -117,15 +119,15 @@ yt-gui/
 | モジュール | 責務 |
 |---|---|
 | `yt_gui/i18n.py` | `t(key)` で翻訳文字列を返す。`set_language()` で言語を切り替え |
-| `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` はテンプレート文字列（`{resolution}` / `{bitrate}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
-| `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES` / `AUDIO_FORMATS`（設定画面の選択肢）を定義 |
+| `yt_gui/locales/ja.py` / `en.py` | 各言語の文字列辞書。`fmt_720p` / `fmt_mp3` / `fmt_best_mp4` はテンプレート文字列（`{resolution}` / `{bitrate}` / `{container}` プレースホルダー）で、`App._build_format_display()` が設定値を埋めて表示名を生成する |
+| `yt_gui/formats.py` | `FORMAT_SPECS` / `FORMAT_KEYS`（ダウンロード形式定義）と `VIDEO_RESOLUTIONS` / `MP3_BITRATES` / `AUDIO_FORMATS` / `VIDEO_CONTAINERS`（設定画面の選択肢）を定義。コンテナ対応の `build_best_spec(container)` / `build_720p_spec(resolution, container)` でコンテナ別の yt-dlp フォーマット文字列を生成する |
 | `yt_gui/utils.py` | `strip_ansi(text)` — ANSI エスケープコードを除去するユーティリティ。ステータス表示・エラーダイアログで使用 |
-| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別し `thumbnail_url` も返す、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。`audio_codec` パラメータ（`"mp3"` / `"flac"`）で出力コーデックを指定し、FFmpegExtractAudio に渡す。Cookies はファイルパス・ブラウザ名の両方に対応。プレイリスト時は `output_dir_override` でサブフォルダに出力。`log_callback` が設定されている場合は `_YtdlpLogger` 経由で yt-dlp の処理メッセージ・警告・エラーをアプリのログに転送する |
-| `yt_gui/original_format_panel.py` | `OriginalFormatPanel(QGroupBox)` — オリジナル形式の詳細設定パネル。内部の `_PanelSignals(QObject)` でフォーマット取得スレッドの結果をメインスレッドへ安全に渡す。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()` |
-| `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `cookies_browser` / `download_path` / `language` / `video_resolution` / `mp3_bitrate` / `audio_format`）と `SettingsManager`。設定を JSON ファイルに読み書き |
-| `yt_gui/settings_dialog.py` | `SettingsDialog(QDialog)` — 「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・音声形式・MP3ビットレート）を持つモーダル設定画面。`QTabWidget` を使用。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタン切り替え。音声形式コンボ（MP3 / FLAC）で選択し、FLAC 選択時はビットレートコンボを非表示にする |
+| `yt_gui/downloader.py` | yt-dlp のラッパー。`fetch_title_or_entries()` で単独/プレイリストを自動判別し `thumbnail_url` も返す、`fetch_formats()` で映像/音声（言語タグ付き）/字幕一覧を取得、`download_video()` でダウンロード実行。`audio_codec`（`"mp3"` / `"flac"`）・`video_container`（`"mp4"` / `"mkv"` / `"webm"`）・`embed_metadata` / `embed_chapters`（メタデータ・チャプター埋め込み）・`embed_thumbnail` パラメータを受け取る。サムネイル埋め込みは非対応コンテナ（WebM）を自動スキップ。同名ファイルが存在する場合は `(n)` サフィックスを付けて保存（全コンテナ対応）。Cookies はファイルパス・ブラウザ名の両方に対応。`log_callback` が設定されている場合は `_YtdlpLogger` 経由で yt-dlp のメッセージをアプリのログに転送する |
+| `yt_gui/original_format_panel.py` | `OriginalFormatPanel(QGroupBox)` — オリジナル形式の詳細設定パネル。内部の `_PanelSignals(QObject)` でフォーマット取得スレッドの結果をメインスレッドへ安全に渡す。映像/音声コンボ・字幕リスト（4行表示）・出力形式ラジオ・メタデータ/チャプター埋め込みチェックボックスを含む。公開 API: `get_format_spec()` / `get_subtitle_opts()` / `get_remux_only()` / `get_embed_metadata()` / `get_embed_chapters()` / `get_raw_settings()` / `restore_from_settings()` / `has_formats_loaded()` / `get_fetched_title()` / `is_both_skipped()` / `trigger_fetch()` / `retranslate(video_container)` |
+| `yt_gui/settings.py` | `Settings` dataclass（`cookies_path` / `cookies_browser` / `download_path` / `language` / `video_resolution` / `mp3_bitrate` / `audio_format` / `video_container`）と `SettingsManager`。設定を JSON ファイルに読み書き |
+| `yt_gui/settings_dialog.py` | `SettingsDialog(QDialog)` — 「一般」タブ（保存フォルダ・Cookies・言語）と「画質・音質」タブ（解像度上限・映像コンテナ・音声形式・MP3ビットレート）を持つモーダル設定画面。`QTabWidget` を使用。Cookies は「使用しない / ファイルを指定 / ブラウザから取得」のラジオボタン切り替え。音声形式コンボ（MP3 / FLAC）で選択し、FLAC 選択時はビットレートコンボを非表示にする |
 | `yt_gui/log_dialog.py` | `LogDialog(QDialog)` — 非モーダルの動作ログダイアログ。`QPlainTextEdit`（ダーク背景・等幅フォント）にタイムスタンプ付きログを表示。最下部にいれば自動スクロール、スクロールアップ中は追従しない。クリア / 閉じるボタン付き |
-| `yt_gui/app.py` | `App(QMainWindow)` — メインウィンドウ。内部の `_AppSignals(QObject)` に定義したシグナル経由でバックグラウンドスレッドからの GUI 更新を安全に処理する。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。`_QueueItem` の `audio_codec` フィールドにエンキュー時の音声形式をスナップショットとして保持し、設定変更後も既存アイテムは追加時のコーデックでダウンロードされる。右クリックコンテキストメニューで「URL をコピー」（複数選択時は改行区切り）と形式変更（編集モード）を提供。キューアイテム追加時にサムネイルをバックグラウンドで非同期取得し `_thumbnail_cache` に base64 data URI としてキャッシュ、ツールチップに 240×135px の画像として表示する。`_log_entries` にセッション中のログを保持し、「ファイル > ログ表示」で `LogDialog` を開く |
+| `yt_gui/app.py` | `App(QMainWindow)` — メインウィンドウ。内部の `_AppSignals(QObject)` に定義したシグナル経由でバックグラウンドスレッドからの GUI 更新を安全に処理する。「追加」ボタンが単独/プレイリストを自動判別しバックグラウンドでタイトルを取得してキューに追加する。`_QueueItem` にエンキュー時の `audio_codec` / `video_container` / `embed_metadata` / `embed_chapters` / `orig_settings` をスナップショットとして保持し、設定変更後も既存アイテムは追加時の設定でダウンロードされる。右クリックコンテキストメニューで「URL をコピー」（複数選択時は改行区切り）と形式変更（編集モード）を提供。編集モードで「オリジナルの形式」アイテムを選択すると前回の設定が自動復元される。キューアイテム追加時にサムネイルをバックグラウンドで非同期取得し `_thumbnail_cache` に base64 data URI としてキャッシュ、ツールチップに 240×135px の画像として表示する。`_log_entries` にセッション中のログを保持し、「ファイル > ログ表示」で `LogDialog` を開く |
 | `yt_gui/__main__.py` | `python -m yt_gui` のエントリーポイント。`QApplication` を起動して `App` を表示する |
 | `main.py` | PyInstaller ビルド用のエントリーポイント |
 
