@@ -97,7 +97,7 @@ class OriginalFormatPanel(QGroupBox):
         self._subtitle_list = QListWidget()
         self._subtitle_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._subtitle_list.setEnabled(False)
-        self._subtitle_list.setMaximumHeight(70)
+        self._subtitle_list.setMinimumHeight(96)
         self._subtitle_list.itemSelectionChanged.connect(self._on_subtitle_changed)
         layout.addWidget(self._subtitle_list, 2, 1, 1, 2)
 
