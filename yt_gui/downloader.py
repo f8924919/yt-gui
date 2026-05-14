@@ -5,7 +5,7 @@ import sys
 from yt_dlp import YoutubeDL
 
 from . import get_resource_base
-from .formats import FORMAT_SPECS, build_720p_spec
+from .formats import FORMAT_SPECS, build_720p_spec, build_best_spec
 from .i18n import t
 from .utils import strip_ansi
 
@@ -245,8 +245,11 @@ class Downloader:
         if format_spec is not None:
             spec = format_spec
             _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
+        elif format_id == "fmt_best_mp4":
+            spec = build_best_spec(video_container)
+            is_audio = False
         elif format_id == "fmt_720p":
-            spec = build_720p_spec(self.video_resolution)
+            spec = build_720p_spec(self.video_resolution, video_container)
             is_audio = False
         else:
             spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))

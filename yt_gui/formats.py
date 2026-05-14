@@ -2,11 +2,31 @@ VIDEO_RESOLUTIONS: tuple[str, ...] = ("480", "720", "1080", "1440", "2160")
 MP3_BITRATES: tuple[str, ...] = ("128", "192", "256", "320")
 
 
-def build_720p_spec(resolution: str) -> str:
+def build_best_spec(container: str = "mp4") -> str:
+    if container == "webm":
+        return (
+            "bestvideo[ext=webm]+bestaudio[ext=webm]"
+            "/bestvideo+bestaudio/best"
+        )
+    if container == "mkv":
+        return "bestvideo+bestaudio/best"
+    return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+
+
+def build_720p_spec(resolution: str, container: str = "mp4") -> str:
+    if container == "webm":
+        return (
+            f"bestvideo[height<={resolution}][ext=webm]+bestaudio[ext=webm]"
+            f"/bestvideo[height<={resolution}]+bestaudio/best"
+        )
+    if container == "mkv":
+        return (
+            f"bestvideo[height<={resolution}]+bestaudio"
+            f"/best"
+        )
     return (
         f"bestvideo[height<={resolution}][ext=mp4]+bestaudio[ext=m4a]"
-        f"/bestvideo[height<={resolution}]+bestaudio"
-        f"/best"
+        f"/bestvideo[height<={resolution}]+bestaudio/best"
     )
 
 # Internal key → (yt-dlp format spec, is_audio)

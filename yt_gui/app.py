@@ -676,8 +676,10 @@ class App(QMainWindow):
                 return
 
             playlist_folder = _sanitize_folder_name(result.get('title', ''))
-            snap_spec = (build_720p_spec(self._settings.video_resolution)
-                         if format_id == "fmt_720p" else None)
+            snap_spec = (
+                build_720p_spec(self._settings.video_resolution, video_container)
+                if format_id == "fmt_720p" else None
+            )
             snap_bitrate = (
                 self._settings.mp3_bitrate
                 if format_id == "fmt_mp3" and audio_codec == "mp3" else None
@@ -731,7 +733,9 @@ class App(QMainWindow):
         video_container: str = "mp4",
     ):
         if format_id == "fmt_720p" and format_spec is None:
-            format_spec = build_720p_spec(self._settings.video_resolution)
+            format_spec = build_720p_spec(
+                self._settings.video_resolution, video_container
+            )
         mp3_bitrate = (
             self._settings.mp3_bitrate
             if format_id == "fmt_mp3" and audio_codec == "mp3" else None
@@ -930,7 +934,10 @@ class App(QMainWindow):
             video_container = self._settings.video_container
         elif format_id in ("fmt_720p", "fmt_best_mp4"):
             format_spec = (
-                build_720p_spec(self._settings.video_resolution)
+                build_720p_spec(
+                    self._settings.video_resolution,
+                    self._settings.video_container,
+                )
                 if format_id == "fmt_720p" else None
             )
             subtitle_opts = None
