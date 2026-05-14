@@ -52,6 +52,8 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(自動生成)",
     "orig_sub_embed": "MP4に埋め込む",
     "orig_embed_thumbnail": "サムネイルを埋め込む",
+    "orig_embed_metadata": "メタデータを埋め込む",
+    "orig_embed_chapters": "チャプターを埋め込む",
     "orig_sub_unavailable": "(字幕なし)",
     "label_orig_output": "出力形式:",
     "orig_output_mp4": "MP4 に結合",

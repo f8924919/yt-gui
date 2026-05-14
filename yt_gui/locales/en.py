@@ -52,6 +52,8 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(auto-generated)",
     "orig_sub_embed": "Embed in MP4",
     "orig_embed_thumbnail": "Embed thumbnail",
+    "orig_embed_metadata": "Embed metadata",
+    "orig_embed_chapters": "Embed chapters",
     "orig_sub_unavailable": "(no subtitles)",
     "label_orig_output": "Output:",
     "orig_output_mp4": "Merge to MP4",

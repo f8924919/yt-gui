@@ -136,6 +136,16 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_thumbnail_check = QCheckBox(t("orig_embed_thumbnail"))
         layout.addWidget(self._embed_thumbnail_check, 4, 1, 1, 3)
 
+        # Row 5: Embed metadata checkbox
+        self._embed_metadata_check = QCheckBox(t("orig_embed_metadata"))
+        self._embed_metadata_check.setChecked(True)
+        layout.addWidget(self._embed_metadata_check, 5, 1, 1, 3)
+
+        # Row 6: Embed chapters checkbox
+        self._embed_chapters_check = QCheckBox(t("orig_embed_chapters"))
+        self._embed_chapters_check.setChecked(True)
+        layout.addWidget(self._embed_chapters_check, 6, 1, 1, 3)
+
     # ── public interface ─────────────────────────────────────────────────────
 
     def trigger_fetch(self):
@@ -163,6 +173,8 @@ class OriginalFormatPanel(QGroupBox):
         self._radio_mp4.setText(t("orig_output_mp4"))
         self._radio_remux.setText(t("orig_output_remux"))
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
+        self._embed_metadata_check.setText(t("orig_embed_metadata"))
+        self._embed_chapters_check.setText(t("orig_embed_chapters"))
 
     def has_formats_loaded(self) -> bool:
         return self._video_combo.isEnabled() and bool(self._fetched_title)
@@ -182,6 +194,12 @@ class OriginalFormatPanel(QGroupBox):
 
     def get_embed_thumbnail(self) -> bool:
         return bool(self._embed_thumbnail_check.isChecked())
+
+    def get_embed_metadata(self) -> bool:
+        return bool(self._embed_metadata_check.isChecked())
+
+    def get_embed_chapters(self) -> bool:
+        return bool(self._embed_chapters_check.isChecked())
 
     def get_format_spec(self) -> str:
         auto_label = t("orig_auto")

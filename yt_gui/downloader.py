@@ -239,7 +239,8 @@ class Downloader:
         self, url, format_id, cookies_path=None, format_spec=None,
         subtitle_opts=None, mp3_bitrate_override=None, embed_thumbnail=False,
         remux_only=False, output_dir_override=None, cookies_browser=None,
-        audio_codec: str = "mp3",
+        audio_codec: str = "mp3", embed_metadata: bool = False,
+        embed_chapters: bool = False,
     ):
         if format_spec is not None:
             spec = format_spec
@@ -270,12 +271,25 @@ class Downloader:
             if audio_codec == "mp3":
                 pp['preferredquality'] = mp3_bitrate_override or self.mp3_bitrate
             ydl_opts['postprocessors'] = [pp]
+            if embed_metadata or embed_chapters:
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegMetadata',
+                    'add_metadata': embed_metadata,
+                    'add_chapters': embed_chapters,
+                })
             if embed_thumbnail and audio_codec == "mp3":
                 ydl_opts['writethumbnail'] = True
                 ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
-        elif not remux_only:
-            ydl_opts['merge_output_format'] = 'mp4'
-            if embed_thumbnail:
+        else:
+            if not remux_only:
+                ydl_opts['merge_output_format'] = 'mp4'
+            if embed_metadata or embed_chapters:
+                ydl_opts.setdefault('postprocessors', []).append({
+                    'key': 'FFmpegMetadata',
+                    'add_metadata': embed_metadata,
+                    'add_chapters': embed_chapters,
+                })
+            if embed_thumbnail and not remux_only:
                 ydl_opts['writethumbnail'] = True
                 ydl_opts.setdefault('postprocessors', []).append(
                     {'key': 'EmbedThumbnail'}
