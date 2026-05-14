@@ -10,6 +10,9 @@ from .i18n import t
 from .utils import strip_ansi
 
 _DISPLAY_SUB_EXTS = frozenset({'srt', 'vtt', 'ttml', 'ass', 'ssa'})
+_THUMBNAIL_EMBED_CONTAINERS = frozenset({
+    'mp3', 'mkv', 'mka', 'ogg', 'opus', 'flac', 'm4a', 'mp4', 'm4v', 'mov'
+})
 _DOWNLOAD_PROGRESS_RE = re.compile(r'\[download\]\s+\d')
 
 
@@ -292,7 +295,8 @@ class Downloader:
                     'add_metadata': embed_metadata,
                     'add_chapters': embed_chapters,
                 })
-            if embed_thumbnail and not remux_only:
+            if (embed_thumbnail and not remux_only
+                    and video_container in _THUMBNAIL_EMBED_CONTAINERS):
                 ydl_opts['writethumbnail'] = True
                 ydl_opts.setdefault('postprocessors', []).append(
                     {'key': 'EmbedThumbnail'}
