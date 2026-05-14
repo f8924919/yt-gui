@@ -130,7 +130,8 @@ class SettingsDialog(QDialog):
         current_browser_display = ""
         if self._settings.cookies_browser in _BROWSER_INTERNAL:
             current_browser_display = _BROWSER_DISPLAY[
-                _BROWSER_INTERNAL.index(self._settings.cookies_browser)]
+                _BROWSER_INTERNAL.index(self._settings.cookies_browser)
+            ]
         self._browser_combo = QComboBox()
         self._browser_combo.addItems(_BROWSER_DISPLAY)
         if current_browser_display:
@@ -193,7 +194,8 @@ class SettingsDialog(QDialog):
         current_vc = self._settings.video_container
         vc_idx = (
             list(VIDEO_CONTAINERS).index(current_vc)
-            if current_vc in VIDEO_CONTAINERS else 0
+            if current_vc in VIDEO_CONTAINERS
+            else 0
         )
         self._container_combo.setCurrentIndex(vc_idx)
         layout.addWidget(self._container_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
@@ -205,7 +207,8 @@ class SettingsDialog(QDialog):
         self._audio_fmt_combo.addItems([t("audio_format_mp3"), t("audio_format_flac")])
         current_af_idx = (
             list(AUDIO_FORMATS).index(self._settings.audio_format)
-            if self._settings.audio_format in AUDIO_FORMATS else 0
+            if self._settings.audio_format in AUDIO_FORMATS
+            else 0
         )
         self._audio_fmt_combo.setCurrentIndex(current_af_idx)
         self._audio_fmt_combo.currentIndexChanged.connect(self._on_audio_format_changed)
@@ -234,7 +237,9 @@ class SettingsDialog(QDialog):
 
     def _browse_cookies(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, t("label_cookies_file"), "",
+            self,
+            t("label_cookies_file"),
+            "",
             f"{t('filetype_text')} (*.txt);;{t('filetype_all')} (*.*)",
         )
         if path:
@@ -246,8 +251,8 @@ class SettingsDialog(QDialog):
 
         self._settings.download_path = self._download_edit.text().strip()
         self._settings.language = new_lang
-        self._settings.video_resolution = (
-            self._res_combo.currentText().removesuffix("p")
+        self._settings.video_resolution = self._res_combo.currentText().removesuffix(
+            "p"
         )
         vc_idx = self._container_combo.currentIndex()
         self._settings.video_container = (
@@ -258,8 +263,8 @@ class SettingsDialog(QDialog):
             AUDIO_FORMATS[af_idx] if af_idx < len(AUDIO_FORMATS) else "mp3"
         )
         if self._settings.audio_format == "mp3":
-            self._settings.mp3_bitrate = (
-                self._bitrate_combo.currentText().removesuffix("kbps")
+            self._settings.mp3_bitrate = self._bitrate_combo.currentText().removesuffix(
+                "kbps"
             )
 
         if self._radio_file.isChecked():
@@ -268,9 +273,9 @@ class SettingsDialog(QDialog):
         elif self._radio_browser.isChecked():
             disp = self._browser_combo.currentText()
             if disp in _BROWSER_DISPLAY:
-                self._settings.cookies_browser = (
-                    _BROWSER_INTERNAL[_BROWSER_DISPLAY.index(disp)]
-                )
+                self._settings.cookies_browser = _BROWSER_INTERNAL[
+                    _BROWSER_DISPLAY.index(disp)
+                ]
             else:
                 self._settings.cookies_browser = ""
             self._settings.cookies_path = ""

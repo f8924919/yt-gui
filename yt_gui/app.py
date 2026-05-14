@@ -53,7 +53,7 @@ _INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 
 def _sanitize_folder_name(name: str) -> str:
-    name = _INVALID_PATH_CHARS.sub('_', name)
+    name = _INVALID_PATH_CHARS.sub("_", name)
     return name[:100].strip() or "playlist"
 
 
@@ -82,9 +82,9 @@ class _QueueItem:
 class _AppSignals(QObject):
     status_update = Signal(str, float)
     log_message = Signal(str)
-    queue_item_refresh = Signal(object)   # _QueueItem
+    queue_item_refresh = Signal(object)  # _QueueItem
     add_button_reset = Signal()
-    fetch_for_add_done = Signal(object)   # carries dict with result + metadata
+    fetch_for_add_done = Signal(object)  # carries dict with result + metadata
     worker_done = Signal()
     show_error = Signal(str, str)
     show_warning = Signal(str, str)
@@ -95,8 +95,8 @@ class _QueueTree(QTreeWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._get_item_cb = None           # (QTreeWidgetItem) -> _QueueItem | None
-        self._context_menu_cb = None       # (items: list[_QueueItem]) -> None
+        self._get_item_cb = None  # (QTreeWidgetItem) -> _QueueItem | None
+        self._context_menu_cb = None  # (items: list[_QueueItem]) -> None
         self._get_thumbnail_b64_cb = None  # (url: str) -> str | None
         self._is_editing = False
 
@@ -106,8 +106,7 @@ class _QueueTree(QTreeWidget):
         selected = self.selectedItems()
         if not selected:
             return
-        items = [qi for ti in selected
-                 if (qi := self._get_item_cb(ti)) is not None]
+        items = [qi for ti in selected if (qi := self._get_item_cb(ti)) is not None]
         waiting = [qi for qi in items if qi.status == "waiting"]
         menu = QMenu(self)
         act_copy_url = menu.addAction(t("ctx_copy_url"))
@@ -144,13 +143,12 @@ class _QueueTree(QTreeWidget):
                         langs = ", ".join(qi.subtitle_opts.get("subtitleslangs", []))
                         fmt = qi.subtitle_opts.get("subtitlesformat", "")
                         embed_lbl = (
-                            t("orig_sub_embed") if qi.subtitle_opts.get("embed")
+                            t("orig_sub_embed")
+                            if qi.subtitle_opts.get("embed")
                             else t("tooltip_sub_file")
                         )
                         sub_lbl = t("tooltip_subtitle")
-                        lines.append(
-                            f"<b>{sub_lbl}:</b> {langs}  {fmt}  {embed_lbl}"
-                        )
+                        lines.append(f"<b>{sub_lbl}:</b> {langs}  {fmt}  {embed_lbl}")
                     if qi.format_id == _ORIGINAL_KEY and qi.format_spec:
                         lines.append(
                             f"<b>{t('tooltip_format_spec')}:</b> {qi.format_spec}"
@@ -204,7 +202,7 @@ class App(QMainWindow):
 
         self._queue_items: list[_QueueItem] = []
         self._queue_lock = threading.Lock()
-        self._thumbnail_cache: dict[str, str] = {}   # thumbnail_url -> data URI
+        self._thumbnail_cache: dict[str, str] = {}  # thumbnail_url -> data URI
         self._thumbnail_fetching: set[str] = set()
         self._thumbnail_lock = threading.Lock()
         self._worker_running = False
@@ -224,9 +222,11 @@ class App(QMainWindow):
         self._signals.fetch_for_add_done.connect(self._on_fetch_for_add_done)
         self._signals.worker_done.connect(lambda: self._set_queue_running(False))
         self._signals.show_error.connect(
-            lambda title, msg: QMessageBox.critical(self, title, msg))
+            lambda title, msg: QMessageBox.critical(self, title, msg)
+        )
         self._signals.show_warning.connect(
-            lambda title, msg: QMessageBox.warning(self, title, msg))
+            lambda title, msg: QMessageBox.warning(self, title, msg)
+        )
 
         self.downloader = Downloader(
             self._resolve_download_path(),
@@ -296,7 +296,8 @@ class App(QMainWindow):
 
         self._lbl_queue_title.setText(f"<b>{t('queue_title')}</b>")
         self._queue_tree.setHeaderLabels(
-            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
+            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
+        )
 
         self.add_button.setText(
             t("btn_apply_edit") if self._edit_mode else t("btn_add")
@@ -313,7 +314,8 @@ class App(QMainWindow):
 
         if not self._worker_running:
             self.status_label.setText(
-                t("status_edit_mode") if self._edit_mode else t("status_ready"))
+                t("status_edit_mode") if self._edit_mode else t("status_ready")
+            )
 
         self._original_panel.retranslate()
 
@@ -337,15 +339,19 @@ class App(QMainWindow):
             if k == "fmt_best_mp4":
                 result.append(t("fmt_best_mp4").format(container=container))
             elif k == "fmt_720p":
-                result.append(t("fmt_720p").format(
-                    resolution=self._settings.video_resolution,
-                    container=container,
-                ))
+                result.append(
+                    t("fmt_720p").format(
+                        resolution=self._settings.video_resolution,
+                        container=container,
+                    )
+                )
             elif k == "fmt_mp3":
                 if self._settings.audio_format == "flac":
                     result.append(t("fmt_flac"))
                 else:
-                    result.append(t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate))
+                    result.append(
+                        t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate)
+                    )
             else:
                 result.append(t(k))
         return result
@@ -449,7 +455,8 @@ class App(QMainWindow):
         self._queue_tree._get_thumbnail_b64_cb = self._get_thumbnail_b64
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
-            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")])
+            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
+        )
         hdr = self._queue_tree.header()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -458,7 +465,9 @@ class App(QMainWindow):
         hdr.resizeSection(0, 36)
         hdr.resizeSection(2, 140)
         hdr.resizeSection(3, 120)
-        self._queue_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._queue_tree.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         self._queue_tree.setRootIsDecorated(False)
         self._queue_tree.setAlternatingRowColors(True)
         qbl.addWidget(self._queue_tree)
@@ -543,19 +552,35 @@ class App(QMainWindow):
             video_container = self._settings.video_container
             if self._original_panel.has_formats_loaded():
                 self._enqueue_single(
-                    url, format_id, format_label, format_spec, subtitle_opts,
-                    self._original_panel.get_fetched_title(), remux_only=remux_only,
-                    embed_thumbnail=embed_thumbnail, embed_metadata=embed_metadata,
-                    embed_chapters=embed_chapters, orig_settings=orig_settings,
+                    url,
+                    format_id,
+                    format_label,
+                    format_spec,
+                    subtitle_opts,
+                    self._original_panel.get_fetched_title(),
+                    remux_only=remux_only,
+                    embed_thumbnail=embed_thumbnail,
+                    embed_metadata=embed_metadata,
+                    embed_chapters=embed_chapters,
+                    orig_settings=orig_settings,
                     video_container=video_container,
                 )
                 self.url_entry.clear()
                 return
             self._start_add_thread(
-                url, cookies_path, cookies_browser, format_id, format_label,
-                format_spec, subtitle_opts, embed_thumbnail, remux_only=remux_only,
-                embed_metadata=embed_metadata, embed_chapters=embed_chapters,
-                orig_settings=orig_settings, video_container=video_container,
+                url,
+                cookies_path,
+                cookies_browser,
+                format_id,
+                format_label,
+                format_spec,
+                subtitle_opts,
+                embed_thumbnail,
+                remux_only=remux_only,
+                embed_metadata=embed_metadata,
+                embed_chapters=embed_chapters,
+                orig_settings=orig_settings,
+                video_container=video_container,
             )
         else:
             audio_codec = (
@@ -564,24 +589,43 @@ class App(QMainWindow):
             if format_id == _MP3_KEY:
                 embed_thumbnail = (
                     bool(self._mp3_thumb_check.isChecked())
-                    if audio_codec == "mp3" else False
+                    if audio_codec == "mp3"
+                    else False
                 )
             elif format_id in ("fmt_best_mp4", "fmt_720p"):
                 embed_thumbnail = True
             else:
                 embed_thumbnail = False
             self._start_add_thread(
-                url, cookies_path, cookies_browser, format_id, format_label,
-                None, None, embed_thumbnail, audio_codec=audio_codec,
-                embed_metadata=True, embed_chapters=True,
+                url,
+                cookies_path,
+                cookies_browser,
+                format_id,
+                format_label,
+                None,
+                None,
+                embed_thumbnail,
+                audio_codec=audio_codec,
+                embed_metadata=True,
+                embed_chapters=True,
                 video_container=self._settings.video_container,
             )
 
     def _start_add_thread(
-        self, url, cookies_path, cookies_browser, format_id, format_label,
-        format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
-        audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True, orig_settings: dict | None = None,
+        self,
+        url,
+        cookies_path,
+        cookies_browser,
+        format_id,
+        format_label,
+        format_spec,
+        subtitle_opts,
+        embed_thumbnail=False,
+        remux_only=False,
+        audio_codec: str = "mp3",
+        embed_metadata: bool = True,
+        embed_chapters: bool = True,
+        orig_settings: dict | None = None,
         video_container: str = "mp4",
     ):
         self.add_button.setEnabled(False)
@@ -589,18 +633,40 @@ class App(QMainWindow):
         self._signals.status_update.emit(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(url, cookies_path, cookies_browser, format_id, format_label,
-                  format_spec, subtitle_opts, embed_thumbnail, remux_only,
-                  audio_codec, embed_metadata, embed_chapters, orig_settings,
-                  video_container),
+            args=(
+                url,
+                cookies_path,
+                cookies_browser,
+                format_id,
+                format_label,
+                format_spec,
+                subtitle_opts,
+                embed_thumbnail,
+                remux_only,
+                audio_codec,
+                embed_metadata,
+                embed_chapters,
+                orig_settings,
+                video_container,
+            ),
             daemon=True,
         ).start()
 
     def _run_fetch_for_add(
-        self, url, cookies_path, cookies_browser, format_id, format_label,
-        format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
-        audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True, orig_settings: dict | None = None,
+        self,
+        url,
+        cookies_path,
+        cookies_browser,
+        format_id,
+        format_label,
+        format_spec,
+        subtitle_opts,
+        embed_thumbnail=False,
+        remux_only=False,
+        audio_codec: str = "mp3",
+        embed_metadata: bool = True,
+        embed_chapters: bool = True,
+        orig_settings: dict | None = None,
         video_container: str = "mp4",
     ):
         try:
@@ -608,18 +674,18 @@ class App(QMainWindow):
                 url, cookies_path, cookies_browser
             )
             payload = {
-                'result': result,
-                'format_id': format_id,
-                'format_label': format_label,
-                'format_spec': format_spec,
-                'subtitle_opts': subtitle_opts,
-                'embed_thumbnail': embed_thumbnail,
-                'remux_only': remux_only,
-                'audio_codec': audio_codec,
-                'embed_metadata': embed_metadata,
-                'embed_chapters': embed_chapters,
-                'orig_settings': orig_settings,
-                'video_container': video_container,
+                "result": result,
+                "format_id": format_id,
+                "format_label": format_label,
+                "format_spec": format_spec,
+                "subtitle_opts": subtitle_opts,
+                "embed_thumbnail": embed_thumbnail,
+                "remux_only": remux_only,
+                "audio_codec": audio_codec,
+                "embed_metadata": embed_metadata,
+                "embed_chapters": embed_chapters,
+                "orig_settings": orig_settings,
+                "video_container": video_container,
             }
             self._signals.fetch_for_add_done.emit(payload)
         except Exception as e:
@@ -639,26 +705,35 @@ class App(QMainWindow):
         )
 
     def _on_fetch_for_add_done(self, payload: dict):
-        result = payload['result']
-        format_id = payload['format_id']
-        format_label = payload['format_label']
-        format_spec = payload['format_spec']
-        subtitle_opts = payload['subtitle_opts']
-        embed_thumbnail = payload['embed_thumbnail']
-        remux_only = payload['remux_only']
-        audio_codec = payload.get('audio_codec', 'mp3')
-        embed_metadata = payload.get('embed_metadata', True)
-        embed_chapters = payload.get('embed_chapters', True)
-        orig_settings = payload.get('orig_settings')
-        video_container = payload.get('video_container', 'mp4')
+        result = payload["result"]
+        format_id = payload["format_id"]
+        format_label = payload["format_label"]
+        format_spec = payload["format_spec"]
+        subtitle_opts = payload["subtitle_opts"]
+        embed_thumbnail = payload["embed_thumbnail"]
+        remux_only = payload["remux_only"]
+        audio_codec = payload.get("audio_codec", "mp3")
+        embed_metadata = payload.get("embed_metadata", True)
+        embed_chapters = payload.get("embed_chapters", True)
+        orig_settings = payload.get("orig_settings")
+        video_container = payload.get("video_container", "mp4")
 
-        if result['type'] == 'single':
+        if result["type"] == "single":
             self._enqueue_single(
-                result['url'], format_id, format_label, format_spec, subtitle_opts,
-                result['title'], embed_thumbnail=embed_thumbnail, remux_only=remux_only,
-                thumbnail_url=result.get('thumbnail_url'), audio_codec=audio_codec,
-                embed_metadata=embed_metadata, embed_chapters=embed_chapters,
-                orig_settings=orig_settings, video_container=video_container,
+                result["url"],
+                format_id,
+                format_label,
+                format_spec,
+                subtitle_opts,
+                result["title"],
+                embed_thumbnail=embed_thumbnail,
+                remux_only=remux_only,
+                thumbnail_url=result.get("thumbnail_url"),
+                audio_codec=audio_codec,
+                embed_metadata=embed_metadata,
+                embed_chapters=embed_chapters,
+                orig_settings=orig_settings,
+                video_container=video_container,
             )
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
@@ -669,32 +744,34 @@ class App(QMainWindow):
                 )
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
-            entries = result['entries']
+            entries = result["entries"]
             if not entries:
                 QMessageBox.warning(self, t("warn_title"), t("warn_playlist_empty"))
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
 
-            playlist_folder = _sanitize_folder_name(result.get('title', ''))
+            playlist_folder = _sanitize_folder_name(result.get("title", ""))
             snap_spec = (
                 build_720p_spec(self._settings.video_resolution, video_container)
-                if format_id == "fmt_720p" else None
+                if format_id == "fmt_720p"
+                else None
             )
             snap_bitrate = (
                 self._settings.mp3_bitrate
-                if format_id == "fmt_mp3" and audio_codec == "mp3" else None
+                if format_id == "fmt_mp3" and audio_codec == "mp3"
+                else None
             )
 
             batch: list[tuple[int, _QueueItem]] = []
             for entry in entries:
                 self._item_counter += 1
                 item = _QueueItem(
-                    url=entry['url'],
+                    url=entry["url"],
                     format_id=format_id,
                     format_label=format_label,
                     format_spec=snap_spec,
                     subtitle_opts=None,
-                    title=entry['title'],
+                    title=entry["title"],
                     mp3_bitrate=snap_bitrate,
                     embed_thumbnail=embed_thumbnail,
                     embed_metadata=embed_metadata,
@@ -702,7 +779,7 @@ class App(QMainWindow):
                     audio_codec=audio_codec,
                     video_container=video_container,
                     playlist_folder=playlist_folder,
-                    thumbnail_url=entry.get('thumbnail_url'),
+                    thumbnail_url=entry.get("thumbnail_url"),
                 )
                 batch.append((self._item_counter, item))
 
@@ -713,7 +790,8 @@ class App(QMainWindow):
             for no, item in batch:
                 short = item.title if len(item.title) <= 45 else item.title[:42] + "..."
                 tree_item = QTreeWidgetItem(
-                    [str(no), short, format_label, t("queue_status_waiting")])
+                    [str(no), short, format_label, t("queue_status_waiting")]
+                )
                 item.tree_item = tree_item
                 self._queue_tree.addTopLevelItem(tree_item)
 
@@ -726,10 +804,20 @@ class App(QMainWindow):
             self._log(msg)
 
     def _enqueue_single(
-        self, url, format_id, format_label, format_spec, subtitle_opts, title,
-        embed_thumbnail=False, remux_only=False, thumbnail_url=None,
-        audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True, orig_settings: dict | None = None,
+        self,
+        url,
+        format_id,
+        format_label,
+        format_spec,
+        subtitle_opts,
+        title,
+        embed_thumbnail=False,
+        remux_only=False,
+        thumbnail_url=None,
+        audio_codec: str = "mp3",
+        embed_metadata: bool = True,
+        embed_chapters: bool = True,
+        orig_settings: dict | None = None,
         video_container: str = "mp4",
     ):
         if format_id == "fmt_720p" and format_spec is None:
@@ -738,7 +826,8 @@ class App(QMainWindow):
             )
         mp3_bitrate = (
             self._settings.mp3_bitrate
-            if format_id == "fmt_mp3" and audio_codec == "mp3" else None
+            if format_id == "fmt_mp3" and audio_codec == "mp3"
+            else None
         )
 
         self._item_counter += 1
@@ -764,7 +853,8 @@ class App(QMainWindow):
 
         short = title if len(title) <= 45 else title[:42] + "..."
         tree_item = QTreeWidgetItem(
-            [str(self._item_counter), short, format_label, t("queue_status_waiting")])
+            [str(self._item_counter), short, format_label, t("queue_status_waiting")]
+        )
         item.tree_item = tree_item
         self._queue_tree.addTopLevelItem(tree_item)
         self._start_thumbnail_fetch(thumbnail_url)
@@ -788,8 +878,10 @@ class App(QMainWindow):
         if not thumbnail_url:
             return
         with self._thumbnail_lock:
-            if (thumbnail_url in self._thumbnail_cache
-                    or thumbnail_url in self._thumbnail_fetching):
+            if (
+                thumbnail_url in self._thumbnail_cache
+                or thumbnail_url in self._thumbnail_fetching
+            ):
                 return
             self._thumbnail_fetching.add(thumbnail_url)
         threading.Thread(
@@ -802,13 +894,13 @@ class App(QMainWindow):
         try:
             req = urllib.request.Request(
                 thumbnail_url,
-                headers={'User-Agent': 'Mozilla/5.0'},
+                headers={"User-Agent": "Mozilla/5.0"},
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = resp.read()
-                ct = resp.headers.get('Content-Type', 'image/jpeg')
-                content_type = ct.split(';')[0].strip() if ct else 'image/jpeg'
-            b64 = base64.b64encode(data).decode('ascii')
+                ct = resp.headers.get("Content-Type", "image/jpeg")
+                content_type = ct.split(";")[0].strip() if ct else "image/jpeg"
+            b64 = base64.b64encode(data).decode("ascii")
             data_uri = f"data:{content_type};base64,{b64}"
             with self._thumbnail_lock:
                 self._thumbnail_cache[thumbnail_url] = data_uri
@@ -821,8 +913,11 @@ class App(QMainWindow):
         if item is None or item.tree_item is None:
             return
         tree_item: QTreeWidgetItem = item.tree_item
-        status_text = (t(self._STATUS_KEY_MAP[item.status])
-                       if item.status in self._STATUS_KEY_MAP else item.status)
+        status_text = (
+            t(self._STATUS_KEY_MAP[item.status])
+            if item.status in self._STATUS_KEY_MAP
+            else item.status
+        )
         tree_item.setText(3, status_text)
         color_hex = self._STATUS_COLORS.get(item.status)
         if color_hex:
@@ -873,8 +968,11 @@ class App(QMainWindow):
         if target_format_id == _MP3_KEY:
             self._mp3_thumb_check.setChecked(first.embed_thumbnail)
 
-        if (target_format_id == _ORIGINAL_KEY
-                and len(items) == 1 and first.orig_settings):
+        if (
+            target_format_id == _ORIGINAL_KEY
+            and len(items) == 1
+            and first.orig_settings
+        ):
             self._original_panel.restore_from_settings(first.orig_settings)
 
         self.add_button.setText(t("btn_apply_edit"))
@@ -926,7 +1024,8 @@ class App(QMainWindow):
             mp3_bitrate = self._settings.mp3_bitrate if audio_codec == "mp3" else None
             embed_thumbnail = (
                 bool(self._mp3_thumb_check.isChecked())
-                if audio_codec == "mp3" else False
+                if audio_codec == "mp3"
+                else False
             )
             embed_metadata = True
             embed_chapters = True
@@ -938,7 +1037,8 @@ class App(QMainWindow):
                     self._settings.video_resolution,
                     self._settings.video_container,
                 )
-                if format_id == "fmt_720p" else None
+                if format_id == "fmt_720p"
+                else None
             )
             subtitle_opts = None
             remux_only = False
@@ -982,8 +1082,11 @@ class App(QMainWindow):
                 item.tree_item.setText(2, format_label)
             self._refresh_tree_item(item)
 
-        self._log(t("log_edit_applied").format(
-            count=len(self._editing_items), fmt=format_label))
+        self._log(
+            t("log_edit_applied").format(
+                count=len(self._editing_items), fmt=format_label
+            )
+        )
         self._exit_edit_mode()
 
     def _cancel_edit(self):
@@ -1055,6 +1158,7 @@ class App(QMainWindow):
                 def cb(text, percent):
                     self._signals.status_update.emit(text, percent)
                     self._signals.queue_item_refresh.emit(qi)
+
                 return cb
 
             self.downloader.status_callback = make_cb(item)
@@ -1075,10 +1179,14 @@ class App(QMainWindow):
                 output_dir_override = None
                 if item.playlist_folder:
                     output_dir_override = os.path.join(
-                        self._resolve_download_path(), item.playlist_folder)
+                        self._resolve_download_path(), item.playlist_folder
+                    )
                 self.downloader.download_video(
-                    item.url, item.format_id, cookies_path,
-                    item.format_spec, item.subtitle_opts,
+                    item.url,
+                    item.format_id,
+                    cookies_path,
+                    item.format_spec,
+                    item.subtitle_opts,
                     mp3_bitrate_override=item.mp3_bitrate,
                     embed_thumbnail=item.embed_thumbnail,
                     remux_only=item.remux_only,
@@ -1097,7 +1205,8 @@ class App(QMainWindow):
                 err_msg = strip_ansi(str(e))
                 self._signals.log_message.emit(f"❌ {err_msg}")
                 self._signals.show_error.emit(
-                    t("err_title"), t("err_download").format(error=err_msg))
+                    t("err_title"), t("err_download").format(error=err_msg)
+                )
 
             self._signals.queue_item_refresh.emit(item)
 

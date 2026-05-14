@@ -72,7 +72,7 @@ STRINGS: dict[str, str] = {
     "audio_format_mp3": "MP3",
     "audio_format_flac": "FLAC",
     "label_mp3_bitrate": "MP3 bitrate:",
-    "quality_note": "Does not affect \"Best quality\" and \"Original format\"",
+    "quality_note": 'Does not affect "Best quality" and "Original format"',
     # download queue
     "btn_add": "Add",
     "btn_adding": "Fetching...",
@@ -91,7 +91,7 @@ STRINGS: dict[str, str] = {
     "status_fetching_title": "🔍 Fetching video info...",
     "status_title_added": "✅ Added to queue",
     "err_fetch_title": "An error occurred while fetching video info:\n{error}",
-    "warn_playlist_original_fmt": "\"Original format\" is not supported for playlist batch-add.\nPlease select a different format.",
+    "warn_playlist_original_fmt": '"Original format" is not supported for playlist batch-add.\nPlease select a different format.',
     "warn_playlist_empty": "No videos found in the playlist. Please check the URL.",
     "warn_queue_empty": "Queue is empty. Add items with URL and format selection.",
     # downloader status
@@ -123,10 +123,10 @@ STRINGS: dict[str, str] = {
     "btn_cancel_edit": "Cancel",
     "status_edit_mode": "✏️ Edit mode — select a format and click Apply",
     "queue_status_editing": "✏️ Editing",
-    "warn_edit_original_multi": "\"Original format\" cannot be used for batch editing.",
-    "warn_edit_formats_not_loaded": "Formats have not been fetched. Please click \"Fetch formats\" first.",
+    "warn_edit_original_multi": '"Original format" cannot be used for batch editing.',
+    "warn_edit_formats_not_loaded": 'Formats have not been fetched. Please click "Fetch formats" first.',
     "edit_multiple_selected": "{count} items selected",
-    "log_edit_applied": "✏️ Changed format of {count} item(s) to \"{fmt}\"",
+    "log_edit_applied": '✏️ Changed format of {count} item(s) to "{fmt}"',
     # dependency check
     "warn_deps_missing_title": "Missing dependencies",
     "warn_deps_missing_ffmpeg": "• ffmpeg — video/audio merging and conversion may not work",

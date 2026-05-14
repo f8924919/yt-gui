@@ -13,10 +13,12 @@ def main():
         window.show()
         sys.exit(app.exec())
     except Exception as e:
-        QMessageBox.critical(None, "Fatal Error",
-                             f"An error occurred during startup:\n{e}")
+        QMessageBox.critical(
+            None, "Fatal Error", f"An error occurred during startup:\n{e}"
+        )
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+

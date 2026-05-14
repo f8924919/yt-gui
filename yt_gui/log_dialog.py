@@ -44,7 +44,9 @@ class LogDialog(QDialog):
 
     def load(self, entries: list[str]):
         self._text.setPlainText("\n".join(entries) + ("\n" if entries else ""))
-        self._text.verticalScrollBar().setValue(self._text.verticalScrollBar().maximum())
+        self._text.verticalScrollBar().setValue(
+            self._text.verticalScrollBar().maximum()
+        )
 
     def append(self, text: str):
         sb = self._text.verticalScrollBar()

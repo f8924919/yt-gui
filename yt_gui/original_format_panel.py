@@ -28,7 +28,7 @@ _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 class _PanelSignals(QObject):
     formats_fetched = Signal(dict)
     fetch_failed = Signal(str, bool)  # (error_msg, is_playlist)
-    fetch_finished = Signal()         # always emitted at end (re-enable button)
+    fetch_finished = Signal()  # always emitted at end (re-enable button)
 
 
 class OriginalFormatPanel(QGroupBox):
@@ -90,12 +90,16 @@ class OriginalFormatPanel(QGroupBox):
         # Row 2: Subtitle listbox + format/embed controls
         self._subtitle_label = QLabel(t("label_orig_subtitle"))
         layout.addWidget(
-            self._subtitle_label, 2, 0,
+            self._subtitle_label,
+            2,
+            0,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
         )
 
         self._subtitle_list = QListWidget()
-        self._subtitle_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._subtitle_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         self._subtitle_list.setEnabled(False)
         self._subtitle_list.setMinimumHeight(96)
         self._subtitle_list.itemSelectionChanged.connect(self._on_subtitle_changed)
@@ -171,9 +175,9 @@ class OriginalFormatPanel(QGroupBox):
             self._fetch_button.setText(t("btn_fetch_formats"))
 
         self._embed_check.setText(t("orig_sub_embed"))
-        self._radio_mp4.setText(t("orig_output_mp4").format(
-            container=video_container.upper()
-        ))
+        self._radio_mp4.setText(
+            t("orig_output_mp4").format(container=video_container.upper())
+        )
         self._radio_remux.setText(t("orig_output_remux"))
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
         self._embed_metadata_check.setText(t("orig_embed_metadata"))
@@ -223,7 +227,9 @@ class OriginalFormatPanel(QGroupBox):
                 _, video_id, is_combined = self._video_formats[idx]
 
         if not is_combined and audio_sel not in (
-            auto_label, skip_label, t("orig_audio_included")
+            auto_label,
+            skip_label,
+            t("orig_audio_included"),
         ):
             if self._audio_formats:
                 idx = self._format_index(self._audio_combo, audio_sel)
@@ -231,30 +237,30 @@ class OriginalFormatPanel(QGroupBox):
                     _, audio_id = self._audio_formats[idx]
 
         return {
-            'video_id': video_id,
-            'is_combined': is_combined,
-            'video_skip': video_skip,
-            'audio_id': audio_id,
-            'audio_skip': audio_skip,
-            'subtitle_opts': self.get_subtitle_opts(),
-            'remux_only': self.get_remux_only(),
-            'embed_thumbnail': self.get_embed_thumbnail(),
-            'embed_metadata': self.get_embed_metadata(),
-            'embed_chapters': self.get_embed_chapters(),
+            "video_id": video_id,
+            "is_combined": is_combined,
+            "video_skip": video_skip,
+            "audio_id": audio_id,
+            "audio_skip": audio_skip,
+            "subtitle_opts": self.get_subtitle_opts(),
+            "remux_only": self.get_remux_only(),
+            "embed_thumbnail": self.get_embed_thumbnail(),
+            "embed_metadata": self.get_embed_metadata(),
+            "embed_chapters": self.get_embed_chapters(),
         }
 
     def restore_from_settings(self, settings: dict):
         """チェックボックス・ラジオボタンを即時復元し、映像/音声/字幕はフォーマット取得後に復元する。"""
-        remux_only = settings.get('remux_only', False)
+        remux_only = settings.get("remux_only", False)
         if remux_only:
             self._radio_remux.setChecked(True)
         else:
             self._radio_mp4.setChecked(True)
             self._embed_thumbnail_check.setChecked(
-                settings.get('embed_thumbnail', False)
+                settings.get("embed_thumbnail", False)
             )
-        self._embed_metadata_check.setChecked(settings.get('embed_metadata', True))
-        self._embed_chapters_check.setChecked(settings.get('embed_chapters', True))
+        self._embed_metadata_check.setChecked(settings.get("embed_metadata", True))
+        self._embed_chapters_check.setChecked(settings.get("embed_chapters", True))
 
         self._pending_restore = settings
         if self.has_formats_loaded():
@@ -280,7 +286,9 @@ class OriginalFormatPanel(QGroupBox):
                 _, video_id, is_combined = self._video_formats[idx]
 
         if not is_combined and audio_sel not in (
-            auto_label, skip_label, t("orig_audio_included")
+            auto_label,
+            skip_label,
+            t("orig_audio_included"),
         ):
             if self._audio_formats:
                 idx = self._format_index(self._audio_combo, audio_sel)
@@ -323,11 +331,11 @@ class OriginalFormatPanel(QGroupBox):
             return None
 
         return {
-            'writesubtitles': has_manual,
-            'writeautomaticsub': has_auto,
-            'subtitleslangs': lang_codes,
-            'subtitlesformat': self._subtitle_fmt_combo.currentText(),
-            'embed': self._embed_check.isChecked(),
+            "writesubtitles": has_manual,
+            "writeautomaticsub": has_auto,
+            "subtitleslangs": lang_codes,
+            "subtitlesformat": self._subtitle_fmt_combo.currentText(),
+            "embed": self._embed_check.isChecked(),
         }
 
     # ── restore helpers ──────────────────────────────────────────────────────
@@ -339,12 +347,12 @@ class OriginalFormatPanel(QGroupBox):
 
         skip_label = t("orig_skip")
         auto_label = t("orig_auto")
-        video_id = settings.get('video_id')
-        audio_id = settings.get('audio_id')
-        is_combined = settings.get('is_combined', False)
-        video_skip = settings.get('video_skip', False)
-        audio_skip = settings.get('audio_skip', False)
-        subtitle_opts = settings.get('subtitle_opts')
+        video_id = settings.get("video_id")
+        audio_id = settings.get("audio_id")
+        is_combined = settings.get("is_combined", False)
+        video_skip = settings.get("video_skip", False)
+        audio_skip = settings.get("audio_skip", False)
+        subtitle_opts = settings.get("subtitle_opts")
 
         # 映像コンボ復元（シグナルをブロックして手動で _on_video_changed を呼ぶ）
         self._video_combo.blockSignals(True)
@@ -382,9 +390,9 @@ class OriginalFormatPanel(QGroupBox):
 
         # 字幕復元
         if subtitle_opts and self._subtitle_formats:
-            langs = set(subtitle_opts.get('subtitleslangs', []))
-            fmt = subtitle_opts.get('subtitlesformat', 'best')
-            embed = subtitle_opts.get('embed', False)
+            langs = set(subtitle_opts.get("subtitleslangs", []))
+            fmt = subtitle_opts.get("subtitlesformat", "best")
+            embed = subtitle_opts.get("embed", False)
 
             self._subtitle_list.blockSignals(True)
             self._subtitle_list.clearSelection()
@@ -434,8 +442,8 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_thumbnail_check.setEnabled(mp4_checked)
 
     def _on_subtitle_changed(self):
-        has_sub = (
-            bool(self._subtitle_list.selectedItems()) and bool(self._subtitle_formats)
+        has_sub = bool(self._subtitle_list.selectedItems()) and bool(
+            self._subtitle_formats
         )
         self._subtitle_fmt_combo.setEnabled(has_sub)
         self._embed_check.setEnabled(has_sub)
@@ -480,7 +488,7 @@ class OriginalFormatPanel(QGroupBox):
             self._signals.formats_fetched.emit(result)
         except Exception as e:
             err_str = strip_ansi(str(e))
-            is_playlist = 'playlist' in err_str.lower()
+            is_playlist = "playlist" in err_str.lower()
             self._signals.fetch_failed.emit(err_str, is_playlist)
         finally:
             self._signals.fetch_finished.emit()
@@ -494,12 +502,12 @@ class OriginalFormatPanel(QGroupBox):
         self._audio_formats = result["audio"]
         self._subtitle_formats = result["subtitles"]
 
-        video_labels = (
-            [auto_label, skip_label] + [lbl for lbl, _, _ in self._video_formats]
-        )
-        audio_labels = (
-            [auto_label, skip_label] + [lbl for lbl, _ in self._audio_formats]
-        )
+        video_labels = [auto_label, skip_label] + [
+            lbl for lbl, _, _ in self._video_formats
+        ]
+        audio_labels = [auto_label, skip_label] + [
+            lbl for lbl, _ in self._audio_formats
+        ]
 
         self._video_combo.blockSignals(True)
         self._video_combo.clear()
