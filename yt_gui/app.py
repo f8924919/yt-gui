@@ -70,6 +70,7 @@ class _QueueItem:
     embed_metadata: bool = True
     embed_chapters: bool = True
     audio_codec: str = "mp3"
+    orig_settings: dict | None = None
     remux_only: bool = False
     playlist_folder: str | None = None
     thumbnail_url: str | None = None
@@ -529,12 +530,13 @@ class App(QMainWindow):
             embed_thumbnail = self._original_panel.get_embed_thumbnail()
             embed_metadata = self._original_panel.get_embed_metadata()
             embed_chapters = self._original_panel.get_embed_chapters()
+            orig_settings = self._original_panel.get_raw_settings()
             if self._original_panel.has_formats_loaded():
                 self._enqueue_single(
                     url, format_id, format_label, format_spec, subtitle_opts,
                     self._original_panel.get_fetched_title(), remux_only=remux_only,
                     embed_thumbnail=embed_thumbnail, embed_metadata=embed_metadata,
-                    embed_chapters=embed_chapters,
+                    embed_chapters=embed_chapters, orig_settings=orig_settings,
                 )
                 self.url_entry.clear()
                 return
@@ -542,6 +544,7 @@ class App(QMainWindow):
                 url, cookies_path, cookies_browser, format_id, format_label,
                 format_spec, subtitle_opts, embed_thumbnail, remux_only=remux_only,
                 embed_metadata=embed_metadata, embed_chapters=embed_chapters,
+                orig_settings=orig_settings,
             )
         else:
             audio_codec = (
@@ -566,7 +569,7 @@ class App(QMainWindow):
         self, url, cookies_path, cookies_browser, format_id, format_label,
         format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
         audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True,
+        embed_chapters: bool = True, orig_settings: dict | None = None,
     ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
@@ -575,7 +578,7 @@ class App(QMainWindow):
             target=self._run_fetch_for_add,
             args=(url, cookies_path, cookies_browser, format_id, format_label,
                   format_spec, subtitle_opts, embed_thumbnail, remux_only,
-                  audio_codec, embed_metadata, embed_chapters),
+                  audio_codec, embed_metadata, embed_chapters, orig_settings),
             daemon=True,
         ).start()
 
@@ -583,7 +586,7 @@ class App(QMainWindow):
         self, url, cookies_path, cookies_browser, format_id, format_label,
         format_spec, subtitle_opts, embed_thumbnail=False, remux_only=False,
         audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True,
+        embed_chapters: bool = True, orig_settings: dict | None = None,
     ):
         try:
             result = self.downloader.fetch_title_or_entries(
@@ -600,6 +603,7 @@ class App(QMainWindow):
                 'audio_codec': audio_codec,
                 'embed_metadata': embed_metadata,
                 'embed_chapters': embed_chapters,
+                'orig_settings': orig_settings,
             }
             self._signals.fetch_for_add_done.emit(payload)
         except Exception as e:
@@ -629,6 +633,7 @@ class App(QMainWindow):
         audio_codec = payload.get('audio_codec', 'mp3')
         embed_metadata = payload.get('embed_metadata', True)
         embed_chapters = payload.get('embed_chapters', True)
+        orig_settings = payload.get('orig_settings')
 
         if result['type'] == 'single':
             self._enqueue_single(
@@ -636,6 +641,7 @@ class App(QMainWindow):
                 result['title'], embed_thumbnail=embed_thumbnail, remux_only=remux_only,
                 thumbnail_url=result.get('thumbnail_url'), audio_codec=audio_codec,
                 embed_metadata=embed_metadata, embed_chapters=embed_chapters,
+                orig_settings=orig_settings,
             )
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
@@ -703,7 +709,7 @@ class App(QMainWindow):
         self, url, format_id, format_label, format_spec, subtitle_opts, title,
         embed_thumbnail=False, remux_only=False, thumbnail_url=None,
         audio_codec: str = "mp3", embed_metadata: bool = True,
-        embed_chapters: bool = True,
+        embed_chapters: bool = True, orig_settings: dict | None = None,
     ):
         if format_id == "fmt_720p" and format_spec is None:
             format_spec = build_720p_spec(self._settings.video_resolution)
@@ -727,6 +733,7 @@ class App(QMainWindow):
             audio_codec=audio_codec,
             remux_only=remux_only,
             thumbnail_url=thumbnail_url,
+            orig_settings=orig_settings,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -842,6 +849,10 @@ class App(QMainWindow):
         if target_format_id == _MP3_KEY:
             self._mp3_thumb_check.setChecked(first.embed_thumbnail)
 
+        if (target_format_id == _ORIGINAL_KEY
+                and len(items) == 1 and first.orig_settings):
+            self._original_panel.restore_from_settings(first.orig_settings)
+
         self.add_button.setText(t("btn_apply_edit"))
         self._cancel_edit_button.setVisible(True)
 
@@ -879,6 +890,7 @@ class App(QMainWindow):
             embed_thumbnail = self._original_panel.get_embed_thumbnail()
             embed_metadata = self._original_panel.get_embed_metadata()
             embed_chapters = self._original_panel.get_embed_chapters()
+            orig_settings = self._original_panel.get_raw_settings()
             audio_codec = "mp3"
             mp3_bitrate = None
         elif format_id == _MP3_KEY:
@@ -893,6 +905,7 @@ class App(QMainWindow):
             )
             embed_metadata = True
             embed_chapters = True
+            orig_settings = None
         elif format_id in ("fmt_720p", "fmt_best_mp4"):
             format_spec = (
                 build_720p_spec(self._settings.video_resolution)
@@ -905,6 +918,7 @@ class App(QMainWindow):
             embed_thumbnail = True
             embed_metadata = True
             embed_chapters = True
+            orig_settings = None
         else:
             format_spec = None
             subtitle_opts = None
@@ -914,6 +928,7 @@ class App(QMainWindow):
             embed_thumbnail = False
             embed_metadata = True
             embed_chapters = True
+            orig_settings = None
 
         with self._queue_lock:
             for item in self._editing_items:
@@ -927,6 +942,7 @@ class App(QMainWindow):
                 item.embed_thumbnail = embed_thumbnail
                 item.embed_metadata = embed_metadata
                 item.embed_chapters = embed_chapters
+                item.orig_settings = orig_settings
                 item.status = "waiting"
 
         for item in self._editing_items:

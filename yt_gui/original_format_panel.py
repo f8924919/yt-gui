@@ -58,6 +58,7 @@ class OriginalFormatPanel(QGroupBox):
         self._signals.fetch_finished.connect(self._on_fetch_finished)
 
         self._build_widgets()
+        self._pending_restore: dict | None = None
 
     def _build_widgets(self):
         layout = QGridLayout(self)
@@ -201,6 +202,63 @@ class OriginalFormatPanel(QGroupBox):
     def get_embed_chapters(self) -> bool:
         return bool(self._embed_chapters_check.isChecked())
 
+    def get_raw_settings(self) -> dict:
+        """現在の選択状態を復元可能な形式で返す。"""
+        auto_label = t("orig_auto")
+        skip_label = t("orig_skip")
+        video_sel = self._video_combo.currentText()
+        audio_sel = self._audio_combo.currentText()
+
+        video_skip = video_sel == skip_label
+        audio_skip = audio_sel == skip_label
+        video_id: str | None = None
+        is_combined = False
+        audio_id: str | None = None
+
+        if video_sel not in (auto_label, skip_label) and self._video_formats:
+            idx = self._format_index(self._video_combo, video_sel)
+            if idx is not None and 0 <= idx < len(self._video_formats):
+                _, video_id, is_combined = self._video_formats[idx]
+
+        if not is_combined and audio_sel not in (
+            auto_label, skip_label, t("orig_audio_included")
+        ):
+            if self._audio_formats:
+                idx = self._format_index(self._audio_combo, audio_sel)
+                if idx is not None and 0 <= idx < len(self._audio_formats):
+                    _, audio_id = self._audio_formats[idx]
+
+        return {
+            'video_id': video_id,
+            'is_combined': is_combined,
+            'video_skip': video_skip,
+            'audio_id': audio_id,
+            'audio_skip': audio_skip,
+            'subtitle_opts': self.get_subtitle_opts(),
+            'remux_only': self.get_remux_only(),
+            'embed_thumbnail': self.get_embed_thumbnail(),
+            'embed_metadata': self.get_embed_metadata(),
+            'embed_chapters': self.get_embed_chapters(),
+        }
+
+    def restore_from_settings(self, settings: dict):
+        """チェックボックス・ラジオボタンを即時復元し、映像/音声/字幕はフォーマット取得後に復元する。"""
+        remux_only = settings.get('remux_only', False)
+        if remux_only:
+            self._radio_remux.setChecked(True)
+        else:
+            self._radio_mp4.setChecked(True)
+            self._embed_thumbnail_check.setChecked(
+                settings.get('embed_thumbnail', False)
+            )
+        self._embed_metadata_check.setChecked(settings.get('embed_metadata', True))
+        self._embed_chapters_check.setChecked(settings.get('embed_chapters', True))
+
+        self._pending_restore = settings
+        if self.has_formats_loaded():
+            self._apply_pending_restore()
+            self._pending_restore = None
+
     def get_format_spec(self) -> str:
         auto_label = t("orig_auto")
         skip_label = t("orig_skip")
@@ -269,6 +327,77 @@ class OriginalFormatPanel(QGroupBox):
             'subtitlesformat': self._subtitle_fmt_combo.currentText(),
             'embed': self._embed_check.isChecked(),
         }
+
+    # ── restore helpers ──────────────────────────────────────────────────────
+
+    def _apply_pending_restore(self):
+        settings = self._pending_restore
+        if settings is None:
+            return
+
+        skip_label = t("orig_skip")
+        auto_label = t("orig_auto")
+        video_id = settings.get('video_id')
+        audio_id = settings.get('audio_id')
+        is_combined = settings.get('is_combined', False)
+        video_skip = settings.get('video_skip', False)
+        audio_skip = settings.get('audio_skip', False)
+        subtitle_opts = settings.get('subtitle_opts')
+
+        # 映像コンボ復元（シグナルをブロックして手動で _on_video_changed を呼ぶ）
+        self._video_combo.blockSignals(True)
+        if video_skip:
+            self._video_combo.setCurrentText(skip_label)
+        elif video_id:
+            matched = False
+            for i, (_, fid, _) in enumerate(self._video_formats):
+                if fid == video_id:
+                    self._video_combo.setCurrentIndex(i + 2)  # auto/skip の分オフセット
+                    matched = True
+                    break
+            if not matched:
+                self._video_combo.setCurrentText(auto_label)
+        else:
+            self._video_combo.setCurrentText(auto_label)
+        self._video_combo.blockSignals(False)
+        self._on_video_changed(self._video_combo.currentText())
+
+        # 音声コンボ復元（複合フォーマット選択時はスキップ）
+        if not is_combined:
+            if audio_skip:
+                self._audio_combo.setCurrentText(skip_label)
+            elif audio_id:
+                matched = False
+                for i, (_, fid) in enumerate(self._audio_formats):
+                    if fid == audio_id:
+                        self._audio_combo.setCurrentIndex(i + 2)
+                        matched = True
+                        break
+                if not matched:
+                    self._audio_combo.setCurrentText(auto_label)
+            else:
+                self._audio_combo.setCurrentText(auto_label)
+
+        # 字幕復元
+        if subtitle_opts and self._subtitle_formats:
+            langs = set(subtitle_opts.get('subtitleslangs', []))
+            fmt = subtitle_opts.get('subtitlesformat', 'best')
+            embed = subtitle_opts.get('embed', False)
+
+            self._subtitle_list.blockSignals(True)
+            self._subtitle_list.clearSelection()
+            for i, (_, lcode, _) in enumerate(self._subtitle_formats):
+                if lcode in langs:
+                    item = self._subtitle_list.item(i)
+                    if item:
+                        item.setSelected(True)
+            self._subtitle_list.blockSignals(False)
+            self._on_subtitle_changed()  # 有効状態を一括更新
+
+            fmt_idx = self._subtitle_fmt_combo.findText(fmt)
+            if fmt_idx >= 0:
+                self._subtitle_fmt_combo.setCurrentIndex(fmt_idx)
+            self._embed_check.setChecked(embed)
 
     # ── internal events ──────────────────────────────────────────────────────
 
@@ -394,6 +523,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setEnabled(False)
 
         if not self._video_formats and not self._audio_formats:
+            self._pending_restore = None
             self._update_status(t("status_fetch_formats_no_formats"), 0)
             QMessageBox.warning(self, t("warn_title"), t("warn_fetch_formats_playlist"))
             return
@@ -406,6 +536,10 @@ class OriginalFormatPanel(QGroupBox):
             ),
             0,
         )
+
+        if self._pending_restore is not None:
+            self._apply_pending_restore()
+            self._pending_restore = None
 
     def _on_fetch_failed(self, err_str: str, is_playlist: bool):
         if is_playlist:
