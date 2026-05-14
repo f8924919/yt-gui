@@ -327,8 +327,10 @@ class Downloader:
         stem, raw_ext = os.path.splitext(raw_path)
         if is_audio:
             final_ext = f'.{audio_codec}'
+        elif remux_only:
+            final_ext = raw_ext
         elif '+' in spec:
-            final_ext = '.mp4'
+            final_ext = f'.{video_container}'
         else:
             final_ext = raw_ext
 
