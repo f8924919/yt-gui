@@ -13,3 +13,4 @@
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
 | [refine-docs.md](refine-docs.md) | 完了 | CLAUDE.md と docs 構成の改善（言語ルール追加・arch/build ハブ新設・双方向リンク） | 2026-05-16 |
+| [yt-dlp-output-template.md](yt-dlp-output-template.md) | 完了 | 設定画面へのOUTPUT TEMPLATE設定UIの追加 | 2026-05-16 |

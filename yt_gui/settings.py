@@ -14,6 +14,10 @@ class Settings:
     mp3_bitrate: str = "192"
     audio_format: str = "mp3"
     video_container: str = "mp4"
+    output_template_video: str = "%(title)s.%(ext)s"
+    output_template_playlist: str = (
+        "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
+    )
 
 
 def _get_config_dir() -> str:

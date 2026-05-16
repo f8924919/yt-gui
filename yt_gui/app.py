@@ -1,6 +1,5 @@
 import base64
 import os
-import re
 import sys
 import threading
 import urllib.request
@@ -49,12 +48,6 @@ _MP3_KEY = "fmt_mp3"
 _WIN_W = 560
 _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 820
-_INVALID_PATH_CHARS = re.compile(r'[\\/:*?"<>|]')
-
-
-def _sanitize_folder_name(name: str) -> str:
-    name = _INVALID_PATH_CHARS.sub("_", name)
-    return name[:100].strip() or "playlist"
 
 
 @dataclass
@@ -73,7 +66,8 @@ class _QueueItem:
     video_container: str = "mp4"
     orig_settings: dict | None = None
     remux_only: bool = False
-    playlist_folder: str | None = None
+    playlist_title: str | None = None
+    playlist_index: int | None = None
     thumbnail_url: str | None = None
     status: str = "waiting"
     tree_item: QTreeWidgetItem | None = None
@@ -135,9 +129,9 @@ class _QueueTree(QTreeWidget):
                         f"<b>{t('tooltip_title')}:</b> {qi.title or qi.url}",
                         f"<b>{t('tooltip_url')}:</b> {qi.url}",
                     ]
-                    if qi.playlist_folder:
+                    if qi.playlist_title:
                         lines.append(
-                            f"<b>{t('tooltip_playlist')}:</b> {qi.playlist_folder}"
+                            f"<b>{t('tooltip_playlist')}:</b> {qi.playlist_title}"
                         )
                     if qi.subtitle_opts:
                         langs = ", ".join(qi.subtitle_opts.get("subtitleslangs", []))
@@ -234,6 +228,8 @@ class App(QMainWindow):
             video_resolution=self._settings.video_resolution,
             mp3_bitrate=self._settings.mp3_bitrate,
             log_callback=self._on_downloader_log,
+            output_template_video=self._settings.output_template_video,
+            output_template_playlist=self._settings.output_template_playlist,
         )
 
         self._create_menu()
@@ -750,7 +746,7 @@ class App(QMainWindow):
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
 
-            playlist_folder = _sanitize_folder_name(result.get("title", ""))
+            playlist_title = result.get("title", "")
             snap_spec = (
                 build_720p_spec(self._settings.video_resolution, video_container)
                 if format_id == "fmt_720p"
@@ -763,7 +759,7 @@ class App(QMainWindow):
             )
 
             batch: list[tuple[int, _QueueItem]] = []
-            for entry in entries:
+            for idx, entry in enumerate(entries, start=1):
                 self._item_counter += 1
                 item = _QueueItem(
                     url=entry["url"],
@@ -778,7 +774,8 @@ class App(QMainWindow):
                     embed_chapters=embed_chapters,
                     audio_codec=audio_codec,
                     video_container=video_container,
-                    playlist_folder=playlist_folder,
+                    playlist_title=playlist_title,
+                    playlist_index=idx,
                     thumbnail_url=entry.get("thumbnail_url"),
                 )
                 batch.append((self._item_counter, item))
@@ -1176,11 +1173,6 @@ class App(QMainWindow):
                     cookies_path = None
 
             try:
-                output_dir_override = None
-                if item.playlist_folder:
-                    output_dir_override = os.path.join(
-                        self._resolve_download_path(), item.playlist_folder
-                    )
                 self.downloader.download_video(
                     item.url,
                     item.format_id,
@@ -1190,12 +1182,13 @@ class App(QMainWindow):
                     mp3_bitrate_override=item.mp3_bitrate,
                     embed_thumbnail=item.embed_thumbnail,
                     remux_only=item.remux_only,
-                    output_dir_override=output_dir_override,
                     cookies_browser=cookies_browser,
                     audio_codec=item.audio_codec,
                     embed_metadata=item.embed_metadata,
                     embed_chapters=item.embed_chapters,
                     video_container=item.video_container,
+                    playlist_title=item.playlist_title,
+                    playlist_index=item.playlist_index,
                 )
                 with self._queue_lock:
                     item.status = "done"
@@ -1245,6 +1238,10 @@ class App(QMainWindow):
         self.downloader.output_dir = self._resolve_download_path()
         self.downloader.video_resolution = self._settings.video_resolution
         self.downloader.mp3_bitrate = self._settings.mp3_bitrate
+        self.downloader.output_template_video = self._settings.output_template_video
+        self.downloader.output_template_playlist = (
+            self._settings.output_template_playlist
+        )
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

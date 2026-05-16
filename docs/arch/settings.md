@@ -16,6 +16,8 @@
 | `mp3_bitrate` | `str` | `"192"` | MP3 ビットレート |
 | `audio_format` | `str` | `"mp3"` | 音声形式（`"mp3"` または `"flac"`） |
 | `video_container` | `str` | `"mp4"` | 映像コンテナ（`"mp4"` / `"mkv"` / `"webm"`） |
+| `output_template_video` | `str` | `"%(title)s.%(ext)s"` | 単独動画の OUTPUT TEMPLATE |
+| `output_template_playlist` | `str` | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | プレイリストの OUTPUT TEMPLATE |
 
 ## クラス: `SettingsManager`
 

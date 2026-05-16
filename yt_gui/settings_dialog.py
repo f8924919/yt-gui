@@ -1,6 +1,7 @@
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -10,15 +11,26 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from .formats import AUDIO_FORMATS, MP3_BITRATES, VIDEO_CONTAINERS, VIDEO_RESOLUTIONS
 from .i18n import AVAILABLE_LANGUAGES, t
+from .output_template import (
+    DEFAULT_PLAYLIST_TEMPLATE,
+    DEFAULT_VIDEO_TEMPLATE,
+    TEMPLATE_FIELDS,
+    YTDLP_OUTPUT_TEMPLATE_DOC_URL,
+    render_preview,
+    validate_template,
+)
 from .settings import SettingsManager
 
 _BROWSERS = [
@@ -43,7 +55,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(t("settings_title"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setFixedSize(480, 355)
+        self.setFixedSize(520, 520)
 
         self._manager = manager
         self._settings = manager.load()
@@ -66,6 +78,10 @@ class SettingsDialog(QDialog):
         quality_widget = QWidget()
         self._build_quality_tab(quality_widget)
         self._tabs.addTab(quality_widget, t("tab_quality"))
+
+        template_widget = QWidget()
+        self._build_output_template_tab(template_widget)
+        self._tabs.addTab(template_widget, t("tab_output_template"))
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -230,6 +246,110 @@ class SettingsDialog(QDialog):
 
         self._on_audio_format_changed(current_af_idx)
 
+    def _build_output_template_tab(self, parent: QWidget):
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        # Single video template
+        layout.addWidget(QLabel(t("label_template_video")))
+        video_row = QHBoxLayout()
+        self._video_template_edit = QLineEdit(self._settings.output_template_video)
+        video_row.addWidget(self._video_template_edit)
+        video_insert_btn = QToolButton()
+        video_insert_btn.setText(f"{t('btn_template_insert')} ▼")
+        video_insert_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        video_insert_btn.setMenu(self._build_insert_menu(self._video_template_edit))
+        video_row.addWidget(video_insert_btn)
+        layout.addLayout(video_row)
+        self._video_preview = QLabel()
+        self._video_preview.setStyleSheet("color: gray;")
+        self._video_template_edit.textChanged.connect(
+            lambda txt: self._update_preview(self._video_preview, txt)
+        )
+        self._update_preview(self._video_preview, self._video_template_edit.text())
+        layout.addWidget(self._video_preview)
+
+        # Playlist template
+        layout.addWidget(QLabel(t("label_template_playlist")))
+        playlist_row = QHBoxLayout()
+        self._playlist_template_edit = QLineEdit(
+            self._settings.output_template_playlist
+        )
+        playlist_row.addWidget(self._playlist_template_edit)
+        playlist_insert_btn = QToolButton()
+        playlist_insert_btn.setText(f"{t('btn_template_insert')} ▼")
+        playlist_insert_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        playlist_insert_btn.setMenu(
+            self._build_insert_menu(self._playlist_template_edit)
+        )
+        playlist_row.addWidget(playlist_insert_btn)
+        layout.addLayout(playlist_row)
+        self._playlist_preview = QLabel()
+        self._playlist_preview.setStyleSheet("color: gray;")
+        self._playlist_template_edit.textChanged.connect(
+            lambda txt: self._update_preview(self._playlist_preview, txt)
+        )
+        self._update_preview(
+            self._playlist_preview, self._playlist_template_edit.text()
+        )
+        layout.addWidget(self._playlist_preview)
+
+        # Reset button
+        reset_row = QHBoxLayout()
+        reset_row.addStretch()
+        reset_btn = QPushButton(t("btn_template_reset"))
+        reset_btn.clicked.connect(self._reset_templates)
+        reset_row.addWidget(reset_btn)
+        layout.addLayout(reset_row)
+
+        # Field reference
+        fields_label = QLabel(f"<b>{t('label_template_fields')}</b>")
+        layout.addWidget(fields_label)
+        for placeholder, key in TEMPLATE_FIELDS:
+            row = QLabel(
+                f"<code>{placeholder}</code> &nbsp;–&nbsp; {t(f'tmpl_field_{key}')}"
+            )
+            row.setTextFormat(Qt.TextFormat.RichText)
+            layout.addWidget(row)
+
+        # Docs link
+        docs_row = QHBoxLayout()
+        docs_row.addStretch()
+        docs_btn = QPushButton(t("btn_open_ytdlp_docs"))
+        docs_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(YTDLP_OUTPUT_TEMPLATE_DOC_URL))
+        )
+        docs_row.addWidget(docs_btn)
+        layout.addLayout(docs_row)
+
+        layout.addStretch()
+
+    def _build_insert_menu(self, target_edit: QLineEdit) -> QMenu:
+        menu = QMenu(self)
+        for placeholder, key in TEMPLATE_FIELDS:
+            label = f"{placeholder} — {t(f'tmpl_field_{key}')}"
+            action = QAction(label, menu)
+            action.triggered.connect(
+                lambda _checked=False, p=placeholder: target_edit.insert(p)
+            )
+            menu.addAction(action)
+        return menu
+
+    @staticmethod
+    def _update_preview(label: QLabel, template: str):
+        rendered = render_preview(template)
+        if rendered is None:
+            label.setText(
+                f"{t('label_template_preview')} {t('template_preview_invalid')}"
+            )
+        else:
+            label.setText(f"{t('label_template_preview')} {rendered}")
+
+    def _reset_templates(self):
+        self._video_template_edit.setText(DEFAULT_VIDEO_TEMPLATE)
+        self._playlist_template_edit.setText(DEFAULT_PLAYLIST_TEMPLATE)
+
     def _browse_download(self):
         path = QFileDialog.getExistingDirectory(self, t("dialog_select_folder"))
         if path:
@@ -246,9 +366,20 @@ class SettingsDialog(QDialog):
             self._cookies_edit.setText(path)
 
     def _save(self):
+        video_template = self._video_template_edit.text().strip()
+        playlist_template = self._playlist_template_edit.text().strip()
+        for tmpl in (video_template, playlist_template):
+            err_key = validate_template(tmpl)
+            if err_key is not None:
+                QMessageBox.warning(self, t("warn_title"), t(err_key))
+                self._tabs.setCurrentIndex(self._tabs.count() - 1)
+                return
+
         lang_idx = self._lang_display.index(self._lang_combo.currentText())
         new_lang = AVAILABLE_LANGUAGES[lang_idx]
 
+        self._settings.output_template_video = video_template
+        self._settings.output_template_playlist = playlist_template
         self._settings.download_path = self._download_edit.text().strip()
         self._settings.language = new_lang
         self._settings.video_resolution = self._res_combo.currentText().removesuffix(

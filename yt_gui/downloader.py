@@ -7,6 +7,7 @@ from yt_dlp import YoutubeDL
 from . import get_resource_base
 from .formats import FORMAT_SPECS, build_720p_spec, build_best_spec
 from .i18n import t
+from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
 from .utils import strip_ansi
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
@@ -54,12 +55,16 @@ class Downloader:
         video_resolution="720",
         mp3_bitrate="192",
         log_callback=None,
+        output_template_video: str = DEFAULT_VIDEO_TEMPLATE,
+        output_template_playlist: str = DEFAULT_PLAYLIST_TEMPLATE,
     ):
         self.output_dir = output_dir
         self.status_callback = status_callback
         self.log_callback = log_callback
         self.video_resolution = video_resolution
         self.mp3_bitrate = mp3_bitrate
+        self.output_template_video = output_template_video
+        self.output_template_playlist = output_template_playlist
 
         _ext = ".exe" if sys.platform == "win32" else ""
         base = get_resource_base()
@@ -280,6 +285,8 @@ class Downloader:
         embed_metadata: bool = False,
         embed_chapters: bool = False,
         video_container: str = "mp4",
+        playlist_title: str | None = None,
+        playlist_index: int | None = None,
     ):
         if format_spec is not None:
             spec = format_spec
@@ -296,9 +303,21 @@ class Downloader:
         out_dir = output_dir_override or self.output_dir
         os.makedirs(out_dir, exist_ok=True)
 
+        is_playlist = playlist_title is not None
+        template = (
+            self.output_template_playlist if is_playlist else self.output_template_video
+        )
+        extra_info: dict | None = None
+        if is_playlist:
+            extra_info = {
+                "playlist_title": playlist_title,
+                "playlist": playlist_title,
+                "playlist_index": playlist_index,
+            }
+
         ydl_opts = {
             "format": spec,
-            "outtmpl": os.path.join(out_dir, "%(title)s.%(ext)s"),
+            "outtmpl": os.path.join(out_dir, template),
             "noplaylist": True,
             "progress_hooks": [self._progress_hook],
             "color": "no_color",
@@ -366,7 +385,7 @@ class Downloader:
             self.log_callback(msg)
 
         with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(url, download=False, extra_info=extra_info)
             raw_path = ydl.prepare_filename(info)
 
         stem, raw_ext = os.path.splitext(raw_path)
@@ -386,4 +405,4 @@ class Downloader:
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
 
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            ydl.extract_info(url, download=True, extra_info=extra_info)

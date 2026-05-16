@@ -24,6 +24,8 @@
 | `video_container` | str | `"mp4"` | 画質・音質タブ — 動画コンテナ |
 | `audio_format` | str | `"mp3"` | 画質・音質タブ — 音声形式 |
 | `mp3_bitrate` | str | `"192"` | 画質・音質タブ — MP3 ビットレート |
+| `output_template_video` | str | `"%(title)s.%(ext)s"` | ファイル名タブ — 単独動画用 OUTPUT TEMPLATE |
+| `output_template_playlist` | str | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | ファイル名タブ — プレイリスト用 OUTPUT TEMPLATE |
 
 ### Cookies の優先順位
 
@@ -72,6 +74,7 @@
 | 解像度上限 | 次のキュー追加から反映（既存アイテムには影響しない） |
 | 動画コンテナ | 次のキュー追加から反映（既存アイテムには影響しない） |
 | 音声形式・ビットレート | 次のキュー追加から反映（既存アイテムには影響しない） |
+| OUTPUT TEMPLATE | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 言語 | 即座に反映（再起動不要） |
 
 既存のキューアイテムは追加時のスナップショット（`audio_codec`・`video_container`・`embed_metadata`・`embed_chapters`）でダウンロードされます。

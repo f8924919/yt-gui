@@ -13,6 +13,8 @@ yt-dlp のラッパー。バックグラウンドスレッドから呼び出さ�
 | `output_dir` | `str` | デフォルト出力先 |
 | `video_resolution` | `str` | 解像度上限（例: `"720"`） |
 | `mp3_bitrate` | `str` | MP3 ビットレート（例: `"192"`） |
+| `output_template_video` | `str` | 単独動画用 outtmpl（既定: `"%(title)s.%(ext)s"`） |
+| `output_template_playlist` | `str` | プレイリスト用 outtmpl（既定: `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"`） |
 | `status_callback` | `Callable` | ダウンロード進捗を受け取るコールバック |
 | `log_callback` | `Callable` | ログ文字列を受け取るコールバック |
 
@@ -45,6 +47,8 @@ URL 種別を判別して返す。
 | `embed_metadata` | `False` | メタデータ埋め込み |
 | `embed_chapters` | `False` | チャプター埋め込み |
 | `remux_only` | `False` | リマックスのみ（再エンコードなし） |
+| `playlist_title` | `None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
+| `playlist_index` | `None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
 
 ## 内部詳細
 
@@ -56,6 +60,10 @@ WebM は非対応のため自動スキップ。
 ### 同名ファイルの衝突回避
 
 同名ファイルが存在する場合は `(n)` サフィックスを付けて保存（MP4/MKV/WebM 全コンテナ対応）。
+
+### OUTPUT TEMPLATE の適用
+
+`outtmpl` は `os.path.join(out_dir, template)` で組み立てる。プレイリスト要素のダウンロード時は `extract_info(url, extra_info={...})` でプレイリスト名・番号を yt-dlp の `info_dict` に注入し、`%(playlist_title)s` / `%(playlist_index)s` を解決する。テンプレートがサブフォルダ（`/`）を含む場合は yt-dlp が自動でディレクトリを作成する。
 
 ### ポストプロセッサの順序
 

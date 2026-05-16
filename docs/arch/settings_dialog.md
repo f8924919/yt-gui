@@ -4,7 +4,7 @@
 
 ## クラス: `SettingsDialog(QDialog)`
 
-モーダルの設定ダイアログ。`setFixedSize(480, 355)`。
+モーダルの設定ダイアログ。`setFixedSize(520, 520)`。
 
 ## タブ構成（`QTabWidget`）
 
@@ -31,9 +31,26 @@ Cookies の排他表示: `_cookies_btn_group.buttonClicked` → `_on_cookies_sou
 | 音声形式 | `QComboBox` | MP3 / FLAC |
 | MP3 ビットレート | `QComboBox` | 128 〜 320kbps（MP3 選択時のみ表示） |
 
+### 「ファイル名」タブ
+
+OUTPUT TEMPLATE 設定を編集する。
+
+| 項目 | ウィジェット | 説明 |
+|------|------------|------|
+| 単独動画 | `QLineEdit` + `QToolButton` | テンプレート入力。挿入ボタンで変数挿入 |
+| 単独動画プレビュー | `QLabel` | `output_template.render_preview()` を `textChanged` で呼び出し更新 |
+| プレイリスト | `QLineEdit` + `QToolButton` | 同上 |
+| プレイリストプレビュー | `QLabel` | 同上 |
+| デフォルトに戻す | `QPushButton` | 両入力欄を `DEFAULT_*_TEMPLATE` にリセット |
+| よく使うフィールド凡例 | `QLabel` 群 | `TEMPLATE_FIELDS` から生成 |
+| 公式ドキュメントを開く | `QPushButton` | `QDesktopServices.openUrl` で yt-dlp の README を表示 |
+
+挿入メニューと凡例は同じ `TEMPLATE_FIELDS`（`yt_gui/output_template.py`）から生成する。
+
 ## 保存フロー
 
-1. 各ウィジェットの値を `Settings` に書き込む
-2. `SettingsManager.save()` を呼ぶ
-3. `self.accept()` でダイアログを閉じる
-4. 呼び出し元（`App._open_settings()`）が `_retranslate_ui()` と `retranslate(video_container)` を呼ぶ
+1. 「ファイル名」タブのテンプレートを `validate_template()` で検証。エラー時は警告ダイアログを表示し、該当タブに切り替えてダイアログを閉じない
+2. 各ウィジェットの値を `Settings` に書き込む
+3. `SettingsManager.save()` を呼ぶ
+4. `self.accept()` でダイアログを閉じる
+5. 呼び出し元（`App._open_settings()`）が `_retranslate_ui()` と `retranslate(video_container)` を呼ぶ

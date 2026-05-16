@@ -23,6 +23,7 @@
 | [log_dialog.md](log_dialog.md) | `log_dialog.py` — ログ表示ダイアログ | [ログダイアログ](../spec/screens/log-dialog.md) |
 | [settings.md](settings.md) | `settings.py` — 設定の読み書き | [設定管理](../spec/settings.md) |
 | [formats.md](formats.md) | `formats.py` — フォーマット定数・仕様生成関数 | [ダウンロード形式](../spec/features/download-formats.md) |
+| [output_template.md](output_template.md) | `output_template.py` — OUTPUT TEMPLATE 定数・検証/プレビュー補助 | [設定管理](../spec/settings.md) |
 | [i18n.md](i18n.md) | `i18n.py` — 多言語対応 | [多言語対応](../spec/i18n.md) |
 | [locales.md](locales.md) | `locales/` — 言語別文字列辞書 | [多言語対応](../spec/i18n.md) |
 | [utils.md](utils.md) | `utils.py` — 共通ユーティリティ | — |
