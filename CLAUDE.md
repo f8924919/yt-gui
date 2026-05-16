@@ -79,5 +79,6 @@ uv remove {パッケージ}
 | [docs/arch/index.md](docs/arch/index.md) | モジュール実装の目次 |
 | [docs/build.md](docs/build.md) | PyInstaller ビルド・バンドルバイナリの詳細 |
 | [docs/task/index.md](docs/task/index.md) | タスクの進捗管理（セッション開始時に必ず確認） |
+| [docs/docs-guide.md](docs/docs-guide.md) | CLAUDE.md / docs の更新ルール（ドキュメント編集時に必ず参照） |
 
-> **コードまたは仕様を変更・拡張するときは、対応する `docs/spec/` / `docs/arch/` のファイルも合わせて更新すること。**
+> **コードまたは仕様を変更・拡張するときは、対応する `docs/spec/` / `docs/arch/` のファイルも合わせて更新すること。詳細な記載基準は [docs/docs-guide.md](docs/docs-guide.md) に従うこと。**
