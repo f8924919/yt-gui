@@ -165,6 +165,8 @@ class SettingsDialog(QDialog):
         self._lang_combo.setCurrentText(current_display)
         layout.addWidget(self._lang_combo, 3, 1, 1, 2)
 
+        layout.setRowStretch(4, 1)
+
         # Set initial state
         if self._settings.cookies_browser:
             self._radio_browser.setChecked(True)
