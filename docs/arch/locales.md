@@ -1,5 +1,7 @@
 # yt_gui/locales/
 
+> 関連仕様: [多言語対応](../spec/i18n.md)
+
 各言語の文字列辞書。`STRINGS: dict[str, str]` を定義する。
 
 ## 現行ファイル

@@ -41,20 +41,6 @@
 
 ---
 
-## アーキテクチャ（モジュール実装）
+## アーキテクチャ
 
-モジュールレベルの実装詳細は [`docs/arch/`](../arch/) 以下に別途記載。
-
-| ドキュメント | モジュール |
-|---|---|
-| [entry.md](../arch/entry.md) | `__main__.py` / `__init__.py` |
-| [app.md](../arch/app.md) | `app.py` |
-| [downloader.md](../arch/downloader.md) | `downloader.py` |
-| [original_format_panel.md](../arch/original_format_panel.md) | `original_format_panel.py` |
-| [settings_dialog.md](../arch/settings_dialog.md) | `settings_dialog.py` |
-| [log_dialog.md](../arch/log_dialog.md) | `log_dialog.py` |
-| [settings.md](../arch/settings.md) | `settings.py` |
-| [formats.md](../arch/formats.md) | `formats.py` |
-| [i18n.md](../arch/i18n.md) | `i18n.py` |
-| [locales.md](../arch/locales.md) | `locales/` |
-| [utils.md](../arch/utils.md) | `utils.py` |
+モジュール実装の詳細は [`docs/arch/index.md`](../arch/index.md) を参照。

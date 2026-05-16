@@ -1,5 +1,7 @@
 # yt_gui/app.py
 
+> 関連仕様: [メインウィンドウ](../spec/screens/main-window.md) ・ [ダウンロードキュー](../spec/features/queue.md)
+
 ## クラス: `App(QMainWindow)`
 
 PySide6 メインウィンドウ。アプリケーションのエントリーポイントから生成される。

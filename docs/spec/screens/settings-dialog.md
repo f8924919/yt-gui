@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/settings_dialog.py](../../arch/settings_dialog.md)
+
 ## 概要
 
 `SettingsDialog(QDialog)` が実装するモーダルダイアログです。`ファイル > 設定...`（Ctrl+,）で開きます。設定変更はメインウィンドウを閉じずに適用されます。

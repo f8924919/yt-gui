@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/formats.py](../../arch/formats.md) ・ [yt_gui/downloader.py](../../arch/downloader.md)
+
 ## 概要
 
 ダウンロード形式は `formats.py` で定義されます。各形式は内部キー（`FORMAT_KEYS`）と yt-dlp フォーマット文字列（`FORMAT_SPECS`）を持ちます。

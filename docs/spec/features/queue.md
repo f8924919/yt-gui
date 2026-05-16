@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/app.py](../../arch/app.md)
+
 ## 概要
 
 yt-gui はダウンロードキューを持ち、URL と形式を複数登録してからまとめて実行できます。`_QueueItem` dataclass がキューの各アイテムを表し、`App` が `_queue_items: list[_QueueItem]` でキュー全体を管理します。

@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/downloader.py](../../arch/downloader.md)
+
 ## 概要
 
 `Downloader` クラスが yt-dlp のラッパーとしてダウンロードを実行します。このドキュメントはダウンロードに関する動作仕様（ファイル名・プレイリスト・サムネイル埋め込み・字幕・Cookies）を記載します。

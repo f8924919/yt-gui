@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/log_dialog.py](../../arch/log_dialog.md)
+
 ## 概要
 
 `LogDialog(QDialog)` が実装する非モーダルダイアログです。`ファイル > ログ表示` で開きます。開いたままメインウィンドウを操作できます。

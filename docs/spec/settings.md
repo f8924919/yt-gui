@@ -2,6 +2,8 @@
 
 [← 目次](index.md)
 
+> 関連実装: [yt_gui/settings.py](../arch/settings.md)
+
 ## 概要
 
 アプリの設定は `Settings` dataclass と `SettingsManager` クラスで管理されます（`settings.py`）。設定は OS 標準の設定ディレクトリに JSON 形式で永続保存されます。

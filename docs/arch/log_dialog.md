@@ -1,5 +1,7 @@
 # yt_gui/log_dialog.py
 
+> 関連仕様: [ログダイアログ](../spec/screens/log-dialog.md)
+
 ## クラス: `LogDialog(QDialog)`
 
 非モーダルのログ表示ダイアログ。

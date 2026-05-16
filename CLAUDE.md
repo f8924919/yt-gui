@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 言語ルール
+
+- **入出力は日本語**: ユーザーへの応答・ドキュメント・コミットメッセージ・PR の説明はすべて日本語で記述する。
+- **思考は英語**: 推論・計画・内部の思考プロセスは英語で行う。
+
+## タスク管理ルール
+
+進行中・未完了のタスクは [docs/task/index.md](docs/task/index.md) で管理する。
+
+> **Claude Code はこの CLAUDE.md を読み込んだ直後に必ず [docs/task/index.md](docs/task/index.md) を確認し、`未着手` または `進行中` のタスクがある場合は、それらの対応を行うかをユーザーに尋ねること。** タスクを完了したらこのファイルの該当行のステータスを `完了` に更新し、更新日を記入する。新規タスクが発生した場合は `docs/task/{slug}.md` を作成して index.md にも追記する。
+
 ## Overview
 
 PySide6製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/解像度指定）・MP3/FLAC（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows / macOS向けデスクトップアプリ。PyInstallerでスタンドアロンバイナリとしてビルドする。
@@ -47,63 +58,26 @@ uv run python -m yt_gui
 # ビルド（PyInstaller）
 uv run pyinstaller yt-gui.spec
 
-# ビルド成果物は dist/yt-gui/ に出力される（macOS は dist/yt-gui.app/）
-
-# 依存パッケージの追加
+# 依存パッケージの追加 / 削除
 uv add {パッケージ}
-
-# 依存パッケージの削除
 uv remove {パッケージ}
 ```
+
+ビルドの詳細・バンドルバイナリ構成は [docs/build.md](docs/build.md) を参照。
 
 ## スレッド間通信パターン
 
 バックグラウンドスレッドから直接 Qt ウィジェットを操作しないこと。`Signal` / `Slot` を経由してメインスレッドにキューイングすること。シグナル定義・一覧は [docs/arch/app.md](docs/arch/app.md) を参照。
 
-## 仕様書
+## ドキュメントマップ
 
-動作仕様・画面仕様は [`docs/spec/index.md`](docs/spec/index.md) を目次として `docs/spec/` 以下に記載。
+詳細は以下の目次から参照する。コード変更時は対応するファイルも合わせて更新すること。
 
-> **仕様を変更・拡張するときは、対応する `docs/spec/` のファイルも合わせて更新すること。**
+| ドキュメント | 内容 |
+|---|---|
+| [docs/spec/index.md](docs/spec/index.md) | 動作仕様・画面仕様の目次 |
+| [docs/arch/index.md](docs/arch/index.md) | モジュール実装の目次 |
+| [docs/build.md](docs/build.md) | PyInstaller ビルド・バンドルバイナリの詳細 |
+| [docs/task/index.md](docs/task/index.md) | タスクの進捗管理（セッション開始時に必ず確認） |
 
-## アーキテクチャ
-
-`yt_gui/` パッケージ構成。各モジュールの詳細は `docs/arch/` 以下を参照。
-
-| ファイル | ドキュメント | 概要 |
-|----------|------------|------|
-| `yt_gui/__main__.py` / `__init__.py` | [docs/arch/entry.md](docs/arch/entry.md) | エントリーポイント・リソースパス解決 |
-| `yt_gui/app.py` | [docs/arch/app.md](docs/arch/app.md) | メインウィンドウ・キュー管理・シグナル定義 |
-| `yt_gui/downloader.py` | [docs/arch/downloader.md](docs/arch/downloader.md) | yt-dlp ラッパー・ダウンロード実行 |
-| `yt_gui/original_format_panel.py` | [docs/arch/original_format_panel.md](docs/arch/original_format_panel.md) | オリジナル形式パネル |
-| `yt_gui/settings_dialog.py` | [docs/arch/settings_dialog.md](docs/arch/settings_dialog.md) | 設定ダイアログ |
-| `yt_gui/log_dialog.py` | [docs/arch/log_dialog.md](docs/arch/log_dialog.md) | ログ表示ダイアログ |
-| `yt_gui/settings.py` | [docs/arch/settings.md](docs/arch/settings.md) | 設定の読み書き |
-| `yt_gui/formats.py` | [docs/arch/formats.md](docs/arch/formats.md) | フォーマット定数・仕様生成関数 |
-| `yt_gui/i18n.py` | [docs/arch/i18n.md](docs/arch/i18n.md) | 多言語対応 |
-| `yt_gui/locales/` | [docs/arch/locales.md](docs/arch/locales.md) | 言語別文字列辞書 |
-| `yt_gui/utils.py` | [docs/arch/utils.md](docs/arch/utils.md) | 共通ユーティリティ |
-
-> モジュールの実装を変更・拡張するときは、対応する `docs/arch/` のファイルも合わせて更新すること。
-
-## 新しい言語を追加する手順
-
-[docs/arch/locales.md](docs/arch/locales.md) 参照。
-
-## バンドルするバイナリ
-
-- `bin/deno[.exe]` — yt-dlpのJavaScriptランタイム（`js_runtimes`オプションで指定）
-- `bin/ffmpeg/ffmpeg[.exe]` — 動画結合・音声変換に使用（`ffmpeg_location`で指定）
-- `bin/ffmpeg/ffprobe[.exe]` — 動画メタデータ取得に使用（ffmpegと同じ `ffmpeg_location` から自動検索される）
-
-`yt-gui.spec` の `binaries` でこれらをバイナリに同梱するよう設定済み。CookiesファイルはGUIの設定画面でユーザーが任意に指定する（ビルド成果物には含まない）。
-
-バイナリは `scripts/download_binaries.py` で自動取得し `bin/` に配置する（`yt-gui.spec` ビルド時に自動呼び出し）。`--update` フラグを渡すと既存ファイルを強制的に再ダウンロードする。
-
-```bash
-python scripts/download_binaries.py --update
-```
-
-`yt-gui.spec` はPySide6向けに設定済み。`pyinstaller-hooks-contrib` がPySide6プラグイン・データを自動検出するため追加設定は最小限。macOS向けビルドでは `BUNDLE` ブロックで `.app` バンドルを自動生成する。
-
-実行時にCookiesフィールドのパスが指すファイルが存在しない場合は警告ダイアログを表示し、Cookiesなしでダウンロードを続行する。
+> **コードまたは仕様を変更・拡張するときは、対応する `docs/spec/` / `docs/arch/` のファイルも合わせて更新すること。**

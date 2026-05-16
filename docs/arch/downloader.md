@@ -1,5 +1,7 @@
 # yt_gui/downloader.py
 
+> 関連仕様: [ダウンロード動作](../spec/features/download-behavior.md) ・ [ダウンロード形式](../spec/features/download-formats.md)
+
 yt-dlp のラッパー。バックグラウンドスレッドから呼び出される。
 
 ## クラス: `Downloader`

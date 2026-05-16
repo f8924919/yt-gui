@@ -1,5 +1,7 @@
 # yt_gui/settings.py
 
+> 関連仕様: [設定管理](../spec/settings.md)
+
 設定の読み書きを担当。
 
 ## クラス: `Settings`（dataclass）

@@ -1,5 +1,7 @@
 # yt_gui/original_format_panel.py
 
+> 関連仕様: [オリジナル形式パネル](../spec/screens/original-format-panel.md)
+
 ## クラス: `OriginalFormatPanel(QGroupBox)`
 
 「オリジナルの形式」選択時に表示される詳細設定パネル。

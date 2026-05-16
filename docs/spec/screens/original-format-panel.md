@@ -2,6 +2,8 @@
 
 [← 目次](../index.md)
 
+> 関連実装: [yt_gui/original_format_panel.py](../../arch/original_format_panel.md)
+
 ## 概要
 
 `OriginalFormatPanel(QGroupBox)` が実装するパネルです。メインウィンドウの形式コンボで「オリジナルの形式」を選択すると表示されます（それ以外では非表示）。

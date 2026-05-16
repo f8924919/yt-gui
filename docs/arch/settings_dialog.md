@@ -1,5 +1,7 @@
 # yt_gui/settings_dialog.py
 
+> 関連仕様: [設定ダイアログ](../spec/screens/settings-dialog.md)
+
 ## クラス: `SettingsDialog(QDialog)`
 
 モーダルの設定ダイアログ。`setFixedSize(480, 355)`。
