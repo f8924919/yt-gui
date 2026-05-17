@@ -86,9 +86,13 @@ yt-dlp の `outtmpl` に `%(title)s.%(ext)s` を指定します。拡張子は�
 | 自動生成字幕の選択 | `writeautomaticsub: True` |
 | 言語コード | `subtitleslangs: [lang1, lang2, ...]` |
 | フォーマット | `subtitlesformat: srt / vtt / best` |
-| MP4 埋め込み | `FFmpegEmbedSubtitle` ポストプロセッサ |
+| MP4 埋め込み | `FFmpegSubtitlesConvertor`（埋め込み前変換） + `FFmpegEmbedSubtitle` ポストプロセッサ |
 
 字幕ファイルを個別に保存する場合（埋め込みなし）は、動画ファイルと同じフォルダに `.srt` / `.vtt` ファイルとして保存されます。
+
+### JSON 字幕の自動変換
+
+YouTube Live など `json3` 形式しか配信されない動画では、`FFmpegEmbedSubtitle` 単体だと `JSON subtitles cannot be embedded` のエラーで埋め込みに失敗します。これを避けるため、埋め込み有効時は `FFmpegSubtitlesConvertor` を埋め込み前に挟み、ユーザーが選んだフォーマット（`srt` / `vtt`）または `srt`（`best` 選択時のフォールバック）へ変換してから埋め込みます。
 
 ---
 

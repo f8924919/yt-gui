@@ -70,7 +70,9 @@ WebM は非対応のため自動スキップ。
 ### ポストプロセッサの順序
 
 - **音声**: FFmpegExtractAudio → FFmpegMetadata → EmbedThumbnail
-- **映像**: FFmpegMetadata → EmbedThumbnail → FFmpegEmbedSubtitle
+- **映像**: FFmpegMetadata → EmbedThumbnail → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
+
+字幕埋め込み時は `FFmpegSubtitlesConvertor` を先に挟む。これは YouTube Live など `json3` しか配信されない動画で `FFmpegEmbedSubtitle` が `JSON subtitles cannot be embedded` で失敗するのを避けるため。変換先はユーザーが選んだフォーマット（`srt` / `vtt`）。`best` 選択時は `srt` をデフォルトに採用する。
 
 ### バイナリパス解決
 

@@ -386,6 +386,14 @@ class Downloader:
                 if key in subtitle_opts:
                     ydl_opts[key] = subtitle_opts[key]
             if embed:
+                # YouTube Live など JSON (json3) しか配信されないケースでは
+                # FFmpegEmbedSubtitle が "JSON subtitles cannot be embedded" を
+                # 出すため、埋め込み前に SRT/VTT へ変換しておく。
+                preferred = subtitle_opts.get("subtitlesformat") or "best"
+                convert_to = "srt" if preferred in ("best", None) else preferred
+                ydl_opts.setdefault("postprocessors", []).append(
+                    {"key": "FFmpegSubtitlesConvertor", "format": convert_to}
+                )
                 ydl_opts.setdefault("postprocessors", []).append(
                     {"key": "FFmpegEmbedSubtitle", "already_have_subtitle": False}
                 )
