@@ -293,6 +293,7 @@ class Downloader:
         video_container: str = "mp4",
         playlist_title: str | None = None,
         playlist_index: int | None = None,
+        audio_only: bool = False,
     ):
         if format_spec is not None:
             spec = format_spec
@@ -305,6 +306,10 @@ class Downloader:
             is_audio = False
         else:
             spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
+
+        # オリジナル形式で音声のみが選ばれている場合は音声抽出経路へ
+        if format_id == "fmt_original" and audio_only:
+            is_audio = True
 
         out_dir = output_dir_override or self.output_dir
         os.makedirs(out_dir, exist_ok=True)

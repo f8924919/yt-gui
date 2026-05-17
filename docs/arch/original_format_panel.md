@@ -26,7 +26,7 @@
 | サムネイル埋め込みチェック | |
 | メタデータ埋め込みチェック | デフォルト ON |
 | チャプター埋め込みチェック | デフォルト ON |
-| 出力形式ラジオグループ | |
+| 出力形式ラジオグループ | コンテナ結合 / remux のみ / 音声のみ の 3 択 |
 
 複合フォーマット（★印）選択時は音声コンボを `setEnabled(False)` で自動無効化。
 
@@ -46,6 +46,8 @@
 | `get_format_spec()` | `str` | yt-dlp フォーマット文字列 |
 | `get_subtitle_opts()` | `dict` | 字幕オプション |
 | `get_remux_only()` | `bool` | リマックスのみフラグ |
+| `get_audio_only()` | `bool` | 音声のみ出力フラグ |
+| `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
 | `get_raw_settings()` | `dict` | 現在の設定スナップショット |
@@ -54,7 +56,7 @@
 | `get_fetched_title()` | `str` | 取得済みタイトル |
 | `is_both_skipped()` | `bool` | 映像・音声ともスキップかどうか |
 | `trigger_fetch()` | — | フォーマット取得を開始する |
-| `retranslate(video_container: str)` | — | 表示文字列を現在の言語・コンテナ設定に更新 |
+| `retranslate(video_container: str, audio_label: str \| None = None)` | — | 表示文字列を現在の言語・コンテナ設定・音声ラベル（例: `MP3 192kbps`）に更新 |
 
 ## 編集モード復元の遅延適用
 

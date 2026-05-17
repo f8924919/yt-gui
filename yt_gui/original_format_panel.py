@@ -51,6 +51,7 @@ class OriginalFormatPanel(QGroupBox):
         self._audio_formats: list[tuple[str, str]] = []
         self._subtitle_formats: list[tuple[str, str, bool]] = []
         self._fetched_title: str = ""
+        self._audio_label: str = "MP3"
 
         self._signals = _PanelSignals()
         self._signals.formats_fetched.connect(self._on_fetch_done)
@@ -80,8 +81,8 @@ class OriginalFormatPanel(QGroupBox):
         layout.addWidget(self._fetch_button, 0, 3)
 
         # Row 1: Audio combo
-        self._audio_label = QLabel(t("label_orig_audio"))
-        layout.addWidget(self._audio_label, 1, 0, Qt.AlignmentFlag.AlignRight)
+        self._audio_label_widget = QLabel(t("label_orig_audio"))
+        layout.addWidget(self._audio_label_widget, 1, 0, Qt.AlignmentFlag.AlignRight)
         self._audio_combo = QComboBox()
         self._audio_combo.addItem(t("orig_auto"))
         self._audio_combo.setEnabled(False)
@@ -128,12 +129,17 @@ class OriginalFormatPanel(QGroupBox):
         self._remux_group = QButtonGroup(self)
         self._radio_mp4 = QRadioButton(t("orig_output_mp4").format(container="MP4"))
         self._radio_remux = QRadioButton(t("orig_output_remux"))
+        self._radio_audio = QRadioButton(
+            t("orig_output_audio_only").format(label=self._audio_label)
+        )
         self._radio_mp4.setChecked(True)
         self._remux_group.addButton(self._radio_mp4, 0)
         self._remux_group.addButton(self._radio_remux, 1)
-        self._radio_mp4.toggled.connect(self._on_output_format_changed)
+        self._remux_group.addButton(self._radio_audio, 2)
+        self._remux_group.buttonToggled.connect(self._on_output_format_changed)
         out_layout.addWidget(self._radio_mp4)
         out_layout.addWidget(self._radio_remux)
+        out_layout.addWidget(self._radio_audio)
         out_layout.addStretch()
         layout.addWidget(out_widget, 3, 1, 1, 3)
 
@@ -156,10 +162,12 @@ class OriginalFormatPanel(QGroupBox):
     def trigger_fetch(self):
         self._start_fetch_thread()
 
-    def retranslate(self, video_container: str = "mp4"):
+    def retranslate(self, video_container: str = "mp4", audio_label: str | None = None):
+        if audio_label is not None:
+            self._audio_label = audio_label
         self.setTitle(t("label_original_detail"))
         self._video_label.setText(t("label_orig_video"))
-        self._audio_label.setText(t("label_orig_audio"))
+        self._audio_label_widget.setText(t("label_orig_audio"))
         self._subtitle_label.setText(t("label_orig_subtitle"))
         self._output_label.setText(t("label_orig_output"))
 
@@ -179,12 +187,17 @@ class OriginalFormatPanel(QGroupBox):
             t("orig_output_mp4").format(container=video_container.upper())
         )
         self._radio_remux.setText(t("orig_output_remux"))
+        self._radio_audio.setText(
+            t("orig_output_audio_only").format(label=self._audio_label)
+        )
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
         self._embed_metadata_check.setText(t("orig_embed_metadata"))
         self._embed_chapters_check.setText(t("orig_embed_chapters"))
 
     def has_formats_loaded(self) -> bool:
-        return self._video_combo.isEnabled() and bool(self._fetched_title)
+        return bool(self._fetched_title) and (
+            bool(self._video_formats) or bool(self._audio_formats)
+        )
 
     def get_fetched_title(self) -> str:
         return self._fetched_title
@@ -196,8 +209,14 @@ class OriginalFormatPanel(QGroupBox):
             and self._audio_combo.currentText() == skip
         )
 
+    def is_audio_skipped(self) -> bool:
+        return bool(self._audio_combo.currentText() == t("orig_skip"))
+
     def get_remux_only(self) -> bool:
         return bool(self._radio_remux.isChecked())
+
+    def get_audio_only(self) -> bool:
+        return bool(self._radio_audio.isChecked())
 
     def get_embed_thumbnail(self) -> bool:
         return bool(self._embed_thumbnail_check.isChecked())
@@ -244,6 +263,7 @@ class OriginalFormatPanel(QGroupBox):
             "audio_skip": audio_skip,
             "subtitle_opts": self.get_subtitle_opts(),
             "remux_only": self.get_remux_only(),
+            "audio_only": self.get_audio_only(),
             "embed_thumbnail": self.get_embed_thumbnail(),
             "embed_metadata": self.get_embed_metadata(),
             "embed_chapters": self.get_embed_chapters(),
@@ -251,8 +271,14 @@ class OriginalFormatPanel(QGroupBox):
 
     def restore_from_settings(self, settings: dict):
         """チェックボックス・ラジオボタンを即時復元し、映像/音声/字幕はフォーマット取得後に復元する。"""
+        audio_only = settings.get("audio_only", False)
         remux_only = settings.get("remux_only", False)
-        if remux_only:
+        if audio_only:
+            self._radio_audio.setChecked(True)
+            self._embed_thumbnail_check.setChecked(
+                settings.get("embed_thumbnail", False)
+            )
+        elif remux_only:
             self._radio_remux.setChecked(True)
         else:
             self._radio_mp4.setChecked(True)
@@ -270,9 +296,18 @@ class OriginalFormatPanel(QGroupBox):
     def get_format_spec(self) -> str:
         auto_label = t("orig_auto")
         skip_label = t("orig_skip")
-        video_sel = self._video_combo.currentText()
         audio_sel = self._audio_combo.currentText()
 
+        if self.get_audio_only():
+            audio_id = None
+            if audio_sel not in (auto_label, skip_label, t("orig_audio_included")):
+                if self._audio_formats:
+                    idx = self._format_index(self._audio_combo, audio_sel)
+                    if idx is not None and 0 <= idx < len(self._audio_formats):
+                        _, audio_id = self._audio_formats[idx]
+            return audio_id if audio_id else "bestaudio/best"
+
+        video_sel = self._video_combo.currentText()
         video_skip = video_sel == skip_label
         audio_skip = audio_sel == skip_label
 
@@ -310,6 +345,8 @@ class OriginalFormatPanel(QGroupBox):
         return "bestvideo+bestaudio/best"
 
     def get_subtitle_opts(self) -> dict | None:
+        if self.get_audio_only():
+            return None
         sel_items = self._subtitle_list.selectedItems()
         if not sel_items or not self._subtitle_formats:
             return None
@@ -412,6 +449,9 @@ class OriginalFormatPanel(QGroupBox):
     # ── internal events ──────────────────────────────────────────────────────
 
     def _on_video_changed(self, selected: str):
+        if self.get_audio_only():
+            return
+
         auto_label = t("orig_auto")
         skip_label = t("orig_skip")
 
@@ -436,10 +476,35 @@ class OriginalFormatPanel(QGroupBox):
                     self._audio_combo.setCurrentText(auto_label)
                 self._audio_combo.setEnabled(True)
 
-    def _on_output_format_changed(self, mp4_checked: bool):
-        if not mp4_checked:
+    def _on_output_format_changed(self, button, checked: bool):
+        if not checked:
+            return
+        is_audio = button is self._radio_audio
+        is_mp4 = button is self._radio_mp4
+
+        self._embed_thumbnail_check.setEnabled(is_mp4 or is_audio)
+        if not (is_mp4 or is_audio):
             self._embed_thumbnail_check.setChecked(False)
-        self._embed_thumbnail_check.setEnabled(mp4_checked)
+
+        formats_available = bool(self._video_formats) or bool(self._audio_formats)
+        if is_audio:
+            self._video_combo.setEnabled(False)
+            if self._audio_combo.currentText() == t("orig_audio_included"):
+                self._audio_combo.setCurrentText(t("orig_auto"))
+            self._audio_combo.setEnabled(bool(self._audio_formats))
+
+            self._subtitle_list.clearSelection()
+            self._subtitle_list.setEnabled(False)
+            self._subtitle_fmt_combo.setEnabled(False)
+            self._embed_check.setEnabled(False)
+            self._embed_check.setChecked(False)
+        else:
+            if formats_available:
+                self._video_combo.setEnabled(True)
+                self._on_video_changed(self._video_combo.currentText())
+            if self._subtitle_formats:
+                self._subtitle_list.setEnabled(True)
+            self._on_subtitle_changed()
 
     def _on_subtitle_changed(self):
         has_sub = bool(self._subtitle_list.selectedItems()) and bool(
@@ -552,6 +617,12 @@ class OriginalFormatPanel(QGroupBox):
         if self._pending_restore is not None:
             self._apply_pending_restore()
             self._pending_restore = None
+
+        # 音声のみモードのときは映像コンボ / 字幕を改めて無効化する
+        # (取得結果反映で setEnabled(True) されたものを元に戻す)
+        checked_btn = self._remux_group.checkedButton()
+        if checked_btn is not None:
+            self._on_output_format_changed(checked_btn, True)
 
     def _on_fetch_failed(self, err_str: str, is_playlist: bool):
         if is_playlist:

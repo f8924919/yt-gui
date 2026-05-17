@@ -59,6 +59,8 @@ STRINGS: dict[str, str] = {
     "label_orig_output": "Output:",
     "orig_output_mp4": "Merge to {container}",
     "orig_output_remux": "Remux only (keep original container)",
+    "orig_output_audio_only": "Audio only ({label})",
+    "warn_skip_audio_only": "Cannot skip audio when 'Audio only' is selected.",
     # format options
     "fmt_best_mp4": "Best quality ({container})",
     "fmt_720p": "{resolution}p ({container})",

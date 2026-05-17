@@ -59,6 +59,8 @@ STRINGS: dict[str, str] = {
     "label_orig_output": "出力形式:",
     "orig_output_mp4": "{container} に結合",
     "orig_output_remux": "remux のみ (元のコンテナを維持)",
+    "orig_output_audio_only": "音声のみ ({label})",
+    "warn_skip_audio_only": "「音声のみ」選択時は音声を「ダウンロードしない」にできません。",
     # format options
     "fmt_best_mp4": "最高画質 ({container}に結合)",
     "fmt_720p": "{resolution}p ({container}に結合)",
