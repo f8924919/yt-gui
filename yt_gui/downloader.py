@@ -44,7 +44,9 @@ class _YtdlpLogger:
         self._cb(f"❌ {strip_ansi(msg)}")
 
 
-_SKIP_AUTO_LANGS = frozenset({"live_chat"})
+# YouTube Live が "subtitles" / "automatic_captions" 双方に挿入する live_chat
+# (json 専用の擬似字幕) は埋め込み・変換とも失敗するため UI から除外する。
+_SKIP_SUB_LANGS = frozenset({"live_chat"})
 
 
 class Downloader:
@@ -235,7 +237,7 @@ class Downloader:
         subtitle_list: list[tuple[str, str, bool]] = []
 
         for lang, formats in sorted(subtitles_raw.items()):
-            if not formats:
+            if not formats or lang in _SKIP_SUB_LANGS:
                 continue
             exts = (
                 ", ".join(
@@ -249,7 +251,7 @@ class Downloader:
             subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
 
         for lang, formats in sorted(auto_captions_raw.items()):
-            if not formats or lang in _SKIP_AUTO_LANGS:
+            if not formats or lang in _SKIP_SUB_LANGS:
                 continue
             # Limit auto captions to primary language family when known
             if primary_lang:

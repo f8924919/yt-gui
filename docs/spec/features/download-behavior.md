@@ -94,6 +94,10 @@ yt-dlp の `outtmpl` に `%(title)s.%(ext)s` を指定します。拡張子は�
 
 YouTube Live など `json3` 形式しか配信されない動画では、`FFmpegEmbedSubtitle` 単体だと `JSON subtitles cannot be embedded` のエラーで埋め込みに失敗します。これを避けるため、埋め込み有効時は `FFmpegSubtitlesConvertor` を埋め込み前に挟み、ユーザーが選んだフォーマット（`srt` / `vtt`）または `srt`（`best` 選択時のフォールバック）へ変換してから埋め込みます。
 
+### `live_chat` 擬似字幕の除外
+
+YouTube Live は `info["subtitles"]` と `info["automatic_captions"]` の両方に `live_chat`（チャットログの JSON）を挿入しますが、これは字幕として埋め込めず、変換にも失敗します。`fetch_formats()` で字幕一覧を組み立てるときに言語コード `live_chat` をスキップし、UI 上では選択肢として現れないようにしています（`_SKIP_SUB_LANGS`）。
+
 ---
 
 ## メタデータ・チャプター
