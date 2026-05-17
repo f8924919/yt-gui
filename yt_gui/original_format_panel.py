@@ -177,6 +177,42 @@ class OriginalFormatPanel(QGroupBox):
     def trigger_fetch(self):
         self._start_fetch_thread()
 
+    def reset(self):
+        """フォーマット取得結果と選択状態を初期状態へ戻す。"""
+        self._video_formats = []
+        self._audio_formats = []
+        self._subtitle_formats = []
+        self._fetched_title = ""
+        self._pending_restore = None
+
+        auto_label = t("orig_auto")
+
+        self._video_combo.blockSignals(True)
+        self._video_combo.clear()
+        self._video_combo.addItem(auto_label)
+        self._video_combo.setEnabled(False)
+        self._video_combo.blockSignals(False)
+
+        self._audio_combo.blockSignals(True)
+        self._audio_combo.clear()
+        self._audio_combo.addItem(auto_label)
+        self._audio_combo.setEnabled(False)
+        self._audio_combo.blockSignals(False)
+
+        self._subtitle_list.blockSignals(True)
+        self._subtitle_list.clear()
+        self._subtitle_list.setEnabled(False)
+        self._subtitle_list.blockSignals(False)
+
+        self._subtitle_fmt_combo.setEnabled(False)
+        self._embed_check.setEnabled(False)
+        self._embed_check.setChecked(False)
+
+        self._radio_mp4.setChecked(True)
+        self._embed_thumbnail_check.setChecked(False)
+        self._embed_metadata_check.setChecked(True)
+        self._embed_chapters_check.setChecked(True)
+
     def retranslate(self, video_container: str = "mp4", audio_label: str | None = None):
         if audio_label is not None:
             self._audio_label = audio_label

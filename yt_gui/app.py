@@ -591,6 +591,7 @@ class App(QMainWindow):
                     audio_only=audio_only,
                 )
                 self.url_entry.clear()
+                self._original_panel.reset()
                 return
             self._start_add_thread(
                 url,
@@ -769,6 +770,8 @@ class App(QMainWindow):
                 audio_only=audio_only,
             )
             self.url_entry.clear()
+            if format_id == _ORIGINAL_KEY:
+                self._original_panel.reset()
             self._signals.status_update.emit(t("status_title_added"), 0)
         else:
             if format_id == _ORIGINAL_KEY:
