@@ -535,7 +535,9 @@ class OriginalFormatPanel(QGroupBox):
         if not self._video_formats and not self._audio_formats:
             self._pending_restore = None
             self._update_status(t("status_fetch_formats_no_formats"), 0)
-            QMessageBox.warning(self, t("warn_title"), t("warn_fetch_formats_playlist"))
+            QMessageBox.warning(
+                self, t("warn_title"), t("warn_fetch_formats_no_formats")
+            )
             return
 
         self._update_status(

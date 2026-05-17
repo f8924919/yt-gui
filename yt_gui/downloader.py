@@ -203,6 +203,11 @@ class Downloader:
             acodec = f.get("acodec") or "none"
             has_video = vcodec != "none"
             has_audio = acodec != "none"
+            # vcodec/acodec が一切未設定の format は muxed メディアとして扱う
+            # （xvideos など、抽出器が直接 URL だけを返す場合の救済）
+            if not has_video and not has_audio:
+                has_video = True
+                has_audio = True
 
             if has_video:
                 height = f.get("height")
@@ -210,7 +215,8 @@ class Downloader:
                 tbr = f.get("tbr") or f.get("vbr")
                 brate = f" – {tbr:.0f}kbps" if tbr else ""
                 marker = " ★" if has_audio else ""
-                label = f"{res} {vcodec} ({ext}) [{fid}]{brate}{marker}"
+                vcodec_label = vcodec if vcodec != "none" else ext
+                label = f"{res} {vcodec_label} ({ext}) [{fid}]{brate}{marker}"
                 video_formats.append((label, fid, has_audio))
             elif has_audio:
                 abr = f.get("abr") or f.get("tbr")

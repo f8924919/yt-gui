@@ -30,6 +30,15 @@
 
 複合フォーマット（★印）選択時は音声コンボを `setEnabled(False)` で自動無効化。
 
+## フォーマット取得結果の分岐
+
+| 結果 | 表示 |
+|------|------|
+| 通常成功 | フォーマットを各コンボに展開し、`status_formats_loaded` |
+| `extract_info` 例外（メッセージに `playlist` を含む） | `warn_fetch_formats_playlist`（プレイリスト誤入力向け） |
+| `extract_info` 例外（その他） | `err_fetch_formats`（エラー詳細を表示） |
+| 成功したが映像/音声フォーマット 0 件 | `warn_fetch_formats_no_formats`（URL 確認を促す中立メッセージ） |
+
 ## 公開 API
 
 | メソッド | 戻り値 | 説明 |

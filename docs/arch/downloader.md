@@ -36,6 +36,8 @@ URL 種別を判別して返す。
 
 フォーマット一覧を返す。キー: `"title"` / `"video"` / `"audio"` / `"subtitles"`。
 
+`info["formats"]` の各エントリを `vcodec` / `acodec` で分類して映像/音声リストに振り分ける。両方が `None` (= 抽出器がコーデック情報を埋めなかった直接 URL の形式、例: xvideos の `flv` / `urllow` / `urlhigh`) の場合は **muxed メディア** とみなし、映像リストへ `has_audio=True` で登録する（音声コンボでは「映像に含まれます」表示になる）。これにより、コーデック情報を返さない抽出器でもオリジナル形式の選択肢が空にならない。
+
 #### `download_video(url, format_id, ...) -> None`
 
 ダウンロードを実行する。主要オプション:

@@ -43,6 +43,7 @@ STRINGS: dict[str, str] = {
     "status_formats_loaded": "✅ Found {video} video / {audio} audio / {subtitle} subtitle formats",
     "err_fetch_formats": "An error occurred while fetching formats:\n{error}",
     "warn_fetch_formats_playlist": "Cannot fetch formats for a playlist URL.\nPlease enter a single video URL.",
+    "warn_fetch_formats_no_formats": "No video or audio formats were found.\nPlease verify the URL and that the site is reachable.",
     "status_fetch_formats_no_formats": "⚠️ No video or audio formats found. Please check the URL.",
     "label_orig_subtitle": "Subtitle:",
     "mp3_embed_thumbnail": "Embed thumbnail",
