@@ -70,9 +70,12 @@ WebM は非対応のため自動スキップ。
 ### ポストプロセッサの順序
 
 - **音声**: FFmpegExtractAudio → FFmpegMetadata → EmbedThumbnail
-- **映像**: FFmpegMetadata → EmbedThumbnail → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
+- **映像 (字幕埋め込み無し)**: FFmpegMetadata → EmbedThumbnail
+- **映像 (字幕埋め込みあり)**: FFmpegMetadata → EmbedThumbnail → (`live_chat` 含む場合 `_StripLiveChatBeforeEmbedPP`) → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
 
-字幕埋め込み時は `FFmpegSubtitlesConvertor` を先に挟む。これは YouTube Live など `json3` しか配信されない動画で `FFmpegEmbedSubtitle` が `JSON subtitles cannot be embedded` で失敗するのを避けるため。変換先はユーザーが選んだフォーマット（`srt` / `vtt`）。`best` 選択時は `srt` をデフォルトに採用する。
+字幕埋め込み時は `FFmpegSubtitlesConvertor` を先に挟む。これは `json3` しか配信されない動画で `FFmpegEmbedSubtitle` が `JSON subtitles cannot be embedded` で失敗するのを避けるため。変換先はユーザーが選んだフォーマット（`srt` / `vtt`）。`best` 選択時は `srt` をデフォルトに採用する。
+
+`live_chat` がユーザー選択に含まれる場合は、convert/embed の前に `_StripLiveChatBeforeEmbedPP` を差し込んで `requested_subtitles` から `live_chat` を取り除く。これにより、ライブチャットの JSON は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
 
 ### バイナリパス解決
 

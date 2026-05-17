@@ -51,6 +51,7 @@ STRINGS: dict[str, str] = {
     "warn_skip_both": "Cannot skip both video and audio.",
     "orig_sub_none": "None (skip)",
     "orig_sub_auto_marker": "(auto-generated)",
+    "orig_sub_live_chat_name": "Live chat (not embeddable, saved as sidecar)",
     "orig_sub_embed": "Embed in MP4",
     "orig_embed_thumbnail": "Embed thumbnail",
     "orig_embed_metadata": "Embed metadata",

@@ -94,9 +94,17 @@ yt-dlp の `outtmpl` に `%(title)s.%(ext)s` を指定します。拡張子は�
 
 YouTube Live など `json3` 形式しか配信されない動画では、`FFmpegEmbedSubtitle` 単体だと `JSON subtitles cannot be embedded` のエラーで埋め込みに失敗します。これを避けるため、埋め込み有効時は `FFmpegSubtitlesConvertor` を埋め込み前に挟み、ユーザーが選んだフォーマット（`srt` / `vtt`）または `srt`（`best` 選択時のフォールバック）へ変換してから埋め込みます。
 
-### `live_chat` 擬似字幕の除外
+### `live_chat`（ライブチャット）の扱い
 
-YouTube Live は `info["subtitles"]` と `info["automatic_captions"]` の両方に `live_chat`（チャットログの JSON）を挿入しますが、これは字幕として埋め込めず、変換にも失敗します。`fetch_formats()` で字幕一覧を組み立てるときに言語コード `live_chat` をスキップし、UI 上では選択肢として現れないようにしています（`_SKIP_SUB_LANGS`）。
+YouTube Live は `info["subtitles"]` と `info["automatic_captions"]` の両方に `live_chat`（チャットログの JSON）を挿入します。これは標準的な字幕フォーマットではないため、`FFmpegSubtitlesConvertor` / `FFmpegEmbedSubtitle` は変換も埋め込みもできません。
+
+字幕リストでは `live_chat` を選択肢として表示しますが（ラベル: `live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]`）、埋め込みパスからは外し、JSON ファイルだけが動画ファイルの隣にサイドカーとして保存されるようにしています。
+
+実装:
+
+- 自動字幕ループでは `live_chat` をスキップ（手動扱いの 1 エントリだけが UI に出る）
+- 「MP4 に埋め込む」が ON でかつ `subtitleslangs` に `live_chat` が含まれるとき、`_StripLiveChatBeforeEmbedPP` を `FFmpegSubtitlesConvertor` の前に差し込み、`requested_subtitles` から `live_chat` を取り除く（ファイルはダウンロード済みなのでディスクには残る）
+- 埋め込み OFF のときは convert/embed PP 自体が走らないため、フィルタも不要
 
 ---
 

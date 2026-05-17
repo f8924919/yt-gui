@@ -3,12 +3,15 @@ import re
 import sys
 
 from yt_dlp import YoutubeDL
+from yt_dlp.postprocessor.common import PostProcessor
 
 from . import get_resource_base
 from .formats import FORMAT_SPECS, build_720p_spec, build_best_spec
 from .i18n import t
 from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
 from .utils import strip_ansi
+
+_LIVE_CHAT_LANG = "live_chat"
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
 _THUMBNAIL_EMBED_CONTAINERS = frozenset(
@@ -44,9 +47,19 @@ class _YtdlpLogger:
         self._cb(f"❌ {strip_ansi(msg)}")
 
 
-# YouTube Live が "subtitles" / "automatic_captions" 双方に挿入する live_chat
-# (json 専用の擬似字幕) は埋め込み・変換とも失敗するため UI から除外する。
-_SKIP_SUB_LANGS = frozenset({"live_chat"})
+class _StripLiveChatBeforeEmbedPP(PostProcessor):
+    """live_chat 字幕は json 専用で ffmpeg では変換も埋め込みもできないため、
+    後段の FFmpegSubtitlesConvertor / FFmpegEmbedSubtitle が処理対象として
+    見ないよう `requested_subtitles` から外す。json ファイルは既に
+    ダウンロード済みなので、サイドカーとしてそのまま残る。"""
+
+    def run(self, info):
+        subs = info.get("requested_subtitles") or {}
+        if _LIVE_CHAT_LANG in subs:
+            info["requested_subtitles"] = {
+                k: v for k, v in subs.items() if k != _LIVE_CHAT_LANG
+            }
+        return [], info
 
 
 class Downloader:
@@ -237,7 +250,13 @@ class Downloader:
         subtitle_list: list[tuple[str, str, bool]] = []
 
         for lang, formats in sorted(subtitles_raw.items()):
-            if not formats or lang in _SKIP_SUB_LANGS:
+            if not formats:
+                continue
+            if lang == _LIVE_CHAT_LANG:
+                # ライブチャット (json 専用、埋め込み不可) は専用ラベルで提示
+                subtitle_list.append(
+                    (f"{lang} – {t('orig_sub_live_chat_name')} [json]", lang, False)
+                )
                 continue
             exts = (
                 ", ".join(
@@ -251,7 +270,7 @@ class Downloader:
             subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
 
         for lang, formats in sorted(auto_captions_raw.items()):
-            if not formats or lang in _SKIP_SUB_LANGS:
+            if not formats or lang == _LIVE_CHAT_LANG:
                 continue
             # Limit auto captions to primary language family when known
             if primary_lang:
@@ -425,5 +444,20 @@ class Downloader:
                 n += 1
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
 
+        # live_chat を埋め込み対象に含む場合は、convert/embed が live_chat.json を
+        # 触らないように先にストリップ PP を実行する。
+        sub_langs = (subtitle_opts or {}).get("subtitleslangs") or []
+        needs_strip_live_chat = (
+            (subtitle_opts or {}).get("embed", False)
+            and _LIVE_CHAT_LANG in sub_langs
+        )
+
         with YoutubeDL(ydl_opts) as ydl:
+            if needs_strip_live_chat:
+                ydl.add_post_processor(
+                    _StripLiveChatBeforeEmbedPP(), when="post_process"
+                )
+                # 末尾に追加された PP を先頭へ移動 (convert/embed の前で実行させる)
+                pp_list = ydl._pps["post_process"]
+                pp_list.insert(0, pp_list.pop())
             ydl.extract_info(url, download=True, extra_info=extra_info)
