@@ -1170,6 +1170,8 @@ class App(QMainWindow):
         if not self._worker_running:
             self.start_queue_button.setEnabled(True)
 
+        self._original_panel.reset()
+
         self._on_format_changed(self.format_combo.currentIndex())
         self._update_status(t("status_ready"), 0)
 
