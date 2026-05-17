@@ -15,3 +15,4 @@
 | [refine-docs.md](refine-docs.md) | 完了 | CLAUDE.md と docs 構成の改善（言語ルール追加・arch/build ハブ新設・双方向リンク） | 2026-05-16 |
 | [yt-dlp-output-template.md](yt-dlp-output-template.md) | 完了 | 設定画面へのOUTPUT TEMPLATE設定UIの追加 | 2026-05-16 |
 | [fix-original-format-no-codec.md](fix-original-format-no-codec.md) | 完了 | codec 情報を返さない抽出器（xvideos 等）でオリジナル形式が「プレイリスト」誤判定される不具合の修正 | 2026-05-17 |
+| [linux-appimage-build.md](linux-appimage-build.md) | 完了 | Linux 向け PyInstaller ビルド時の AppImage 自動生成 | 2026-05-17 |

@@ -130,3 +130,10 @@ if sys.platform == 'darwin':
             'CFBundleShortVersionString': '0.1.0',
         },
     )
+elif sys.platform == 'linux':
+    # Linux では PyInstaller COLLECT 出力を AppImage 化する
+    subprocess.run(
+        [sys.executable, os.path.join(SPECPATH, 'scripts', 'build_appimage.py'),
+         '--force'],
+        check=True,
+    )
