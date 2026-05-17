@@ -25,6 +25,21 @@ from .utils import strip_ansi
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 
 
+class _ToggleListWidget(QListWidget):
+    """修飾キーなしの左クリックで選択済み項目を再クリックすると選択解除する。"""
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and not (
+            event.modifiers()
+            & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+        ):
+            item = self.itemAt(event.position().toPoint())
+            if item is not None and item.isSelected():
+                item.setSelected(False)
+                return
+        super().mousePressEvent(event)
+
+
 class _PanelSignals(QObject):
     formats_fetched = Signal(dict)
     fetch_failed = Signal(str, bool)  # (error_msg, is_playlist)
@@ -97,7 +112,7 @@ class OriginalFormatPanel(QGroupBox):
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
         )
 
-        self._subtitle_list = QListWidget()
+        self._subtitle_list = _ToggleListWidget()
         self._subtitle_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
         )

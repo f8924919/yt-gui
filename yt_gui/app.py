@@ -95,6 +95,18 @@ class _QueueTree(QTreeWidget):
         self._get_thumbnail_b64_cb = None  # (url: str) -> str | None
         self._is_editing = False
 
+    def mousePressEvent(self, event):
+        # 修飾キーなしの左クリックで選択済みアイテムを再クリックした場合は解除する
+        if event.button() == Qt.MouseButton.LeftButton and not (
+            event.modifiers()
+            & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+        ):
+            item = self.itemAt(event.position().toPoint())
+            if item is not None and item.isSelected():
+                item.setSelected(False)
+                return
+        super().mousePressEvent(event)
+
     def contextMenuEvent(self, event):
         if self._context_menu_cb is None or self._get_item_cb is None:
             return
