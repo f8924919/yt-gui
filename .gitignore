@@ -11,3 +11,8 @@ wheels/
 bin/
 assets/icon_generated.ico
 assets/icon_generated.icns
+
+# Test artifacts
+.coverage
+.pytest_cache/
+htmlcov/

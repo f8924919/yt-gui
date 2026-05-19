@@ -59,6 +59,7 @@ CLAUDE.md には概要 1〜2 行と詳細ファイルへのリンクのみを残
 | `docs/arch/` | `yt_gui/` 各モジュールの **実装詳細**（"どう実装されているか"） | `snake_case.md`（モジュール名と一致） |
 | `docs/task/` | 進行中・完了タスクの管理 | `kebab-case.md`（タスク slug） |
 | `docs/research/` | 採否未決の **調査・検討メモ**（実装前の比較検討など） | `kebab-case.md` |
+| `docs/testing/` | テスト方針・実行コマンド・カバレッジ運用 | `kebab-case.md` |
 | `docs/build.md` | PyInstaller ビルド・同梱バイナリ | 直下の単独ファイル |
 | `docs/docs-guide.md` | 本ガイド | 直下の単独ファイル |
 
@@ -171,6 +172,8 @@ CLAUDE.md にも記載のとおり、**コードまたは仕様を変更・拡�
 | 新言語追加 | `docs/spec/i18n.md` + `docs/arch/locales.md` |
 | ビルド構成・同梱バイナリ変更 | `docs/build.md` |
 | 翻訳キー追加・変更のみ | ドキュメント更新不要（キー一覧は記載しない方針） |
+| テスト方針・スコープ変更 | `docs/testing/policy.md` + `pyproject.toml` の `[tool.coverage.run] omit` |
+| テスト対象モジュール追加 | `tests/test_{module}.py` 新規 + `docs/testing/policy.md` のスコープ表更新 |
 | リファクタリング（振る舞い不変） | 該当 `arch/{module}.md` のみ（必要に応じて） |
 
 ### 4.2 タスク完了時の手順
