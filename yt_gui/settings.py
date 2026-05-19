@@ -51,4 +51,3 @@ class SettingsManager:
         os.makedirs(self._config_dir, exist_ok=True)
         with open(self._config_file, "w", encoding="utf-8") as f:
             json.dump(asdict(settings), f, ensure_ascii=False, indent=2)
-
