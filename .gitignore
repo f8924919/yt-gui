@@ -16,3 +16,6 @@ assets/icon_generated.icns
 .coverage
 .pytest_cache/
 htmlcov/
+
+# Personal cookies (must not be committed)
+cookies.txt
