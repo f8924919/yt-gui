@@ -347,6 +347,10 @@ class Downloader:
                 "playlist_index": playlist_index,
             }
 
+        # 複数音声ストリームを 1 ファイルにマージする場合は MKV に強制する
+        # (`bestvideo+aid1+aid2` のように `+` が 2 個以上含まれるパターン)。
+        is_multi_audio = (not is_audio) and spec.count("+") >= 2
+
         ydl_opts = {
             "format": spec,
             "outtmpl": os.path.join(out_dir, template),
@@ -355,6 +359,10 @@ class Downloader:
             "color": "no_color",
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
+
+        if is_multi_audio:
+            ydl_opts["allow_multiple_audio_streams"] = True
+            video_container = "mkv"
 
         if is_audio:
             pp: dict = {
@@ -447,10 +455,9 @@ class Downloader:
         # live_chat を埋め込み対象に含む場合は、convert/embed が live_chat.json を
         # 触らないように先にストリップ PP を実行する。
         sub_langs = (subtitle_opts or {}).get("subtitleslangs") or []
-        needs_strip_live_chat = (
-            (subtitle_opts or {}).get("embed", False)
-            and _LIVE_CHAT_LANG in sub_langs
-        )
+        needs_strip_live_chat = (subtitle_opts or {}).get(
+            "embed", False
+        ) and _LIVE_CHAT_LANG in sub_langs
 
         with YoutubeDL(ydl_opts) as ydl:
             if needs_strip_live_chat:

@@ -53,7 +53,8 @@
 
 - フォーマット文字列はパネルの選択状態から動的生成（`OriginalFormatPanel.get_format_spec()` が担当）
 - 生成ロジックの詳細は [オリジナル形式パネル — フォーマット文字列生成ロジック](../screens/original-format-panel.md#フォーマット文字列生成ロジック) を参照
-- 出力形式ラジオで「音声のみ」を選んだ場合は `Downloader.download_video()` の `audio_only=True` 経路に乗り、`fmt_mp3` と同じ `FFmpegExtractAudio` ポストプロセッサで MP3 / FLAC に変換する。音声形式・MP3 ビットレートはアプリ設定 (`audio_format` / `mp3_bitrate`) を流用する。
+- 音声は multi-select 対応。複数選択時は `+` で連結した format 文字列 (例: `bestvideo+251+140`) が生成され、`Downloader` 側で `allow_multiple_audio_streams: True` と `merge_output_format: "mkv"` が自動付与される
+- 出力形式ラジオで「音声のみ」を選んだ場合は `Downloader.download_video()` の `audio_only=True` 経路に乗り、`fmt_mp3` と同じ `FFmpegExtractAudio` ポストプロセッサで MP3 / FLAC に変換する。音声形式・MP3 ビットレートはアプリ設定 (`audio_format` / `mp3_bitrate`) を流用する。音声のみモードでは複数音声選択を許容するが**先頭の 1 件のみ使用**（フェーズ 1 制約）
 
 ---
 

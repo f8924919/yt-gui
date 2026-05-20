@@ -62,6 +62,8 @@ STRINGS: dict[str, str] = {
     "orig_output_remux": "Remux only (keep original container)",
     "orig_output_audio_only": "Audio only ({label})",
     "warn_skip_audio_only": "Cannot skip audio when 'Audio only' is selected.",
+    "status_multi_audio_mkv_promoted": "ℹ️ Switched container to MKV for multiple audio tracks",
+    "status_multi_audio_audio_only_truncated": "⚠️ Only the first audio track is used in Audio-only mode",
     # format options
     "fmt_best_mp4": "Best quality ({container})",
     "fmt_720p": "{resolution}p ({container})",

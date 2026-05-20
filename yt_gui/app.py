@@ -370,6 +370,33 @@ class App(QMainWindow):
             return "FLAC"
         return f"MP3 {self._settings.mp3_bitrate}kbps"
 
+    def _adjust_video_container_for_multi_audio(
+        self,
+        video_container: str,
+        multi_audio: bool,
+        *,
+        remux_only: bool,
+        audio_only: bool,
+    ) -> str:
+        """複数音声選択時に動画コンテナを MKV へ自動昇格する。
+
+        対象: 通常の結合モード (remux_only / audio_only ではない) で multi_audio=True、
+        かつ現在のコンテナが mkv 以外のときのみ昇格する。
+        昇格時はステータスバーへ通知メッセージを表示する。
+        """
+        if not multi_audio or remux_only or audio_only:
+            return video_container
+        if video_container == "mkv":
+            return video_container
+        self._update_status(t("status_multi_audio_mkv_promoted"), 0)
+        return "mkv"
+
+    def _notify_audio_only_truncated_if_needed(
+        self, multi_audio: bool, audio_only: bool
+    ) -> None:
+        if multi_audio and audio_only:
+            self._update_status(t("status_multi_audio_audio_only_truncated"), 0)
+
     # ── menu ─────────────────────────────────────────────────────────────────
 
     def _create_menu(self):
@@ -569,8 +596,16 @@ class App(QMainWindow):
             embed_metadata = self._original_panel.get_embed_metadata()
             embed_chapters = self._original_panel.get_embed_chapters()
             orig_settings = self._original_panel.get_raw_settings()
-            video_container = self._settings.video_container
+            video_container = self._adjust_video_container_for_multi_audio(
+                self._settings.video_container,
+                self._original_panel.has_multiple_audio_selected(),
+                remux_only=remux_only,
+                audio_only=audio_only,
+            )
             audio_codec = self._settings.audio_format if audio_only else "mp3"
+            self._notify_audio_only_truncated_if_needed(
+                self._original_panel.has_multiple_audio_selected(), audio_only
+            )
             if audio_only:
                 format_label = f"{format_label} → {self._build_audio_label()}"
             if self._original_panel.has_formats_loaded():
@@ -1059,12 +1094,20 @@ class App(QMainWindow):
             embed_metadata = self._original_panel.get_embed_metadata()
             embed_chapters = self._original_panel.get_embed_chapters()
             orig_settings = self._original_panel.get_raw_settings()
-            video_container = self._settings.video_container
+            video_container = self._adjust_video_container_for_multi_audio(
+                self._settings.video_container,
+                self._original_panel.has_multiple_audio_selected(),
+                remux_only=remux_only,
+                audio_only=audio_only,
+            )
             audio_codec = self._settings.audio_format if audio_only else "mp3"
             mp3_bitrate = (
                 self._settings.mp3_bitrate
                 if audio_only and audio_codec == "mp3"
                 else None
+            )
+            self._notify_audio_only_truncated_if_needed(
+                self._original_panel.has_multiple_audio_selected(), audio_only
             )
             if audio_only:
                 format_label = f"{format_label} → {self._build_audio_label()}"

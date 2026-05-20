@@ -20,7 +20,7 @@
 | ウィジェット | 説明 |
 |------------|------|
 | 映像コンボ | 映像フォーマット選択 |
-| 音声コンボ | 音声フォーマット選択 |
+| 音声リスト | `_AudioListWidget`（`_ToggleListWidget` 派生、`ExtendedSelection`、最低 4 行表示）。multi-select 対応 |
 | 字幕リスト | `QListWidget`（`ExtendedSelection`、最低4行表示） |
 | 字幕フォーマットコンボ | 字幕出力形式 |
 | サムネイル埋め込みチェック | |
@@ -28,7 +28,18 @@
 | チャプター埋め込みチェック | デフォルト ON |
 | 出力形式ラジオグループ | コンテナ結合 / remux のみ / 音声のみ の 3 択 |
 
-複合フォーマット（★印）選択時は音声コンボを `setEnabled(False)` で自動無効化。
+複合フォーマット（★印）選択時は音声リストを `set_included_mode()` で「映像に含まれます」1 行表示に切り替え、`setEnabled(False)` で操作不可にする。
+
+## 内部クラス: `_AudioListWidget`
+
+`_ToggleListWidget` を継承した音声選択用 multi-select リスト。`set_normal_mode()` / `set_included_mode()` の 2 状態を持ち、後者は複合フォーマット映像が選ばれているときに 1 行表示で無効化される。
+
+排他ロジック (`_enforce_exclusivity`):
+
+- 「自動」と他 (skip / 音声 ID) が同時選択されたら「自動」を解除
+- 「ダウンロードしない」と音声 ID が同時選択されたら「ダウンロードしない」を解除
+
+公開ヘルパ: `select_auto()` / `select_skip()` / `select_audio_rows(rows)` / `get_selection() -> (auto, skip, rows)` / `is_included_mode()`
 
 ## フォーマット取得結果の分岐
 
@@ -50,11 +61,12 @@
 | `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
-| `get_raw_settings()` | `dict` | 現在の設定スナップショット |
-| `restore_from_settings(settings: dict)` | — | 設定を復元する |
+| `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]` を含む） |
+| `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる |
 | `has_formats_loaded()` | `bool` | フォーマット取得済みかどうか |
 | `get_fetched_title()` | `str` | 取得済みタイトル |
 | `is_both_skipped()` | `bool` | 映像・音声ともスキップかどうか |
+| `has_multiple_audio_selected()` | `bool` | 音声 ID が 2 件以上選択されているか（MKV 自動昇格の判定用） |
 | `trigger_fetch()` | — | フォーマット取得を開始する |
 | `reset()` | — | フォーマット取得結果と選択状態を初期状態に戻す（キュー追加成功時 / 編集モード終了時に呼び出される） |
 | `retranslate(video_container: str, audio_label: str \| None = None)` | — | 表示文字列を現在の言語・コンテナ設定・音声ラベル（例: `MP3 192kbps`）に更新 |

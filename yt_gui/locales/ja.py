@@ -62,6 +62,8 @@ STRINGS: dict[str, str] = {
     "orig_output_remux": "remux のみ (元のコンテナを維持)",
     "orig_output_audio_only": "音声のみ ({label})",
     "warn_skip_audio_only": "「音声のみ」選択時は音声を「ダウンロードしない」にできません。",
+    "status_multi_audio_mkv_promoted": "ℹ️ 複数音声選択のためコンテナを MKV に切り替えました",
+    "status_multi_audio_audio_only_truncated": "⚠️ 音声のみモードでは先頭の音声トラックのみが使用されます",
     # format options
     "fmt_best_mp4": "最高画質 ({container}に結合)",
     "fmt_720p": "{resolution}p ({container}に結合)",

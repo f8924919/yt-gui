@@ -52,6 +52,15 @@ URL 種別を判別して返す。
 | `playlist_title` | `None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
 | `playlist_index` | `None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
 
+### 複数音声ストリーム対応
+
+`format_spec` に含まれる `+` の個数が **2 個以上**（例: `bestvideo+251+140`、`bv*+251+140` 等）で、かつ音声抽出経路（`is_audio=True`）でない場合は、以下を自動付与する:
+
+- `ydl_opts["allow_multiple_audio_streams"] = True`
+- `video_container = "mkv"` に強制（`merge_output_format` も MKV になり、ファイル拡張子計算も `.mkv` に整合する）
+
+サムネイル埋め込み判定の `_THUMBNAIL_EMBED_CONTAINERS` には既に `mkv` が含まれているため、サムネ埋め込み付きでも問題ない。
+
 ## 内部詳細
 
 ### サムネイル埋め込み対応コンテナ

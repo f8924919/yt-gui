@@ -98,14 +98,7 @@
 
 ### テスト
 
-`tests/` に以下を追加する想定。
-
-- `OriginalFormatPanel.get_format_spec()` の単体テスト
-  - 音声選択 0 / 1 / 2 / 3 件のそれぞれで期待文字列が出ること
-  - 「自動」と特定 ID が同時選択にならない（排他ロジック）こと
-  - 複合フォーマット選択時にリスト全体が無効化されること
-- `_AudioListWidget` の選択挙動テスト（モックなしで実 QListWidget を用いる既存パターンを踏襲）
-- `Downloader` 側は `+` 2 個以上の format_spec を受けたときに `allow_multiple_audio_streams` と `merge_output_format='mkv'` が `ydl_opts` に入ることを確認するテスト（YoutubeDL を組み立て前の opts dict 比較で検証）
+[docs/testing/policy.md](../testing/policy.md) のテスト対象スコープでは `original_format_panel.py` (Qt UI) と `downloader.py` (外部 I/O) はいずれも **対象外** と定められているため、本タスクではこれらに対する単体テストの追加は見送る。代わりに実機での動作確認で振る舞いを担保する。
 
 実機での `--audio-multistreams` 動作確認は **YouTube** を主対象とし、ニコニコ動画・Twitch VOD は **動作確認程度** にとどめる（リサーチの §13 参照）。
 
@@ -120,4 +113,4 @@
 
 ## ステータス
 
-未着手
+完了 (2026-05-20)
