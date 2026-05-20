@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSplitter,
     QStatusBar,
     QToolTip,
     QTreeWidget,
@@ -424,8 +425,18 @@ class App(QMainWindow):
     def _create_widgets(self):
         central = QWidget()
         self.setCentralWidget(central)
-        layout = QGridLayout(central)
-        layout.setContentsMargins(10, 10, 10, 10)
+        central_layout = QVBoxLayout(central)
+        central_layout.setContentsMargins(10, 10, 10, 10)
+        central_layout.setSpacing(0)
+
+        self._splitter = QSplitter(Qt.Orientation.Vertical, central)
+        self._splitter.setChildrenCollapsible(False)
+        self._splitter.setHandleWidth(6)
+
+        # Top container: URL / Format / Original panel / Add button
+        top_widget = QWidget()
+        layout = QGridLayout(top_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         layout.setColumnStretch(1, 1)
 
@@ -446,7 +457,7 @@ class App(QMainWindow):
 
         # Row 2a: Original format detail panel (hidden by default)
         self._original_panel = OriginalFormatPanel(
-            central,
+            top_widget,
             downloader=self.downloader,
             get_url=lambda: self.url_entry.text().strip(),
             get_cookies=self._resolve_cookies,
@@ -482,7 +493,9 @@ class App(QMainWindow):
         add_layout.addStretch()
         layout.addWidget(add_frame, 3, 0, 1, 3)
 
-        # Row 4: Queue (expands)
+        self._splitter.addWidget(top_widget)
+
+        # Bottom: Queue (expands)
         queue_box = QFrame()
         queue_box.setFrameShape(QFrame.Shape.StyledPanel)
         qbl = QVBoxLayout(queue_box)
@@ -531,8 +544,11 @@ class App(QMainWindow):
         qbfl.addStretch()
         qbl.addWidget(queue_btn_frame)
 
-        layout.addWidget(queue_box, 4, 0, 1, 3)
-        layout.setRowStretch(4, 1)
+        self._splitter.addWidget(queue_box)
+        # Top stays at sizeHint, queue stretches to fill extra space
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        central_layout.addWidget(self._splitter)
 
         # Status bar
         status_bar = QStatusBar()
