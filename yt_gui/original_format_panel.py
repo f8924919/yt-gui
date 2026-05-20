@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -15,7 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
-    QWidget,
+    QVBoxLayout,
 )
 
 from .downloader import Downloader
@@ -220,32 +219,34 @@ class OriginalFormatPanel(QGroupBox):
         self._pending_restore: dict | None = None
 
     def _build_widgets(self):
-        layout = QGridLayout(self)
-        layout.setContentsMargins(8, 12, 8, 8)
-        layout.setSpacing(6)
-        layout.setColumnStretch(1, 1)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(8, 12, 8, 8)
+        outer.setSpacing(6)
 
         # Row 0: Video combo + fetch button
+        video_row = QHBoxLayout()
+        video_row.setSpacing(6)
         self._video_label = QLabel(t("label_orig_video"))
-        layout.addWidget(self._video_label, 0, 0, Qt.AlignmentFlag.AlignRight)
+        video_row.addWidget(self._video_label)
         self._video_combo = QComboBox()
         self._video_combo.addItem(t("orig_auto"))
         self._video_combo.setEnabled(False)
         self._video_combo.currentTextChanged.connect(self._on_video_changed)
-        layout.addWidget(self._video_combo, 0, 1, 1, 2)
+        video_row.addWidget(self._video_combo, 1)
 
         self._fetch_button = QPushButton(t("btn_fetch_formats"))
         self._fetch_button.clicked.connect(self._start_fetch_thread)
-        layout.addWidget(self._fetch_button, 0, 3)
+        video_row.addWidget(self._fetch_button)
+        outer.addLayout(video_row)
 
-        # Row 1: Audio multi-select list
+        # Row 1: Audio (left) + Subtitle (right) side-by-side
+        lists_row = QHBoxLayout()
+        lists_row.setSpacing(8)
+
+        audio_col = QVBoxLayout()
+        audio_col.setSpacing(2)
         self._audio_label_widget = QLabel(t("label_orig_audio"))
-        layout.addWidget(
-            self._audio_label_widget,
-            1,
-            0,
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
-        )
+        audio_col.addWidget(self._audio_label_widget)
         self._audio_list = _AudioListWidget()
         self._audio_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
@@ -254,17 +255,13 @@ class OriginalFormatPanel(QGroupBox):
         self._audio_list.set_normal_mode(t("orig_auto"), t("orig_skip"), [])
         self._audio_list.item(0).setSelected(True)
         self._audio_list.setEnabled(False)
-        layout.addWidget(self._audio_list, 1, 1, 1, 2)
+        audio_col.addWidget(self._audio_list)
+        lists_row.addLayout(audio_col, 1)
 
-        # Row 2: Subtitle listbox + format/embed controls
+        subtitle_col = QVBoxLayout()
+        subtitle_col.setSpacing(2)
         self._subtitle_label = QLabel(t("label_orig_subtitle"))
-        layout.addWidget(
-            self._subtitle_label,
-            2,
-            0,
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
-        )
-
+        subtitle_col.addWidget(self._subtitle_label)
         self._subtitle_list = _ToggleListWidget()
         self._subtitle_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
@@ -272,28 +269,29 @@ class OriginalFormatPanel(QGroupBox):
         self._subtitle_list.setEnabled(False)
         self._subtitle_list.setMinimumHeight(96)
         self._subtitle_list.itemSelectionChanged.connect(self._on_subtitle_changed)
-        layout.addWidget(self._subtitle_list, 2, 1, 1, 2)
+        subtitle_col.addWidget(self._subtitle_list)
 
-        sub_right = QWidget()
-        sub_right_layout = QHBoxLayout(sub_right)
-        sub_right_layout.setContentsMargins(0, 0, 0, 0)
-        sub_right_layout.setSpacing(4)
+        sub_ctrl_row = QHBoxLayout()
+        sub_ctrl_row.setContentsMargins(0, 0, 0, 0)
+        sub_ctrl_row.setSpacing(4)
         self._subtitle_fmt_combo = QComboBox()
         self._subtitle_fmt_combo.addItems(_SUBTITLE_FORMATS)
         self._subtitle_fmt_combo.setEnabled(False)
         self._subtitle_fmt_combo.setMaximumWidth(70)
-        sub_right_layout.addWidget(self._subtitle_fmt_combo)
+        sub_ctrl_row.addWidget(self._subtitle_fmt_combo)
         self._embed_check = QCheckBox(t("orig_sub_embed"))
         self._embed_check.setEnabled(False)
-        sub_right_layout.addWidget(self._embed_check)
-        layout.addWidget(sub_right, 2, 3, Qt.AlignmentFlag.AlignTop)
+        sub_ctrl_row.addWidget(self._embed_check)
+        sub_ctrl_row.addStretch()
+        subtitle_col.addLayout(sub_ctrl_row)
+        lists_row.addLayout(subtitle_col, 1)
+        outer.addLayout(lists_row)
 
-        # Row 3: Output format radio buttons
+        # Row 2: Output format radio buttons
+        out_row = QHBoxLayout()
+        out_row.setSpacing(6)
         self._output_label = QLabel(t("label_orig_output"))
-        layout.addWidget(self._output_label, 3, 0, Qt.AlignmentFlag.AlignRight)
-        out_widget = QWidget()
-        out_layout = QHBoxLayout(out_widget)
-        out_layout.setContentsMargins(0, 0, 0, 0)
+        out_row.addWidget(self._output_label)
         self._remux_group = QButtonGroup(self)
         self._radio_mp4 = QRadioButton(t("orig_output_mp4").format(container="MP4"))
         self._radio_remux = QRadioButton(t("orig_output_remux"))
@@ -305,25 +303,25 @@ class OriginalFormatPanel(QGroupBox):
         self._remux_group.addButton(self._radio_remux, 1)
         self._remux_group.addButton(self._radio_audio, 2)
         self._remux_group.buttonToggled.connect(self._on_output_format_changed)
-        out_layout.addWidget(self._radio_mp4)
-        out_layout.addWidget(self._radio_remux)
-        out_layout.addWidget(self._radio_audio)
-        out_layout.addStretch()
-        layout.addWidget(out_widget, 3, 1, 1, 3)
+        out_row.addWidget(self._radio_mp4)
+        out_row.addWidget(self._radio_remux)
+        out_row.addWidget(self._radio_audio)
+        out_row.addStretch()
+        outer.addLayout(out_row)
 
-        # Row 4: Embed thumbnail checkbox
+        # Row 3: Embed checkboxes (thumbnail / metadata / chapters) in one row
+        embed_row = QHBoxLayout()
+        embed_row.setSpacing(12)
         self._embed_thumbnail_check = QCheckBox(t("orig_embed_thumbnail"))
-        layout.addWidget(self._embed_thumbnail_check, 4, 1, 1, 3)
-
-        # Row 5: Embed metadata checkbox
+        embed_row.addWidget(self._embed_thumbnail_check)
         self._embed_metadata_check = QCheckBox(t("orig_embed_metadata"))
         self._embed_metadata_check.setChecked(True)
-        layout.addWidget(self._embed_metadata_check, 5, 1, 1, 3)
-
-        # Row 6: Embed chapters checkbox
+        embed_row.addWidget(self._embed_metadata_check)
         self._embed_chapters_check = QCheckBox(t("orig_embed_chapters"))
         self._embed_chapters_check.setChecked(True)
-        layout.addWidget(self._embed_chapters_check, 6, 1, 1, 3)
+        embed_row.addWidget(self._embed_chapters_check)
+        embed_row.addStretch()
+        outer.addLayout(embed_row)
 
     # ── public interface ─────────────────────────────────────────────────────
 
