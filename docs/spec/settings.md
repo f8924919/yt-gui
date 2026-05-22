@@ -26,6 +26,16 @@
 | `mp3_bitrate` | str | `"192"` | 画質・音質タブ — MP3 ビットレート |
 | `output_template_video` | str | `"%(title)s.%(ext)s"` | ファイル名タブ — 単独動画用 OUTPUT TEMPLATE |
 | `output_template_playlist` | str | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | ファイル名タブ — プレイリスト用 OUTPUT TEMPLATE |
+| `proxy_enabled` | bool | `False` | プロキシタブ — プロキシ有効化チェック |
+| `proxy_scheme` | str | `"http"` | プロキシタブ — プロトコル (`http` / `https` / `socks4` / `socks5` / `socks5h`) |
+| `proxy_host` | str | `""` | プロキシタブ — ホスト |
+| `proxy_port` | str | `""` | プロキシタブ — ポート（空欄時はプロトコル既定ポート） |
+| `proxy_username` | str | `""` | プロキシタブ — ユーザー名（任意） |
+| `proxy_password` | str | `""` | プロキシタブ — パスワード（任意、平文保存） |
+
+### プロキシ URL の組み立て
+
+`build_proxy_url(settings)` (`yt_gui/settings.py`) が `proxy_*` フィールドを `scheme://[user[:password]@]host[:port]` 形式の URL に組み立てて返す。`proxy_enabled=False` または `proxy_host` が空のときは空文字を返し、yt-dlp に `proxy` オプションを渡さない動作になる。ユーザー名・パスワードは `urllib.parse.quote(..., safe="")` でエンコードされる。
 
 ### Cookies の優先順位
 
@@ -75,6 +85,7 @@
 | 動画コンテナ | 次のキュー追加から反映（既存アイテムには影響しない） |
 | 音声形式・ビットレート | 次のキュー追加から反映（既存アイテムには影響しない） |
 | OUTPUT TEMPLATE | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
+| プロキシ | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 言語 | 即座に反映（再起動不要） |
 
 既存のキューアイテムは追加時のスナップショット（`audio_codec`・`video_container`・`embed_metadata`・`embed_chapters`）でダウンロードされます。

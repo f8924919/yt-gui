@@ -2,6 +2,9 @@ import json
 import os
 import sys
 from dataclasses import asdict, dataclass
+from urllib.parse import quote
+
+PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h")
 
 
 @dataclass
@@ -18,6 +21,34 @@ class Settings:
     output_template_playlist: str = (
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
+    proxy_enabled: bool = False
+    proxy_scheme: str = "http"
+    proxy_host: str = ""
+    proxy_port: str = ""
+    proxy_username: str = ""
+    proxy_password: str = ""
+
+
+def build_proxy_url(settings: Settings) -> str:
+    """yt-dlp の `proxy` オプションに渡せる URL を組み立てて返す。
+    `proxy_enabled` が False または `proxy_host` が空のときは空文字を返す。"""
+    if not settings.proxy_enabled:
+        return ""
+    host = settings.proxy_host.strip()
+    if not host:
+        return ""
+    scheme = settings.proxy_scheme.strip() or "http"
+    auth = ""
+    if settings.proxy_username:
+        user = quote(settings.proxy_username, safe="")
+        if settings.proxy_password:
+            pw = quote(settings.proxy_password, safe="")
+            auth = f"{user}:{pw}@"
+        else:
+            auth = f"{user}@"
+    port = settings.proxy_port.strip()
+    port_part = f":{port}" if port else ""
+    return f"{scheme}://{auth}{host}{port_part}"
 
 
 def _get_config_dir() -> str:

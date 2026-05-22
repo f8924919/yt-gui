@@ -1,9 +1,10 @@
 import sys
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -31,7 +32,7 @@ from .output_template import (
     render_preview,
     validate_template,
 )
-from .settings import SettingsManager
+from .settings import PROXY_SCHEMES, SettingsManager
 
 _BROWSERS = [
     ("Brave", "brave"),
@@ -81,7 +82,13 @@ class SettingsDialog(QDialog):
 
         template_widget = QWidget()
         self._build_output_template_tab(template_widget)
-        self._tabs.addTab(template_widget, t("tab_output_template"))
+        self._template_tab_index = self._tabs.addTab(
+            template_widget, t("tab_output_template")
+        )
+
+        proxy_widget = QWidget()
+        self._build_proxy_tab(proxy_widget)
+        self._proxy_tab_index = self._tabs.addTab(proxy_widget, t("tab_proxy"))
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -327,6 +334,73 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
 
+    def _build_proxy_tab(self, parent: QWidget):
+        layout = QGridLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        layout.setColumnStretch(1, 1)
+
+        self._proxy_check = QCheckBox(t("label_proxy_enabled"))
+        self._proxy_check.setChecked(self._settings.proxy_enabled)
+        layout.addWidget(self._proxy_check, 0, 0, 1, 2)
+
+        layout.addWidget(
+            QLabel(t("label_proxy_scheme")), 1, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._proxy_scheme_combo = QComboBox()
+        self._proxy_scheme_combo.addItems(list(PROXY_SCHEMES))
+        if self._settings.proxy_scheme in PROXY_SCHEMES:
+            self._proxy_scheme_combo.setCurrentText(self._settings.proxy_scheme)
+        layout.addWidget(self._proxy_scheme_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
+
+        layout.addWidget(
+            QLabel(t("label_proxy_host")), 2, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._proxy_host_edit = QLineEdit(self._settings.proxy_host)
+        self._proxy_host_edit.setPlaceholderText("example.com")
+        layout.addWidget(self._proxy_host_edit, 2, 1)
+
+        layout.addWidget(
+            QLabel(t("label_proxy_port")), 3, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._proxy_port_edit = QLineEdit(self._settings.proxy_port)
+        self._proxy_port_edit.setPlaceholderText("8080")
+        self._proxy_port_edit.setValidator(QIntValidator(1, 65535, self))
+        layout.addWidget(self._proxy_port_edit, 3, 1, Qt.AlignmentFlag.AlignLeft)
+
+        layout.addWidget(
+            QLabel(t("label_proxy_username")), 4, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._proxy_username_edit = QLineEdit(self._settings.proxy_username)
+        layout.addWidget(self._proxy_username_edit, 4, 1)
+
+        layout.addWidget(
+            QLabel(t("label_proxy_password")), 5, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._proxy_password_edit = QLineEdit(self._settings.proxy_password)
+        self._proxy_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self._proxy_password_edit, 5, 1)
+
+        help_label = QLabel(t("proxy_help"))
+        help_label.setStyleSheet("color: gray;")
+        help_label.setWordWrap(True)
+        layout.addWidget(help_label, 6, 0, 1, 2)
+        layout.setRowStretch(7, 1)
+
+        self._proxy_inputs = (
+            self._proxy_scheme_combo,
+            self._proxy_host_edit,
+            self._proxy_port_edit,
+            self._proxy_username_edit,
+            self._proxy_password_edit,
+        )
+        self._proxy_check.toggled.connect(self._on_proxy_toggled)
+        self._on_proxy_toggled(self._proxy_check.isChecked())
+
+    def _on_proxy_toggled(self, enabled: bool):
+        for widget in self._proxy_inputs:
+            widget.setEnabled(enabled)
+
     def _build_insert_menu(self, target_edit: QLineEdit) -> QMenu:
         menu = QMenu(self)
         for placeholder, key in TEMPLATE_FIELDS:
@@ -374,8 +448,25 @@ class SettingsDialog(QDialog):
             err_key = validate_template(tmpl)
             if err_key is not None:
                 QMessageBox.warning(self, t("warn_title"), t(err_key))
-                self._tabs.setCurrentIndex(self._tabs.count() - 1)
+                self._tabs.setCurrentIndex(self._template_tab_index)
                 return
+
+        if self._proxy_check.isChecked():
+            host = self._proxy_host_edit.text().strip()
+            if not host:
+                QMessageBox.warning(self, t("warn_title"), t("warn_proxy_no_host"))
+                self._tabs.setCurrentIndex(self._proxy_tab_index)
+                return
+            port_text = self._proxy_port_edit.text().strip()
+            if port_text:
+                try:
+                    n = int(port_text)
+                    if not (1 <= n <= 65535):
+                        raise ValueError
+                except ValueError:
+                    QMessageBox.warning(self, t("warn_title"), t("warn_proxy_bad_port"))
+                    self._tabs.setCurrentIndex(self._proxy_tab_index)
+                    return
 
         lang_idx = self._lang_display.index(self._lang_combo.currentText())
         new_lang = AVAILABLE_LANGUAGES[lang_idx]
@@ -415,6 +506,13 @@ class SettingsDialog(QDialog):
         else:
             self._settings.cookies_path = ""
             self._settings.cookies_browser = ""
+
+        self._settings.proxy_enabled = self._proxy_check.isChecked()
+        self._settings.proxy_scheme = self._proxy_scheme_combo.currentText()
+        self._settings.proxy_host = self._proxy_host_edit.text().strip()
+        self._settings.proxy_port = self._proxy_port_edit.text().strip()
+        self._settings.proxy_username = self._proxy_username_edit.text()
+        self._settings.proxy_password = self._proxy_password_edit.text()
 
         self._manager.save(self._settings)
 

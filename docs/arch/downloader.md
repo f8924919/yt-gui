@@ -15,6 +15,7 @@ yt-dlp のラッパー。バックグラウンドスレッドから呼び出さ�
 | `mp3_bitrate` | `str` | MP3 ビットレート（例: `"192"`） |
 | `output_template_video` | `str` | 単独動画用 outtmpl（既定: `"%(title)s.%(ext)s"`） |
 | `output_template_playlist` | `str` | プレイリスト用 outtmpl（既定: `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"`） |
+| `proxy_url` | `str` | yt-dlp に渡すプロキシ URL（既定: `""` = 未使用）。`scheme://[user[:password]@]host[:port]` 形式 |
 | `status_callback` | `Callable` | ダウンロード進捗を受け取るコールバック |
 | `log_callback` | `Callable` | ログ文字列を受け取るコールバック |
 
@@ -99,6 +100,12 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 ### Cookies
 
 `cookies_path`（ファイルパス）と `cookies_browser`（ブラウザ名）の両方に対応。両方指定時はブラウザ優先。
+
+### プロキシ
+
+`self.proxy_url` が空でない場合、`_base_ydl_opts()` で `opts["proxy"] = self.proxy_url` を付与する。`fetch_title_or_entries` / `fetch_formats` / `download_video`（メタデータ抽出・実ダウンロード）の全 `YoutubeDL` 呼び出しが `_base_ydl_opts()` を経由するため、1 箇所の代入で全経路に反映される。
+
+設定変更は `App._open_settings()` から `self.downloader.proxy_url = build_proxy_url(...)` で即時反映され、次のジョブから新しいプロキシが使われる。
 
 ### ロガー: `_YtdlpLogger`
 

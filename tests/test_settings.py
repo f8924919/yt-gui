@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from yt_gui.settings import Settings, SettingsManager
+from yt_gui.settings import Settings, SettingsManager, build_proxy_url
 
 
 def test_settings_defaults_match_spec() -> None:
@@ -25,6 +25,12 @@ def test_settings_defaults_match_spec() -> None:
     assert s.output_template_playlist == (
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
+    assert s.proxy_enabled is False
+    assert s.proxy_scheme == "http"
+    assert s.proxy_host == ""
+    assert s.proxy_port == ""
+    assert s.proxy_username == ""
+    assert s.proxy_password == ""
 
 
 @pytest.fixture
@@ -69,3 +75,100 @@ def test_load_ignores_unknown_fields(manager: SettingsManager, tmp_path: Path) -
     loaded = manager.load()
     assert loaded.language == "en"
     assert not hasattr(loaded, "obsolete_field")
+
+
+def test_proxy_fields_roundtrip(manager: SettingsManager) -> None:
+    original = Settings(
+        proxy_enabled=True,
+        proxy_scheme="socks5h",
+        proxy_host="proxy.example.com",
+        proxy_port="1080",
+        proxy_username="alice",
+        proxy_password="s3cret",
+    )
+    manager.save(original)
+    assert manager.load() == original
+
+
+def test_proxy_fields_migrate_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    """proxy_* 無しの古い settings.json でもデフォルト値で読み込めること。"""
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    loaded = manager.load()
+    assert loaded.language == "en"
+    assert loaded.proxy_enabled is False
+    assert loaded.proxy_host == ""
+
+
+def test_build_proxy_url_disabled_returns_empty() -> None:
+    assert (
+        build_proxy_url(Settings(proxy_enabled=False, proxy_host="proxy.example.com"))
+        == ""
+    )
+
+
+def test_build_proxy_url_no_host_returns_empty() -> None:
+    assert build_proxy_url(Settings(proxy_enabled=True, proxy_host="")) == ""
+
+
+def test_build_proxy_url_blank_host_returns_empty() -> None:
+    assert build_proxy_url(Settings(proxy_enabled=True, proxy_host="   ")) == ""
+
+
+def test_build_proxy_url_basic_http() -> None:
+    s = Settings(
+        proxy_enabled=True,
+        proxy_scheme="http",
+        proxy_host="proxy.example.com",
+        proxy_port="8080",
+    )
+    assert build_proxy_url(s) == "http://proxy.example.com:8080"
+
+
+def test_build_proxy_url_socks5h_without_port() -> None:
+    s = Settings(
+        proxy_enabled=True,
+        proxy_scheme="socks5h",
+        proxy_host="proxy.example.com",
+    )
+    assert build_proxy_url(s) == "socks5h://proxy.example.com"
+
+
+def test_build_proxy_url_with_auth() -> None:
+    s = Settings(
+        proxy_enabled=True,
+        proxy_scheme="socks5",
+        proxy_host="proxy.example.com",
+        proxy_port="1080",
+        proxy_username="alice",
+        proxy_password="bob",
+    )
+    assert build_proxy_url(s) == "socks5://alice:bob@proxy.example.com:1080"
+
+
+def test_build_proxy_url_with_username_only() -> None:
+    s = Settings(
+        proxy_enabled=True,
+        proxy_scheme="http",
+        proxy_host="proxy.example.com",
+        proxy_port="8080",
+        proxy_username="alice",
+    )
+    assert build_proxy_url(s) == "http://alice@proxy.example.com:8080"
+
+
+def test_build_proxy_url_encodes_special_chars() -> None:
+    s = Settings(
+        proxy_enabled=True,
+        proxy_scheme="http",
+        proxy_host="proxy.example.com",
+        proxy_port="8080",
+        proxy_username="user@corp",
+        proxy_password="p@ss:word",
+    )
+    assert (
+        build_proxy_url(s) == "http://user%40corp:p%40ss%3Aword@proxy.example.com:8080"
+    )

@@ -16,7 +16,7 @@
 | ファイル | 内容 |
 |---|---|
 | [メインウィンドウ](screens/main-window.md) | URL入力・形式選択・キュー表示・ステータスバー・メニューバー |
-| [設定ダイアログ](screens/settings-dialog.md) | 一般タブ（保存先・Cookies・言語）・画質音質タブ |
+| [設定ダイアログ](screens/settings-dialog.md) | 一般タブ・画質音質タブ・ファイル名タブ・プロキシタブ |
 | [オリジナル形式パネル](screens/original-format-panel.md) | 映像/音声/字幕トラック選択・出力形式・メタデータ設定 |
 | [ログダイアログ](screens/log-dialog.md) | 動作ログ表示・クリア |
 

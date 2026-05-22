@@ -31,6 +31,17 @@ STRINGS: dict[str, str] = {
     "filetype_text": "Text files",
     "filetype_all": "All files",
     "restart_required": "Language change will take effect after restart.",
+    # proxy settings tab
+    "tab_proxy": "Proxy",
+    "label_proxy_enabled": "Enable proxy",
+    "label_proxy_scheme": "Protocol:",
+    "label_proxy_host": "Host:",
+    "label_proxy_port": "Port:",
+    "label_proxy_username": "Username:",
+    "label_proxy_password": "Password:",
+    "proxy_help": "Specify a proxy used for yt-dlp traffic.\nExample: http://user:pass@host:port or socks5h://host:port\nThe password is stored in plain text in the settings file.",
+    "warn_proxy_no_host": "Please enter the proxy host.",
+    "warn_proxy_bad_port": "The proxy port must be an integer between 1 and 65535.",
     # original format detail panel
     "label_original_detail": "Original format details",
     "label_orig_video": "Video:",

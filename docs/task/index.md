@@ -18,3 +18,4 @@
 | [linux-appimage-build.md](linux-appimage-build.md) | 完了 | Linux 向け PyInstaller ビルド時の AppImage 自動生成 | 2026-05-17 |
 | [original-audio-only.md](original-audio-only.md) | 完了 | オリジナル形式パネルの出力形式に「音声のみ」選択肢を追加 | 2026-05-17 |
 | [multi-audio-download.md](multi-audio-download.md) | 完了 | オリジナル形式パネルの音声を multi-select 化し、複数音声トラックを MKV にマージできるようにする（フェーズ 1） | 2026-05-20 |
+| [proxy-settings.md](proxy-settings.md) | 完了 | 設定ダイアログにプロキシタブを追加し、yt-dlp の `proxy` オプションを GUI から設定可能にする | 2026-05-22 |

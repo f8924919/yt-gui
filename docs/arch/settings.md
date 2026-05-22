@@ -18,6 +18,24 @@
 | `video_container` | `str` | `"mp4"` | 映像コンテナ（`"mp4"` / `"mkv"` / `"webm"`） |
 | `output_template_video` | `str` | `"%(title)s.%(ext)s"` | 単独動画の OUTPUT TEMPLATE |
 | `output_template_playlist` | `str` | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | プレイリストの OUTPUT TEMPLATE |
+| `proxy_enabled` | `bool` | `False` | プロキシの有効化トグル |
+| `proxy_scheme` | `str` | `"http"` | プロキシのプロトコル (`PROXY_SCHEMES` のいずれか) |
+| `proxy_host` | `str` | `""` | プロキシのホスト名または IP |
+| `proxy_port` | `str` | `""` | プロキシのポート（空欄時はプロトコル既定ポート） |
+| `proxy_username` | `str` | `""` | プロキシ認証のユーザー名（任意） |
+| `proxy_password` | `str` | `""` | プロキシ認証のパスワード（任意、平文保存） |
+
+## 定数: `PROXY_SCHEMES`
+
+`("http", "https", "socks4", "socks5", "socks5h")`。設定ダイアログのプロトコル選択肢として使用。
+
+## 関数: `build_proxy_url(settings: Settings) -> str`
+
+`Settings` の `proxy_*` フィールドから yt-dlp の `proxy` オプションに渡せる URL を組み立てる純粋関数。
+
+- `proxy_enabled=False` または `proxy_host` が空のときは `""` を返す（呼び出し側で `proxy` オプションを付けない）
+- ユーザー名・パスワードは `urllib.parse.quote(..., safe="")` でパーセントエンコード
+- 戻り値は `scheme://[user[:password]@]host[:port]`
 
 ## クラス: `SettingsManager`
 

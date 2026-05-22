@@ -40,7 +40,7 @@ from .formats import FORMAT_KEYS, build_720p_spec
 from .i18n import t
 from .log_dialog import LogDialog
 from .original_format_panel import OriginalFormatPanel
-from .settings import SettingsManager
+from .settings import SettingsManager, build_proxy_url
 from .settings_dialog import SettingsDialog
 from .utils import strip_ansi
 
@@ -244,6 +244,7 @@ class App(QMainWindow):
             log_callback=self._on_downloader_log,
             output_template_video=self._settings.output_template_video,
             output_template_playlist=self._settings.output_template_playlist,
+            proxy_url=build_proxy_url(self._settings),
         )
 
         self._create_menu()
@@ -1363,6 +1364,7 @@ class App(QMainWindow):
         self.downloader.output_template_playlist = (
             self._settings.output_template_playlist
         )
+        self.downloader.proxy_url = build_proxy_url(self._settings)
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

@@ -31,6 +31,17 @@ STRINGS: dict[str, str] = {
     "filetype_text": "テキストファイル",
     "filetype_all": "すべてのファイル",
     "restart_required": "言語の変更は再起動後に反映されます。",
+    # proxy settings tab
+    "tab_proxy": "プロキシ",
+    "label_proxy_enabled": "プロキシを有効にする",
+    "label_proxy_scheme": "プロトコル:",
+    "label_proxy_host": "ホスト:",
+    "label_proxy_port": "ポート:",
+    "label_proxy_username": "ユーザー名:",
+    "label_proxy_password": "パスワード:",
+    "proxy_help": "yt-dlp の通信に使うプロキシを指定します。\n例: http://user:pass@host:port、socks5h://host:port\nパスワードは設定ファイルに平文で保存されます。",
+    "warn_proxy_no_host": "プロキシのホストを入力してください。",
+    "warn_proxy_bad_port": "プロキシのポートは 1〜65535 の整数で入力してください。",
     # original format detail panel
     "label_original_detail": "オリジナル形式の詳細設定",
     "label_orig_video": "映像:",

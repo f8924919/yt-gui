@@ -72,6 +72,7 @@ class Downloader:
         log_callback=None,
         output_template_video: str = DEFAULT_VIDEO_TEMPLATE,
         output_template_playlist: str = DEFAULT_PLAYLIST_TEMPLATE,
+        proxy_url: str = "",
     ):
         self.output_dir = output_dir
         self.status_callback = status_callback
@@ -80,6 +81,7 @@ class Downloader:
         self.mp3_bitrate = mp3_bitrate
         self.output_template_video = output_template_video
         self.output_template_playlist = output_template_playlist
+        self.proxy_url = proxy_url
 
         _ext = ".exe" if sys.platform == "win32" else ""
         base = get_resource_base()
@@ -143,6 +145,8 @@ class Downloader:
             "remote_components": ["ejs:github"],
             **self._cookies_opts(cookies_path, cookies_browser),
         }
+        if self.proxy_url:
+            opts["proxy"] = self.proxy_url
         if self.log_callback:
             opts["logger"] = _YtdlpLogger(self.log_callback)
         return opts
