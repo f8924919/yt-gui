@@ -7,6 +7,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **入出力は日本語**: ユーザーへの応答・ドキュメント・コミットメッセージ・PR の説明はすべて日本語で記述する。
 - **思考は英語**: 推論・計画・内部の思考プロセスは英語で行う。
 
+## 調査ルール: docs 先・コード裏取り
+
+新しいタスクの設計・実装に着手する前に、必ず以下の順序でドキュメントを先に確認する。コードの探索（grep / Explore エージェント / ファイル読み込み）は **docs に書かれている内容の裏取り** として使うこと。
+
+1. このファイル（CLAUDE.md）
+2. [docs/task/index.md](docs/task/index.md) — 既存タスクの状況
+3. 該当機能の [docs/spec/index.md](docs/spec/index.md) 配下のファイル — 動作仕様・画面仕様
+4. 該当モジュールの [docs/arch/index.md](docs/arch/index.md) 配下のファイル — 実装の意図・接続ポイント
+5. 上記で当たりを付けた箇所をコードで確認
+
+このリポジトリは spec ↔ arch ↔ コードのマッピングが整備されており、コード変更時は docs も同時更新する運用なので、docs の鮮度は高い前提で読んでよい。docs が薄いトピック、または docs と実装が乖離している箇所を見つけた場合は、コード優先に切り替えたうえで docs の更新も提案すること。
+
 ## タスク管理ルール
 
 進行中・未完了のタスクは [docs/task/index.md](docs/task/index.md) で管理する。
