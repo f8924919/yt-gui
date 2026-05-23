@@ -1,0 +1,34 @@
+# リポジトリ内のテキストファイルは LF で保存する（チェックアウト時も LF を維持）
+* text=auto eol=lf
+
+# 明示的にテキスト扱いするファイル
+*.py    text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.lock  text eol=lf
+*.spec  text eol=lf
+*.cfg   text eol=lf
+*.ini   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.sh    text eol=lf
+
+# Windows 用スクリプトのみ CRLF を維持
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# バイナリファイル
+*.png   binary
+*.ico   binary
+*.icns  binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.zip   binary
+*.gz    binary
