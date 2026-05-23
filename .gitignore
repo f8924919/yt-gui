@@ -19,3 +19,6 @@ htmlcov/
 
 # Personal cookies (must not be committed)
 cookies.txt
+
+# Claude Code 個人ローカル設定
+.claude/settings.local.json
