@@ -52,7 +52,7 @@ URL 種別を判別して返す。
 | `remux_only` | `False` | リマックスのみ（再エンコードなし） |
 | `playlist_title` | `None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
 | `playlist_index` | `None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
-| `nico_comments_opts` | `None` | ニコニコ動画コメント → ASS 変換オプション（`convert_to_ass` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`convert_to_ass=True` かつ字幕に `comments` lang が含まれる場合、ダウンロード完了後に danmaku2ass を subprocess 呼び出しして `{stem}.comments.ass` を生成する |
+| `nico_comments_opts` | `None` | ニコニコ動画コメント → ASS 変換 / MKV 統合オプション（`convert_to_ass` / `embed_to_mkv` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`convert_to_ass=True` かつ字幕に `comments` lang が含まれる場合、ダウンロード完了後に danmaku2ass を subprocess 呼び出しして `{stem}.comments.ass` を生成する。さらに `embed_to_mkv=True` のときは ffmpeg で `{stem}.with-comments.mkv` を別ファイルとして生成する |
 
 ### 複数音声ストリーム対応
 
@@ -98,6 +98,16 @@ WebM は非対応のため自動スキップ。
 - subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f NiconicoYtdlpJson2 -dm {sec} -fs {size} -a {opacity} {json}` を実行
 - `-f NiconicoYtdlpJson2` は yt-dlp の `v1/threads` JSON 用パーサ（フェーズ 0 で検証済み）
 - 失敗（バイナリ欠如・JSON 不在・サブプロセス非 0 終了）はいずれも `log_callback` に警告を流すのみで例外を投げない
+
+### コメント ASS と動画の MKV 統合
+
+`nico_comments_opts.embed_to_mkv=True` かつ ASS 変換が成功した場合、`_embed_nico_comments_into_mkv(stem, final_ext, opts)` を呼び出す。実装上の要点:
+
+- ffmpeg を subprocess で実行: `-i {video} -i {ass} -map 0 -map 1 -c copy -c:s ass -metadata:s:s:0 title=ニコニコ動画コメント -metadata:s:s:0 language=jpn {out}`
+- 再エンコードなし (stream copy) のため処理は高速
+- 元動画は触らず、別ファイル `{stem}.with-comments.mkv` を生成（同名衝突時は `(n)` サフィックス）
+- 「音声のみ」モード (`is_audio=True`) では本処理をスキップ（動画統合の対象外）
+- 失敗（ffmpeg 欠如・入力ファイル欠如・サブプロセス非 0 終了）はいずれも非致命でログのみ
 
 ### バイナリパス解決
 

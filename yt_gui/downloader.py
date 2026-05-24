@@ -316,11 +316,21 @@ class Downloader:
             label = f"{lang} – {name} {t('orig_sub_auto_marker')} [{exts}]"
             subtitle_list.append((label, lang, True))
 
+        # 映像 ID → (width, height) (フェーズ 3: コメント ASS 解像度の自動追従用)
+        video_resolutions: dict[str, tuple[int, int]] = {}
+        for f in raw:
+            fid = f.get("format_id")
+            w = f.get("width")
+            h = f.get("height")
+            if fid and isinstance(w, int) and isinstance(h, int) and w > 0 and h > 0:
+                video_resolutions[fid] = (w, h)
+
         return {
             "title": info.get("title", ""),
             "video": video_formats,
             "audio": audio_formats,
             "subtitles": subtitle_list,
+            "video_resolutions": video_resolutions,
         }
 
     def download_video(
@@ -509,6 +519,12 @@ class Downloader:
         ):
             self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
 
+            # フェーズ 3: コメント ASS を動画と合わせた MKV を別ファイルで生成
+            if nico_comments_opts.get("embed_to_mkv") and not is_audio:
+                self._embed_nico_comments_into_mkv(
+                    effective_stem, final_ext, nico_comments_opts
+                )
+
     def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
         """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
 
@@ -557,3 +573,71 @@ class Downloader:
             # _danmaku2ass_path が exists() を通ったあとに消えた等のレース
             if self.log_callback:
                 self.log_callback(t("warn_danmaku2ass_missing"))
+
+    def _embed_nico_comments_into_mkv(
+        self, stem: str, final_ext: str, opts: dict
+    ) -> None:
+        """動画 + コメント ASS をソフトサブで結合した MKV を別ファイルとして生成する。
+
+        元動画は触らず、`{stem}.with-comments.mkv` を新規作成する。
+        ffmpeg は再エンコードなしの stream copy (`-c copy -c:s ass`)。
+        失敗・前提ファイル不在はいずれも非致命としてログのみ。
+        """
+        video_path = f"{stem}{final_ext}"
+        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+
+        if not os.path.exists(video_path):
+            if self.log_callback:
+                base = os.path.basename(video_path)
+                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+            return
+        if not os.path.exists(ass_path):
+            if self.log_callback:
+                base = os.path.basename(ass_path)
+                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+            return
+        if not os.path.exists(self._ffmpeg_path):
+            if self.log_callback:
+                self.log_callback("⚠️ ffmpeg が見つからないため MKV 統合をスキップ")
+            return
+
+        out_path = f"{stem}.with-comments.mkv"
+        if os.path.exists(out_path):
+            n = 1
+            while os.path.exists(f"{stem}.with-comments ({n}).mkv"):
+                n += 1
+            out_path = f"{stem}.with-comments ({n}).mkv"
+
+        cmd = [
+            self._ffmpeg_path,
+            "-y",
+            "-i",
+            video_path,
+            "-i",
+            ass_path,
+            "-map",
+            "0",
+            "-map",
+            "1",
+            "-c",
+            "copy",
+            "-c:s",
+            "ass",
+            "-metadata:s:s:0",
+            "title=ニコニコ動画コメント",
+            "-metadata:s:s:0",
+            "language=jpn",
+            out_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.log_callback:
+                self.log_callback(
+                    t("status_nico_mkv_created").format(
+                        filename=os.path.basename(out_path)
+                    )
+                )
+        except subprocess.CalledProcessError as e:
+            if self.log_callback:
+                err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
+                self.log_callback(t("warn_nico_mkv_failed").format(error=err))

@@ -38,6 +38,7 @@ yt-gui は PySide6 製のデスクトップ動画ダウンローダーです。�
 - **多言語対応**: 日本語 / English を切り替え可能。言語変更は即座に反映（再起動不要）
 - **ログ表示**: セッション中の動作ログをダイアログで確認可能
 - **依存ツールチェック**: 起動時に ffmpeg・ffprobe・deno の存在を確認
+- **ニコニコ動画コメント統合**: ニコニコ動画 URL で `comments` 字幕を選択するとコメント JSON が保存され、オプションで ASS 字幕への変換・MKV ソフトサブ統合まで対応（[ダウンロード動作](features/download-behavior.md) / [オリジナル形式パネル](screens/original-format-panel.md) 参照）
 
 ---
 
