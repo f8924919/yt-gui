@@ -468,6 +468,9 @@ class App(QMainWindow):
         self._original_panel.retranslate(
             self._settings.video_container, self._build_audio_label()
         )
+        # パネル内のレイアウト変化 (ニコニコ動画コメントグループの出現等) で
+        # 上位 QSplitter の上段サイズを再計算する
+        self._original_panel.on_size_hint_changed(self._resync_splitter_to_top_hint)
         layout.addWidget(self._original_panel, 2, 0, 1, 3)
 
         # Row 2b: MP3 thumbnail option (hidden by default)
@@ -564,6 +567,27 @@ class App(QMainWindow):
         status_bar.addPermanentWidget(self.progress_bar)
 
     # ── format / panel visibility ─────────────────────────────────────────────
+
+    def _resync_splitter_to_top_hint(self):
+        """上段 (URL / 形式 / オリジナルパネル) の sizeHint が変わったときに
+        QSplitter のサイズ配分を再計算する。下段（キュー）は上段で確定した
+        残りを受け取り、画面全体の高さが足りなければ全体ウィンドウを伸ばす。"""
+        top = self._splitter.widget(0)
+        bottom = self._splitter.widget(1)
+        if top is None or bottom is None:
+            return
+        top_hint = top.sizeHint().height()
+        cur_top, cur_bottom = self._splitter.sizes()
+        total = cur_top + cur_bottom
+        # 下段の最小確保 (200px 程度) は維持しつつ、上段に必要な高さを与える
+        bottom_min = max(bottom.minimumSizeHint().height(), 200)
+        if top_hint + bottom_min > total:
+            # 画面全体を伸ばして両方を確保
+            extra = top_hint + bottom_min - total
+            self.resize(self.width(), self.height() + extra)
+            self._splitter.setSizes([top_hint, bottom_min])
+        else:
+            self._splitter.setSizes([top_hint, total - top_hint])
 
     def _on_format_changed(self, index: int):
         if index < 0 or index >= len(FORMAT_KEYS):

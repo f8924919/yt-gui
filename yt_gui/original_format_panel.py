@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
 )
@@ -196,6 +197,7 @@ class _PanelSignals(QObject):
     formats_fetched = Signal(dict)
     fetch_failed = Signal(str, bool)  # (error_msg, is_playlist)
     fetch_finished = Signal()  # always emitted at end (re-enable button)
+    size_hint_changed = Signal()  # 内部レイアウトの sizeHint が変わったとき
 
 
 class OriginalFormatPanel(QGroupBox):
@@ -336,8 +338,12 @@ class OriginalFormatPanel(QGroupBox):
         # ニコニコ動画コメント (ASS 変換) グループ
         # `comments` lang が字幕リストに含まれるときだけ可視化する。
         # コンパクト 2 行構成: チェック行 + パラメータ 1 行（縦圧迫を最小化）
+        # 内部の SpinBox が潰れないよう vertical SizePolicy を Fixed にする
         self._nico_group = QGroupBox(t("nico_group_title"))
         self._nico_group.setVisible(False)
+        self._nico_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
         nico_layout = QVBoxLayout()
         nico_layout.setContentsMargins(8, 4, 8, 4)
         nico_layout.setSpacing(4)
@@ -537,6 +543,11 @@ class OriginalFormatPanel(QGroupBox):
 
     def get_embed_chapters(self) -> bool:
         return bool(self._embed_chapters_check.isChecked())
+
+    def on_size_hint_changed(self, callback: Callable[[], None]) -> None:
+        """パネル内部のレイアウトが変わって sizeHint が変化したときに呼ばれる
+        コールバックを登録する（例: 上位の QSplitter のサイズ再計算用）。"""
+        self._signals.size_hint_changed.connect(callback)
 
     def get_nico_comments_opts(self) -> dict:
         """ニコニコ動画コメント → ASS 変換オプションを返す。"""
@@ -980,6 +991,7 @@ class OriginalFormatPanel(QGroupBox):
         # 可視化前後でパネルの sizeHint が変わるので親 (スプリッタ) に通知する
         self._nico_group.setVisible(self._has_nico_comments_lang())
         self.updateGeometry()
+        self._signals.size_hint_changed.emit()
 
         if not self._video_formats and not self._audio_formats:
             self._pending_restore = None
