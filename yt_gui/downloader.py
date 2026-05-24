@@ -560,7 +560,14 @@ class Downloader:
             json_path,
         ]
         try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
             if self.log_callback:
                 self.log_callback(
                     f"[danmaku2ass] {os.path.basename(ass_path)} を生成しました"
@@ -630,7 +637,14 @@ class Downloader:
             out_path,
         ]
         try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
             if self.log_callback:
                 self.log_callback(
                     t("status_nico_mkv_created").format(
