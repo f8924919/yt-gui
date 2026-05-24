@@ -204,6 +204,15 @@ class Downloader:
         ydl_opts = {
             "quiet": True,
             "noplaylist": True,
+            # 一部の抽出器 (例: NiconicoIE) は `InfoExtractor.extract_subtitles` を
+            # 経由して字幕を info dict に詰める。このメソッドは `writesubtitles` /
+            # `listsubtitles` のいずれかが立っていないと `_get_subtitles` を呼ばず
+            # `{}` を返すため、フラグを立てない限りニコニコ動画の `comments` lang
+            # などが UI 上の字幕リストに出てこない。YouTube extractor は
+            # `info['subtitles']` を直接代入するため影響を受けないが、ゲート経由の
+            # 抽出器のために本フラグを必ず立てる。`download=False` ではファイル
+            # 書き出しは発生しないので安全。
+            "writesubtitles": True,
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:

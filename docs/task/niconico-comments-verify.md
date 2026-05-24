@@ -140,19 +140,16 @@ python3 danmaku2ass.py -o out.ass -s 1920x1080 \
 
 `niconico-comments-phase2.md` の subprocess 呼び出し例に `-f Niconico` を指定していたが、これは XML 旧形式リーダーへのマッピングで誤り。`-f NiconicoYtdlpJson2` に修正済み。
 
-### 実機での最終確認（推奨）
+### 実機での最終確認（実施済み・2026-05-24 追記）
 
-サンドボックス外（ニコニコ動画 API へ到達可能なネットワーク）で以下を 1 度実施し、本検証結果を裏付けることを推奨する:
+ネットワーク許可後にサンドボックスから実 API 経由で再検証を実施。
 
-```bash
-uv run yt-dlp --write-subs --sub-langs comments --skip-download \
-    "https://www.nicovideo.jp/watch/{動画ID}"
-uv tool run --from <pyinstaller化前の danmaku2ass> \
-    danmaku2ass -o out.ass -s 1920x1080 -f NiconicoYtdlpJson2 *.comments.json
-ffplay -vf "ass=out.ass" sample.mp4
-```
+- 検証動画: `sm9`（ニコニコ動画の代表的な長期動画、コメント多数）
+- yt-dlp 経由で `info['subtitles']['comments']` を取得 → **1030 コメント**を取得成功
+- 各コメントのキー: `['body', 'commands', 'id', 'isMyPost', 'isPremium', 'nicoruCount', 'nicoruId', 'no', 'postedAt', 'score', 'source', 'userId', 'vposMs']`
+- danmaku2ass `-f NiconicoYtdlpJson2` で変換 → **1030 行の Dialogue を含む ASS 生成成功**（警告・エラーなし）
 
-スキーマ突き合わせの確度は高いため、これは形式的確認のみ。
+実データでも合成サンプルでもスキーマ完全一致を確認。フェーズ 0 の Go 判定を実データで裏付け。
 
 ## ステータス
 
