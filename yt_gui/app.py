@@ -1293,6 +1293,11 @@ class App(QMainWindow):
                     )
                     cookies_path = None
 
+            nico_comments_opts = (
+                (item.orig_settings or {}).get("nico_comments")
+                if item.orig_settings
+                else None
+            )
             try:
                 self.downloader.download_video(
                     item.url,
@@ -1311,6 +1316,7 @@ class App(QMainWindow):
                     playlist_title=item.playlist_title,
                     playlist_index=item.playlist_index,
                     audio_only=item.audio_only,
+                    nico_comments_opts=nico_comments_opts,
                 )
                 with self._queue_lock:
                     item.status = "done"

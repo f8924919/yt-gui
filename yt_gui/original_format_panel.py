@@ -7,6 +7,8 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -14,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QSpinBox,
     QVBoxLayout,
 )
 
@@ -22,6 +25,14 @@ from .i18n import t
 from .utils import strip_ansi
 
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
+_COMMENTS_LANG = "comments"
+
+# ニコニコ動画コメント → ASS 変換のデフォルト値
+_NICO_DEFAULT_WIDTH = 1920
+_NICO_DEFAULT_HEIGHT = 1080
+_NICO_DEFAULT_DURATION = 8.0
+_NICO_DEFAULT_OPACITY = 0.8
+_NICO_DEFAULT_FONT_SIZE = 32
 
 
 class _ToggleListWidget(QListWidget):
@@ -323,6 +334,63 @@ class OriginalFormatPanel(QGroupBox):
         embed_row.addStretch()
         outer.addLayout(embed_row)
 
+        # ニコニコ動画コメント (ASS 変換) グループ
+        # `comments` lang が字幕リストに含まれるときだけ可視化する。
+        self._nico_group = QGroupBox(t("nico_group_title"))
+        self._nico_group.setVisible(False)
+        nico_layout = QGridLayout()
+        nico_layout.setContentsMargins(8, 8, 8, 8)
+        nico_layout.setHorizontalSpacing(8)
+        nico_layout.setVerticalSpacing(4)
+
+        self._nico_convert_check = QCheckBox(t("nico_convert_ass"))
+        self._nico_convert_check.toggled.connect(self._on_nico_convert_toggled)
+        nico_layout.addWidget(self._nico_convert_check, 0, 0, 1, 4)
+
+        self._nico_resolution_label = QLabel(t("nico_resolution"))
+        nico_layout.addWidget(self._nico_resolution_label, 1, 0)
+        self._nico_width_spin = QSpinBox()
+        self._nico_width_spin.setRange(320, 7680)
+        self._nico_width_spin.setSingleStep(2)
+        self._nico_width_spin.setValue(_NICO_DEFAULT_WIDTH)
+        self._nico_width_spin.setSuffix(" px")
+        nico_layout.addWidget(self._nico_width_spin, 1, 1)
+        nico_layout.addWidget(QLabel("×"), 1, 2)
+        self._nico_height_spin = QSpinBox()
+        self._nico_height_spin.setRange(240, 4320)
+        self._nico_height_spin.setSingleStep(2)
+        self._nico_height_spin.setValue(_NICO_DEFAULT_HEIGHT)
+        self._nico_height_spin.setSuffix(" px")
+        nico_layout.addWidget(self._nico_height_spin, 1, 3)
+
+        self._nico_duration_label = QLabel(t("nico_duration"))
+        nico_layout.addWidget(self._nico_duration_label, 2, 0)
+        self._nico_duration_spin = QDoubleSpinBox()
+        self._nico_duration_spin.setRange(1.0, 60.0)
+        self._nico_duration_spin.setSingleStep(0.5)
+        self._nico_duration_spin.setValue(_NICO_DEFAULT_DURATION)
+        nico_layout.addWidget(self._nico_duration_spin, 2, 1)
+
+        self._nico_opacity_label = QLabel(t("nico_opacity"))
+        nico_layout.addWidget(self._nico_opacity_label, 2, 2)
+        self._nico_opacity_spin = QDoubleSpinBox()
+        self._nico_opacity_spin.setRange(0.1, 1.0)
+        self._nico_opacity_spin.setSingleStep(0.1)
+        self._nico_opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
+        nico_layout.addWidget(self._nico_opacity_spin, 2, 3)
+
+        self._nico_font_label = QLabel(t("nico_font_size"))
+        nico_layout.addWidget(self._nico_font_label, 3, 0)
+        self._nico_font_spin = QSpinBox()
+        self._nico_font_spin.setRange(8, 128)
+        self._nico_font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
+        self._nico_font_spin.setSuffix(" px")
+        nico_layout.addWidget(self._nico_font_spin, 3, 1)
+
+        self._nico_group.setLayout(nico_layout)
+        outer.addWidget(self._nico_group)
+        self._set_nico_controls_enabled(False)
+
     # ── public interface ─────────────────────────────────────────────────────
 
     def trigger_fetch(self):
@@ -363,6 +431,16 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_thumbnail_check.setChecked(False)
         self._embed_metadata_check.setChecked(True)
         self._embed_chapters_check.setChecked(True)
+
+        # ニコニコ動画コメントグループを初期状態に戻す
+        self._nico_group.setVisible(False)
+        self._nico_convert_check.setChecked(False)
+        self._nico_width_spin.setValue(_NICO_DEFAULT_WIDTH)
+        self._nico_height_spin.setValue(_NICO_DEFAULT_HEIGHT)
+        self._nico_duration_spin.setValue(_NICO_DEFAULT_DURATION)
+        self._nico_opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
+        self._nico_font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
+        self._set_nico_controls_enabled(False)
 
     def retranslate(self, video_container: str = "mp4", audio_label: str | None = None):
         if audio_label is not None:
@@ -407,6 +485,12 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
         self._embed_metadata_check.setText(t("orig_embed_metadata"))
         self._embed_chapters_check.setText(t("orig_embed_chapters"))
+        self._nico_group.setTitle(t("nico_group_title"))
+        self._nico_convert_check.setText(t("nico_convert_ass"))
+        self._nico_resolution_label.setText(t("nico_resolution"))
+        self._nico_duration_label.setText(t("nico_duration"))
+        self._nico_opacity_label.setText(t("nico_opacity"))
+        self._nico_font_label.setText(t("nico_font_size"))
 
     def has_formats_loaded(self) -> bool:
         return bool(self._fetched_title) and (
@@ -446,6 +530,47 @@ class OriginalFormatPanel(QGroupBox):
     def get_embed_chapters(self) -> bool:
         return bool(self._embed_chapters_check.isChecked())
 
+    def get_nico_comments_opts(self) -> dict:
+        """ニコニコ動画コメント → ASS 変換オプションを返す。"""
+        return {
+            "convert_to_ass": bool(self._nico_convert_check.isChecked()),
+            "resolution_w": int(self._nico_width_spin.value()),
+            "resolution_h": int(self._nico_height_spin.value()),
+            "duration_sec": float(self._nico_duration_spin.value()),
+            "opacity": float(self._nico_opacity_spin.value()),
+            "font_size": int(self._nico_font_spin.value()),
+        }
+
+    def _has_nico_comments_lang(self) -> bool:
+        """字幕フォーマットに `comments` lang が含まれるか。"""
+        return any(lang == _COMMENTS_LANG for _, lang, _ in self._subtitle_formats)
+
+    def _on_nico_convert_toggled(self, checked: bool):
+        """コメント ASS 変換チェック切替: 子コントロールを enable/disable し、
+        ON 時には字幕リストの `comments` 行を自動選択する。"""
+        self._set_nico_controls_enabled(checked)
+        if checked and self._subtitle_formats:
+            for i, (_, lang, _) in enumerate(self._subtitle_formats):
+                if lang != _COMMENTS_LANG:
+                    continue
+                item = self._subtitle_list.item(i)
+                if item is not None and not item.isSelected():
+                    self._subtitle_list.blockSignals(True)
+                    item.setSelected(True)
+                    self._subtitle_list.blockSignals(False)
+                    self._on_subtitle_changed()
+                break
+
+    def _set_nico_controls_enabled(self, enabled: bool):
+        for w in (
+            self._nico_width_spin,
+            self._nico_height_spin,
+            self._nico_duration_spin,
+            self._nico_opacity_spin,
+            self._nico_font_spin,
+        ):
+            w.setEnabled(enabled)
+
     def get_raw_settings(self) -> dict:
         """現在の選択状態を復元可能な形式で返す。"""
         auto_label = t("orig_auto")
@@ -479,6 +604,7 @@ class OriginalFormatPanel(QGroupBox):
             "embed_thumbnail": self.get_embed_thumbnail(),
             "embed_metadata": self.get_embed_metadata(),
             "embed_chapters": self.get_embed_chapters(),
+            "nico_comments": self.get_nico_comments_opts(),
         }
 
     def _collect_selected_audio_ids(self) -> list[str]:
@@ -512,6 +638,24 @@ class OriginalFormatPanel(QGroupBox):
             )
         self._embed_metadata_check.setChecked(settings.get("embed_metadata", True))
         self._embed_chapters_check.setChecked(settings.get("embed_chapters", True))
+
+        nico = settings.get("nico_comments") or {}
+        self._nico_width_spin.setValue(
+            int(nico.get("resolution_w", _NICO_DEFAULT_WIDTH))
+        )
+        self._nico_height_spin.setValue(
+            int(nico.get("resolution_h", _NICO_DEFAULT_HEIGHT))
+        )
+        self._nico_duration_spin.setValue(
+            float(nico.get("duration_sec", _NICO_DEFAULT_DURATION))
+        )
+        self._nico_opacity_spin.setValue(
+            float(nico.get("opacity", _NICO_DEFAULT_OPACITY))
+        )
+        self._nico_font_spin.setValue(
+            int(nico.get("font_size", _NICO_DEFAULT_FONT_SIZE))
+        )
+        self._nico_convert_check.setChecked(bool(nico.get("convert_to_ass", False)))
 
         self._pending_restore = settings
         if self.has_formats_loaded():
@@ -823,6 +967,9 @@ class OriginalFormatPanel(QGroupBox):
             self._subtitle_list.setEnabled(False)
         self._subtitle_fmt_combo.setEnabled(False)
         self._embed_check.setEnabled(False)
+
+        # `comments` lang (ニコニコ動画) が含まれるときだけグループを可視化
+        self._nico_group.setVisible(self._has_nico_comments_lang())
 
         if not self._video_formats and not self._audio_formats:
             self._pending_restore = None

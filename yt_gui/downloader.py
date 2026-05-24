@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 import sys
 
 from yt_dlp import YoutubeDL
@@ -91,6 +92,7 @@ class Downloader:
         self._deno_path = os.path.join(bin_dir, f"deno{_ext}")
         self._ffmpeg_path = os.path.join(bin_dir, "ffmpeg", f"ffmpeg{_ext}")
         self._ffprobe_path = os.path.join(bin_dir, "ffmpeg", f"ffprobe{_ext}")
+        self._danmaku2ass_path = os.path.join(bin_dir, f"danmaku2ass{_ext}")
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -340,6 +342,7 @@ class Downloader:
         playlist_title: str | None = None,
         playlist_index: int | None = None,
         audio_only: bool = False,
+        nico_comments_opts: dict | None = None,
     ):
         if format_spec is not None:
             spec = format_spec
@@ -471,11 +474,13 @@ class Downloader:
         else:
             final_ext = raw_ext
 
+        effective_stem = stem
         if os.path.exists(stem + final_ext):
             n = 1
             while os.path.exists(f"{stem} ({n}){final_ext}"):
                 n += 1
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
+            effective_stem = f"{stem} ({n})"
 
         # json 専用字幕 (live_chat / ニコニコ動画 comments) を埋め込み対象に
         # 含む場合は、convert/embed がそれらの json を触らないように先に
@@ -494,3 +499,61 @@ class Downloader:
                 pp_list = ydl._pps["post_process"]
                 pp_list.insert(0, pp_list.pop())
             ydl.extract_info(url, download=True, extra_info=extra_info)
+
+        # ニコニコ動画コメント JSON → ASS 変換 (フェーズ 2)
+        # 字幕は `{stem}.comments.json` 形式で yt-dlp が保存する。
+        if (
+            nico_comments_opts
+            and nico_comments_opts.get("convert_to_ass")
+            and _COMMENTS_LANG in sub_langs
+        ):
+            self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
+
+    def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
+        """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
+
+        失敗・バイナリ欠如はいずれも非致命としてログのみ。
+        """
+        json_path = f"{stem}.{_COMMENTS_LANG}.json"
+        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+
+        if not os.path.exists(json_path):
+            if self.log_callback:
+                base = os.path.basename(json_path)
+                self.log_callback(f"⚠️ {base} が見つからないため ASS 変換をスキップ")
+            return
+        if not os.path.exists(self._danmaku2ass_path):
+            if self.log_callback:
+                self.log_callback(t("warn_danmaku2ass_missing"))
+            return
+
+        cmd = [
+            self._danmaku2ass_path,
+            "-o",
+            ass_path,
+            "-s",
+            f"{opts.get('resolution_w', 1920)}x{opts.get('resolution_h', 1080)}",
+            "-f",
+            "NiconicoYtdlpJson2",
+            "-dm",
+            str(opts.get("duration_sec", 8.0)),
+            "-fs",
+            str(opts.get("font_size", 32)),
+            "-a",
+            str(opts.get("opacity", 0.8)),
+            json_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.log_callback:
+                self.log_callback(
+                    f"[danmaku2ass] {os.path.basename(ass_path)} を生成しました"
+                )
+        except subprocess.CalledProcessError as e:
+            if self.log_callback:
+                err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
+                self.log_callback(t("warn_danmaku2ass_failed").format(error=err))
+        except FileNotFoundError:
+            # _danmaku2ass_path が exists() を通ったあとに消えた等のレース
+            if self.log_callback:
+                self.log_callback(t("warn_danmaku2ass_missing"))

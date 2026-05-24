@@ -15,6 +15,7 @@ _ext = '.exe' if sys.platform == 'win32' else ''
 deno_bin = f'deno{_ext}'
 ffmpeg_bin = f'ffmpeg{_ext}'
 ffprobe_bin = f'ffprobe{_ext}'
+danmaku2ass_bin = f'danmaku2ass{_ext}'
 
 _bin_dir = os.path.join(SPECPATH, 'bin')
 _png_path = os.path.join(SPECPATH, 'assets', 'icon.png')
@@ -22,6 +23,7 @@ _extra_binaries = [
     (os.path.join(_bin_dir, deno_bin), '.'),
     (os.path.join(_bin_dir, 'ffmpeg', ffmpeg_bin), 'ffmpeg'),
     (os.path.join(_bin_dir, 'ffmpeg', ffprobe_bin), 'ffmpeg'),
+    (os.path.join(_bin_dir, danmaku2ass_bin), '.'),
 ]
 
 

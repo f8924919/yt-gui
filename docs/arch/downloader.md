@@ -52,6 +52,7 @@ URL 種別を判別して返す。
 | `remux_only` | `False` | リマックスのみ（再エンコードなし） |
 | `playlist_title` | `None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
 | `playlist_index` | `None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
+| `nico_comments_opts` | `None` | ニコニコ動画コメント → ASS 変換オプション（`convert_to_ass` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`convert_to_ass=True` かつ字幕に `comments` lang が含まれる場合、ダウンロード完了後に danmaku2ass を subprocess 呼び出しして `{stem}.comments.ass` を生成する |
 
 ### 複数音声ストリーム対応
 
@@ -87,7 +88,16 @@ WebM は非対応のため自動スキップ。
 
 `_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` のいずれかがユーザー選択に含まれる場合は、convert/embed の前に `_StripJsonOnlySubsBeforeEmbedPP` を差し込んで `requested_subtitles` から該当 lang を取り除く。これにより、ライブチャット (YouTube) およびニコニコ動画コメント の JSON は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
 
-ニコニコ動画コメント (`comments` lang) は yt-dlp の `NiconicoIE._get_subtitles` が出力する v1/threads JSON。ライブチャットと同じ「json 専用・埋め込み不可」カテゴリとして同一の strip 機構で扱う。フェーズ 2 以降で danmaku2ass による ASS 変換・動画統合を追加予定。
+ニコニコ動画コメント (`comments` lang) は yt-dlp の `NiconicoIE._get_subtitles` が出力する v1/threads JSON。ライブチャットと同じ「json 専用・埋め込み不可」カテゴリとして同一の strip 機構で扱う。
+
+### ニコニコ動画コメントの ASS 変換
+
+`nico_comments_opts.convert_to_ass=True` かつ `subtitle_opts.subtitleslangs` に `comments` が含まれる場合、`extract_info(download=True)` 完了後に `_convert_nico_comments_to_ass(stem, opts)` を呼び出す。実装上の要点:
+
+- yt-dlp が保存する `{stem}.comments.json` をベースに `{stem}.comments.ass` を生成する（`stem` は同名衝突回避の `(n)` サフィックスを含む実効ステム）
+- subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f NiconicoYtdlpJson2 -dm {sec} -fs {size} -a {opacity} {json}` を実行
+- `-f NiconicoYtdlpJson2` は yt-dlp の `v1/threads` JSON 用パーサ（フェーズ 0 で検証済み）
+- 失敗（バイナリ欠如・JSON 不在・サブプロセス非 0 終了）はいずれも `log_callback` に警告を流すのみで例外を投げない
 
 ### バイナリパス解決
 
@@ -96,8 +106,9 @@ WebM は非対応のため自動スキップ。
 | ffmpeg | `bin/ffmpeg/ffmpeg[.exe]` |
 | ffprobe | `bin/ffmpeg/ffprobe[.exe]` |
 | deno | `bin/deno[.exe]` |
+| danmaku2ass | `bin/danmaku2ass[.exe]` |
 
-PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。
+PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。danmaku2ass バイナリが欠如している場合は ASS 変換のみがスキップされ、JSON 保存・その他のダウンロードは通常通り動作する（非致命扱い）。
 
 ### Cookies
 

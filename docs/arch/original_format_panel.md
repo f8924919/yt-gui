@@ -27,6 +27,7 @@
 | メタデータ埋め込みチェック | デフォルト ON |
 | チャプター埋め込みチェック | デフォルト ON |
 | 出力形式ラジオグループ | コンテナ結合 / remux のみ / 音声のみ の 3 択 |
+| ニコニコ動画コメントグループ | `QGroupBox`（`comments` lang が字幕リストに含まれるときだけ可視化）。コメント ASS 変換チェック + 解像度/表示時間/不透明度/フォントサイズの SpinBox |
 
 複合フォーマット（★印）選択時は音声リストを `set_included_mode()` で「映像に含まれます」1 行表示に切り替え、`setEnabled(False)` で操作不可にする。
 
@@ -61,8 +62,9 @@
 | `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
-| `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]` を含む） |
-| `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる |
+| `get_nico_comments_opts()` | `dict` | ニコニコ動画コメント → ASS 変換オプション（`convert_to_ass` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`） |
+| `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]`、ニコニコ動画コメント設定は `nico_comments: dict` を含む） |
+| `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる。`nico_comments` 欠如時はデフォルト値を採用 |
 | `has_formats_loaded()` | `bool` | フォーマット取得済みかどうか |
 | `get_fetched_title()` | `str` | 取得済みタイトル |
 | `is_both_skipped()` | `bool` | 映像・音声ともスキップかどうか |

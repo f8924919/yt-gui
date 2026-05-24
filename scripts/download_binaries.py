@@ -7,8 +7,10 @@ import os
 import platform
 import shutil
 import stat
+import subprocess
 import sys
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 
@@ -147,6 +149,61 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
 
 
 # ---------------------------------------------------------------------------
+# danmaku2ass (ニコニコ動画コメント → ASS 字幕変換)
+# ---------------------------------------------------------------------------
+# 単一 Python スクリプト danmaku2ass.py を PyInstaller で onefile バイナリ化し
+# bin/ 配下へ配置する。GPL-3.0 ライセンスのため、ffmpeg と同様に同意プロンプト
+# を経由する。
+# 再現性のため master 追従ではなくコミットハッシュで固定する。
+
+DANMAKU2ASS_REPO = 'https://github.com/m13253/danmaku2ass.git'
+DANMAKU2ASS_REF = 'ced881747670c2eb1c0dbd292c2a567f444b056a'  # 2024-08-28
+
+
+def download_danmaku2ass(force=False):
+    _ext = '.exe' if sys.platform == 'win32' else ''
+    out_path = os.path.join(BIN_DIR, f'danmaku2ass{_ext}')
+    os.makedirs(BIN_DIR, exist_ok=True)
+
+    if os.path.exists(out_path) and not force:
+        print(f'[danmaku2ass] {out_path} already exists. Skipping.')
+        return
+
+    tmpdir = tempfile.mkdtemp(prefix='danmaku2ass-build-')
+    try:
+        print('[danmaku2ass] Cloning source...')
+        subprocess.run(
+            ['git', 'clone', '--quiet', DANMAKU2ASS_REPO, tmpdir],
+            check=True,
+        )
+        subprocess.run(
+            ['git', '-C', tmpdir, 'checkout', '--quiet', DANMAKU2ASS_REF],
+            check=True,
+        )
+
+        print('[danmaku2ass] Building with PyInstaller (onefile)...')
+        work_dir = os.path.join(tmpdir, '_build')
+        subprocess.run(
+            [
+                sys.executable, '-m', 'PyInstaller',
+                '--onefile',
+                '--name', 'danmaku2ass',
+                '--distpath', BIN_DIR,
+                '--workpath', work_dir,
+                '--specpath', work_dir,
+                '--noconfirm',
+                '--log-level', 'WARN',
+                os.path.join(tmpdir, 'danmaku2ass.py'),
+            ],
+            check=True,
+        )
+        _make_executable(out_path)
+        print(f'[danmaku2ass] Saved: {out_path}')
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
 
 def _prompt_ffmpeg_consent() -> bool:
     """Show ffmpeg license notice and prompt for consent. Returns True if accepted."""
@@ -165,6 +222,30 @@ def _prompt_ffmpeg_consent() -> bool:
     try:
         answer = input(
             "Do you agree to download ffmpeg under the GPL license? [y/N] "
+        ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return answer in ('y', 'yes')
+
+
+def _prompt_danmaku2ass_consent() -> bool:
+    """Show danmaku2ass license notice and prompt. Returns True if accepted."""
+    print()
+    print("=" * 60)
+    print("danmaku2ass License Notice")
+    print("=" * 60)
+    print("This script will build danmaku2ass from source, which is")
+    print("licensed under the GNU General Public License (GPL) v3.")
+    print()
+    print("danmaku2ass converts Niconico/Bilibili/AcFun comments to")
+    print("ASS subtitle files (used by the Niconico comments feature).")
+    print()
+    print("Repository: https://github.com/m13253/danmaku2ass")
+    print("=" * 60)
+    try:
+        answer = input(
+            "Do you agree to build danmaku2ass under the GPL-3.0 license? [y/N] "
         ).strip().lower()
     except (EOFError, KeyboardInterrupt):
         print()
@@ -200,3 +281,13 @@ if __name__ == '__main__':
             sys.exit(0)
 
     download_ffmpeg(force=args.update)
+
+    _danmaku2ass_path = os.path.join(BIN_DIR, f'danmaku2ass{_ext}')
+    _needs_danmaku2ass = not os.path.exists(_danmaku2ass_path) or args.update
+
+    if _needs_danmaku2ass and not args.yes:
+        if not _prompt_danmaku2ass_consent():
+            print('[danmaku2ass] Build cancelled.')
+            sys.exit(0)
+
+    download_danmaku2ass(force=args.update)

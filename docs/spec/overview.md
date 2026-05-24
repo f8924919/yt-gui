@@ -58,6 +58,7 @@ yt-gui は PySide6 製のデスクトップ動画ダウンローダーです。�
 | `deno` / `deno.exe` | yt-dlp の JavaScript ランタイム |
 | `ffmpeg/ffmpeg` / `ffmpeg.exe` | 動画結合・音声変換 |
 | `ffmpeg/ffprobe` / `ffprobe.exe` | 動画メタデータ取得 |
+| `danmaku2ass` / `danmaku2ass.exe` | ニコニコ動画コメント JSON → ASS 字幕変換（PyInstaller でビルドした単独実行ファイル） |
 | `assets/icon.png` | アプリアイコン |
 
 `bin/` 以下のバイナリは `scripts/download_binaries.py` で取得します（`uv run pyinstaller yt-gui.spec` 実行時に自動呼び出し）。
