@@ -63,6 +63,7 @@ STRINGS: dict[str, str] = {
     "orig_sub_none": "None (skip)",
     "orig_sub_auto_marker": "(auto-generated)",
     "orig_sub_live_chat_name": "Live chat (not embeddable, saved as sidecar)",
+    "orig_sub_nico_comments_name": "Niconico comments (not embeddable, saved as sidecar)",
     "orig_sub_embed": "Embed in MP4",
     "orig_embed_thumbnail": "Embed thumbnail",
     "orig_embed_metadata": "Embed metadata",

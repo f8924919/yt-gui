@@ -115,9 +115,11 @@ aac (m4a) [140] – 128kbps
 ja – 日本語 [srt, vtt]
 en – English [srt, vtt]
 ja – 日本語 (自動生成) [vtt]
+live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]      # YouTube Live のみ
+comments – ニコニコ動画コメント (埋め込み不可・サイドカー保存) [json]  # ニコニコ動画のみ
 ```
 
-字幕が選択された場合のみ、字幕フォーマットコンボ（srt / vtt / best）と埋め込みチェックボックスが有効化されます。
+字幕が選択された場合のみ、字幕フォーマットコンボ（srt / vtt / best）と埋め込みチェックボックスが有効化されます。`live_chat` / `comments` は json 専用のためコンテナへの埋め込み対象外で、選択しても常にサイドカー JSON として保存されます（詳細: [ダウンロード動作 § JSON 専用字幕の扱い](../features/download-behavior.md)）。
 
 ---
 

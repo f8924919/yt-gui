@@ -63,6 +63,7 @@ STRINGS: dict[str, str] = {
     "orig_sub_none": "なし (ダウンロードしない)",
     "orig_sub_auto_marker": "(自動生成)",
     "orig_sub_live_chat_name": "ライブチャット (埋め込み不可・サイドカー保存)",
+    "orig_sub_nico_comments_name": "ニコニコ動画コメント (埋め込み不可・サイドカー保存)",
     "orig_sub_embed": "MP4に埋め込む",
     "orig_embed_thumbnail": "サムネイルを埋め込む",
     "orig_embed_metadata": "メタデータを埋め込む",

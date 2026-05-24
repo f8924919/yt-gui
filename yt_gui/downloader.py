@@ -12,6 +12,8 @@ from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
 from .utils import strip_ansi
 
 _LIVE_CHAT_LANG = "live_chat"
+_COMMENTS_LANG = "comments"
+_JSON_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG})
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
 _THUMBNAIL_EMBED_CONTAINERS = frozenset(
@@ -47,18 +49,18 @@ class _YtdlpLogger:
         self._cb(f"❌ {strip_ansi(msg)}")
 
 
-class _StripLiveChatBeforeEmbedPP(PostProcessor):
-    """live_chat 字幕は json 専用で ffmpeg では変換も埋め込みもできないため、
-    後段の FFmpegSubtitlesConvertor / FFmpegEmbedSubtitle が処理対象として
-    見ないよう `requested_subtitles` から外す。json ファイルは既に
-    ダウンロード済みなので、サイドカーとしてそのまま残る。"""
+class _StripJsonOnlySubsBeforeEmbedPP(PostProcessor):
+    """json 専用字幕 (live_chat / ニコニコ動画 comments) は ffmpeg では
+    変換も埋め込みもできないため、後段の FFmpegSubtitlesConvertor /
+    FFmpegEmbedSubtitle が処理対象として見ないよう `requested_subtitles`
+    から外す。json ファイルは既にダウンロード済みなので、サイドカーとして
+    そのまま残る。"""
 
     def run(self, info):
         subs = info.get("requested_subtitles") or {}
-        if _LIVE_CHAT_LANG in subs:
-            info["requested_subtitles"] = {
-                k: v for k, v in subs.items() if k != _LIVE_CHAT_LANG
-            }
+        filtered = {k: v for k, v in subs.items() if k not in _JSON_ONLY_SUB_LANGS}
+        if len(filtered) != len(subs):
+            info["requested_subtitles"] = filtered
         return [], info
 
 
@@ -262,6 +264,16 @@ class Downloader:
                     (f"{lang} – {t('orig_sub_live_chat_name')} [json]", lang, False)
                 )
                 continue
+            if lang == _COMMENTS_LANG:
+                # ニコニコ動画コメント (json 専用、埋め込み不可) は専用ラベルで提示
+                subtitle_list.append(
+                    (
+                        f"{lang} – {t('orig_sub_nico_comments_name')} [json]",
+                        lang,
+                        False,
+                    )
+                )
+                continue
             exts = (
                 ", ".join(
                     dict.fromkeys(
@@ -274,7 +286,7 @@ class Downloader:
             subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
 
         for lang, formats in sorted(auto_captions_raw.items()):
-            if not formats or lang == _LIVE_CHAT_LANG:
+            if not formats or lang in _JSON_ONLY_SUB_LANGS:
                 continue
             # Limit auto captions to primary language family when known
             if primary_lang:
@@ -456,17 +468,18 @@ class Downloader:
                 n += 1
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
 
-        # live_chat を埋め込み対象に含む場合は、convert/embed が live_chat.json を
-        # 触らないように先にストリップ PP を実行する。
+        # json 専用字幕 (live_chat / ニコニコ動画 comments) を埋め込み対象に
+        # 含む場合は、convert/embed がそれらの json を触らないように先に
+        # ストリップ PP を実行する。
         sub_langs = (subtitle_opts or {}).get("subtitleslangs") or []
-        needs_strip_live_chat = (subtitle_opts or {}).get(
-            "embed", False
-        ) and _LIVE_CHAT_LANG in sub_langs
+        needs_strip_json_only_subs = (subtitle_opts or {}).get("embed", False) and any(
+            lang in _JSON_ONLY_SUB_LANGS for lang in sub_langs
+        )
 
         with YoutubeDL(ydl_opts) as ydl:
-            if needs_strip_live_chat:
+            if needs_strip_json_only_subs:
                 ydl.add_post_processor(
-                    _StripLiveChatBeforeEmbedPP(), when="post_process"
+                    _StripJsonOnlySubsBeforeEmbedPP(), when="post_process"
                 )
                 # 末尾に追加された PP を先頭へ移動 (convert/embed の前で実行させる)
                 pp_list = ydl._pps["post_process"]
