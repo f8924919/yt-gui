@@ -46,7 +46,7 @@ from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
-_WIN_W = 560
+_WIN_W = 940
 _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
 
