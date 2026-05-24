@@ -94,16 +94,21 @@ yt-dlp の `outtmpl` に `%(title)s.%(ext)s` を指定します。拡張子は�
 
 YouTube Live など `json3` 形式しか配信されない動画では、`FFmpegEmbedSubtitle` 単体だと `JSON subtitles cannot be embedded` のエラーで埋め込みに失敗します。これを避けるため、埋め込み有効時は `FFmpegSubtitlesConvertor` を埋め込み前に挟み、ユーザーが選んだフォーマット（`srt` / `vtt`）または `srt`（`best` 選択時のフォールバック）へ変換してから埋め込みます。
 
-### `live_chat`（ライブチャット）の扱い
+### JSON 専用字幕の扱い（`live_chat` / `comments`）
 
-YouTube Live は `info["subtitles"]` と `info["automatic_captions"]` の両方に `live_chat`（チャットログの JSON）を挿入します。これは標準的な字幕フォーマットではないため、`FFmpegSubtitlesConvertor` / `FFmpegEmbedSubtitle` は変換も埋め込みもできません。
+一部の抽出器は標準的な字幕フォーマットではない JSON のみを字幕として公開します。
 
-字幕リストでは `live_chat` を選択肢として表示しますが（ラベル: `live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]`）、埋め込みパスからは外し、JSON ファイルだけが動画ファイルの隣にサイドカーとして保存されるようにしています。
+| lang | 由来 | ラベル |
+|---|---|---|
+| `live_chat` | YouTube Live のチャットログ（`info["subtitles"]` / `info["automatic_captions"]` 双方に出現） | `live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]` |
+| `comments` | ニコニコ動画コメント（`NiconicoIE._get_subtitles` が v1/threads JSON として出力） | `comments – ニコニコ動画コメント (埋め込み不可・サイドカー保存) [json]` |
+
+これらは `FFmpegSubtitlesConvertor` / `FFmpegEmbedSubtitle` で変換も埋め込みもできないため、字幕リストには表示しつつ、埋め込みパスからは除外して JSON ファイルだけがサイドカーとして残るようにしています。
 
 実装:
 
-- 自動字幕ループでは `live_chat` をスキップ（手動扱いの 1 エントリだけが UI に出る）
-- 「MP4 に埋め込む」が ON でかつ `subtitleslangs` に `live_chat` が含まれるとき、`_StripLiveChatBeforeEmbedPP` を `FFmpegSubtitlesConvertor` の前に差し込み、`requested_subtitles` から `live_chat` を取り除く（ファイルはダウンロード済みなのでディスクには残る）
+- 自動字幕ループでは `_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` をスキップ（手動扱いの 1 エントリだけが UI に出る）
+- 「MP4 に埋め込む」が ON でかつ `subtitleslangs` にいずれかの json 専用 lang が含まれるとき、`_StripJsonOnlySubsBeforeEmbedPP` を `FFmpegSubtitlesConvertor` の前に差し込み、`requested_subtitles` から該当 lang を取り除く（ファイルはダウンロード済みなのでディスクには残る）
 - 埋め込み OFF のときは convert/embed PP 自体が走らないため、フィルタも不要
 
 ---

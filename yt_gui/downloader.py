@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 import sys
 
 from yt_dlp import YoutubeDL
@@ -12,6 +13,8 @@ from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
 from .utils import strip_ansi
 
 _LIVE_CHAT_LANG = "live_chat"
+_COMMENTS_LANG = "comments"
+_JSON_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG})
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
 _THUMBNAIL_EMBED_CONTAINERS = frozenset(
@@ -47,18 +50,18 @@ class _YtdlpLogger:
         self._cb(f"❌ {strip_ansi(msg)}")
 
 
-class _StripLiveChatBeforeEmbedPP(PostProcessor):
-    """live_chat 字幕は json 専用で ffmpeg では変換も埋め込みもできないため、
-    後段の FFmpegSubtitlesConvertor / FFmpegEmbedSubtitle が処理対象として
-    見ないよう `requested_subtitles` から外す。json ファイルは既に
-    ダウンロード済みなので、サイドカーとしてそのまま残る。"""
+class _StripJsonOnlySubsBeforeEmbedPP(PostProcessor):
+    """json 専用字幕 (live_chat / ニコニコ動画 comments) は ffmpeg では
+    変換も埋め込みもできないため、後段の FFmpegSubtitlesConvertor /
+    FFmpegEmbedSubtitle が処理対象として見ないよう `requested_subtitles`
+    から外す。json ファイルは既にダウンロード済みなので、サイドカーとして
+    そのまま残る。"""
 
     def run(self, info):
         subs = info.get("requested_subtitles") or {}
-        if _LIVE_CHAT_LANG in subs:
-            info["requested_subtitles"] = {
-                k: v for k, v in subs.items() if k != _LIVE_CHAT_LANG
-            }
+        filtered = {k: v for k, v in subs.items() if k not in _JSON_ONLY_SUB_LANGS}
+        if len(filtered) != len(subs):
+            info["requested_subtitles"] = filtered
         return [], info
 
 
@@ -89,6 +92,7 @@ class Downloader:
         self._deno_path = os.path.join(bin_dir, f"deno{_ext}")
         self._ffmpeg_path = os.path.join(bin_dir, "ffmpeg", f"ffmpeg{_ext}")
         self._ffprobe_path = os.path.join(bin_dir, "ffmpeg", f"ffprobe{_ext}")
+        self._danmaku2ass_path = os.path.join(bin_dir, f"danmaku2ass{_ext}")
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -202,6 +206,15 @@ class Downloader:
         ydl_opts = {
             "quiet": True,
             "noplaylist": True,
+            # 一部の抽出器 (例: NiconicoIE) は `InfoExtractor.extract_subtitles` を
+            # 経由して字幕を info dict に詰める。このメソッドは `writesubtitles` /
+            # `listsubtitles` のいずれかが立っていないと `_get_subtitles` を呼ばず
+            # `{}` を返すため、フラグを立てない限りニコニコ動画の `comments` lang
+            # などが UI 上の字幕リストに出てこない。YouTube extractor は
+            # `info['subtitles']` を直接代入するため影響を受けないが、ゲート経由の
+            # 抽出器のために本フラグを必ず立てる。`download=False` ではファイル
+            # 書き出しは発生しないので安全。
+            "writesubtitles": True,
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
         with YoutubeDL(ydl_opts) as ydl:
@@ -262,6 +275,16 @@ class Downloader:
                     (f"{lang} – {t('orig_sub_live_chat_name')} [json]", lang, False)
                 )
                 continue
+            if lang == _COMMENTS_LANG:
+                # ニコニコ動画コメント (json 専用、埋め込み不可) は専用ラベルで提示
+                subtitle_list.append(
+                    (
+                        f"{lang} – {t('orig_sub_nico_comments_name')} [json]",
+                        lang,
+                        False,
+                    )
+                )
+                continue
             exts = (
                 ", ".join(
                     dict.fromkeys(
@@ -274,7 +297,7 @@ class Downloader:
             subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
 
         for lang, formats in sorted(auto_captions_raw.items()):
-            if not formats or lang == _LIVE_CHAT_LANG:
+            if not formats or lang in _JSON_ONLY_SUB_LANGS:
                 continue
             # Limit auto captions to primary language family when known
             if primary_lang:
@@ -293,11 +316,21 @@ class Downloader:
             label = f"{lang} – {name} {t('orig_sub_auto_marker')} [{exts}]"
             subtitle_list.append((label, lang, True))
 
+        # 映像 ID → (width, height) (フェーズ 3: コメント ASS 解像度の自動追従用)
+        video_resolutions: dict[str, tuple[int, int]] = {}
+        for f in raw:
+            fid = f.get("format_id")
+            w = f.get("width")
+            h = f.get("height")
+            if fid and isinstance(w, int) and isinstance(h, int) and w > 0 and h > 0:
+                video_resolutions[fid] = (w, h)
+
         return {
             "title": info.get("title", ""),
             "video": video_formats,
             "audio": audio_formats,
             "subtitles": subtitle_list,
+            "video_resolutions": video_resolutions,
         }
 
     def download_video(
@@ -319,6 +352,7 @@ class Downloader:
         playlist_title: str | None = None,
         playlist_index: int | None = None,
         audio_only: bool = False,
+        nico_comments_opts: dict | None = None,
     ):
         if format_spec is not None:
             spec = format_spec
@@ -450,25 +484,160 @@ class Downloader:
         else:
             final_ext = raw_ext
 
+        effective_stem = stem
         if os.path.exists(stem + final_ext):
             n = 1
             while os.path.exists(f"{stem} ({n}){final_ext}"):
                 n += 1
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
+            effective_stem = f"{stem} ({n})"
 
-        # live_chat を埋め込み対象に含む場合は、convert/embed が live_chat.json を
-        # 触らないように先にストリップ PP を実行する。
+        # json 専用字幕 (live_chat / ニコニコ動画 comments) を埋め込み対象に
+        # 含む場合は、convert/embed がそれらの json を触らないように先に
+        # ストリップ PP を実行する。
         sub_langs = (subtitle_opts or {}).get("subtitleslangs") or []
-        needs_strip_live_chat = (subtitle_opts or {}).get(
-            "embed", False
-        ) and _LIVE_CHAT_LANG in sub_langs
+        needs_strip_json_only_subs = (subtitle_opts or {}).get("embed", False) and any(
+            lang in _JSON_ONLY_SUB_LANGS for lang in sub_langs
+        )
 
         with YoutubeDL(ydl_opts) as ydl:
-            if needs_strip_live_chat:
+            if needs_strip_json_only_subs:
                 ydl.add_post_processor(
-                    _StripLiveChatBeforeEmbedPP(), when="post_process"
+                    _StripJsonOnlySubsBeforeEmbedPP(), when="post_process"
                 )
                 # 末尾に追加された PP を先頭へ移動 (convert/embed の前で実行させる)
                 pp_list = ydl._pps["post_process"]
                 pp_list.insert(0, pp_list.pop())
             ydl.extract_info(url, download=True, extra_info=extra_info)
+
+        # ニコニコ動画コメント JSON → ASS 変換 (フェーズ 2)
+        # 字幕は `{stem}.comments.json` 形式で yt-dlp が保存する。
+        if (
+            nico_comments_opts
+            and nico_comments_opts.get("convert_to_ass")
+            and _COMMENTS_LANG in sub_langs
+        ):
+            self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
+
+            # フェーズ 3: コメント ASS を動画と合わせた MKV を別ファイルで生成
+            if nico_comments_opts.get("embed_to_mkv") and not is_audio:
+                self._embed_nico_comments_into_mkv(
+                    effective_stem, final_ext, nico_comments_opts
+                )
+
+    def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
+        """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
+
+        失敗・バイナリ欠如はいずれも非致命としてログのみ。
+        """
+        json_path = f"{stem}.{_COMMENTS_LANG}.json"
+        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+
+        if not os.path.exists(json_path):
+            if self.log_callback:
+                base = os.path.basename(json_path)
+                self.log_callback(f"⚠️ {base} が見つからないため ASS 変換をスキップ")
+            return
+        if not os.path.exists(self._danmaku2ass_path):
+            if self.log_callback:
+                self.log_callback(t("warn_danmaku2ass_missing"))
+            return
+
+        cmd = [
+            self._danmaku2ass_path,
+            "-o",
+            ass_path,
+            "-s",
+            f"{opts.get('resolution_w', 1920)}x{opts.get('resolution_h', 1080)}",
+            "-f",
+            "NiconicoYtdlpJson2",
+            "-dm",
+            str(opts.get("duration_sec", 8.0)),
+            "-fs",
+            str(opts.get("font_size", 32)),
+            "-a",
+            str(opts.get("opacity", 0.8)),
+            json_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.log_callback:
+                self.log_callback(
+                    f"[danmaku2ass] {os.path.basename(ass_path)} を生成しました"
+                )
+        except subprocess.CalledProcessError as e:
+            if self.log_callback:
+                err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
+                self.log_callback(t("warn_danmaku2ass_failed").format(error=err))
+        except FileNotFoundError:
+            # _danmaku2ass_path が exists() を通ったあとに消えた等のレース
+            if self.log_callback:
+                self.log_callback(t("warn_danmaku2ass_missing"))
+
+    def _embed_nico_comments_into_mkv(
+        self, stem: str, final_ext: str, opts: dict
+    ) -> None:
+        """動画 + コメント ASS をソフトサブで結合した MKV を別ファイルとして生成する。
+
+        元動画は触らず、`{stem}.with-comments.mkv` を新規作成する。
+        ffmpeg は再エンコードなしの stream copy (`-c copy -c:s ass`)。
+        失敗・前提ファイル不在はいずれも非致命としてログのみ。
+        """
+        video_path = f"{stem}{final_ext}"
+        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+
+        if not os.path.exists(video_path):
+            if self.log_callback:
+                base = os.path.basename(video_path)
+                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+            return
+        if not os.path.exists(ass_path):
+            if self.log_callback:
+                base = os.path.basename(ass_path)
+                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+            return
+        if not os.path.exists(self._ffmpeg_path):
+            if self.log_callback:
+                self.log_callback("⚠️ ffmpeg が見つからないため MKV 統合をスキップ")
+            return
+
+        out_path = f"{stem}.with-comments.mkv"
+        if os.path.exists(out_path):
+            n = 1
+            while os.path.exists(f"{stem}.with-comments ({n}).mkv"):
+                n += 1
+            out_path = f"{stem}.with-comments ({n}).mkv"
+
+        cmd = [
+            self._ffmpeg_path,
+            "-y",
+            "-i",
+            video_path,
+            "-i",
+            ass_path,
+            "-map",
+            "0",
+            "-map",
+            "1",
+            "-c",
+            "copy",
+            "-c:s",
+            "ass",
+            "-metadata:s:s:0",
+            "title=ニコニコ動画コメント",
+            "-metadata:s:s:0",
+            "language=jpn",
+            out_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.log_callback:
+                self.log_callback(
+                    t("status_nico_mkv_created").format(
+                        filename=os.path.basename(out_path)
+                    )
+                )
+        except subprocess.CalledProcessError as e:
+            if self.log_callback:
+                err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
+                self.log_callback(t("warn_nico_mkv_failed").format(error=err))

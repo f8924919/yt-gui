@@ -17,12 +17,17 @@ uv run pyinstaller yt-gui.spec
 | deno | `bin/deno[.exe]` | yt-dlp の JavaScript ランタイム（`js_runtimes` オプションで指定） |
 | ffmpeg | `bin/ffmpeg/ffmpeg[.exe]` | 動画結合・音声変換（`ffmpeg_location` で指定） |
 | ffprobe | `bin/ffmpeg/ffprobe[.exe]` | 動画メタデータ取得（`ffmpeg_location` から自動検索される） |
+| danmaku2ass | `bin/danmaku2ass[.exe]` | ニコニコ動画コメント JSON → ASS 字幕変換（オリジナル形式パネルから subprocess 呼び出し） |
 
 `yt-gui.spec` の `binaries` 設定でこれらをバイナリに同梱する。
 
 ## バイナリの自動取得
 
-`scripts/download_binaries.py` で deno / ffmpeg / ffprobe を自動取得し `bin/` 配下に配置する。`yt-gui.spec` のビルド時に自動呼び出しされる。
+`scripts/download_binaries.py` で deno / ffmpeg / ffprobe / danmaku2ass を自動取得し `bin/` 配下に配置する。`yt-gui.spec` のビルド時に自動呼び出しされる。
+
+danmaku2ass は GitHub から `git clone` でソースを取得し、`sys.executable -m PyInstaller --onefile` で単独実行ファイルにビルドする。再現性のため master 追従ではなくコミットハッシュ（`DANMAKU2ASS_REF`）で固定する。ライセンスが GPL-3.0 なので ffmpeg と同様に同意プロンプトを通る（CI では `--yes` で省略）。
+
+クロスビルド非対応のため、ターゲット OS と同じ OS 上でビルドする必要がある（GitHub Actions の OS マトリックスに準拠）。
 
 ```bash
 # 既存ファイルがあればスキップ
