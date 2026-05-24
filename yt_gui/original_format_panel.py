@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -28,8 +27,8 @@ _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 _COMMENTS_LANG = "comments"
 
 # ニコニコ動画コメント → ASS 変換のデフォルト値
-_NICO_DEFAULT_WIDTH = 1920
-_NICO_DEFAULT_HEIGHT = 1080
+_NICO_DEFAULT_WIDTH = 1280
+_NICO_DEFAULT_HEIGHT = 720
 _NICO_DEFAULT_DURATION = 8.0
 _NICO_DEFAULT_OPACITY = 0.8
 _NICO_DEFAULT_FONT_SIZE = 32
@@ -336,56 +335,65 @@ class OriginalFormatPanel(QGroupBox):
 
         # ニコニコ動画コメント (ASS 変換) グループ
         # `comments` lang が字幕リストに含まれるときだけ可視化する。
+        # コンパクト 2 行構成: チェック行 + パラメータ 1 行（縦圧迫を最小化）
         self._nico_group = QGroupBox(t("nico_group_title"))
         self._nico_group.setVisible(False)
-        nico_layout = QGridLayout()
-        nico_layout.setContentsMargins(8, 8, 8, 8)
-        nico_layout.setHorizontalSpacing(8)
-        nico_layout.setVerticalSpacing(4)
+        nico_layout = QVBoxLayout()
+        nico_layout.setContentsMargins(8, 4, 8, 4)
+        nico_layout.setSpacing(4)
 
         self._nico_convert_check = QCheckBox(t("nico_convert_ass"))
         self._nico_convert_check.toggled.connect(self._on_nico_convert_toggled)
-        nico_layout.addWidget(self._nico_convert_check, 0, 0, 1, 4)
+        nico_layout.addWidget(self._nico_convert_check)
+
+        nico_params_row = QHBoxLayout()
+        nico_params_row.setSpacing(8)
 
         self._nico_resolution_label = QLabel(t("nico_resolution"))
-        nico_layout.addWidget(self._nico_resolution_label, 1, 0)
+        nico_params_row.addWidget(self._nico_resolution_label)
         self._nico_width_spin = QSpinBox()
         self._nico_width_spin.setRange(320, 7680)
         self._nico_width_spin.setSingleStep(2)
         self._nico_width_spin.setValue(_NICO_DEFAULT_WIDTH)
         self._nico_width_spin.setSuffix(" px")
-        nico_layout.addWidget(self._nico_width_spin, 1, 1)
-        nico_layout.addWidget(QLabel("×"), 1, 2)
+        nico_params_row.addWidget(self._nico_width_spin)
+        nico_params_row.addWidget(QLabel("×"))
         self._nico_height_spin = QSpinBox()
         self._nico_height_spin.setRange(240, 4320)
         self._nico_height_spin.setSingleStep(2)
         self._nico_height_spin.setValue(_NICO_DEFAULT_HEIGHT)
         self._nico_height_spin.setSuffix(" px")
-        nico_layout.addWidget(self._nico_height_spin, 1, 3)
+        nico_params_row.addWidget(self._nico_height_spin)
 
+        nico_params_row.addSpacing(12)
         self._nico_duration_label = QLabel(t("nico_duration"))
-        nico_layout.addWidget(self._nico_duration_label, 2, 0)
+        nico_params_row.addWidget(self._nico_duration_label)
         self._nico_duration_spin = QDoubleSpinBox()
         self._nico_duration_spin.setRange(1.0, 60.0)
         self._nico_duration_spin.setSingleStep(0.5)
         self._nico_duration_spin.setValue(_NICO_DEFAULT_DURATION)
-        nico_layout.addWidget(self._nico_duration_spin, 2, 1)
+        nico_params_row.addWidget(self._nico_duration_spin)
 
+        nico_params_row.addSpacing(12)
         self._nico_opacity_label = QLabel(t("nico_opacity"))
-        nico_layout.addWidget(self._nico_opacity_label, 2, 2)
+        nico_params_row.addWidget(self._nico_opacity_label)
         self._nico_opacity_spin = QDoubleSpinBox()
         self._nico_opacity_spin.setRange(0.1, 1.0)
         self._nico_opacity_spin.setSingleStep(0.1)
         self._nico_opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
-        nico_layout.addWidget(self._nico_opacity_spin, 2, 3)
+        nico_params_row.addWidget(self._nico_opacity_spin)
 
+        nico_params_row.addSpacing(12)
         self._nico_font_label = QLabel(t("nico_font_size"))
-        nico_layout.addWidget(self._nico_font_label, 3, 0)
+        nico_params_row.addWidget(self._nico_font_label)
         self._nico_font_spin = QSpinBox()
         self._nico_font_spin.setRange(8, 128)
         self._nico_font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
         self._nico_font_spin.setSuffix(" px")
-        nico_layout.addWidget(self._nico_font_spin, 3, 1)
+        nico_params_row.addWidget(self._nico_font_spin)
+
+        nico_params_row.addStretch()
+        nico_layout.addLayout(nico_params_row)
 
         self._nico_group.setLayout(nico_layout)
         outer.addWidget(self._nico_group)
@@ -969,7 +977,9 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setEnabled(False)
 
         # `comments` lang (ニコニコ動画) が含まれるときだけグループを可視化
+        # 可視化前後でパネルの sizeHint が変わるので親 (スプリッタ) に通知する
         self._nico_group.setVisible(self._has_nico_comments_lang())
+        self.updateGeometry()
 
         if not self._video_formats and not self._audio_formats:
             self._pending_restore = None
