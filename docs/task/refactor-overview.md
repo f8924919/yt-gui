@@ -30,7 +30,7 @@
 
 | フェーズ | タスク | 対応候補 | 優先度 | 状態 |
 |---|---|---|---|---|
-| 1 | [refactor-job-spec.md](refactor-job-spec.md) | A, B, C | 高 | 未着手 |
+| 1 | [refactor-job-spec.md](refactor-job-spec.md) | A, B, C | 高 | 完了 (2026-05-25) |
 | 2 | [refactor-app-split.md](refactor-app-split.md) | D | 中 | 未着手 |
 | 3 | [refactor-nico-comments-group.md](refactor-nico-comments-group.md) | E | 中 | 未着手 |
 | 4 | [refactor-thread-signal-helper.md](refactor-thread-signal-helper.md) | F | 中 | 未着手 |
