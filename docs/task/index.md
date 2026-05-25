@@ -23,3 +23,11 @@
 | [niconico-comments-phase1.md](niconico-comments-phase1.md) | 完了 | ニコニコ動画コメント取得（フェーズ 1）: `comments` lang を字幕リストに追加し JSON ファイルとして保存可能にする | 2026-05-24 |
 | [niconico-comments-phase2.md](niconico-comments-phase2.md) | 完了 | ニコニコ動画コメント取得（フェーズ 2）: danmaku2ass を PyInstaller でビルドして `bin/` に同梱し、コメント JSON を ASS に変換する | 2026-05-24 |
 | [niconico-comments-phase3.md](niconico-comments-phase3.md) | 完了 | ニコニコ動画コメント取得（フェーズ 3）: ffmpeg で動画 + ASS を MKV ソフトサブとして統合する | 2026-05-24 |
+| [refactor-overview.md](refactor-overview.md) | 進行中 | リファクタリング全体計画（フェーズ 1–7 の進行管理） | 2026-05-25 |
+| [refactor-job-spec.md](refactor-job-spec.md) | 未着手 | リファクタ フェーズ 1: `JobSpec` dataclass + `build_job_spec` 集約 + テスト先行（候補 A/B/C） | 2026-05-25 |
+| [refactor-app-split.md](refactor-app-split.md) | 未着手 | リファクタ フェーズ 2: `App` を `ThumbnailCache` / `QueueController` に分割（候補 D） | 2026-05-25 |
+| [refactor-nico-comments-group.md](refactor-nico-comments-group.md) | 未着手 | リファクタ フェーズ 3: `_NicoCommentsGroup` を子ウィジェットに切り出し（候補 E） | 2026-05-25 |
+| [refactor-thread-signal-helper.md](refactor-thread-signal-helper.md) | 未着手 | リファクタ フェーズ 4: バックグラウンドスレッド + シグナルの共通化（候補 F） | 2026-05-25 |
+| [refactor-i18n-combo-sentinel.md](refactor-i18n-combo-sentinel.md) | 未着手 | リファクタ フェーズ 5: コンボの sentinel 化 + AUTO/SKIP オフセット隠蔽（候補 G/H） | 2026-05-25 |
+| [refactor-downloader-split.md](refactor-downloader-split.md) | 未着手 | リファクタ フェーズ 6: `download_video` 分割 + 依存チェック公開化（候補 I/J） | 2026-05-25 |
+| [refactor-misc-cleanup.md](refactor-misc-cleanup.md) | 未着手 | リファクタ フェーズ 7: 小規模クリーンアップ（候補 K/L） | 2026-05-25 |
