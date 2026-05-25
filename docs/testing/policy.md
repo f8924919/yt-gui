@@ -22,8 +22,8 @@
 | 純粋関数 | `yt_gui/output_template.py` | ◯ |
 | グローバル状態 | `yt_gui/i18n.py` | ◯ |
 | ファイル I/O | `yt_gui/settings.py` | ◯ |
-| Qt UI | `yt_gui/app.py` ・ `original_format_panel.py` ・ `settings_dialog.py` ・ `log_dialog.py` | × |
-| 外部 I/O | `yt_gui/downloader.py`（yt-dlp） | × |
+| Qt UI | `yt_gui/app.py` ・ `original_format_panel.py` ・ `settings_dialog.py` ・ `log_dialog.py` ・ `queue_controller.py` | × |
+| 外部 I/O | `yt_gui/downloader.py`（yt-dlp）・ `thumbnail_cache.py`（HTTP） | × |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 
