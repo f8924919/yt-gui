@@ -18,6 +18,7 @@
 |---|---|---|
 | 純粋関数 | `yt_gui/utils.py` | ◯ |
 | 純粋関数 | `yt_gui/formats.py` | ◯ |
+| 純粋関数 | `yt_gui/job_spec.py` | ◯ |
 | 純粋関数 | `yt_gui/output_template.py` | ◯ |
 | グローバル状態 | `yt_gui/i18n.py` | ◯ |
 | ファイル I/O | `yt_gui/settings.py` | ◯ |
@@ -71,6 +72,7 @@ tests/
 ├── conftest.py            ← 共有フィクスチャ（i18n のグローバル状態復元）
 ├── test_utils.py
 ├── test_formats.py
+├── test_job_spec.py
 ├── test_output_template.py
 ├── test_i18n.py
 └── test_settings.py

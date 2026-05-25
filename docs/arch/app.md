@@ -31,16 +31,20 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 
 ## 内部クラス: `_QueueItem`（dataclass）
 
+実行設定 (format_spec / embed_* / audio_codec / video_container / subtitle_opts / nico_comments 等) は `JobSpec` ([job_spec.md](job_spec.md)) に集約済みで、`_QueueItem` はキュー固有の情報のみを保持する。
+
 | フィールド | 説明 |
 |-----------|------|
-| `playlist_folder` | プレイリスト用サブフォルダ名 |
-| `remux_only` | リマックスのみフラグ |
+| `url` | ダウンロード対象 URL |
+| `title` | 動画タイトル (キューに表示) |
+| `format_label` | フォーマット表示用ラベル (例: `"音声のみ → MP3 192kbps"`) |
+| `job` | `JobSpec` — 実行設定一式 |
+| `playlist_title` | プレイリスト名 (プレイリスト要素のみ) |
+| `playlist_index` | プレイリスト内番号 (プレイリスト要素のみ) |
 | `thumbnail_url` | サムネイル URL |
-| `audio_codec` | 音声コーデック |
-| `video_container` | 映像コンテナ |
-| `embed_metadata` | メタデータ埋め込みフラグ |
-| `embed_chapters` | チャプター埋め込みフラグ |
-| `orig_settings` | エンキュー時のスナップショット（編集モード復元用） |
+| `status` | `waiting` / `downloading` / `done` / `error` / `editing` |
+| `tree_item` | 対応する `QTreeWidgetItem` |
+| `format_id` (property) | `job.format_id` のエイリアス |
 
 ## 内部クラス: `_QueueTree(QTreeWidget)`
 
@@ -89,11 +93,18 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 | メソッド | 説明 |
 |----------|------|
 | `_enter_edit_mode(items)` | ステータスを `"editing"` にしてワーカー対象から除外、「追加」ボタンを「変更」に差し替え |
-| `_apply_edit()` | 各形式に応じて `embed_metadata`・`embed_chapters`・`video_container`・`orig_settings` を書き込む |
+| `_apply_edit()` | `build_job_spec()` で新しい `JobSpec` を生成し、編集中アイテムの `item.job` を差し替える |
 | `_cancel_edit()` | 編集を破棄して通常モードに戻る |
 | `_exit_edit_mode()` | 共通後処理 |
 
-単一の ORIGINAL_KEY アイテムを編集モードに入れた場合は `_original_panel.restore_from_settings(item.orig_settings)` で前回の設定を復元。
+単一の ORIGINAL_KEY アイテムを編集モードに入れた場合は `_original_panel.restore_from_settings(item.job.orig_settings)` で前回の設定を復元。
+
+### キュー追加経路
+
+- `_add_url()` で `build_job_spec()` を呼び出して `JobSpec` を組み立て、URL 取得スレッドへ渡す。`fmt_original` のときは `_original_panel.get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。
+- `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str}`。単発・プレイリストとも同一 `JobSpec` を全エントリで共有する。
+- `_enqueue_single(url, title, format_label, job, *, thumbnail_url)` は `_QueueItem` を生成してキューへ追加するのみ。format_id 派生は build_job_spec 側で完結している。
+- `_notify_container_promotion_if_needed(job)`: 複数音声で MKV 昇格が起きた場合のステータス通知。`build_job_spec` は UI 通知を行わないため UI 側で発火する。
 
 ## ログ機能
 

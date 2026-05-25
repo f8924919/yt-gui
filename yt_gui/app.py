@@ -36,8 +36,9 @@ from PySide6.QtWidgets import (
 
 from . import get_resource_base, i18n
 from .downloader import Downloader
-from .formats import FORMAT_KEYS, build_720p_spec
+from .formats import FORMAT_KEYS
 from .i18n import t
+from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
 from .original_format_panel import OriginalFormatPanel
 from .settings import SettingsManager, build_proxy_url
@@ -54,25 +55,18 @@ _WIN_H_EXPANDED = 700
 @dataclass
 class _QueueItem:
     url: str
-    format_id: str
+    title: str
     format_label: str
-    format_spec: str | None
-    subtitle_opts: dict | None
-    title: str = ""
-    mp3_bitrate: str | None = None
-    embed_thumbnail: bool = False
-    embed_metadata: bool = True
-    embed_chapters: bool = True
-    audio_codec: str = "mp3"
-    video_container: str = "mp4"
-    orig_settings: dict | None = None
-    remux_only: bool = False
-    audio_only: bool = False
+    job: JobSpec
     playlist_title: str | None = None
     playlist_index: int | None = None
     thumbnail_url: str | None = None
     status: str = "waiting"
     tree_item: QTreeWidgetItem | None = None
+
+    @property
+    def format_id(self) -> str:
+        return self.job.format_id
 
 
 class _AppSignals(QObject):
@@ -147,19 +141,21 @@ class _QueueTree(QTreeWidget):
                         lines.append(
                             f"<b>{t('tooltip_playlist')}:</b> {qi.playlist_title}"
                         )
-                    if qi.subtitle_opts:
-                        langs = ", ".join(qi.subtitle_opts.get("subtitleslangs", []))
-                        fmt = qi.subtitle_opts.get("subtitlesformat", "")
+                    if qi.job.subtitle_opts:
+                        langs = ", ".join(
+                            qi.job.subtitle_opts.get("subtitleslangs", [])
+                        )
+                        fmt = qi.job.subtitle_opts.get("subtitlesformat", "")
                         embed_lbl = (
                             t("orig_sub_embed")
-                            if qi.subtitle_opts.get("embed")
+                            if qi.job.subtitle_opts.get("embed")
                             else t("tooltip_sub_file")
                         )
                         sub_lbl = t("tooltip_subtitle")
                         lines.append(f"<b>{sub_lbl}:</b> {langs}  {fmt}  {embed_lbl}")
-                    if qi.format_id == _ORIGINAL_KEY and qi.format_spec:
+                    if qi.format_id == _ORIGINAL_KEY and qi.job.format_spec:
                         lines.append(
-                            f"<b>{t('tooltip_format_spec')}:</b> {qi.format_spec}"
+                            f"<b>{t('tooltip_format_spec')}:</b> {qi.job.format_spec}"
                         )
                     QToolTip.showText(
                         event.globalPos(),
@@ -372,26 +368,10 @@ class App(QMainWindow):
             return "FLAC"
         return f"MP3 {self._settings.mp3_bitrate}kbps"
 
-    def _adjust_video_container_for_multi_audio(
-        self,
-        video_container: str,
-        multi_audio: bool,
-        *,
-        remux_only: bool,
-        audio_only: bool,
-    ) -> str:
-        """複数音声選択時に動画コンテナを MKV へ自動昇格する。
-
-        対象: 通常の結合モード (remux_only / audio_only ではない) で multi_audio=True、
-        かつ現在のコンテナが mkv 以外のときのみ昇格する。
-        昇格時はステータスバーへ通知メッセージを表示する。
-        """
-        if not multi_audio or remux_only or audio_only:
-            return video_container
-        if video_container == "mkv":
-            return video_container
-        self._update_status(t("status_multi_audio_mkv_promoted"), 0)
-        return "mkv"
+    def _notify_container_promotion_if_needed(self, job: JobSpec) -> None:
+        """build_job_spec で複数音声 → MKV 自動昇格が発生した場合に通知する。"""
+        if job.is_multi_audio and job.video_container != self._settings.video_container:
+            self._update_status(t("status_multi_audio_mkv_promoted"), 0)
 
     def _notify_audio_only_truncated_if_needed(
         self, multi_audio: bool, audio_only: bool
@@ -630,171 +610,64 @@ class App(QMainWindow):
             if not audio_only and self._original_panel.is_both_skipped():
                 QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
                 return
-            format_spec = self._original_panel.get_format_spec()
-            subtitle_opts = self._original_panel.get_subtitle_opts()
-            remux_only = self._original_panel.get_remux_only()
-            embed_thumbnail = self._original_panel.get_embed_thumbnail()
-            embed_metadata = self._original_panel.get_embed_metadata()
-            embed_chapters = self._original_panel.get_embed_chapters()
-            orig_settings = self._original_panel.get_raw_settings()
-            video_container = self._adjust_video_container_for_multi_audio(
-                self._settings.video_container,
-                self._original_panel.has_multiple_audio_selected(),
-                remux_only=remux_only,
-                audio_only=audio_only,
-            )
-            audio_codec = self._settings.audio_format if audio_only else "mp3"
+            panel = self._original_panel.get_snapshot()
+            job = build_job_spec(format_id, self._settings, panel=panel)
+            self._notify_container_promotion_if_needed(job)
             self._notify_audio_only_truncated_if_needed(
-                self._original_panel.has_multiple_audio_selected(), audio_only
+                panel.has_multiple_audio, audio_only
             )
             if audio_only:
                 format_label = f"{format_label} → {self._build_audio_label()}"
             if self._original_panel.has_formats_loaded():
                 self._enqueue_single(
                     url,
-                    format_id,
-                    format_label,
-                    format_spec,
-                    subtitle_opts,
                     self._original_panel.get_fetched_title(),
-                    remux_only=remux_only,
-                    embed_thumbnail=embed_thumbnail,
-                    embed_metadata=embed_metadata,
-                    embed_chapters=embed_chapters,
-                    orig_settings=orig_settings,
-                    video_container=video_container,
-                    audio_codec=audio_codec,
-                    audio_only=audio_only,
+                    format_label,
+                    job,
                 )
                 self.url_entry.clear()
                 self._original_panel.reset()
                 return
             self._start_add_thread(
-                url,
-                cookies_path,
-                cookies_browser,
-                format_id,
-                format_label,
-                format_spec,
-                subtitle_opts,
-                embed_thumbnail,
-                remux_only=remux_only,
-                embed_metadata=embed_metadata,
-                embed_chapters=embed_chapters,
-                orig_settings=orig_settings,
-                video_container=video_container,
-                audio_codec=audio_codec,
-                audio_only=audio_only,
+                url, cookies_path, cookies_browser, job, format_label
             )
         else:
-            audio_codec = (
-                self._settings.audio_format if format_id == _MP3_KEY else "mp3"
-            )
-            if format_id == _MP3_KEY:
-                embed_thumbnail = (
-                    bool(self._mp3_thumb_check.isChecked())
-                    if audio_codec == "mp3"
-                    else False
-                )
-            elif format_id in ("fmt_best_mp4", "fmt_720p"):
-                embed_thumbnail = True
-            else:
-                embed_thumbnail = False
+            mp3_thumb = bool(self._mp3_thumb_check.isChecked())
+            job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
             self._start_add_thread(
-                url,
-                cookies_path,
-                cookies_browser,
-                format_id,
-                format_label,
-                None,
-                None,
-                embed_thumbnail,
-                audio_codec=audio_codec,
-                embed_metadata=True,
-                embed_chapters=True,
-                video_container=self._settings.video_container,
+                url, cookies_path, cookies_browser, job, format_label
             )
 
     def _start_add_thread(
         self,
-        url,
-        cookies_path,
-        cookies_browser,
-        format_id,
-        format_label,
-        format_spec,
-        subtitle_opts,
-        embed_thumbnail=False,
-        remux_only=False,
-        audio_codec: str = "mp3",
-        embed_metadata: bool = True,
-        embed_chapters: bool = True,
-        orig_settings: dict | None = None,
-        video_container: str = "mp4",
-        audio_only: bool = False,
+        url: str,
+        cookies_path: str | None,
+        cookies_browser: str | None,
+        job: JobSpec,
+        format_label: str,
     ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
         self._signals.status_update.emit(t("status_fetching_title"), 0)
         threading.Thread(
             target=self._run_fetch_for_add,
-            args=(
-                url,
-                cookies_path,
-                cookies_browser,
-                format_id,
-                format_label,
-                format_spec,
-                subtitle_opts,
-                embed_thumbnail,
-                remux_only,
-                audio_codec,
-                embed_metadata,
-                embed_chapters,
-                orig_settings,
-                video_container,
-                audio_only,
-            ),
+            args=(url, cookies_path, cookies_browser, job, format_label),
             daemon=True,
         ).start()
 
     def _run_fetch_for_add(
         self,
-        url,
-        cookies_path,
-        cookies_browser,
-        format_id,
-        format_label,
-        format_spec,
-        subtitle_opts,
-        embed_thumbnail=False,
-        remux_only=False,
-        audio_codec: str = "mp3",
-        embed_metadata: bool = True,
-        embed_chapters: bool = True,
-        orig_settings: dict | None = None,
-        video_container: str = "mp4",
-        audio_only: bool = False,
+        url: str,
+        cookies_path: str | None,
+        cookies_browser: str | None,
+        job: JobSpec,
+        format_label: str,
     ):
         try:
             result = self.downloader.fetch_title_or_entries(
                 url, cookies_path, cookies_browser
             )
-            payload = {
-                "result": result,
-                "format_id": format_id,
-                "format_label": format_label,
-                "format_spec": format_spec,
-                "subtitle_opts": subtitle_opts,
-                "embed_thumbnail": embed_thumbnail,
-                "remux_only": remux_only,
-                "audio_codec": audio_codec,
-                "embed_metadata": embed_metadata,
-                "embed_chapters": embed_chapters,
-                "orig_settings": orig_settings,
-                "video_container": video_container,
-                "audio_only": audio_only,
-            }
+            payload = {"result": result, "job": job, "format_label": format_label}
             self._signals.fetch_for_add_done.emit(payload)
         except Exception as e:
             err_msg = strip_ansi(str(e))
@@ -814,36 +687,17 @@ class App(QMainWindow):
 
     def _on_fetch_for_add_done(self, payload: dict):
         result = payload["result"]
-        format_id = payload["format_id"]
-        format_label = payload["format_label"]
-        format_spec = payload["format_spec"]
-        subtitle_opts = payload["subtitle_opts"]
-        embed_thumbnail = payload["embed_thumbnail"]
-        remux_only = payload["remux_only"]
-        audio_codec = payload.get("audio_codec", "mp3")
-        embed_metadata = payload.get("embed_metadata", True)
-        embed_chapters = payload.get("embed_chapters", True)
-        orig_settings = payload.get("orig_settings")
-        video_container = payload.get("video_container", "mp4")
-        audio_only = payload.get("audio_only", False)
+        job: JobSpec = payload["job"]
+        format_label: str = payload["format_label"]
+        format_id = job.format_id
 
         if result["type"] == "single":
             self._enqueue_single(
                 result["url"],
-                format_id,
-                format_label,
-                format_spec,
-                subtitle_opts,
                 result["title"],
-                embed_thumbnail=embed_thumbnail,
-                remux_only=remux_only,
+                format_label,
+                job,
                 thumbnail_url=result.get("thumbnail_url"),
-                audio_codec=audio_codec,
-                embed_metadata=embed_metadata,
-                embed_chapters=embed_chapters,
-                orig_settings=orig_settings,
-                video_container=video_container,
-                audio_only=audio_only,
             )
             self.url_entry.clear()
             if format_id == _ORIGINAL_KEY:
@@ -863,33 +717,15 @@ class App(QMainWindow):
                 return
 
             playlist_title = result.get("title", "")
-            snap_spec = (
-                build_720p_spec(self._settings.video_resolution, video_container)
-                if format_id == "fmt_720p"
-                else None
-            )
-            snap_bitrate = (
-                self._settings.mp3_bitrate
-                if format_id == "fmt_mp3" and audio_codec == "mp3"
-                else None
-            )
 
             batch: list[tuple[int, _QueueItem]] = []
             for idx, entry in enumerate(entries, start=1):
                 self._item_counter += 1
                 item = _QueueItem(
                     url=entry["url"],
-                    format_id=format_id,
-                    format_label=format_label,
-                    format_spec=snap_spec,
-                    subtitle_opts=None,
                     title=entry["title"],
-                    mp3_bitrate=snap_bitrate,
-                    embed_thumbnail=embed_thumbnail,
-                    embed_metadata=embed_metadata,
-                    embed_chapters=embed_chapters,
-                    audio_codec=audio_codec,
-                    video_container=video_container,
+                    format_label=format_label,
+                    job=job,
                     playlist_title=playlist_title,
                     playlist_index=idx,
                     thumbnail_url=entry.get("thumbnail_url"),
@@ -918,53 +754,20 @@ class App(QMainWindow):
 
     def _enqueue_single(
         self,
-        url,
-        format_id,
-        format_label,
-        format_spec,
-        subtitle_opts,
-        title,
-        embed_thumbnail=False,
-        remux_only=False,
-        thumbnail_url=None,
-        audio_codec: str = "mp3",
-        embed_metadata: bool = True,
-        embed_chapters: bool = True,
-        orig_settings: dict | None = None,
-        video_container: str = "mp4",
-        audio_only: bool = False,
+        url: str,
+        title: str,
+        format_label: str,
+        job: JobSpec,
+        *,
+        thumbnail_url: str | None = None,
     ):
-        if format_id == "fmt_720p" and format_spec is None:
-            format_spec = build_720p_spec(
-                self._settings.video_resolution, video_container
-            )
-        is_audio_extraction = format_id == "fmt_mp3" or (
-            format_id == _ORIGINAL_KEY and audio_only
-        )
-        mp3_bitrate = (
-            self._settings.mp3_bitrate
-            if is_audio_extraction and audio_codec == "mp3"
-            else None
-        )
-
         self._item_counter += 1
         item = _QueueItem(
             url=url,
-            format_id=format_id,
-            format_label=format_label,
-            format_spec=format_spec,
-            subtitle_opts=subtitle_opts,
             title=title,
-            mp3_bitrate=mp3_bitrate,
-            embed_thumbnail=embed_thumbnail,
-            embed_metadata=embed_metadata,
-            embed_chapters=embed_chapters,
-            audio_codec=audio_codec,
-            video_container=video_container,
-            remux_only=remux_only,
-            audio_only=audio_only,
+            format_label=format_label,
+            job=job,
             thumbnail_url=thumbnail_url,
-            orig_settings=orig_settings,
         )
         with self._queue_lock:
             self._queue_items.append(item)
@@ -1084,14 +887,14 @@ class App(QMainWindow):
             self._on_format_changed(idx)
 
         if target_format_id == _MP3_KEY:
-            self._mp3_thumb_check.setChecked(first.embed_thumbnail)
+            self._mp3_thumb_check.setChecked(first.job.embed_thumbnail)
 
         if (
             target_format_id == _ORIGINAL_KEY
             and len(items) == 1
-            and first.orig_settings
+            and first.job.orig_settings
         ):
-            self._original_panel.restore_from_settings(first.orig_settings)
+            self._original_panel.restore_from_settings(first.job.orig_settings)
 
         self.add_button.setText(t("btn_apply_edit"))
         self._cancel_edit_button.setVisible(True)
@@ -1128,93 +931,22 @@ class App(QMainWindow):
             if not audio_only and self._original_panel.is_both_skipped():
                 QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
                 return
-            format_spec = self._original_panel.get_format_spec()
-            subtitle_opts = self._original_panel.get_subtitle_opts()
-            remux_only = self._original_panel.get_remux_only()
-            embed_thumbnail = self._original_panel.get_embed_thumbnail()
-            embed_metadata = self._original_panel.get_embed_metadata()
-            embed_chapters = self._original_panel.get_embed_chapters()
-            orig_settings = self._original_panel.get_raw_settings()
-            video_container = self._adjust_video_container_for_multi_audio(
-                self._settings.video_container,
-                self._original_panel.has_multiple_audio_selected(),
-                remux_only=remux_only,
-                audio_only=audio_only,
-            )
-            audio_codec = self._settings.audio_format if audio_only else "mp3"
-            mp3_bitrate = (
-                self._settings.mp3_bitrate
-                if audio_only and audio_codec == "mp3"
-                else None
-            )
+            panel = self._original_panel.get_snapshot()
+            job = build_job_spec(format_id, self._settings, panel=panel)
+            self._notify_container_promotion_if_needed(job)
             self._notify_audio_only_truncated_if_needed(
-                self._original_panel.has_multiple_audio_selected(), audio_only
+                panel.has_multiple_audio, audio_only
             )
             if audio_only:
                 format_label = f"{format_label} → {self._build_audio_label()}"
-        elif format_id == _MP3_KEY:
-            format_spec = None
-            subtitle_opts = None
-            remux_only = False
-            audio_only = False
-            audio_codec = self._settings.audio_format
-            mp3_bitrate = self._settings.mp3_bitrate if audio_codec == "mp3" else None
-            embed_thumbnail = (
-                bool(self._mp3_thumb_check.isChecked())
-                if audio_codec == "mp3"
-                else False
-            )
-            embed_metadata = True
-            embed_chapters = True
-            orig_settings = None
-            video_container = self._settings.video_container
-        elif format_id in ("fmt_720p", "fmt_best_mp4"):
-            format_spec = (
-                build_720p_spec(
-                    self._settings.video_resolution,
-                    self._settings.video_container,
-                )
-                if format_id == "fmt_720p"
-                else None
-            )
-            subtitle_opts = None
-            remux_only = False
-            audio_only = False
-            audio_codec = "mp3"
-            mp3_bitrate = None
-            embed_thumbnail = True
-            embed_metadata = True
-            embed_chapters = True
-            orig_settings = None
-            video_container = self._settings.video_container
         else:
-            format_spec = None
-            subtitle_opts = None
-            remux_only = False
-            audio_only = False
-            audio_codec = "mp3"
-            mp3_bitrate = None
-            embed_thumbnail = False
-            embed_metadata = True
-            embed_chapters = True
-            orig_settings = None
-            video_container = self._settings.video_container
+            mp3_thumb = bool(self._mp3_thumb_check.isChecked())
+            job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
 
         with self._queue_lock:
             for item in self._editing_items:
-                item.format_id = format_id
                 item.format_label = format_label
-                item.format_spec = format_spec
-                item.subtitle_opts = subtitle_opts
-                item.remux_only = remux_only
-                item.audio_only = audio_only
-                item.audio_codec = audio_codec
-                item.mp3_bitrate = mp3_bitrate
-                item.embed_thumbnail = embed_thumbnail
-                item.embed_metadata = embed_metadata
-                item.embed_chapters = embed_chapters
-                item.orig_settings = orig_settings
-                item.video_container = video_container
+                item.job = job
                 item.status = "waiting"
 
         for item in self._editing_items:
@@ -1317,30 +1049,14 @@ class App(QMainWindow):
                     )
                     cookies_path = None
 
-            nico_comments_opts = (
-                (item.orig_settings or {}).get("nico_comments")
-                if item.orig_settings
-                else None
-            )
             try:
                 self.downloader.download_video(
                     item.url,
-                    item.format_id,
+                    item.job,
                     cookies_path,
-                    item.format_spec,
-                    item.subtitle_opts,
-                    mp3_bitrate_override=item.mp3_bitrate,
-                    embed_thumbnail=item.embed_thumbnail,
-                    remux_only=item.remux_only,
                     cookies_browser=cookies_browser,
-                    audio_codec=item.audio_codec,
-                    embed_metadata=item.embed_metadata,
-                    embed_chapters=item.embed_chapters,
-                    video_container=item.video_container,
                     playlist_title=item.playlist_title,
                     playlist_index=item.playlist_index,
-                    audio_only=item.audio_only,
-                    nico_comments_opts=nico_comments_opts,
                 )
                 with self._queue_lock:
                     item.status = "done"

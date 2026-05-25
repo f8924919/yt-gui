@@ -64,6 +64,7 @@
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
 | `get_nico_comments_opts()` | `dict` | ニコニコ動画コメント → ASS 変換 / MKV 統合オプション（`convert_to_ass` / `embed_to_mkv` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す |
 | `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]`、ニコニコ動画コメント設定は `nico_comments: dict` を含む） |
+| `get_snapshot()` | `PanelSnapshot` | `build_job_spec` ([job_spec.md](job_spec.md)) に渡すための UI 非依存スナップショット。`get_format_spec` / `get_subtitle_opts` / 各 `get_embed_*` / `has_multiple_audio_selected` / `get_raw_settings` を 1 つの dataclass にまとめたもの |
 | `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる。`nico_comments` 欠如時はデフォルト値を採用 |
 | `has_formats_loaded()` | `bool` | フォーマット取得済みかどうか |
 | `get_fetched_title()` | `str` | 取得済みタイトル |

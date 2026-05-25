@@ -39,27 +39,30 @@ URL 種別を判別して返す。
 
 `info["formats"]` の各エントリを `vcodec` / `acodec` で分類して映像/音声リストに振り分ける。両方が `None` (= 抽出器がコーデック情報を埋めなかった直接 URL の形式、例: xvideos の `flv` / `urllow` / `urlhigh`) の場合は **muxed メディア** とみなし、映像リストへ `has_audio=True` で登録する（音声コンボでは「映像に含まれます」表示になる）。これにより、コーデック情報を返さない抽出器でもオリジナル形式の選択肢が空にならない。
 
-#### `download_video(url, format_id, ...) -> None`
+#### `download_video(url, job, cookies_path=None, *, output_dir_override=None, cookies_browser=None, playlist_title=None, playlist_index=None) -> None`
 
-ダウンロードを実行する。主要オプション:
+ダウンロードを実行する。実行設定は `JobSpec` ([job_spec.md](job_spec.md)) に集約済みで、`format_spec` / `audio_codec` / `video_container` / `embed_*` / `remux_only` / `audio_only` / `mp3_bitrate` / `subtitle_opts` / `is_multi_audio` などはすべて `job` 経由で受け取る。downloader 側では format_id ごとの fallback ロジックは持たない。
 
-| 引数 | デフォルト | 説明 |
-|------|-----------|------|
-| `audio_codec` | `"mp3"` | 音声コーデック |
-| `video_container` | `"mp4"` | 映像コンテナ |
-| `embed_metadata` | `False` | メタデータ埋め込み |
-| `embed_chapters` | `False` | チャプター埋め込み |
-| `remux_only` | `False` | リマックスのみ（再エンコードなし） |
-| `playlist_title` | `None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
-| `playlist_index` | `None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
-| `nico_comments_opts` | `None` | ニコニコ動画コメント → ASS 変換 / MKV 統合オプション（`convert_to_ass` / `embed_to_mkv` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`convert_to_ass=True` かつ字幕に `comments` lang が含まれる場合、ダウンロード完了後に danmaku2ass を subprocess 呼び出しして `{stem}.comments.ass` を生成する。さらに `embed_to_mkv=True` のときは ffmpeg で `{stem}.with-comments.mkv` を別ファイルとして生成する |
+主要引数:
+
+| 引数 | 型 | 説明 |
+|------|----|------|
+| `url` | `str` | ダウンロード対象 URL |
+| `job` | `JobSpec` | 実行設定 ([job_spec.md](job_spec.md)) |
+| `cookies_path` | `str \| None` | cookies.txt のパス |
+| `cookies_browser` | `str \| None` | ブラウザ名 (指定時は cookies_path より優先) |
+| `output_dir_override` | `str \| None` | デフォルト出力先を上書きする場合に指定 |
+| `playlist_title` | `str \| None` | プレイリスト名（指定時はプレイリスト用テンプレートを採用し `extra_info` 経由で `%(playlist_title)s` を解決） |
+| `playlist_index` | `int \| None` | プレイリスト内番号（`%(playlist_index)s` の解決に使用） |
+
+ニコニコ動画コメント関連オプションは `job.orig_settings["nico_comments"]` から読み出す。
 
 ### 複数音声ストリーム対応
 
-`format_spec` に含まれる `+` の個数が **2 個以上**（例: `bestvideo+251+140`、`bv*+251+140` 等）で、かつ音声抽出経路（`is_audio=True`）でない場合は、以下を自動付与する:
+`job.is_multi_audio=True` のとき以下を自動付与する:
 
 - `ydl_opts["allow_multiple_audio_streams"] = True`
-- `video_container = "mkv"` に強制（`merge_output_format` も MKV になり、ファイル拡張子計算も `.mkv` に整合する）
+- `job.video_container` は `build_job_spec` 側で既に `mkv` へ昇格済み (`merge_output_format` も MKV になり、ファイル拡張子計算も `.mkv` に整合する)
 
 サムネイル埋め込み判定の `_THUMBNAIL_EMBED_CONTAINERS` には既に `mkv` が含まれているため、サムネ埋め込み付きでも問題ない。
 
