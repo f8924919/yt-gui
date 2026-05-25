@@ -1,14 +1,11 @@
-import base64
 import os
 import sys
 import threading
-import urllib.request
-from dataclasses import dataclass
 from datetime import datetime
 from os.path import expanduser
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -29,7 +26,6 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QToolTip,
     QTreeWidget,
-    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -41,8 +37,10 @@ from .i18n import t
 from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
 from .original_format_panel import OriginalFormatPanel
+from .queue_controller import QueueController, _QueueItem
 from .settings import SettingsManager, build_proxy_url
 from .settings_dialog import SettingsDialog
+from .thumbnail_cache import ThumbnailCache
 from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
@@ -52,32 +50,20 @@ _WIN_H_DEFAULT = 480
 _WIN_H_EXPANDED = 700
 
 
-@dataclass
-class _QueueItem:
-    url: str
-    title: str
-    format_label: str
-    job: JobSpec
-    playlist_title: str | None = None
-    playlist_index: int | None = None
-    thumbnail_url: str | None = None
-    status: str = "waiting"
-    tree_item: QTreeWidgetItem | None = None
-
-    @property
-    def format_id(self) -> str:
-        return self.job.format_id
-
-
 class _AppSignals(QObject):
+    """App 自身がバックグラウンドスレッドから emit する用のシグナル。
+
+    キュー走行ワーカー由来のシグナルは `QueueController` に移管済み。
+    残っているのは URL タイトル取得スレッド (`_run_fetch_for_add`) で
+    使う `fetch_for_add_done` / `add_button_reset` と、共通ハンドラ
+    (status / log / error / warning) のみ。
+    """
+
     status_update = Signal(str, float)
     log_message = Signal(str)
-    queue_item_refresh = Signal(object)  # _QueueItem
     add_button_reset = Signal()
     fetch_for_add_done = Signal(object)  # carries dict with result + metadata
-    worker_done = Signal()
     show_error = Signal(str, str)
-    show_warning = Signal(str, str)
 
 
 class _QueueTree(QTreeWidget):
@@ -170,20 +156,6 @@ class _QueueTree(QTreeWidget):
 
 
 class App(QMainWindow):
-    _STATUS_KEY_MAP: dict[str, str] = {
-        "waiting": "queue_status_waiting",
-        "downloading": "queue_status_downloading",
-        "done": "queue_status_done",
-        "error": "queue_status_error",
-        "editing": "queue_status_editing",
-    }
-    _STATUS_COLORS: dict[str, str] = {
-        "downloading": "#1565c0",
-        "done": "#2e7d32",
-        "error": "#c62828",
-        "editing": "#e65100",
-    }
-
     def __init__(self):
         super().__init__()
 
@@ -204,32 +176,17 @@ class App(QMainWindow):
             if os.path.isfile(default):
                 self._settings.cookies_path = default
 
-        self._queue_items: list[_QueueItem] = []
-        self._queue_lock = threading.Lock()
-        self._thumbnail_cache: dict[str, str] = {}  # thumbnail_url -> data URI
-        self._thumbnail_fetching: set[str] = set()
-        self._thumbnail_lock = threading.Lock()
-        self._worker_running = False
-        self._paused = False
         self._showing_pause_button = False
-        self._item_counter = 0
         self._log_entries: list[str] = []
         self._log_dialog: LogDialog | None = None
-        self._edit_mode = False
-        self._editing_items: list[_QueueItem] = []
 
         self._signals = _AppSignals()
         self._signals.status_update.connect(self._update_status)
         self._signals.log_message.connect(self._log)
-        self._signals.queue_item_refresh.connect(self._refresh_tree_item)
         self._signals.add_button_reset.connect(self._reset_add_button)
         self._signals.fetch_for_add_done.connect(self._on_fetch_for_add_done)
-        self._signals.worker_done.connect(lambda: self._set_queue_running(False))
         self._signals.show_error.connect(
             lambda title, msg: QMessageBox.critical(self, title, msg)
-        )
-        self._signals.show_warning.connect(
-            lambda title, msg: QMessageBox.warning(self, title, msg)
         )
 
         self.downloader = Downloader(
@@ -243,9 +200,33 @@ class App(QMainWindow):
             proxy_url=build_proxy_url(self._settings),
         )
 
+        self._thumbnail_cache = ThumbnailCache(self)
+
         self._create_menu()
         self._create_widgets()
+
+        # Queue controller の生成は _queue_tree 構築後でないといけないため、
+        # _create_widgets の後で行う。
+        self.queue = QueueController(self.downloader, self._queue_tree, self)
+        self._wire_queue_signals()
+
         QTimer.singleShot(0, self._check_dependencies)
+
+    def _wire_queue_signals(self) -> None:
+        """QueueController のシグナルを App スロットへ配線する。"""
+        self.queue.item_refresh.connect(self.queue.refresh_tree_item)
+        self.queue.status_update.connect(self._update_status)
+        self.queue.log_message.connect(self._log)
+        self.queue.show_error.connect(
+            lambda title, msg: QMessageBox.critical(self, title, msg)
+        )
+        self.queue.show_warning.connect(
+            lambda title, msg: QMessageBox.warning(self, title, msg)
+        )
+        self.queue.worker_done.connect(lambda: self._set_queue_running(False))
+        self.queue.item_added.connect(self._on_queue_item_added)
+        self.queue.edit_mode_entered.connect(self._on_edit_mode_entered)
+        self.queue.edit_mode_exited.connect(self._on_edit_mode_exited)
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -294,7 +275,7 @@ class App(QMainWindow):
         self.format_combo.addItems(self._format_display)
         self.format_combo.setCurrentIndex(old_idx)
         self.format_combo.blockSignals(False)
-        if self._edit_mode and len(self._editing_items) > 1:
+        if self.queue.edit_mode and len(self.queue.editing_items) > 1:
             self._set_original_format_enabled(False)
         self._on_format_changed(old_idx)
 
@@ -309,21 +290,18 @@ class App(QMainWindow):
         )
 
         self.add_button.setText(
-            t("btn_apply_edit") if self._edit_mode else t("btn_add")
+            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
         )
         self._cancel_edit_button.setText(t("btn_cancel_edit"))
         self.start_queue_button.setText(t("btn_start_queue"))
         self.pause_queue_button.setText(t("btn_pause_queue"))
         self.remove_item_button.setText(t("btn_remove_item"))
 
-        with self._queue_lock:
-            items = list(self._queue_items)
-        for item in items:
-            self._refresh_tree_item(item)
+        self.queue.refresh_all_tree_items()
 
-        if not self._worker_running:
+        if not self.queue.is_running:
             self.status_label.setText(
-                t("status_edit_mode") if self._edit_mode else t("status_ready")
+                t("status_edit_mode") if self.queue.edit_mode else t("status_ready")
             )
 
     def _resolve_download_path(self) -> str:
@@ -490,9 +468,10 @@ class App(QMainWindow):
         qbl.addWidget(self._lbl_queue_title)
 
         self._queue_tree = _QueueTree()
-        self._queue_tree._get_item_cb = self._get_queue_item_for_tree_item
+        # self.queue は _create_widgets の後で生成されるため lambda 経由で遅延参照
+        self._queue_tree._get_item_cb = lambda ti: self.queue.find_item_for(ti)
         self._queue_tree._context_menu_cb = self._enter_edit_mode
-        self._queue_tree._get_thumbnail_b64_cb = self._get_thumbnail_b64
+        self._queue_tree._get_thumbnail_b64_cb = self._thumbnail_cache.get
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
@@ -589,7 +568,7 @@ class App(QMainWindow):
     # ── queue operations ──────────────────────────────────────────────────────
 
     def _add_url(self):
-        if self._edit_mode:
+        if self.queue.edit_mode:
             self._apply_edit()
             return
         url = self.url_entry.text().strip()
@@ -619,7 +598,7 @@ class App(QMainWindow):
             if audio_only:
                 format_label = f"{format_label} → {self._build_audio_label()}"
             if self._original_panel.has_formats_loaded():
-                self._enqueue_single(
+                self.queue.enqueue_single(
                     url,
                     self._original_panel.get_fetched_title(),
                     format_label,
@@ -682,7 +661,7 @@ class App(QMainWindow):
     def _reset_add_button(self):
         self.add_button.setEnabled(True)
         self.add_button.setText(
-            t("btn_apply_edit") if self._edit_mode else t("btn_add")
+            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
         )
 
     def _on_fetch_for_add_done(self, payload: dict):
@@ -692,7 +671,7 @@ class App(QMainWindow):
         format_id = job.format_id
 
         if result["type"] == "single":
-            self._enqueue_single(
+            self.queue.enqueue_single(
                 result["url"],
                 result["title"],
                 format_label,
@@ -717,154 +696,28 @@ class App(QMainWindow):
                 return
 
             playlist_title = result.get("title", "")
-
-            batch: list[tuple[int, _QueueItem]] = []
-            for idx, entry in enumerate(entries, start=1):
-                self._item_counter += 1
-                item = _QueueItem(
-                    url=entry["url"],
-                    title=entry["title"],
-                    format_label=format_label,
-                    job=job,
-                    playlist_title=playlist_title,
-                    playlist_index=idx,
-                    thumbnail_url=entry.get("thumbnail_url"),
-                )
-                batch.append((self._item_counter, item))
-
-            with self._queue_lock:
-                for _, item in batch:
-                    self._queue_items.append(item)
-
-            for no, item in batch:
-                short = item.title if len(item.title) <= 45 else item.title[:42] + "..."
-                tree_item = QTreeWidgetItem(
-                    [str(no), short, format_label, t("queue_status_waiting")]
-                )
-                item.tree_item = tree_item
-                self._queue_tree.addTopLevelItem(tree_item)
-
-            for _, item in batch:
-                self._start_thumbnail_fetch(item.thumbnail_url)
+            added = self.queue.enqueue_playlist(
+                entries, playlist_title, format_label, job
+            )
 
             self.url_entry.clear()
-            msg = t("status_playlist_added").format(count=len(batch))
+            msg = t("status_playlist_added").format(count=len(added))
             self._signals.status_update.emit(msg, 0)
             self._log(msg)
 
-    def _enqueue_single(
-        self,
-        url: str,
-        title: str,
-        format_label: str,
-        job: JobSpec,
-        *,
-        thumbnail_url: str | None = None,
-    ):
-        self._item_counter += 1
-        item = _QueueItem(
-            url=url,
-            title=title,
-            format_label=format_label,
-            job=job,
-            thumbnail_url=thumbnail_url,
-        )
-        with self._queue_lock:
-            self._queue_items.append(item)
-
-        short = title if len(title) <= 45 else title[:42] + "..."
-        tree_item = QTreeWidgetItem(
-            [str(self._item_counter), short, format_label, t("queue_status_waiting")]
-        )
-        item.tree_item = tree_item
-        self._queue_tree.addTopLevelItem(tree_item)
-        self._start_thumbnail_fetch(thumbnail_url)
-        self._log(f"📥 {title}  [{format_label}]")
-
-    def _get_queue_item_for_tree_item(
-        self, tree_item: QTreeWidgetItem
-    ) -> _QueueItem | None:
-        with self._queue_lock:
-            return next(
-                (i for i in self._queue_items if i.tree_item is tree_item), None
-            )
-
-    # ── thumbnail cache ───────────────────────────────────────────────────────
-
-    def _get_thumbnail_b64(self, thumbnail_url: str) -> str | None:
-        with self._thumbnail_lock:
-            return self._thumbnail_cache.get(thumbnail_url)
-
-    def _start_thumbnail_fetch(self, thumbnail_url: str | None):
-        if not thumbnail_url:
-            return
-        with self._thumbnail_lock:
-            if (
-                thumbnail_url in self._thumbnail_cache
-                or thumbnail_url in self._thumbnail_fetching
-            ):
-                return
-            self._thumbnail_fetching.add(thumbnail_url)
-        threading.Thread(
-            target=self._run_thumbnail_fetch,
-            args=(thumbnail_url,),
-            daemon=True,
-        ).start()
-
-    def _run_thumbnail_fetch(self, thumbnail_url: str):
-        try:
-            req = urllib.request.Request(
-                thumbnail_url,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = resp.read()
-                ct = resp.headers.get("Content-Type", "image/jpeg")
-                content_type = ct.split(";")[0].strip() if ct else "image/jpeg"
-            b64 = base64.b64encode(data).decode("ascii")
-            data_uri = f"data:{content_type};base64,{b64}"
-            with self._thumbnail_lock:
-                self._thumbnail_cache[thumbnail_url] = data_uri
-                self._thumbnail_fetching.discard(thumbnail_url)
-        except Exception:
-            with self._thumbnail_lock:
-                self._thumbnail_fetching.discard(thumbnail_url)
-
-    def _refresh_tree_item(self, item: _QueueItem):
-        if item is None or item.tree_item is None:
-            return
-        tree_item: QTreeWidgetItem = item.tree_item
-        status_text = (
-            t(self._STATUS_KEY_MAP[item.status])
-            if item.status in self._STATUS_KEY_MAP
-            else item.status
-        )
-        tree_item.setText(3, status_text)
-        color_hex = self._STATUS_COLORS.get(item.status)
-        if color_hex:
-            c = QColor(color_hex)
-            for col in range(4):
-                tree_item.setForeground(col, c)
-        else:
-            for col in range(4):
-                tree_item.setData(col, Qt.ItemDataRole.ForegroundRole, None)
+    def _on_queue_item_added(self, item: _QueueItem) -> None:
+        """QueueController から追加通知を受け、サムネ取得を起動する。"""
+        self._thumbnail_cache.request(item.thumbnail_url)
 
     # ── edit mode ─────────────────────────────────────────────────────────────
 
     def _enter_edit_mode(self, items: list[_QueueItem]):
-        with self._queue_lock:
-            for item in items:
-                if item.status != "waiting":
-                    return
-            for item in items:
-                item.status = "editing"
+        """`_QueueTree` のコンテキストメニューから呼ばれる。"""
+        self.queue.enter_edit_mode(items)
 
-        self._edit_mode = True
-        self._editing_items = items
+    def _on_edit_mode_entered(self, items: list[_QueueItem]) -> None:
+        """QueueController からの通知を受けて UI を編集モードに整える。"""
         self._queue_tree._is_editing = True
-
-        for item in items:
-            self._refresh_tree_item(item)
 
         if len(items) == 1:
             self.url_entry.setText(items[0].url)
@@ -899,7 +752,7 @@ class App(QMainWindow):
         self.add_button.setText(t("btn_apply_edit"))
         self._cancel_edit_button.setVisible(True)
 
-        if not self._worker_running:
+        if not self.queue.is_running:
             self.start_queue_button.setEnabled(False)
 
         self._update_status(t("status_edit_mode"), 0)
@@ -914,7 +767,7 @@ class App(QMainWindow):
         format_id = FORMAT_KEYS[idx]
         format_label = self.format_combo.currentText()
 
-        if len(self._editing_items) > 1 and format_id == _ORIGINAL_KEY:
+        if len(self.queue.editing_items) > 1 and format_id == _ORIGINAL_KEY:
             QMessageBox.warning(self, t("warn_title"), t("warn_edit_original_multi"))
             return
 
@@ -943,36 +796,13 @@ class App(QMainWindow):
             mp3_thumb = bool(self._mp3_thumb_check.isChecked())
             job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
 
-        with self._queue_lock:
-            for item in self._editing_items:
-                item.format_label = format_label
-                item.job = job
-                item.status = "waiting"
-
-        for item in self._editing_items:
-            if item.tree_item is not None:
-                item.tree_item.setText(2, format_label)
-            self._refresh_tree_item(item)
-
-        self._log(
-            t("log_edit_applied").format(
-                count=len(self._editing_items), fmt=format_label
-            )
-        )
-        self._exit_edit_mode()
+        self.queue.apply_edit(format_label, job)
 
     def _cancel_edit(self):
-        with self._queue_lock:
-            for item in self._editing_items:
-                if item.status == "editing":
-                    item.status = "waiting"
-        for item in self._editing_items:
-            self._refresh_tree_item(item)
-        self._exit_edit_mode()
+        self.queue.cancel_edit()
 
-    def _exit_edit_mode(self):
-        self._edit_mode = False
-        self._editing_items = []
+    def _on_edit_mode_exited(self) -> None:
+        """QueueController からの通知を受けて UI を通常モードに戻す。"""
         self._queue_tree._is_editing = False
 
         self.url_entry.clear()
@@ -983,7 +813,7 @@ class App(QMainWindow):
 
         self._set_original_format_enabled(True)
 
-        if not self._worker_running:
+        if not self.queue.is_running:
             self.start_queue_button.setEnabled(True)
 
         self._original_panel.reset()
@@ -994,86 +824,16 @@ class App(QMainWindow):
     # ── queue control ─────────────────────────────────────────────────────────
 
     def _start_queue(self):
-        with self._queue_lock:
-            has_waiting = any(i.status == "waiting" for i in self._queue_items)
-        if not has_waiting:
+        if not self.queue.has_waiting():
             QMessageBox.warning(self, t("warn_title"), t("warn_queue_empty"))
             return
-        if self._worker_running:
+        if self.queue.is_running:
             return
-
-        self._paused = False
-        self._worker_running = True
-        self._set_queue_running(True)
-        self._log(t("log_queue_started"))
-        threading.Thread(target=self._worker, daemon=True).start()
-
-    def _worker(self):
-        while True:
-            with self._queue_lock:
-                if self._paused:
-                    self._worker_running = False
-                    return
-                item = next(
-                    (i for i in self._queue_items if i.status == "waiting"), None
-                )
-                if item is None:
-                    self._worker_running = False
-                    self._signals.status_update.emit(t("status_ready"), 0)
-                    self._signals.log_message.emit(t("log_queue_done"))
-                    self._signals.worker_done.emit()
-                    return
-                item.status = "downloading"
-
-            self._signals.queue_item_refresh.emit(item)
-            self._signals.log_message.emit(f"⬇️ {item.title}  [{item.format_label}]")
-
-            def make_cb(qi):
-                def cb(text, percent):
-                    self._signals.status_update.emit(text, percent)
-                    self._signals.queue_item_refresh.emit(qi)
-
-                return cb
-
-            self.downloader.status_callback = make_cb(item)
-
-            cookies_browser = self._settings.cookies_browser or None
-            if cookies_browser:
-                cookies_path = None
-            else:
-                cookies_path = self._settings.cookies_path or None
-                if cookies_path and not os.path.isfile(cookies_path):
-                    self._signals.show_warning.emit(
-                        t("warn_title"),
-                        t("warn_cookies_not_found").format(path=cookies_path),
-                    )
-                    cookies_path = None
-
-            try:
-                self.downloader.download_video(
-                    item.url,
-                    item.job,
-                    cookies_path,
-                    cookies_browser=cookies_browser,
-                    playlist_title=item.playlist_title,
-                    playlist_index=item.playlist_index,
-                )
-                with self._queue_lock:
-                    item.status = "done"
-            except Exception as e:
-                with self._queue_lock:
-                    item.status = "error"
-                err_msg = strip_ansi(str(e))
-                self._signals.log_message.emit(f"❌ {err_msg}")
-                self._signals.show_error.emit(
-                    t("err_title"), t("err_download").format(error=err_msg)
-                )
-
-            self._signals.queue_item_refresh.emit(item)
+        if self.queue.start(self._resolve_cookies):
+            self._set_queue_running(True)
 
     def _pause_queue(self):
-        self._paused = True
-        self._log(t("log_queue_paused"))
+        self.queue.pause()
         self._set_queue_running(False)
 
     def _set_queue_running(self, running: bool):
@@ -1084,17 +844,7 @@ class App(QMainWindow):
         self._showing_pause_button = running
 
     def _remove_selected(self):
-        for tree_item in self._queue_tree.selectedItems():
-            with self._queue_lock:
-                qi = next(
-                    (i for i in self._queue_items if i.tree_item is tree_item), None
-                )
-                if qi is None or qi.status in ("downloading", "editing"):
-                    continue
-                self._queue_items.remove(qi)
-            idx = self._queue_tree.indexOfTopLevelItem(tree_item)
-            if idx >= 0:
-                self._queue_tree.takeTopLevelItem(idx)
+        self.queue.remove_selected()
 
     # ── settings ──────────────────────────────────────────────────────────────
 
@@ -1127,7 +877,7 @@ class App(QMainWindow):
                 self._settings.video_container, self._build_audio_label()
             )
             self._on_format_changed(old_idx)
-            if self._edit_mode and len(self._editing_items) > 1:
+            if self.queue.edit_mode and len(self.queue.editing_items) > 1:
                 self._set_original_format_enabled(False)
 
     # ── status / log ──────────────────────────────────────────────────────────

@@ -16,7 +16,9 @@
 | ドキュメント | モジュール | 関連仕様 |
 |---|---|---|
 | [entry.md](entry.md) | `__main__.py` / `__init__.py` — エントリーポイント・リソースパス解決 | — |
-| [app.md](app.md) | `app.py` — メインウィンドウ・キュー管理・シグナル定義 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) |
+| [app.md](app.md) | `app.py` — メインウィンドウ・ウィジェット組み立て・シグナル配線 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) |
+| [queue_controller.md](queue_controller.md) | `queue_controller.py` — キュー所有・ワーカースレッド・編集モード状態機械 | [ダウンロードキュー](../spec/features/queue.md) |
+| [thumbnail_cache.md](thumbnail_cache.md) | `thumbnail_cache.py` — 動画サムネイル画像の非同期取得・キャッシュ | — |
 | [downloader.md](downloader.md) | `downloader.py` — yt-dlp ラッパー・ダウンロード実行 | [ダウンロード動作](../spec/features/download-behavior.md) / [ダウンロード形式](../spec/features/download-formats.md) |
 | [original_format_panel.md](original_format_panel.md) | `original_format_panel.py` — オリジナル形式パネル | [オリジナル形式パネル](../spec/screens/original-format-panel.md) |
 | [settings_dialog.md](settings_dialog.md) | `settings_dialog.py` — 設定ダイアログ | [設定ダイアログ](../spec/screens/settings-dialog.md) |
