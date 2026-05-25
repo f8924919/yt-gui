@@ -7,8 +7,8 @@ from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
 
 from . import get_resource_base
-from .formats import FORMAT_SPECS, build_720p_spec, build_best_spec
 from .i18n import t
+from .job_spec import JobSpec
 from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
 from .utils import strip_ansi
 
@@ -335,40 +335,26 @@ class Downloader:
 
     def download_video(
         self,
-        url,
-        format_id,
-        cookies_path=None,
-        format_spec=None,
-        subtitle_opts=None,
-        mp3_bitrate_override=None,
-        embed_thumbnail=False,
-        remux_only=False,
-        output_dir_override=None,
-        cookies_browser=None,
-        audio_codec: str = "mp3",
-        embed_metadata: bool = False,
-        embed_chapters: bool = False,
-        video_container: str = "mp4",
+        url: str,
+        job: JobSpec,
+        cookies_path: str | None = None,
+        *,
+        output_dir_override: str | None = None,
+        cookies_browser: str | None = None,
         playlist_title: str | None = None,
         playlist_index: int | None = None,
-        audio_only: bool = False,
-        nico_comments_opts: dict | None = None,
     ):
-        if format_spec is not None:
-            spec = format_spec
-            _, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
-        elif format_id == "fmt_best_mp4":
-            spec = build_best_spec(video_container)
-            is_audio = False
-        elif format_id == "fmt_720p":
-            spec = build_720p_spec(self.video_resolution, video_container)
-            is_audio = False
-        else:
-            spec, is_audio = FORMAT_SPECS.get(format_id, ("best/best", False))
-
-        # オリジナル形式で音声のみが選ばれている場合は音声抽出経路へ
-        if format_id == "fmt_original" and audio_only:
-            is_audio = True
+        spec = job.format_spec
+        is_audio = job.is_audio_extraction
+        audio_codec = job.audio_codec
+        embed_thumbnail = job.embed_thumbnail
+        embed_metadata = job.embed_metadata
+        embed_chapters = job.embed_chapters
+        remux_only = job.remux_only
+        video_container = job.video_container
+        subtitle_opts = job.subtitle_opts
+        mp3_bitrate_override = job.mp3_bitrate
+        nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
 
         out_dir = output_dir_override or self.output_dir
         os.makedirs(out_dir, exist_ok=True)
@@ -385,10 +371,6 @@ class Downloader:
                 "playlist_index": playlist_index,
             }
 
-        # 複数音声ストリームを 1 ファイルにマージする場合は MKV に強制する
-        # (`bestvideo+aid1+aid2` のように `+` が 2 個以上含まれるパターン)。
-        is_multi_audio = (not is_audio) and spec.count("+") >= 2
-
         ydl_opts = {
             "format": spec,
             "outtmpl": os.path.join(out_dir, template),
@@ -398,9 +380,8 @@ class Downloader:
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
 
-        if is_multi_audio:
+        if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True
-            video_container = "mkv"
 
         if is_audio:
             pp: dict = {

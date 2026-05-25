@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from .downloader import Downloader
 from .i18n import t
+from .job_spec import PanelSnapshot
 from .utils import strip_ansi
 
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
@@ -683,6 +684,20 @@ class OriginalFormatPanel(QGroupBox):
             self._nico_embed_mkv_check.blockSignals(True)
             self._nico_embed_mkv_check.setChecked(False)
             self._nico_embed_mkv_check.blockSignals(False)
+
+    def get_snapshot(self) -> PanelSnapshot:
+        """build_job_spec に渡す UI 非依存スナップショットを返す。"""
+        return PanelSnapshot(
+            format_spec=self.get_format_spec(),
+            subtitle_opts=self.get_subtitle_opts(),
+            remux_only=self.get_remux_only(),
+            audio_only=self.get_audio_only(),
+            embed_thumbnail=self.get_embed_thumbnail(),
+            embed_metadata=self.get_embed_metadata(),
+            embed_chapters=self.get_embed_chapters(),
+            has_multiple_audio=self.has_multiple_audio_selected(),
+            raw_settings=self.get_raw_settings(),
+        )
 
     def get_raw_settings(self) -> dict:
         """現在の選択状態を復元可能な形式で返す。"""
