@@ -3,8 +3,10 @@ Script to fetch platform-specific binaries (deno, ffmpeg) before building.
 Called automatically when running: pyinstaller yt-gui.spec
 Can also be run manually.
 """
+import json
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -93,9 +95,34 @@ def download_ffmpeg(force=False):
     print(f'[ffmpeg] Saved: {ffmpeg_dir}')
 
 
+def _resolve_btbn_ffmpeg_win64_gpl_url() -> str:
+    """BtbN/FFmpeg-Builds の最新リリースから win64-gpl の autobuild zip URL を解決する。
+
+    かつては `ffmpeg-master-latest-win64-gpl.zip` という固定名のアセットが提供されて
+    いたが、現在は `ffmpeg-N-{N}-g{hash}-win64-gpl.zip` のようにコミットハッシュ付きの
+    名前に変わっており、固定 URL では 404 になる。Releases API でアセット名を引いて
+    動的に URL を解決する。
+    """
+    api = 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest'
+    req = urllib.request.Request(api, headers={'Accept': 'application/vnd.github+json'})
+    with urllib.request.urlopen(req) as resp:
+        data = json.load(resp)
+
+    # master autobuild の win64-gpl (shared / lgpl / 安定版 nX.Y.Z は除外)
+    pattern = re.compile(r'^ffmpeg-N-\d+-g[0-9a-f]+-win64-gpl\.zip$')
+    for asset in data.get('assets', []):
+        name = asset.get('name', '')
+        if pattern.match(name):
+            return asset['browser_download_url']
+
+    raise RuntimeError(
+        'No matching ffmpeg win64-gpl asset found in '
+        'BtbN/FFmpeg-Builds latest release. Asset naming may have changed again.'
+    )
+
+
 def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
-    url = ('https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/'
-           'ffmpeg-master-latest-win64-gpl.zip')
+    url = _resolve_btbn_ffmpeg_win64_gpl_url()
     tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
     print('[ffmpeg] Downloading (Windows)...')
     _download(url, tmp)
