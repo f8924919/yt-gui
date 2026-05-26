@@ -107,4 +107,4 @@ def missing_dependencies(self) -> list[str]:
 
 ## ステータス
 
-未着手
+完了 (2026-05-26)

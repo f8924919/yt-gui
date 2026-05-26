@@ -96,6 +96,22 @@ class Downloader:
 
         os.makedirs(self.output_dir, exist_ok=True)
 
+    def missing_dependencies(self) -> list[str]:
+        """同梱バイナリのうち存在しないものの名前を返す。
+
+        返り値: `['ffmpeg', 'ffprobe', 'deno']` のサブセット。
+        空リストならすべて揃っている。`app.py` 起動時の依存チェックや
+        `_embed_nico_comments_into_mkv` 内で利用される。
+        """
+        missing: list[str] = []
+        if not self._ffmpeg_path or not os.path.isfile(self._ffmpeg_path):
+            missing.append("ffmpeg")
+        if not self._ffprobe_path or not os.path.isfile(self._ffprobe_path):
+            missing.append("ffprobe")
+        if not self._deno_path or not os.path.isfile(self._deno_path):
+            missing.append("deno")
+        return missing
+
     def _progress_hook(self, d):
         if self.status_callback is None:
             return
@@ -344,25 +360,10 @@ class Downloader:
         playlist_title: str | None = None,
         playlist_index: int | None = None,
     ):
-        spec = job.format_spec
-        is_audio = job.is_audio_extraction
-        audio_codec = job.audio_codec
-        embed_thumbnail = job.embed_thumbnail
-        embed_metadata = job.embed_metadata
-        embed_chapters = job.embed_chapters
-        remux_only = job.remux_only
-        video_container = job.video_container
-        subtitle_opts = job.subtitle_opts
-        mp3_bitrate_override = job.mp3_bitrate
-        nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
-
         out_dir = output_dir_override or self.output_dir
         os.makedirs(out_dir, exist_ok=True)
 
         is_playlist = playlist_title is not None
-        template = (
-            self.output_template_playlist if is_playlist else self.output_template_video
-        )
         extra_info: dict | None = None
         if is_playlist:
             extra_info = {
@@ -371,8 +372,59 @@ class Downloader:
                 "playlist_index": playlist_index,
             }
 
-        ydl_opts = {
-            "format": spec,
+        ydl_opts = self._build_ydl_opts(
+            job,
+            out_dir=out_dir,
+            is_playlist=is_playlist,
+            cookies_path=cookies_path,
+            cookies_browser=cookies_browser,
+        )
+
+        msg = t("dl_fetching")
+        self.status_callback(msg, 0)
+        if self.log_callback:
+            self.log_callback(msg)
+
+        effective_stem, final_ext = self._resolve_unique_path(
+            ydl_opts, url, job, extra_info=extra_info
+        )
+
+        self._run_download(ydl_opts, url, job, extra_info=extra_info)
+
+        nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
+        sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
+        if (
+            nico_comments_opts
+            and nico_comments_opts.get("convert_to_ass")
+            and _COMMENTS_LANG in sub_langs
+        ):
+            self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
+
+            if nico_comments_opts.get("embed_to_mkv") and not job.is_audio_extraction:
+                self._embed_nico_comments_into_mkv(
+                    effective_stem, final_ext, nico_comments_opts
+                )
+
+    def _build_ydl_opts(
+        self,
+        job: JobSpec,
+        *,
+        out_dir: str,
+        is_playlist: bool,
+        cookies_path: str | None,
+        cookies_browser: str | None,
+    ) -> dict:
+        """`JobSpec` から `ydl_opts` dict を組み立てる。
+
+        - 音声抽出 / 映像ダウンロードでそれぞれ必要な postprocessors を積む
+        - 字幕埋め込み時は convert + embed PP を最後に積む
+        """
+        template = (
+            self.output_template_playlist if is_playlist else self.output_template_video
+        )
+
+        ydl_opts: dict = {
+            "format": job.format_spec,
             "outtmpl": os.path.join(out_dir, template),
             "noplaylist": True,
             "progress_hooks": [self._progress_hook],
@@ -383,85 +435,104 @@ class Downloader:
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True
 
-        if is_audio:
-            pp: dict = {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": audio_codec,
-            }
-            if audio_codec == "mp3":
-                pp["preferredquality"] = mp3_bitrate_override or self.mp3_bitrate
-            ydl_opts["postprocessors"] = [pp]
-            if embed_metadata or embed_chapters:
-                ydl_opts["postprocessors"].append(
-                    {
-                        "key": "FFmpegMetadata",
-                        "add_metadata": embed_metadata,
-                        "add_chapters": embed_chapters,
-                    }
-                )
-            if embed_thumbnail and audio_codec == "mp3":
-                ydl_opts["writethumbnail"] = True
-                ydl_opts["postprocessors"].append({"key": "EmbedThumbnail"})
+        if job.is_audio_extraction:
+            self._append_audio_postprocessors(ydl_opts, job)
         else:
-            if not remux_only:
-                ydl_opts["merge_output_format"] = video_container
-            if embed_metadata or embed_chapters:
-                ydl_opts.setdefault("postprocessors", []).append(
-                    {
-                        "key": "FFmpegMetadata",
-                        "add_metadata": embed_metadata,
-                        "add_chapters": embed_chapters,
-                    }
-                )
-            if (
-                embed_thumbnail
-                and not remux_only
-                and video_container in _THUMBNAIL_EMBED_CONTAINERS
-            ):
-                ydl_opts["writethumbnail"] = True
-                ydl_opts.setdefault("postprocessors", []).append(
-                    {"key": "EmbedThumbnail"}
-                )
+            self._append_video_postprocessors(ydl_opts, job)
 
-        if subtitle_opts:
-            embed = subtitle_opts.get("embed", False)
-            for key in (
-                "writesubtitles",
-                "writeautomaticsub",
-                "subtitleslangs",
-                "subtitlesformat",
-            ):
-                if key in subtitle_opts:
-                    ydl_opts[key] = subtitle_opts[key]
-            if embed:
-                # YouTube Live など JSON (json3) しか配信されないケースでは
-                # FFmpegEmbedSubtitle が "JSON subtitles cannot be embedded" を
-                # 出すため、埋め込み前に SRT/VTT へ変換しておく。
-                preferred = subtitle_opts.get("subtitlesformat") or "best"
-                convert_to = "srt" if preferred in ("best", None) else preferred
-                ydl_opts.setdefault("postprocessors", []).append(
-                    {"key": "FFmpegSubtitlesConvertor", "format": convert_to}
-                )
-                ydl_opts.setdefault("postprocessors", []).append(
-                    {"key": "FFmpegEmbedSubtitle", "already_have_subtitle": False}
-                )
+        if job.subtitle_opts:
+            self._append_subtitle_options(ydl_opts, job.subtitle_opts)
 
-        msg = t("dl_fetching")
-        self.status_callback(msg, 0)
-        if self.log_callback:
-            self.log_callback(msg)
+        return ydl_opts
 
+    def _append_audio_postprocessors(self, ydl_opts: dict, job: JobSpec) -> None:
+        audio_codec = job.audio_codec
+        pp: dict = {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": audio_codec,
+        }
+        if audio_codec == "mp3":
+            pp["preferredquality"] = job.mp3_bitrate or self.mp3_bitrate
+        ydl_opts["postprocessors"] = [pp]
+        if job.embed_metadata or job.embed_chapters:
+            ydl_opts["postprocessors"].append(
+                {
+                    "key": "FFmpegMetadata",
+                    "add_metadata": job.embed_metadata,
+                    "add_chapters": job.embed_chapters,
+                }
+            )
+        if job.embed_thumbnail and audio_codec == "mp3":
+            ydl_opts["writethumbnail"] = True
+            ydl_opts["postprocessors"].append({"key": "EmbedThumbnail"})
+
+    def _append_video_postprocessors(self, ydl_opts: dict, job: JobSpec) -> None:
+        if not job.remux_only:
+            ydl_opts["merge_output_format"] = job.video_container
+        if job.embed_metadata or job.embed_chapters:
+            ydl_opts.setdefault("postprocessors", []).append(
+                {
+                    "key": "FFmpegMetadata",
+                    "add_metadata": job.embed_metadata,
+                    "add_chapters": job.embed_chapters,
+                }
+            )
+        if (
+            job.embed_thumbnail
+            and not job.remux_only
+            and job.video_container in _THUMBNAIL_EMBED_CONTAINERS
+        ):
+            ydl_opts["writethumbnail"] = True
+            ydl_opts.setdefault("postprocessors", []).append({"key": "EmbedThumbnail"})
+
+    @staticmethod
+    def _append_subtitle_options(ydl_opts: dict, subtitle_opts: dict) -> None:
+        for key in (
+            "writesubtitles",
+            "writeautomaticsub",
+            "subtitleslangs",
+            "subtitlesformat",
+        ):
+            if key in subtitle_opts:
+                ydl_opts[key] = subtitle_opts[key]
+        if subtitle_opts.get("embed", False):
+            # YouTube Live など JSON (json3) しか配信されないケースでは
+            # FFmpegEmbedSubtitle が "JSON subtitles cannot be embedded" を
+            # 出すため、埋め込み前に SRT/VTT へ変換しておく。
+            preferred = subtitle_opts.get("subtitlesformat") or "best"
+            convert_to = "srt" if preferred in ("best", None) else preferred
+            ydl_opts.setdefault("postprocessors", []).append(
+                {"key": "FFmpegSubtitlesConvertor", "format": convert_to}
+            )
+            ydl_opts.setdefault("postprocessors", []).append(
+                {"key": "FFmpegEmbedSubtitle", "already_have_subtitle": False}
+            )
+
+    def _resolve_unique_path(
+        self,
+        ydl_opts: dict,
+        url: str,
+        job: JobSpec,
+        *,
+        extra_info: dict | None,
+    ) -> tuple[str, str]:
+        """同名ファイル衝突を避けるため `(stem, final_ext)` を予測し、
+        必要なら `outtmpl` を ` (N)` 付きに上書きする。
+
+        戻り値: `(effective_stem, final_ext)` — ニコニコ動画コメントの
+        後処理がファイル名を組み立てるのに使う。
+        """
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False, extra_info=extra_info)
             raw_path = ydl.prepare_filename(info)
 
         stem, raw_ext = os.path.splitext(raw_path)
-        if is_audio:
-            final_ext = f".{audio_codec}"
-        elif remux_only:
+        if job.is_audio_extraction:
+            final_ext = f".{job.audio_codec}"
+        elif job.remux_only:
             final_ext = raw_ext
-        elif "+" in spec:
-            final_ext = f".{video_container}"
+        elif "+" in job.format_spec:
+            final_ext = f".{job.video_container}"
         else:
             final_ext = raw_ext
 
@@ -473,38 +544,40 @@ class Downloader:
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
             effective_stem = f"{stem} ({n})"
 
-        # json 専用字幕 (live_chat / ニコニコ動画 comments) を埋め込み対象に
-        # 含む場合は、convert/embed がそれらの json を触らないように先に
-        # ストリップ PP を実行する。
-        sub_langs = (subtitle_opts or {}).get("subtitleslangs") or []
-        needs_strip_json_only_subs = (subtitle_opts or {}).get("embed", False) and any(
-            lang in _JSON_ONLY_SUB_LANGS for lang in sub_langs
-        )
+        return effective_stem, final_ext
+
+    def _run_download(
+        self,
+        ydl_opts: dict,
+        url: str,
+        job: JobSpec,
+        *,
+        extra_info: dict | None,
+    ) -> None:
+        """ydl を起動してダウンロードを実行する。
+
+        json 専用字幕 (live_chat / ニコニコ動画 comments) が埋め込み対象に
+        含まれるときは convert/embed が json を触らないように strip PP を
+        先頭に挿入する。
+        """
+        sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
+        needs_strip_json_only_subs = bool(
+            job.subtitle_opts and job.subtitle_opts.get("embed", False)
+        ) and any(lang in _JSON_ONLY_SUB_LANGS for lang in sub_langs)
 
         with YoutubeDL(ydl_opts) as ydl:
             if needs_strip_json_only_subs:
                 ydl.add_post_processor(
                     _StripJsonOnlySubsBeforeEmbedPP(), when="post_process"
                 )
-                # 末尾に追加された PP を先頭へ移動 (convert/embed の前で実行させる)
+                # yt-dlp 内部 API 依存: `add_post_processor` は常に末尾追加で
+                # ある一方、convert/embed の前で strip を走らせる必要がある。
+                # `params["postprocessors"]` は dict 形式のみ受け付けるため
+                # custom PP クラスをそこに混ぜることもできない。yt-dlp の
+                # バージョン更新時にここが壊れる可能性があるので注意。
                 pp_list = ydl._pps["post_process"]
                 pp_list.insert(0, pp_list.pop())
             ydl.extract_info(url, download=True, extra_info=extra_info)
-
-        # ニコニコ動画コメント JSON → ASS 変換 (フェーズ 2)
-        # 字幕は `{stem}.comments.json` 形式で yt-dlp が保存する。
-        if (
-            nico_comments_opts
-            and nico_comments_opts.get("convert_to_ass")
-            and _COMMENTS_LANG in sub_langs
-        ):
-            self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
-
-            # フェーズ 3: コメント ASS を動画と合わせた MKV を別ファイルで生成
-            if nico_comments_opts.get("embed_to_mkv") and not is_audio:
-                self._embed_nico_comments_into_mkv(
-                    effective_stem, final_ext, nico_comments_opts
-                )
 
     def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
         """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
