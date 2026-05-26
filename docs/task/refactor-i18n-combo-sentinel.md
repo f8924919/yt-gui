@@ -111,4 +111,4 @@ def is_meta_row(self, row: int) -> bool:
 
 ## ステータス
 
-未着手
+完了 (2026-05-26)

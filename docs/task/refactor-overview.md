@@ -34,7 +34,7 @@
 | 2 | [refactor-app-split.md](refactor-app-split.md) | D | 中 | 完了 (2026-05-25) |
 | 3 | [refactor-nico-comments-group.md](refactor-nico-comments-group.md) | E | 中 | 完了 (2026-05-26) |
 | 4 | [refactor-thread-signal-helper.md](refactor-thread-signal-helper.md) | F | 中 | 完了 (2026-05-26) |
-| 5 | [refactor-i18n-combo-sentinel.md](refactor-i18n-combo-sentinel.md) | G, H | 中 | 未着手 |
+| 5 | [refactor-i18n-combo-sentinel.md](refactor-i18n-combo-sentinel.md) | G, H | 中 | 完了 (2026-05-26) |
 | 6 | [refactor-downloader-split.md](refactor-downloader-split.md) | I, J | 中 | 未着手 |
 | 7 | [refactor-misc-cleanup.md](refactor-misc-cleanup.md) | K, L | 低 | 未着手 |
 

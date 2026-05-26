@@ -30,16 +30,41 @@
 
 複合フォーマット（★印）選択時は音声リストを `set_included_mode()` で「映像に含まれます」1 行表示に切り替え、`setEnabled(False)` で操作不可にする。
 
+## 翻訳済み文字列と論理状態の分離 (sentinel)
+
+「自動」「ダウンロードしない」項目は翻訳済み文字列ではなく `Qt.ItemDataRole.UserRole` の sentinel 値 (`_AUTO_SENTINEL = "__auto__"` / `_SKIP_SENTINEL = "__skip__"`) で識別する。これにより:
+
+- 比較ロジックは `combo.currentData() == _AUTO_SENTINEL` のように **言語非依存** になる
+- `set_language()` で `setItemText` だけ呼べばよく、論理状態の再構築は不要
+- 新言語追加時は表示文字列だけ翻訳すればよく、ロジック側の変更不要
+
+映像コンボ (`_video_combo`) は索引 0/1 が AUTO/SKIP、2 番目以降は `addItem(label, format_id)` で `userData` に `format_id` を直接保持する。`findData(format_id)` で復元、`currentData()` で取得。
+
+`_AudioListWidget` でも同様に各行に sentinel または音声 ID を `UserRole` で持たせる。
+
 ## 内部クラス: `_AudioListWidget`
 
 `_ToggleListWidget` を継承した音声選択用 multi-select リスト。`set_normal_mode()` / `set_included_mode()` の 2 状態を持ち、後者は複合フォーマット映像が選ばれているときに 1 行表示で無効化される。
+
+`set_normal_mode(auto_label, skip_label, audio_entries: list[tuple[str, str]])` の `audio_entries` は `(表示ラベル, 音声 ID)` のリスト。各行に sentinel または音声 ID が `UserRole` にセットされる。
 
 排他ロジック (`_enforce_exclusivity`):
 
 - 「自動」と他 (skip / 音声 ID) が同時選択されたら「自動」を解除
 - 「ダウンロードしない」と音声 ID が同時選択されたら「ダウンロードしない」を解除
 
-公開ヘルパ: `select_auto()` / `select_skip()` / `select_audio_rows(rows)` / `get_selection() -> (auto, skip, rows)` / `is_included_mode()`
+公開ヘルパ:
+
+| API | 用途 |
+|---|---|
+| `select_auto()` / `select_skip()` / `select_audio_rows(rows)` | 行選択 |
+| `get_selection() -> (auto, skip, rows)` | 現在の選択 |
+| `is_included_mode()` | 複合フォーマット時の状態判定 |
+| `audio_row(audio_index)` | 音声 0-based index → 物理行 (AUTO/SKIP オフセット隠蔽) |
+| `audio_index_from_row(row)` | 物理行 → 音声 0-based index (`None` if meta row) |
+| `is_meta_row(row)` | AUTO/SKIP 行判定 |
+
+物理行オフセット `+2` (`_AUDIO_OFFSET`) は内部に閉じ、呼び出し側がリテラルを書かないようにする。
 
 ## 内部クラス: `_NicoCommentsGroup`
 
