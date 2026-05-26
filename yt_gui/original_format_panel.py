@@ -28,6 +28,12 @@ from .utils import strip_ansi
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 _COMMENTS_LANG = "comments"
 
+# コンボ・リストの「自動」「ダウンロードしない」項目を翻訳済み文字列ではなく
+# `userData` のセンチネルで識別するための定数。
+# 表示文字列 (`t("orig_auto")` 等) と論理状態を完全分離する。
+_AUTO_SENTINEL = "__auto__"
+_SKIP_SENTINEL = "__skip__"
+
 # ニコニコ動画コメント → ASS 変換のデフォルト値
 _NICO_DEFAULT_WIDTH = 1280
 _NICO_DEFAULT_HEIGHT = 720
@@ -59,10 +65,14 @@ class _AudioListWidget(_ToggleListWidget):
     - 「ダウンロードしない」を選ぶと他の全行が解除される
     - 音声 ID を選ぶと「自動」「ダウンロードしない」が解除される
     - 「映像に含まれます」(複合フォーマット時の固定行) は単独表示用で、選択操作は無効
+
+    AUTO/SKIP の物理行オフセット (+2) は内部に閉じ込め、外部からは
+    `audio_row(i)` / `audio_index_from_row(row)` 経由でアクセスする。
     """
 
     AUTO_ROW = 0
     SKIP_ROW = 1
+    _AUDIO_OFFSET = 2
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -85,20 +95,46 @@ class _AudioListWidget(_ToggleListWidget):
         self._suppress_enforce = False
 
     def set_normal_mode(
-        self, auto_label: str, skip_label: str, audio_labels: list[str]
+        self,
+        auto_label: str,
+        skip_label: str,
+        audio_entries: list[tuple[str, str]],
     ):
-        """通常モードに切り替える。フォーマット取得後やリセット時に呼ぶ。"""
+        """通常モードに切り替える。フォーマット取得後やリセット時に呼ぶ。
+
+        `audio_entries` は `(表示ラベル, 音声ID)` のリスト。
+        AUTO/SKIP 行には sentinel を userData にセットし、音声行には
+        音声 ID を userData にセットすることで「翻訳済み文字列と論理状態の
+        分離」と「呼び出し側からのオフセット隠蔽」を両立する。
+        """
         self._mode = "normal"
         self._suppress_enforce = True
         self.clear()
         self.addItem(auto_label)
+        self.item(self.AUTO_ROW).setData(Qt.ItemDataRole.UserRole, _AUTO_SENTINEL)
         self.addItem(skip_label)
-        for lbl in audio_labels:
+        self.item(self.SKIP_ROW).setData(Qt.ItemDataRole.UserRole, _SKIP_SENTINEL)
+        for lbl, fid in audio_entries:
             self.addItem(lbl)
+            self.item(self.count() - 1).setData(Qt.ItemDataRole.UserRole, fid)
         self._suppress_enforce = False
 
     def is_included_mode(self) -> bool:
         return self._mode == "included"
+
+    def audio_row(self, audio_index: int) -> int:
+        """音声フォーマットの 0-based インデックスをリストの物理行に変換。"""
+        return audio_index + self._AUDIO_OFFSET
+
+    def audio_index_from_row(self, row: int) -> int | None:
+        """リスト物理行を音声フォーマットの 0-based インデックスに変換。
+        AUTO/SKIP 行のときは `None`。"""
+        if row < self._AUDIO_OFFSET:
+            return None
+        return row - self._AUDIO_OFFSET
+
+    def is_meta_row(self, row: int) -> bool:
+        return row < self._AUDIO_OFFSET
 
     def select_auto(self):
         """「自動」を単独選択。"""
@@ -467,9 +503,9 @@ class OriginalFormatPanel(QGroupBox):
         self._video_label = QLabel(t("label_orig_video"))
         video_row.addWidget(self._video_label)
         self._video_combo = QComboBox()
-        self._video_combo.addItem(t("orig_auto"))
+        self._video_combo.addItem(t("orig_auto"), _AUTO_SENTINEL)
         self._video_combo.setEnabled(False)
-        self._video_combo.currentTextChanged.connect(self._on_video_changed)
+        self._video_combo.currentIndexChanged.connect(self._on_video_changed)
         video_row.addWidget(self._video_combo, 1)
 
         self._fetch_button = QPushButton(t("btn_fetch_formats"))
@@ -491,7 +527,7 @@ class OriginalFormatPanel(QGroupBox):
         )
         self._audio_list.setMinimumHeight(96)
         self._audio_list.set_normal_mode(t("orig_auto"), t("orig_skip"), [])
-        self._audio_list.item(0).setSelected(True)
+        self._audio_list.item(_AudioListWidget.AUTO_ROW).setSelected(True)
         self._audio_list.setEnabled(False)
         audio_col.addWidget(self._audio_list)
         lists_row.addLayout(audio_col, 1)
@@ -585,17 +621,15 @@ class OriginalFormatPanel(QGroupBox):
         self._fetched_title = ""
         self._pending_restore = None
 
-        auto_label = t("orig_auto")
-
         self._video_combo.blockSignals(True)
         self._video_combo.clear()
-        self._video_combo.addItem(auto_label)
+        self._video_combo.addItem(t("orig_auto"), _AUTO_SENTINEL)
         self._video_combo.setEnabled(False)
         self._video_combo.blockSignals(False)
 
         self._audio_list.blockSignals(True)
-        self._audio_list.set_normal_mode(auto_label, t("orig_skip"), [])
-        self._audio_list.item(0).setSelected(True)
+        self._audio_list.set_normal_mode(t("orig_auto"), t("orig_skip"), [])
+        self._audio_list.item(_AudioListWidget.AUTO_ROW).setSelected(True)
         self._audio_list.setEnabled(False)
         self._audio_list.blockSignals(False)
 
@@ -669,8 +703,10 @@ class OriginalFormatPanel(QGroupBox):
         return self._fetched_title
 
     def is_both_skipped(self) -> bool:
-        skip = t("orig_skip")
-        return bool(self._video_combo.currentText() == skip and self.is_audio_skipped())
+        return bool(
+            self._video_combo.currentData() == _SKIP_SENTINEL
+            and self.is_audio_skipped()
+        )
 
     def is_audio_skipped(self) -> bool:
         _, skip, _ = self._audio_list.get_selection()
@@ -709,18 +745,17 @@ class OriginalFormatPanel(QGroupBox):
     def _get_selected_video_resolution(self) -> tuple[int, int] | None:
         """選択中の映像フォーマット ID に対応する (width, height) を返す。
         「自動」「ダウンロードしない」または解像度未知のときは None。"""
-        if not self._video_formats:
+        fid = self._current_video_format_id()
+        if fid is None:
             return None
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-        video_sel = self._video_combo.currentText()
-        if video_sel in (auto_label, skip_label):
-            return None
-        idx = self._format_index(self._video_combo, video_sel)
-        if idx is None or not (0 <= idx < len(self._video_formats)):
-            return None
-        _, fid, _ = self._video_formats[idx]
         return self._video_resolutions.get(fid)
+
+    def _current_video_format_id(self) -> str | None:
+        """映像コンボの現在選択値。AUTO/SKIP のときは None。"""
+        data = self._video_combo.currentData()
+        if data in (_AUTO_SENTINEL, _SKIP_SENTINEL, None):
+            return None
+        return str(data)
 
     def _has_nico_comments_lang(self) -> bool:
         """字幕フォーマットに `comments` lang が含まれるか。"""
@@ -758,18 +793,18 @@ class OriginalFormatPanel(QGroupBox):
 
     def get_raw_settings(self) -> dict:
         """現在の選択状態を復元可能な形式で返す。"""
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-        video_sel = self._video_combo.currentText()
-
-        video_skip = video_sel == skip_label
+        current_data = self._video_combo.currentData()
+        video_skip = current_data == _SKIP_SENTINEL
         video_id: str | None = None
         is_combined = False
 
-        if video_sel not in (auto_label, skip_label) and self._video_formats:
-            idx = self._format_index(self._video_combo, video_sel)
-            if idx is not None and 0 <= idx < len(self._video_formats):
-                _, video_id, is_combined = self._video_formats[idx]
+        fid = self._current_video_format_id()
+        if fid is not None and self._video_formats:
+            for _, vid, combined in self._video_formats:
+                if vid == fid:
+                    video_id = vid
+                    is_combined = combined
+                    break
 
         audio_skip = False
         audio_ids: list[str] = []
@@ -799,8 +834,8 @@ class OriginalFormatPanel(QGroupBox):
         _, _, rows = self._audio_list.get_selection()
         out: list[str] = []
         for row in rows:
-            audio_idx = row - 2  # AUTO/SKIP の分オフセット
-            if 0 <= audio_idx < len(self._audio_formats):
+            audio_idx = self._audio_list.audio_index_from_row(row)
+            if audio_idx is not None and 0 <= audio_idx < len(self._audio_formats):
                 _, fid = self._audio_formats[audio_idx]
                 out.append(fid)
         return out
@@ -832,9 +867,6 @@ class OriginalFormatPanel(QGroupBox):
             self._pending_restore = None
 
     def get_format_spec(self) -> str:
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-
         audio_ids = self._collect_selected_audio_ids()
         audio_skip = self.is_audio_skipped()
 
@@ -844,15 +876,18 @@ class OriginalFormatPanel(QGroupBox):
                 return audio_ids[0]
             return "bestaudio/best"
 
-        video_sel = self._video_combo.currentText()
-        video_skip = video_sel == skip_label
+        current_data = self._video_combo.currentData()
+        video_skip = current_data == _SKIP_SENTINEL
 
-        video_id = None
+        video_id: str | None = None
         is_combined = False
-        if video_sel not in (auto_label, skip_label) and self._video_formats:
-            idx = self._format_index(self._video_combo, video_sel)
-            if idx is not None and 0 <= idx < len(self._video_formats):
-                _, video_id, is_combined = self._video_formats[idx]
+        fid = self._current_video_format_id()
+        if fid is not None and self._video_formats:
+            for _, vid, combined in self._video_formats:
+                if vid == fid:
+                    video_id = vid
+                    is_combined = combined
+                    break
 
         if is_combined:
             return video_id or "bestvideo/best"
@@ -910,8 +945,6 @@ class OriginalFormatPanel(QGroupBox):
         if settings is None:
             return
 
-        skip_label = t("orig_skip")
-        auto_label = t("orig_auto")
         video_id = settings.get("video_id")
         # 後方互換: 旧キー audio_id (str | None) と新キー audio_ids (list[str])
         audio_ids = settings.get("audio_ids")
@@ -926,20 +959,23 @@ class OriginalFormatPanel(QGroupBox):
         # 映像コンボ復元（シグナルをブロックして手動で _on_video_changed を呼ぶ）
         self._video_combo.blockSignals(True)
         if video_skip:
-            self._video_combo.setCurrentText(skip_label)
+            self._video_combo.setCurrentIndex(
+                self._video_combo.findData(_SKIP_SENTINEL)
+            )
         elif video_id:
-            matched = False
-            for i, (_, fid, _) in enumerate(self._video_formats):
-                if fid == video_id:
-                    self._video_combo.setCurrentIndex(i + 2)  # auto/skip の分オフセット
-                    matched = True
-                    break
-            if not matched:
-                self._video_combo.setCurrentText(auto_label)
+            idx = self._video_combo.findData(video_id)
+            if idx >= 0:
+                self._video_combo.setCurrentIndex(idx)
+            else:
+                self._video_combo.setCurrentIndex(
+                    self._video_combo.findData(_AUTO_SENTINEL)
+                )
         else:
-            self._video_combo.setCurrentText(auto_label)
+            self._video_combo.setCurrentIndex(
+                self._video_combo.findData(_AUTO_SENTINEL)
+            )
         self._video_combo.blockSignals(False)
-        self._on_video_changed(self._video_combo.currentText())
+        self._on_video_changed()
 
         # 音声リスト復元（複合フォーマット選択時はスキップ）
         if not is_combined and not self._audio_list.is_included_mode():
@@ -950,7 +986,7 @@ class OriginalFormatPanel(QGroupBox):
                 for aid in audio_ids:
                     for i, (_, fid) in enumerate(self._audio_formats):
                         if fid == aid:
-                            rows.append(i + 2)  # AUTO/SKIP の分オフセット
+                            rows.append(self._audio_list.audio_row(i))
                             break
                 if rows:
                     self._audio_list.select_audio_rows(rows)
@@ -982,30 +1018,37 @@ class OriginalFormatPanel(QGroupBox):
 
     # ── internal events ──────────────────────────────────────────────────────
 
-    def _on_video_changed(self, selected: str):
+    def _on_video_changed(self, *_args):
+        """映像コンボ選択変更ハンドラ。
+        Qt から `currentIndexChanged(int)` 経由で呼ばれるほか、復元処理から
+        引数なしでも呼ばれるので、シグネチャは可変長で受ける。"""
         if self.get_audio_only():
             return
 
-        auto_label = t("orig_auto")
-        skip_label = t("orig_skip")
-
-        if selected in (auto_label, skip_label) or not self._video_formats:
+        if not self._video_formats:
             self._restore_audio_normal_mode()
             if self._audio_formats:
                 self._audio_list.setEnabled(True)
             return
 
-        idx = self._format_index(self._video_combo, selected)
-        if idx is None:
+        fid = self._current_video_format_id()
+        if fid is None:
+            self._restore_audio_normal_mode()
+            if self._audio_formats:
+                self._audio_list.setEnabled(True)
             return
 
-        if 0 <= idx < len(self._video_formats):
-            _, _, is_combined = self._video_formats[idx]
-            if is_combined:
-                self._audio_list.set_included_mode(t("orig_audio_included"))
-            else:
-                self._restore_audio_normal_mode()
-                self._audio_list.setEnabled(True)
+        is_combined = False
+        for _, vid, combined in self._video_formats:
+            if vid == fid:
+                is_combined = combined
+                break
+
+        if is_combined:
+            self._audio_list.set_included_mode(t("orig_audio_included"))
+        else:
+            self._restore_audio_normal_mode()
+            self._audio_list.setEnabled(True)
 
     def _restore_audio_normal_mode(self):
         """included → normal モードに切り替え（必要時のみ）。
@@ -1013,8 +1056,9 @@ class OriginalFormatPanel(QGroupBox):
         リストの中身を再構築する。"""
         if not self._audio_list.is_included_mode():
             return
-        audio_labels = [lbl for lbl, _ in self._audio_formats]
-        self._audio_list.set_normal_mode(t("orig_auto"), t("orig_skip"), audio_labels)
+        self._audio_list.set_normal_mode(
+            t("orig_auto"), t("orig_skip"), list(self._audio_formats)
+        )
         # 復元: デフォルトは「自動」
         self._audio_list.select_auto()
 
@@ -1042,7 +1086,7 @@ class OriginalFormatPanel(QGroupBox):
         else:
             if formats_available:
                 self._video_combo.setEnabled(True)
-                self._on_video_changed(self._video_combo.currentText())
+                self._on_video_changed()
             if self._subtitle_formats:
                 self._subtitle_list.setEnabled(True)
             self._on_subtitle_changed()
@@ -1060,13 +1104,6 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setEnabled(has_sub)
         if not has_sub:
             self._embed_check.setChecked(False)
-
-    @staticmethod
-    def _format_index(combo: QComboBox, selected: str) -> int | None:
-        idx = combo.findText(selected)
-        if idx < 0:
-            return None
-        return idx - 2  # offset past [auto, skip]
 
     # ── format fetching ──────────────────────────────────────────────────────
 
@@ -1110,20 +1147,20 @@ class OriginalFormatPanel(QGroupBox):
         self._subtitle_formats = result["subtitles"]
         self._video_resolutions = result.get("video_resolutions", {}) or {}
 
-        video_labels = [auto_label, skip_label] + [
-            lbl for lbl, _, _ in self._video_formats
-        ]
-        audio_labels = [lbl for lbl, _ in self._audio_formats]
-
         self._video_combo.blockSignals(True)
         self._video_combo.clear()
-        self._video_combo.addItems(video_labels)
-        self._video_combo.setCurrentText(auto_label)
+        self._video_combo.addItem(auto_label, _AUTO_SENTINEL)
+        self._video_combo.addItem(skip_label, _SKIP_SENTINEL)
+        for lbl, fid, _ in self._video_formats:
+            self._video_combo.addItem(lbl, fid)
+        self._video_combo.setCurrentIndex(0)
         self._video_combo.setEnabled(True)
         self._video_combo.blockSignals(False)
 
         self._audio_list.blockSignals(True)
-        self._audio_list.set_normal_mode(auto_label, skip_label, audio_labels)
+        self._audio_list.set_normal_mode(
+            auto_label, skip_label, list(self._audio_formats)
+        )
         self._audio_list.blockSignals(False)
         self._audio_list.select_auto()
         self._audio_list.setEnabled(bool(self._audio_formats))
