@@ -43,14 +43,24 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 5. `QueueController` 生成（引数: `downloader`, `queue_tree`）
 6. `_wire_queue_signals()` でコントローラのシグナルをスロットに配線
 
-`QueueController` は `_queue_tree` 構築後にしか作れないため、`_create_widgets()` の後で生成する。`_QueueTree` の `_get_item_cb` などのコールバックには `lambda ti: self.queue.find_item_for(ti)` の形で遅延参照を仕込んである。
+`QueueController` は `_queue_tree` 構築後にしか作れないため、`_create_widgets()` の後で生成する。`_QueueTree` への依存はコンストラクタ DI で渡し、`self.queue` 未生成の段階の参照は lambda 経由で遅延化する (`get_item=lambda ti: self.queue.find_item_for(ti)`)。
 
 ## 内部クラス: `_QueueTree(QTreeWidget)`
 
-キュー表示。以下を独自実装:
+キュー表示。依存は **コンストラクタ DI** で受け取り、外部からの属性書き込みは行わない:
 
-- **ツールチップ**: `viewportEvent` で `QEvent.Type.ToolTip` を捕捉。`QToolTip.showText()` に `rect=self.visualItemRect(item)` を渡してマウスがアイテム行にいる間は持続表示（`rect` なしだとタイムアウトで消える）。サムネイルがキャッシュ済みなら 240×135px の `<img>`（base64 data URI）をツールチップ先頭に挿入。`_get_thumbnail_b64_cb` には `ThumbnailCache.get` を直接バインドする。
-- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」（編集モード移行）を提供。「形式を変更」は `_context_menu_cb = self._enter_edit_mode` に紐付き、`QueueController.enter_edit_mode(items)` を呼ぶ。
+| パラメータ | 型 | 提供元 |
+|---|---|---|
+| `get_item` | `Callable[[QTreeWidgetItem], _QueueItem | None]` | `QueueController.find_item_for` |
+| `get_thumbnail_b64` | `Callable[[str], str | None]` | `ThumbnailCache.get` |
+| `is_editing` | `Callable[[], bool]` | `lambda: self.queue.edit_mode` |
+
+「形式を変更」コンテキストメニュー操作は `edit_format_requested(list)` シグナルで通知し、`App._enter_edit_mode` に接続する。
+
+独自実装:
+
+- **ツールチップ**: `viewportEvent` で `QEvent.Type.ToolTip` を捕捉。`QToolTip.showText()` に `rect=self.visualItemRect(item)` を渡してマウスがアイテム行にいる間は持続表示（`rect` なしだとタイムアウトで消える）。サムネイルがキャッシュ済みなら 240×135px の `<img>`（base64 data URI）をツールチップ先頭に挿入。
+- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」は `edit_format_requested.emit(waiting)` を発行し、編集モード中 (`is_editing()`) はメニュー項目を無効化する。
 - **アイテム色リセット**: `setData(col, Qt.ItemDataRole.ForegroundRole, None)` を使用（`setForeground(col, QColor())` は黒固定になりダークモード非対応）。
 
 ## キュー追加経路
@@ -86,9 +96,11 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 `OriginalFormatPanel` / `_mp3_frame`（MP3 時のみ表示）を `setVisible()` で切り替え、ウィンドウ高さを `resize()` で調整（オリジナル形式選択時は `_WIN_H_EXPANDED`）。
 
-### `_retranslate_ui()`
+### `_retranslate_ui()` / `_refresh_format_labels()`
 
-フォーマットコンボ更新後に `_on_format_changed()` を呼んで表示を同期。言語切り替え時に `SettingsDialog` から呼ばれる。キュー行の再描画は `self.queue.refresh_all_tree_items()` に委譲。
+`_refresh_format_labels()` は `video_container` / `audio_format` / `mp3_bitrate` 等の **設定変更** や **言語変更** で必要になるフォーマットコンボとオリジナルパネルの再構築をまとめたヘルパ。`_retranslate_ui` (言語切替時) と `_open_settings` (言語非変更の設定保存時) の両方から呼ばれる。
+
+`_retranslate_ui()` は本ヘルパに加えてメニュー・ラベル・ボタンなど **言語切替時のみ更新が必要な要素** を再翻訳する。キュー行の再描画は `self.queue.refresh_all_tree_items()` に委譲。
 
 ### `_check_dependencies()`
 

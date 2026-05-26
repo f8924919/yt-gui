@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
 
@@ -64,14 +65,31 @@ class _AppSignals(QObject):
 
 
 class _QueueTree(QTreeWidget):
-    """QTreeWidget with hover tooltips and a context menu for queue items."""
+    """QTreeWidget with hover tooltips and a context menu for queue items.
 
-    def __init__(self, parent=None):
+    依存はコンストラクタで注入する。
+    - `get_item`: ツリー行 → `_QueueItem` の解決 (`QueueController.find_item_for`)
+    - `get_thumbnail_b64`: サムネ URL → data URI (`ThumbnailCache.get`)
+    - `is_editing`: 編集モード中かを返す getter (`QueueController.edit_mode`)
+
+    「形式を変更」コンテキストメニュー操作は `edit_format_requested(list)`
+    シグナルで通知する（外部からの属性書き込みは行わない）。
+    """
+
+    edit_format_requested = Signal(list)  # list[_QueueItem]
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        get_item: Callable[[object], _QueueItem | None],
+        get_thumbnail_b64: Callable[[str], str | None],
+        is_editing: Callable[[], bool],
+    ):
         super().__init__(parent)
-        self._get_item_cb = None  # (QTreeWidgetItem) -> _QueueItem | None
-        self._context_menu_cb = None  # (items: list[_QueueItem]) -> None
-        self._get_thumbnail_b64_cb = None  # (url: str) -> str | None
-        self._is_editing = False
+        self._get_item = get_item
+        self._get_thumbnail_b64 = get_thumbnail_b64
+        self._is_editing = is_editing
 
     def mousePressEvent(self, event):
         # 修飾キーなしの左クリックで選択済みアイテムを再クリックした場合は解除する
@@ -86,34 +104,33 @@ class _QueueTree(QTreeWidget):
         super().mousePressEvent(event)
 
     def contextMenuEvent(self, event):
-        if self._context_menu_cb is None or self._get_item_cb is None:
-            return
         selected = self.selectedItems()
         if not selected:
             return
-        items = [qi for ti in selected if (qi := self._get_item_cb(ti)) is not None]
+        items = [qi for ti in selected if (qi := self._get_item(ti)) is not None]
         waiting = [qi for qi in items if qi.status == "waiting"]
+        editing = self._is_editing()
         menu = QMenu(self)
         act_copy_url = menu.addAction(t("ctx_copy_url"))
         menu.addSeparator()
         act_edit = menu.addAction(t("ctx_edit_format"))
-        act_edit.setEnabled(bool(waiting) and not self._is_editing)
+        act_edit.setEnabled(bool(waiting) and not editing)
         chosen = menu.exec(event.globalPos())
         if chosen == act_copy_url:
             urls = "\n".join(qi.url for qi in items)
             QApplication.clipboard().setText(urls)
-        elif chosen == act_edit and waiting and not self._is_editing:
-            self._context_menu_cb(waiting)
+        elif chosen == act_edit and waiting and not editing:
+            self.edit_format_requested.emit(waiting)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.Type.ToolTip:
             item = self.itemAt(event.pos())
-            if item is not None and self._get_item_cb is not None:
-                qi = self._get_item_cb(item)
+            if item is not None:
+                qi = self._get_item(item)
                 if qi is not None:
                     lines = []
-                    if qi.thumbnail_url and self._get_thumbnail_b64_cb is not None:
-                        b64 = self._get_thumbnail_b64_cb(qi.thumbnail_url)
+                    if qi.thumbnail_url:
+                        b64 = self._get_thumbnail_b64(qi.thumbnail_url)
                         if b64:
                             lines.append(f'<img src="{b64}" width="240" height="135">')
                     lines += [
@@ -252,18 +269,10 @@ class App(QMainWindow):
                 t("warn_deps_missing_body").format(tools="\n".join(missing)),
             )
 
-    def _retranslate_ui(self):
-        self.setWindowTitle(t("app_title"))
-
-        self._file_menu.setTitle(t("menu_file"))
-        self._act_settings.setText(t("menu_settings"))
-        self._act_log.setText(t("menu_log"))
-        if self._act_quit is not None:
-            self._act_quit.setText(t("menu_quit"))
-
-        self._lbl_url.setText(t("label_url"))
-        self._lbl_format.setText(t("label_format"))
-
+    def _refresh_format_labels(self):
+        """`video_container` / `audio_format` / `mp3_bitrate` 等の設定や
+        言語変更に追従して、フォーマットコンボとオリジナルパネルの表示文字列を
+        再構築する。`_retranslate_ui` と `_open_settings` の共通処理。"""
         old_idx = self.format_combo.currentIndex()
         self._format_display = self._build_format_display()
         self.format_combo.blockSignals(True)
@@ -278,6 +287,20 @@ class App(QMainWindow):
         self._original_panel.retranslate(
             self._settings.video_container, self._build_audio_label()
         )
+
+    def _retranslate_ui(self):
+        self.setWindowTitle(t("app_title"))
+
+        self._file_menu.setTitle(t("menu_file"))
+        self._act_settings.setText(t("menu_settings"))
+        self._act_log.setText(t("menu_log"))
+        if self._act_quit is not None:
+            self._act_quit.setText(t("menu_quit"))
+
+        self._lbl_url.setText(t("label_url"))
+        self._lbl_format.setText(t("label_format"))
+
+        self._refresh_format_labels()
         self._mp3_thumb_check.setText(t("mp3_embed_thumbnail"))
 
         self._lbl_queue_title.setText(f"<b>{t('queue_title')}</b>")
@@ -463,11 +486,13 @@ class App(QMainWindow):
         self._lbl_queue_title = QLabel(f"<b>{t('queue_title')}</b>")
         qbl.addWidget(self._lbl_queue_title)
 
-        self._queue_tree = _QueueTree()
         # self.queue は _create_widgets の後で生成されるため lambda 経由で遅延参照
-        self._queue_tree._get_item_cb = lambda ti: self.queue.find_item_for(ti)
-        self._queue_tree._context_menu_cb = self._enter_edit_mode
-        self._queue_tree._get_thumbnail_b64_cb = self._thumbnail_cache.get
+        self._queue_tree = _QueueTree(
+            get_item=lambda ti: self.queue.find_item_for(ti),
+            get_thumbnail_b64=self._thumbnail_cache.get,
+            is_editing=lambda: self.queue.edit_mode,
+        )
+        self._queue_tree.edit_format_requested.connect(self._enter_edit_mode)
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
@@ -706,8 +731,6 @@ class App(QMainWindow):
 
     def _on_edit_mode_entered(self, items: list[_QueueItem]) -> None:
         """QueueController からの通知を受けて UI を編集モードに整える。"""
-        self._queue_tree._is_editing = True
-
         if len(items) == 1:
             self.url_entry.setText(items[0].url)
         else:
@@ -792,8 +815,6 @@ class App(QMainWindow):
 
     def _on_edit_mode_exited(self) -> None:
         """QueueController からの通知を受けて UI を通常モードに戻す。"""
-        self._queue_tree._is_editing = False
-
         self.url_entry.clear()
         self.url_entry.setReadOnly(False)
 
@@ -855,19 +876,7 @@ class App(QMainWindow):
             i18n.set_language(self._settings.language)
             self._retranslate_ui()
         else:
-            old_idx = self.format_combo.currentIndex()
-            self._format_display = self._build_format_display()
-            self.format_combo.blockSignals(True)
-            self.format_combo.clear()
-            self.format_combo.addItems(self._format_display)
-            self.format_combo.setCurrentIndex(old_idx)
-            self.format_combo.blockSignals(False)
-            self._original_panel.retranslate(
-                self._settings.video_container, self._build_audio_label()
-            )
-            self._on_format_changed(old_idx)
-            if self.queue.edit_mode and len(self.queue.editing_items) > 1:
-                self._set_original_format_enabled(False)
+            self._refresh_format_labels()
 
     # ── status / log ──────────────────────────────────────────────────────────
 
