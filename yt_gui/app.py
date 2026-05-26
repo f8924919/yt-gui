@@ -237,13 +237,14 @@ class App(QMainWindow):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
 
     def _check_dependencies(self):
-        missing = []
-        if not os.path.isfile(self.downloader._ffmpeg_path):
-            missing.append(t("warn_deps_missing_ffmpeg"))
-        if not os.path.isfile(self.downloader._ffprobe_path):
-            missing.append(t("warn_deps_missing_ffprobe"))
-        if not os.path.isfile(self.downloader._deno_path):
-            missing.append(t("warn_deps_missing_deno"))
+        label_keys = {
+            "ffmpeg": "warn_deps_missing_ffmpeg",
+            "ffprobe": "warn_deps_missing_ffprobe",
+            "deno": "warn_deps_missing_deno",
+        }
+        missing = [
+            t(label_keys[name]) for name in self.downloader.missing_dependencies()
+        ]
         if missing:
             QMessageBox.warning(
                 self,

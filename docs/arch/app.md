@@ -92,7 +92,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 ### `_check_dependencies()`
 
-起動時に `QTimer.singleShot(0, ...)` で ffmpeg・ffprobe・deno の存在チェック。見つからないツールがあれば `QMessageBox.warning()` を表示。
+起動時に `QTimer.singleShot(0, ...)` で ffmpeg・ffprobe・deno の存在チェック。判定は `self.downloader.missing_dependencies()` (公開 API) に委譲し、見つからないツールがあれば `QMessageBox.warning()` を表示する。バイナリパス (`_ffmpeg_path` 等) の private 属性アクセスは行わない。
 
 ### `_set_original_format_enabled(enabled: bool)`
 
