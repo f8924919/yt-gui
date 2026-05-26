@@ -194,6 +194,232 @@ class _AudioListWidget(_ToggleListWidget):
             self._suppress_enforce = False
 
 
+class _NicoCommentsGroup(QGroupBox):
+    """ニコニコ動画コメント (ASS 変換 / MKV 統合) 設定グループ。
+
+    `comments` lang が字幕リストに含まれるときだけ親パネルから可視化される。
+    親パネル (OriginalFormatPanel) は以下を委譲する:
+      - 出力モード (audio_only / remux_only) の変化 → `update_output_mode`
+      - 選択中映像の解像度 (`auto_resolution` 用) → コンストラクタの callback
+      - ASS 変換 ON 時に字幕リストの `comments` lang を自動選択する処理
+        → `request_select_comments` シグナルを親が捕捉
+    """
+
+    request_select_comments = Signal()
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        get_video_resolution: Callable[[], tuple[int, int] | None],
+    ):
+        super().__init__(t("nico_group_title"), parent)
+        self._get_video_resolution = get_video_resolution
+        self._output_audio_only = False
+        self._output_remux_only = False
+        self.setVisible(False)
+        # 内部の SpinBox が潰れないよう vertical SizePolicy を Fixed にする
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self._build()
+        self._set_controls_enabled(False)
+
+    def _build(self):
+        # コンパクト 2 行構成: チェック行 + パラメータ 1 行（縦圧迫を最小化）
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(4)
+
+        check_row = QHBoxLayout()
+        check_row.setSpacing(12)
+        self._convert_check = QCheckBox(t("nico_convert_ass"))
+        self._convert_check.toggled.connect(self._on_convert_toggled)
+        check_row.addWidget(self._convert_check)
+        self._embed_mkv_check = QCheckBox(t("nico_embed_mkv"))
+        self._embed_mkv_check.toggled.connect(self._on_embed_mkv_toggled)
+        check_row.addWidget(self._embed_mkv_check)
+        check_row.addStretch()
+        layout.addLayout(check_row)
+
+        params_row = QHBoxLayout()
+        params_row.setSpacing(8)
+
+        self._auto_res_check = QCheckBox(t("nico_auto_resolution"))
+        self._auto_res_check.setChecked(True)
+        self._auto_res_check.toggled.connect(self._on_auto_res_toggled)
+        params_row.addWidget(self._auto_res_check)
+
+        self._resolution_label = QLabel(t("nico_resolution"))
+        params_row.addWidget(self._resolution_label)
+        self._width_spin = QSpinBox()
+        self._width_spin.setRange(320, 7680)
+        self._width_spin.setSingleStep(2)
+        self._width_spin.setValue(_NICO_DEFAULT_WIDTH)
+        self._width_spin.setSuffix(" px")
+        params_row.addWidget(self._width_spin)
+        params_row.addWidget(QLabel("×"))
+        self._height_spin = QSpinBox()
+        self._height_spin.setRange(240, 4320)
+        self._height_spin.setSingleStep(2)
+        self._height_spin.setValue(_NICO_DEFAULT_HEIGHT)
+        self._height_spin.setSuffix(" px")
+        params_row.addWidget(self._height_spin)
+
+        params_row.addSpacing(12)
+        self._duration_label = QLabel(t("nico_duration"))
+        params_row.addWidget(self._duration_label)
+        self._duration_spin = QDoubleSpinBox()
+        self._duration_spin.setRange(1.0, 60.0)
+        self._duration_spin.setSingleStep(0.5)
+        self._duration_spin.setValue(_NICO_DEFAULT_DURATION)
+        params_row.addWidget(self._duration_spin)
+
+        params_row.addSpacing(12)
+        self._opacity_label = QLabel(t("nico_opacity"))
+        params_row.addWidget(self._opacity_label)
+        self._opacity_spin = QDoubleSpinBox()
+        self._opacity_spin.setRange(0.1, 1.0)
+        self._opacity_spin.setSingleStep(0.1)
+        self._opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
+        params_row.addWidget(self._opacity_spin)
+
+        params_row.addSpacing(12)
+        self._font_label = QLabel(t("nico_font_size"))
+        params_row.addWidget(self._font_label)
+        self._font_spin = QSpinBox()
+        self._font_spin.setRange(8, 128)
+        self._font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
+        self._font_spin.setSuffix(" px")
+        params_row.addWidget(self._font_spin)
+
+        params_row.addStretch()
+        layout.addLayout(params_row)
+
+        self.setLayout(layout)
+
+    def reset(self):
+        """初期状態へ戻す。"""
+        self.setVisible(False)
+        self._convert_check.setChecked(False)
+        self._embed_mkv_check.setChecked(False)
+        self._auto_res_check.setChecked(True)
+        self._width_spin.setValue(_NICO_DEFAULT_WIDTH)
+        self._height_spin.setValue(_NICO_DEFAULT_HEIGHT)
+        self._duration_spin.setValue(_NICO_DEFAULT_DURATION)
+        self._opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
+        self._font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
+        self._set_controls_enabled(False)
+
+    def retranslate(self):
+        self.setTitle(t("nico_group_title"))
+        self._convert_check.setText(t("nico_convert_ass"))
+        self._embed_mkv_check.setText(t("nico_embed_mkv"))
+        self._auto_res_check.setText(t("nico_auto_resolution"))
+        self._resolution_label.setText(t("nico_resolution"))
+        self._duration_label.setText(t("nico_duration"))
+        self._opacity_label.setText(t("nico_opacity"))
+        self._font_label.setText(t("nico_font_size"))
+
+    def get_opts(self) -> dict:
+        """ニコニコ動画コメント → ASS 変換オプションを返す。
+
+        `auto_resolution=True` かつ親から解像度情報が取得できれば、
+        スピンボックスの値ではなく動画の実解像度を採用する。
+        """
+        auto_res = bool(self._auto_res_check.isChecked())
+        w = int(self._width_spin.value())
+        h = int(self._height_spin.value())
+        if auto_res:
+            detected = self._get_video_resolution()
+            if detected is not None:
+                w, h = detected
+        return {
+            "convert_to_ass": bool(self._convert_check.isChecked()),
+            "embed_to_mkv": bool(self._embed_mkv_check.isChecked()),
+            "auto_resolution": auto_res,
+            "resolution_w": w,
+            "resolution_h": h,
+            "duration_sec": float(self._duration_spin.value()),
+            "opacity": float(self._opacity_spin.value()),
+            "font_size": int(self._font_spin.value()),
+        }
+
+    def restore_from(self, settings: dict):
+        """`settings["nico_comments"]` から状態を復元する。
+
+        欠如時はデフォルト値を用いる。"""
+        nico = settings.get("nico_comments") or {}
+        self._auto_res_check.setChecked(bool(nico.get("auto_resolution", True)))
+        self._width_spin.setValue(int(nico.get("resolution_w", _NICO_DEFAULT_WIDTH)))
+        self._height_spin.setValue(int(nico.get("resolution_h", _NICO_DEFAULT_HEIGHT)))
+        self._duration_spin.setValue(
+            float(nico.get("duration_sec", _NICO_DEFAULT_DURATION))
+        )
+        self._opacity_spin.setValue(float(nico.get("opacity", _NICO_DEFAULT_OPACITY)))
+        self._font_spin.setValue(int(nico.get("font_size", _NICO_DEFAULT_FONT_SIZE)))
+        self._convert_check.setChecked(bool(nico.get("convert_to_ass", False)))
+        self._embed_mkv_check.setChecked(bool(nico.get("embed_to_mkv", False)))
+
+    def update_output_mode(self, *, audio_only: bool, remux_only: bool):
+        """出力モードに応じて MKV 統合チェックの利用可否を更新する。"""
+        self._output_audio_only = audio_only
+        self._output_remux_only = remux_only
+        self._refresh_embed_mkv_enabled()
+
+    def _on_convert_toggled(self, checked: bool):
+        """ASS 変換チェック切替: 子コントロールを enable/disable し、
+        ON 時には親に `comments` lang 自動選択を要求する。OFF にしたとき
+        は MKV 統合チェックも連動して OFF にする (MKV 統合は ASS 変換に
+        依存するため)。"""
+        self._set_controls_enabled(checked)
+        if not checked and self._embed_mkv_check.isChecked():
+            self._embed_mkv_check.blockSignals(True)
+            self._embed_mkv_check.setChecked(False)
+            self._embed_mkv_check.blockSignals(False)
+        if checked:
+            self.request_select_comments.emit()
+
+    def _on_embed_mkv_toggled(self, checked: bool):
+        """MKV 統合チェック切替: ON 時は ASS 変換チェックを強制 ON にする。"""
+        if checked and not self._convert_check.isChecked():
+            self._convert_check.setChecked(True)
+
+    def _on_auto_res_toggled(self, checked: bool):
+        """解像度自動追従チェック切替: ON 時は手動解像度入力を無効化する
+        (フォールバック値として残す)。"""
+        self._width_spin.setEnabled((not checked) and self._convert_check.isChecked())
+        self._height_spin.setEnabled((not checked) and self._convert_check.isChecked())
+
+    def _set_controls_enabled(self, enabled: bool):
+        for w in (
+            self._duration_spin,
+            self._opacity_spin,
+            self._font_spin,
+            self._auto_res_check,
+        ):
+            w.setEnabled(enabled)
+        manual_res_enabled = enabled and not self._auto_res_check.isChecked()
+        self._width_spin.setEnabled(manual_res_enabled)
+        self._height_spin.setEnabled(manual_res_enabled)
+        self._refresh_embed_mkv_enabled()
+
+    def _refresh_embed_mkv_enabled(self):
+        """MKV 統合チェックの enabled 状態を再評価する。
+
+        ASS 変換 ON かつ出力モードが「コンテナ結合」のときだけ操作可能。
+        音声のみ / remux のみのときは disable (動画統合の対象外)。
+        """
+        usable = (
+            self._convert_check.isChecked()
+            and not self._output_audio_only
+            and not self._output_remux_only
+        )
+        self._embed_mkv_check.setEnabled(usable)
+        if not usable and self._embed_mkv_check.isChecked():
+            self._embed_mkv_check.blockSignals(True)
+            self._embed_mkv_check.setChecked(False)
+            self._embed_mkv_check.blockSignals(False)
+
+
 class _PanelSignals(QObject):
     formats_fetched = Signal(dict)
     fetch_failed = Signal(str, bool)  # (error_msg, is_playlist)
@@ -338,87 +564,15 @@ class OriginalFormatPanel(QGroupBox):
         embed_row.addStretch()
         outer.addLayout(embed_row)
 
-        # ニコニコ動画コメント (ASS 変換) グループ
+        # ニコニコ動画コメント (ASS 変換) グループ。
         # `comments` lang が字幕リストに含まれるときだけ可視化する。
-        # コンパクト 2 行構成: チェック行 + パラメータ 1 行（縦圧迫を最小化）
-        # 内部の SpinBox が潰れないよう vertical SizePolicy を Fixed にする
-        self._nico_group = QGroupBox(t("nico_group_title"))
-        self._nico_group.setVisible(False)
-        self._nico_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        self._nico_group: _NicoCommentsGroup = _NicoCommentsGroup(
+            get_video_resolution=self._get_selected_video_resolution,
         )
-        nico_layout = QVBoxLayout()
-        nico_layout.setContentsMargins(8, 4, 8, 4)
-        nico_layout.setSpacing(4)
-
-        nico_check_row = QHBoxLayout()
-        nico_check_row.setSpacing(12)
-        self._nico_convert_check = QCheckBox(t("nico_convert_ass"))
-        self._nico_convert_check.toggled.connect(self._on_nico_convert_toggled)
-        nico_check_row.addWidget(self._nico_convert_check)
-        self._nico_embed_mkv_check = QCheckBox(t("nico_embed_mkv"))
-        self._nico_embed_mkv_check.toggled.connect(self._on_nico_embed_mkv_toggled)
-        nico_check_row.addWidget(self._nico_embed_mkv_check)
-        nico_check_row.addStretch()
-        nico_layout.addLayout(nico_check_row)
-
-        nico_params_row = QHBoxLayout()
-        nico_params_row.setSpacing(8)
-
-        self._nico_auto_res_check = QCheckBox(t("nico_auto_resolution"))
-        self._nico_auto_res_check.setChecked(True)
-        self._nico_auto_res_check.toggled.connect(self._on_nico_auto_res_toggled)
-        nico_params_row.addWidget(self._nico_auto_res_check)
-
-        self._nico_resolution_label = QLabel(t("nico_resolution"))
-        nico_params_row.addWidget(self._nico_resolution_label)
-        self._nico_width_spin = QSpinBox()
-        self._nico_width_spin.setRange(320, 7680)
-        self._nico_width_spin.setSingleStep(2)
-        self._nico_width_spin.setValue(_NICO_DEFAULT_WIDTH)
-        self._nico_width_spin.setSuffix(" px")
-        nico_params_row.addWidget(self._nico_width_spin)
-        nico_params_row.addWidget(QLabel("×"))
-        self._nico_height_spin = QSpinBox()
-        self._nico_height_spin.setRange(240, 4320)
-        self._nico_height_spin.setSingleStep(2)
-        self._nico_height_spin.setValue(_NICO_DEFAULT_HEIGHT)
-        self._nico_height_spin.setSuffix(" px")
-        nico_params_row.addWidget(self._nico_height_spin)
-
-        nico_params_row.addSpacing(12)
-        self._nico_duration_label = QLabel(t("nico_duration"))
-        nico_params_row.addWidget(self._nico_duration_label)
-        self._nico_duration_spin = QDoubleSpinBox()
-        self._nico_duration_spin.setRange(1.0, 60.0)
-        self._nico_duration_spin.setSingleStep(0.5)
-        self._nico_duration_spin.setValue(_NICO_DEFAULT_DURATION)
-        nico_params_row.addWidget(self._nico_duration_spin)
-
-        nico_params_row.addSpacing(12)
-        self._nico_opacity_label = QLabel(t("nico_opacity"))
-        nico_params_row.addWidget(self._nico_opacity_label)
-        self._nico_opacity_spin = QDoubleSpinBox()
-        self._nico_opacity_spin.setRange(0.1, 1.0)
-        self._nico_opacity_spin.setSingleStep(0.1)
-        self._nico_opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
-        nico_params_row.addWidget(self._nico_opacity_spin)
-
-        nico_params_row.addSpacing(12)
-        self._nico_font_label = QLabel(t("nico_font_size"))
-        nico_params_row.addWidget(self._nico_font_label)
-        self._nico_font_spin = QSpinBox()
-        self._nico_font_spin.setRange(8, 128)
-        self._nico_font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
-        self._nico_font_spin.setSuffix(" px")
-        nico_params_row.addWidget(self._nico_font_spin)
-
-        nico_params_row.addStretch()
-        nico_layout.addLayout(nico_params_row)
-
-        self._nico_group.setLayout(nico_layout)
+        self._nico_group.request_select_comments.connect(
+            self._on_request_select_comments
+        )
         outer.addWidget(self._nico_group)
-        self._set_nico_controls_enabled(False)
 
     # ── public interface ─────────────────────────────────────────────────────
 
@@ -462,17 +616,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_metadata_check.setChecked(True)
         self._embed_chapters_check.setChecked(True)
 
-        # ニコニコ動画コメントグループを初期状態に戻す
-        self._nico_group.setVisible(False)
-        self._nico_convert_check.setChecked(False)
-        self._nico_embed_mkv_check.setChecked(False)
-        self._nico_auto_res_check.setChecked(True)
-        self._nico_width_spin.setValue(_NICO_DEFAULT_WIDTH)
-        self._nico_height_spin.setValue(_NICO_DEFAULT_HEIGHT)
-        self._nico_duration_spin.setValue(_NICO_DEFAULT_DURATION)
-        self._nico_opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
-        self._nico_font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
-        self._set_nico_controls_enabled(False)
+        self._nico_group.reset()
 
     def retranslate(self, video_container: str = "mp4", audio_label: str | None = None):
         if audio_label is not None:
@@ -517,14 +661,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_thumbnail_check.setText(t("orig_embed_thumbnail"))
         self._embed_metadata_check.setText(t("orig_embed_metadata"))
         self._embed_chapters_check.setText(t("orig_embed_chapters"))
-        self._nico_group.setTitle(t("nico_group_title"))
-        self._nico_convert_check.setText(t("nico_convert_ass"))
-        self._nico_embed_mkv_check.setText(t("nico_embed_mkv"))
-        self._nico_auto_res_check.setText(t("nico_auto_resolution"))
-        self._nico_resolution_label.setText(t("nico_resolution"))
-        self._nico_duration_label.setText(t("nico_duration"))
-        self._nico_opacity_label.setText(t("nico_opacity"))
-        self._nico_font_label.setText(t("nico_font_size"))
+        self._nico_group.retranslate()
 
     def has_formats_loaded(self) -> bool:
         return bool(self._fetched_title) and (
@@ -570,28 +707,7 @@ class OriginalFormatPanel(QGroupBox):
         self._signals.size_hint_changed.connect(callback)
 
     def get_nico_comments_opts(self) -> dict:
-        """ニコニコ動画コメント → ASS 変換オプションを返す。
-
-        `auto_resolution=True` かつ選択中の映像 ID に解像度情報があれば、
-        スピンボックスの値ではなく動画の実解像度を採用する。
-        """
-        auto_res = bool(self._nico_auto_res_check.isChecked())
-        w = int(self._nico_width_spin.value())
-        h = int(self._nico_height_spin.value())
-        if auto_res:
-            detected = self._get_selected_video_resolution()
-            if detected is not None:
-                w, h = detected
-        return {
-            "convert_to_ass": bool(self._nico_convert_check.isChecked()),
-            "embed_to_mkv": bool(self._nico_embed_mkv_check.isChecked()),
-            "auto_resolution": auto_res,
-            "resolution_w": w,
-            "resolution_h": h,
-            "duration_sec": float(self._nico_duration_spin.value()),
-            "opacity": float(self._nico_opacity_spin.value()),
-            "font_size": int(self._nico_font_spin.value()),
-        }
+        return self._nico_group.get_opts()
 
     def _get_selected_video_resolution(self) -> tuple[int, int] | None:
         """選択中の映像フォーマット ID に対応する (width, height) を返す。
@@ -613,77 +729,21 @@ class OriginalFormatPanel(QGroupBox):
         """字幕フォーマットに `comments` lang が含まれるか。"""
         return any(lang == _COMMENTS_LANG for _, lang, _ in self._subtitle_formats)
 
-    def _on_nico_convert_toggled(self, checked: bool):
-        """コメント ASS 変換チェック切替: 子コントロールを enable/disable し、
-        ON 時には字幕リストの `comments` 行を自動選択する。OFF にしたとき
-        は MKV 統合チェックも連動して OFF にする (MKV 統合は ASS 変換に
-        依存するため)。"""
-        self._set_nico_controls_enabled(checked)
-        if not checked and self._nico_embed_mkv_check.isChecked():
-            # ASS 変換 OFF にしたら MKV 統合も解除
-            self._nico_embed_mkv_check.blockSignals(True)
-            self._nico_embed_mkv_check.setChecked(False)
-            self._nico_embed_mkv_check.blockSignals(False)
-        if checked and self._subtitle_formats:
-            for i, (_, lang, _) in enumerate(self._subtitle_formats):
-                if lang != _COMMENTS_LANG:
-                    continue
-                item = self._subtitle_list.item(i)
-                if item is not None and not item.isSelected():
-                    self._subtitle_list.blockSignals(True)
-                    item.setSelected(True)
-                    self._subtitle_list.blockSignals(False)
-                    self._on_subtitle_changed()
-                break
-
-    def _on_nico_embed_mkv_toggled(self, checked: bool):
-        """MKV 統合チェック切替: ON 時は ASS 変換チェックを強制 ON にする。"""
-        if checked and not self._nico_convert_check.isChecked():
-            self._nico_convert_check.setChecked(True)
-
-    def _on_nico_auto_res_toggled(self, checked: bool):
-        """解像度自動追従チェック切替: ON 時は手動解像度入力を無効化する
-        (フォールバック値として残す)。"""
-        self._nico_width_spin.setEnabled(
-            (not checked) and self._nico_convert_check.isChecked()
-        )
-        self._nico_height_spin.setEnabled(
-            (not checked) and self._nico_convert_check.isChecked()
-        )
-
-    def _set_nico_controls_enabled(self, enabled: bool):
-        for w in (
-            self._nico_duration_spin,
-            self._nico_opacity_spin,
-            self._nico_font_spin,
-            self._nico_auto_res_check,
-        ):
-            w.setEnabled(enabled)
-        # 手動解像度入力は auto_resolution が OFF のときだけ有効
-        manual_res_enabled = enabled and not self._nico_auto_res_check.isChecked()
-        self._nico_width_spin.setEnabled(manual_res_enabled)
-        self._nico_height_spin.setEnabled(manual_res_enabled)
-        # MKV 統合チェックも convert に依存するが、出力モードによる
-        # disable は別途 _refresh_nico_embed_mkv_enabled() で扱う
-        self._refresh_nico_embed_mkv_enabled()
-
-    def _refresh_nico_embed_mkv_enabled(self):
-        """MKV 統合チェックの enabled 状態を再評価する。
-
-        ASS 変換 ON かつ出力モードが「コンテナ結合」のときだけ操作可能。
-        音声のみ / remux のみのときは disable (動画統合の対象外)。
-        """
-        usable = (
-            self._nico_convert_check.isChecked()
-            and not self._radio_audio.isChecked()
-            and not self._radio_remux.isChecked()
-        )
-        self._nico_embed_mkv_check.setEnabled(usable)
-        if not usable and self._nico_embed_mkv_check.isChecked():
-            # 利用不能になったら OFF にして整合性を保つ
-            self._nico_embed_mkv_check.blockSignals(True)
-            self._nico_embed_mkv_check.setChecked(False)
-            self._nico_embed_mkv_check.blockSignals(False)
+    def _on_request_select_comments(self):
+        """`_NicoCommentsGroup` から ASS 変換 ON 通知を受けたとき、
+        字幕リストの `comments` lang を自動選択する。"""
+        if not self._subtitle_formats:
+            return
+        for i, (_, lang, _) in enumerate(self._subtitle_formats):
+            if lang != _COMMENTS_LANG:
+                continue
+            item = self._subtitle_list.item(i)
+            if item is not None and not item.isSelected():
+                self._subtitle_list.blockSignals(True)
+                item.setSelected(True)
+                self._subtitle_list.blockSignals(False)
+                self._on_subtitle_changed()
+            break
 
     def get_snapshot(self) -> PanelSnapshot:
         """build_job_spec に渡す UI 非依存スナップショットを返す。"""
@@ -767,25 +827,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_metadata_check.setChecked(settings.get("embed_metadata", True))
         self._embed_chapters_check.setChecked(settings.get("embed_chapters", True))
 
-        nico = settings.get("nico_comments") or {}
-        self._nico_auto_res_check.setChecked(bool(nico.get("auto_resolution", True)))
-        self._nico_width_spin.setValue(
-            int(nico.get("resolution_w", _NICO_DEFAULT_WIDTH))
-        )
-        self._nico_height_spin.setValue(
-            int(nico.get("resolution_h", _NICO_DEFAULT_HEIGHT))
-        )
-        self._nico_duration_spin.setValue(
-            float(nico.get("duration_sec", _NICO_DEFAULT_DURATION))
-        )
-        self._nico_opacity_spin.setValue(
-            float(nico.get("opacity", _NICO_DEFAULT_OPACITY))
-        )
-        self._nico_font_spin.setValue(
-            int(nico.get("font_size", _NICO_DEFAULT_FONT_SIZE))
-        )
-        self._nico_convert_check.setChecked(bool(nico.get("convert_to_ass", False)))
-        self._nico_embed_mkv_check.setChecked(bool(nico.get("embed_to_mkv", False)))
+        self._nico_group.restore_from(settings)
 
         self._pending_restore = settings
         if self.has_formats_loaded():
@@ -1008,7 +1050,10 @@ class OriginalFormatPanel(QGroupBox):
                 self._subtitle_list.setEnabled(True)
             self._on_subtitle_changed()
         # 出力モードに応じて MKV 統合チェックの利用可否を更新
-        self._refresh_nico_embed_mkv_enabled()
+        self._nico_group.update_output_mode(
+            audio_only=self._radio_audio.isChecked(),
+            remux_only=self._radio_remux.isChecked(),
+        )
 
     def _on_subtitle_changed(self):
         has_sub = bool(self._subtitle_list.selectedItems()) and bool(
