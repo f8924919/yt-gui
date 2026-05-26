@@ -27,7 +27,7 @@
 | [refactor-job-spec.md](refactor-job-spec.md) | 完了 | リファクタ フェーズ 1: `JobSpec` dataclass + `build_job_spec` 集約 + テスト先行（候補 A/B/C） | 2026-05-25 |
 | [refactor-app-split.md](refactor-app-split.md) | 完了 | リファクタ フェーズ 2: `App` を `ThumbnailCache` / `QueueController` に分割（候補 D） | 2026-05-25 |
 | [refactor-nico-comments-group.md](refactor-nico-comments-group.md) | 完了 | リファクタ フェーズ 3: `_NicoCommentsGroup` を子ウィジェットに切り出し（候補 E） | 2026-05-26 |
-| [refactor-thread-signal-helper.md](refactor-thread-signal-helper.md) | 未着手 | リファクタ フェーズ 4: バックグラウンドスレッド + シグナルの共通化（候補 F） | 2026-05-25 |
+| [refactor-thread-signal-helper.md](refactor-thread-signal-helper.md) | 完了 | リファクタ フェーズ 4: バックグラウンドスレッド + シグナルの共通化（候補 F） | 2026-05-26 |
 | [refactor-i18n-combo-sentinel.md](refactor-i18n-combo-sentinel.md) | 未着手 | リファクタ フェーズ 5: コンボの sentinel 化 + AUTO/SKIP オフセット隠蔽（候補 G/H） | 2026-05-25 |
 | [refactor-downloader-split.md](refactor-downloader-split.md) | 未着手 | リファクタ フェーズ 6: `download_video` 分割 + 依存チェック公開化（候補 I/J） | 2026-05-25 |
 | [refactor-misc-cleanup.md](refactor-misc-cleanup.md) | 未着手 | リファクタ フェーズ 7: 小規模クリーンアップ（候補 K/L） | 2026-05-25 |

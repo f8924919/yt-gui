@@ -22,17 +22,17 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 
 ## シグナル（内部クラス `_AppSignals(QObject)`）
 
-ワーカーキュー由来のシグナルは `QueueController` に移管済み。`_AppSignals` には URL タイトル取得スレッド (`_run_fetch_for_add`) で必要なものと、共通ハンドラだけを残している。
+ワーカーキュー由来のシグナルは `QueueController` に移管済み。URL タイトル取得スレッドは [`threading_utils.run_in_thread`](threading_utils.md) に移行したため、`_AppSignals` には汎用ハンドラだけが残る。
 
 | シグナル | 引数 | 用途 |
 |----------|------|------|
 | `status_update` | `str, float` | ステータスバー更新（テキスト・進捗） |
 | `log_message` | `str` | ログ追記 |
-| `add_button_reset` | — | 「追加」ボタンを通常状態に戻す |
-| `fetch_for_add_done` | `object (dict)` | タイトル取得完了・エンキュー処理をメインスレッドで行う |
 | `show_error` | `str, str` | エラーダイアログ表示（title, message） |
 
-`OriginalFormatPanel` も同様に内部クラス `_PanelSignals(QObject)` でシグナルを定義する（詳細は [original_format_panel.md](original_format_panel.md) 参照）。
+URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` / `on_failed` / `on_finished` コールバックでメインスレッドの UI 操作を完結させる。`on_failed` 内で `_update_status` / `_log` / `QMessageBox.critical` を直接呼び、`on_finished` で「追加」ボタンを再有効化する。
+
+`OriginalFormatPanel` も同じパターンで `run_in_thread` を使う（詳細は [original_format_panel.md](original_format_panel.md) 参照）。
 
 ## 初期化順序
 

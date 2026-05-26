@@ -1,4 +1,3 @@
-import threading
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -23,6 +22,7 @@ from PySide6.QtWidgets import (
 from .downloader import Downloader
 from .i18n import t
 from .job_spec import PanelSnapshot
+from .threading_utils import run_in_thread
 from .utils import strip_ansi
 
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
@@ -421,9 +421,9 @@ class _NicoCommentsGroup(QGroupBox):
 
 
 class _PanelSignals(QObject):
-    formats_fetched = Signal(dict)
-    fetch_failed = Signal(str, bool)  # (error_msg, is_playlist)
-    fetch_finished = Signal()  # always emitted at end (re-enable button)
+    """フォーマット取得スレッドは `threading_utils.run_in_thread` に移行したため、
+    パネル内部のレイアウト通知用シグナルだけが残る。"""
+
     size_hint_changed = Signal()  # 内部レイアウトの sizeHint が変わったとき
 
 
@@ -452,9 +452,6 @@ class OriginalFormatPanel(QGroupBox):
         self._audio_label: str = "MP3"
 
         self._signals = _PanelSignals()
-        self._signals.formats_fetched.connect(self._on_fetch_done)
-        self._signals.fetch_failed.connect(self._on_fetch_failed)
-        self._signals.fetch_finished.connect(self._on_fetch_finished)
 
         self._build_widgets()
         self._pending_restore: dict | None = None
@@ -1090,22 +1087,18 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setEnabled(False)
         self._update_status(t("status_fetching_formats"), 0)
 
-        threading.Thread(
-            target=self._run_fetch,
-            args=(url, cookies_path, cookies_browser),
-            daemon=True,
-        ).start()
-
-    def _run_fetch(self, url, cookies_path, cookies_browser):
-        try:
-            result = self._downloader.fetch_formats(url, cookies_path, cookies_browser)
-            self._signals.formats_fetched.emit(result)
-        except Exception as e:
-            err_str = strip_ansi(str(e))
+        def _on_failed(exc: Exception) -> None:
+            err_str = strip_ansi(str(exc))
             is_playlist = "playlist" in err_str.lower()
-            self._signals.fetch_failed.emit(err_str, is_playlist)
-        finally:
-            self._signals.fetch_finished.emit()
+            self._on_fetch_failed(err_str, is_playlist)
+
+        run_in_thread(
+            lambda: self._downloader.fetch_formats(url, cookies_path, cookies_browser),
+            on_done=self._on_fetch_done,
+            on_failed=_on_failed,
+            on_finished=self._on_fetch_finished,
+            parent=self,
+        )
 
     def _on_fetch_done(self, result: dict):
         auto_label = t("orig_auto")

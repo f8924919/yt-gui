@@ -24,7 +24,7 @@
 - `_cache: dict[str, str]` — URL → data URI
 - `_fetching: set[str]` — 取得中の URL
 - `_lock: threading.Lock` — 上記 2 つの排他制御
-- `_fetch(url)` — バックグラウンドスレッドで `urllib.request` 取得、Content-Type を data URI に保持
+- `_fetch(url)` — `urllib.request` 取得、Content-Type を data URI に保持。スレッド起動は [`threading_utils.run_in_thread`](threading_utils.md) に委譲し、`_on_fetched` / `_on_fetch_failed` をメインスレッドのコールバックとして受ける
 
 ## 呼び出し側 (`app.py`)
 

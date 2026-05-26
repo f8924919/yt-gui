@@ -42,6 +42,7 @@ omit = [
     "yt_gui/downloader.py",
     "yt_gui/queue_controller.py",
     "yt_gui/thumbnail_cache.py",
+    "yt_gui/threading_utils.py",
     "yt_gui/locales/*.py",
 ]
 
