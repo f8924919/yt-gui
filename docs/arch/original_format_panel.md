@@ -10,10 +10,9 @@
 
 | シグナル | 引数 | タイミング |
 |----------|------|-----------|
-| `formats_fetched` | `dict` | フォーマット取得成功時 |
-| `fetch_failed` | `str, bool` | フォーマット取得失敗時 |
+| `size_hint_changed` | — | 内部レイアウトの sizeHint が変わったとき（親スプリッタへ再計算を促す） |
 
-フォーマット取得はバックグラウンドスレッドで行い、シグナル経由でメインスレッドへ渡す。
+フォーマット取得は [`threading_utils.run_in_thread`](threading_utils.md) に委譲し、`_on_fetch_done` / `_on_fetch_failed` / `_on_fetch_finished` をメインスレッドのコールバックとして受ける。`on_failed` 内でエラー文字列を解析して `is_playlist` を判定する。
 
 ## 内包ウィジェット
 

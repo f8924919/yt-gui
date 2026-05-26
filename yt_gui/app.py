@@ -1,6 +1,5 @@
 import os
 import sys
-import threading
 from datetime import datetime
 from os.path import expanduser
 
@@ -40,6 +39,7 @@ from .original_format_panel import OriginalFormatPanel
 from .queue_controller import QueueController, _QueueItem
 from .settings import SettingsManager, build_proxy_url
 from .settings_dialog import SettingsDialog
+from .threading_utils import run_in_thread
 from .thumbnail_cache import ThumbnailCache
 from .utils import strip_ansi
 
@@ -54,15 +54,12 @@ class _AppSignals(QObject):
     """App 自身がバックグラウンドスレッドから emit する用のシグナル。
 
     キュー走行ワーカー由来のシグナルは `QueueController` に移管済み。
-    残っているのは URL タイトル取得スレッド (`_run_fetch_for_add`) で
-    使う `fetch_for_add_done` / `add_button_reset` と、共通ハンドラ
-    (status / log / error / warning) のみ。
+    URL タイトル取得スレッドは `threading_utils.run_in_thread` に移行し、
+    `_AppSignals` には共通ハンドラ (status / log / error) のみが残る。
     """
 
     status_update = Signal(str, float)
     log_message = Signal(str)
-    add_button_reset = Signal()
-    fetch_for_add_done = Signal(object)  # carries dict with result + metadata
     show_error = Signal(str, str)
 
 
@@ -183,8 +180,6 @@ class App(QMainWindow):
         self._signals = _AppSignals()
         self._signals.status_update.connect(self._update_status)
         self._signals.log_message.connect(self._log)
-        self._signals.add_button_reset.connect(self._reset_add_button)
-        self._signals.fetch_for_add_done.connect(self._on_fetch_for_add_done)
         self._signals.show_error.connect(
             lambda title, msg: QMessageBox.critical(self, title, msg)
         )
@@ -627,36 +622,29 @@ class App(QMainWindow):
     ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
-        self._signals.status_update.emit(t("status_fetching_title"), 0)
-        threading.Thread(
-            target=self._run_fetch_for_add,
-            args=(url, cookies_path, cookies_browser, job, format_label),
-            daemon=True,
-        ).start()
+        self._update_status(t("status_fetching_title"), 0)
 
-    def _run_fetch_for_add(
-        self,
-        url: str,
-        cookies_path: str | None,
-        cookies_browser: str | None,
-        job: JobSpec,
-        format_label: str,
-    ):
-        try:
+        def _work():
             result = self.downloader.fetch_title_or_entries(
                 url, cookies_path, cookies_browser
             )
-            payload = {"result": result, "job": job, "format_label": format_label}
-            self._signals.fetch_for_add_done.emit(payload)
-        except Exception as e:
-            err_msg = strip_ansi(str(e))
-            self._signals.status_update.emit(f"❌ {err_msg}", 0)
-            self._signals.log_message.emit(f"❌ {err_msg}")
-            self._signals.show_error.emit(
-                t("err_title"), t("err_fetch_title").format(error=err_msg)
+            return {"result": result, "job": job, "format_label": format_label}
+
+        def _on_failed(exc: Exception) -> None:
+            err_msg = strip_ansi(str(exc))
+            self._update_status(f"❌ {err_msg}", 0)
+            self._log(f"❌ {err_msg}")
+            QMessageBox.critical(
+                self, t("err_title"), t("err_fetch_title").format(error=err_msg)
             )
-        finally:
-            self._signals.add_button_reset.emit()
+
+        run_in_thread(
+            _work,
+            on_done=self._on_fetch_for_add_done,
+            on_failed=_on_failed,
+            on_finished=self._reset_add_button,
+            parent=self,
+        )
 
     def _reset_add_button(self):
         self.add_button.setEnabled(True)
