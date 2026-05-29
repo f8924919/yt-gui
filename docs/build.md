@@ -8,7 +8,7 @@ PyInstaller でスタンドアロンバイナリをビルドする際の構成�
 uv run pyinstaller yt-gui.spec
 ```
 
-ビルド成果物は `dist/yt-gui/` に出力される（macOS は `dist/yt-gui.app/`、Linux は加えて `dist/yt-gui-{arch}.AppImage`）。
+ビルド成果物は `dist/yt-gui/` に出力される（macOS は `dist/yt-gui.app/`、Linux は加えて `dist/yt-gui-{version}-{arch}.AppImage`）。
 
 ## 同梱するバイナリ
 
@@ -37,16 +37,35 @@ python scripts/download_binaries.py
 python scripts/download_binaries.py --update
 ```
 
+## バージョン管理（単一ソース）
+
+アプリのバージョンは **`pyproject.toml` の `[project] version` を唯一のソース** とする。更新時はこの 1 箇所だけを書き換える。
+
+| 参照先 | 取得方法 |
+|---|---|
+| ウィンドウタイトル（実行時） | `yt_gui.get_version()` → `importlib.metadata.version("yt-gui")` |
+| macOS `.app` の `CFBundleShortVersionString` | `yt-gui.spec` が `tomllib` で `pyproject.toml` を読み取り注入 |
+| Windows `.exe` のバージョンリソース | `yt-gui.spec` が `VSVersionInfo` を組み立て `EXE(version=...)` に渡す（`FileVersion` / `ProductVersion`） |
+| Linux AppImage のファイル名 | `scripts/build_appimage.py` が `get_version()` を用い `yt-gui-{version}-{arch}.AppImage` とし、`VERSION` 環境変数も設定 |
+
+`importlib.metadata` で実行時にバージョンを解決するため、以下が前提となる。
+
+- `pyproject.toml` に `[build-system]`（hatchling）を定義し、`uv sync` で yt-gui 自身をパッケージとしてインストールしてメタデータ（`*.dist-info`）を生成する。
+- PyInstaller バンドルでもメタデータを解決できるよう、`yt-gui.spec` の `datas` に `copy_metadata('yt-gui')` を追加して `*.dist-info` を同梱する。
+
+> メタデータが見つからない場合 `get_version()` は `"unknown"` を返す（クラッシュさせない）。Windows のバージョンリソースは `pyproject.toml` の値を直接読むため `"unknown"` にはならないが、AppImage のファイル名は `get_version()` 経由のため `uv sync` 未実施時は `unknown` を含みうる。
+
 ## yt-gui.spec の構成
 
 - PySide6 向けに設定済み。`pyinstaller-hooks-contrib` が PySide6 プラグイン・データを自動検出するため追加設定は最小限。
 - macOS 向けビルドでは `BUNDLE` ブロックで `.app` バンドルを自動生成する。
 - Linux 向けビルドでは `scripts/build_appimage.py` を後処理として自動呼び出しし、`.AppImage` を生成する。
 - アイコンは `assets/icon.png` から PNG → ICO（Windows）/ ICNS（macOS）への自動変換に対応。
+- ビルド時に `pyproject.toml` からバージョンを読み取り（`tomllib`）、`CFBundleShortVersionString` に注入する。`copy_metadata('yt-gui')` でパッケージメタデータも同梱する（バージョン管理セクション参照）。
 
 ## Linux AppImage の生成
 
-Linux 上で `uv run pyinstaller yt-gui.spec` を実行すると、`COLLECT` 完了後に `scripts/build_appimage.py` が自動実行され `dist/yt-gui-{arch}.AppImage` を生成する。
+Linux 上で `uv run pyinstaller yt-gui.spec` を実行すると、`COLLECT` 完了後に `scripts/build_appimage.py` が自動実行され `dist/yt-gui-{version}-{arch}.AppImage` を生成する。
 
 | 要素 | 内容 |
 |---|---|
