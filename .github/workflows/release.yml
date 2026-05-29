@@ -98,8 +98,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # 成果物はアーティファクトによっては dist/ などの階層付きで展開されるため、
+          # ディレクトリではなくファイルだけを収集して添付する（assets/* だとディレクトリを掴む）。
+          mapfile -t files < <(find assets -type f)
           gh release create "v${{ needs.version-gate.outputs.version }}" \
             --repo "${{ github.repository }}" \
             --title "v${{ needs.version-gate.outputs.version }}" \
             --generate-notes \
-            assets/*
+            "${files[@]}"
