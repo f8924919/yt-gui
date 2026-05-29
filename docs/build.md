@@ -55,6 +55,43 @@ python scripts/download_binaries.py --update
 
 > メタデータが見つからない場合 `get_version()` は `"unknown"` を返す（クラッシュさせない）。Windows のバージョンリソースは `pyproject.toml` の値を直接読むため `"unknown"` にはならないが、AppImage のファイル名は `get_version()` 経由のため `uv sync` 未実施時は `unknown` を含みうる。
 
+## CI / リリース自動化（GitHub Actions）
+
+`.github/workflows/release.yml` が、`main` への push を契機にタグ作成からリリース公開までを自動化する。詳細な設計は [docs/task/release-workflow.md](task/release-workflow.md) を参照。
+
+### トリガーと冪等性
+
+`pyproject.toml` の `[project] version` を読み取り、`v{version}` タグが**未存在のときだけ**リリース処理を実行する（コミット差分ではなくタグ有無で判定するため冪等）。バージョンを上げて `main` にマージするだけで一連の処理が走り、バージョン無関係の push やワークフロー再実行では何もしない。
+
+### ジョブ構成
+
+| ジョブ | 役割 |
+|---|---|
+| `version-gate` | version を読み、`v{version}` タグの有無で `should_release` を決定 |
+| `tag` | `should_release` のとき `v{version}` タグを作成・push |
+| `build` | OS マトリックスでビルドし成果物を artifact 化 |
+| `release` | artifact を集約し `gh release create v{version}` に添付 |
+
+`GITHUB_TOKEN` で作成したタグは別ワークフローを再トリガーしない仕様のため、`tag` → `build` → `release` を `needs` で同一実行内に連結している（PAT 不要）。
+
+### OS マトリックスと成果物
+
+クロスビルド非対応のため各 OS ランナーでビルドする。
+
+| ランナー | アーキ | 成果物 |
+|---|---|---|
+| `windows-latest` | x64 | `yt-gui-{version}-windows-x64.zip`（`dist/yt-gui/` を圧縮） |
+| `macos-latest` | arm64 | `yt-gui-{version}-macos-arm64.zip`（`dist/yt-gui.app` を `ditto` で圧縮） |
+| `ubuntu-22.04` | x64 | `yt-gui-{version}-x86_64.AppImage`（spec が生成） |
+
+- `ubuntu-22.04` を採用するのは glibc 互換性のため（新しい glibc でビルドした AppImage は古い環境で起動しない）。
+- ビルド前に `scripts/download_binaries.py --yes` を実行して GPL 同意プロンプトを自動承認する（spec 内の再呼び出しは既存ファイルありでスキップ）。
+- Linux ランナーでは `binutils`（objdump）・`file`（appimagetool）を apt で導入する。
+
+### 留意点
+
+- **コード署名なし**: Windows は SmartScreen 警告、macOS は Gatekeeper でブロックされる（未署名アプリのため）。署名・公証は別途対応が必要。
+
 ## yt-gui.spec の構成
 
 - PySide6 向けに設定済み。`pyinstaller-hooks-contrib` が PySide6 プラグイン・データを自動検出するため追加設定は最小限。
