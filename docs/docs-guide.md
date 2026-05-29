@@ -57,7 +57,8 @@ CLAUDE.md には概要 1〜2 行と詳細ファイルへのリンクのみを残
 | `docs/spec/features/` | 機能単位の仕様（キュー・ダウンロード形式 等） | `kebab-case.md` |
 | `docs/spec/screens/` | 画面単位の仕様（ダイアログ・パネル 等） | `kebab-case.md` |
 | `docs/arch/` | `yt_gui/` 各モジュールの **実装詳細**（"どう実装されているか"） | `snake_case.md`（モジュール名と一致） |
-| `docs/task/` | 進行中・完了タスクの管理 | `kebab-case.md`（タスク slug） |
+| `docs/task/` | 進行中・未着手タスクの管理（`index.md` + 作業中の `{slug}.md`） | `kebab-case.md`（タスク slug） |
+| `docs/task/archive/` | 完了タスクのアーカイブ（テーマ別 `index.md` + 完了済み `{slug}.md`） | `kebab-case.md`（タスク slug） |
 | `docs/research/` | 採否未決の **調査・検討メモ**（実装前の比較検討など） | `kebab-case.md` |
 | `docs/testing/` | テスト方針・実行コマンド・カバレッジ運用 | `kebab-case.md` |
 | `docs/build.md` | PyInstaller ビルド・同梱バイナリ | 直下の単独ファイル |
@@ -180,8 +181,9 @@ CLAUDE.md にも記載のとおり、**コードまたは仕様を変更・拡�
 ### 4.2 タスク完了時の手順
 
 1. コード変更 + 対応ドキュメント更新を同一の作業範囲で完了させる
-2. `docs/task/{slug}.md` のステータスを更新
-3. `docs/task/index.md` の該当行を `完了` + 更新日に書き換える
+2. `docs/task/{slug}.md` を `docs/task/archive/` へ移動する
+3. `docs/task/index.md`「進行中・未着手」テーブルから該当行を削除する
+4. `docs/task/archive/index.md` の該当テーマ表に概要 + 更新日を追記する
 
 ---
 

@@ -71,7 +71,7 @@ python scripts/download_binaries.py --update
 
 ## CI / リリース自動化（GitHub Actions）
 
-`.github/workflows/release.yml` が、`main` への push を契機にタグ作成からリリース公開までを自動化する。詳細な設計は [docs/task/release-workflow.md](task/release-workflow.md) を参照。
+`.github/workflows/release.yml` が、`main` への push を契機にタグ作成からリリース公開までを自動化する。詳細な設計は [docs/task/archive/release-workflow.md](task/archive/release-workflow.md) を参照。
 
 ### トリガーと冪等性
 
