@@ -58,3 +58,28 @@ def test_excludes_shared_and_stable():
 def test_empty_assets_raises():
     with pytest.raises(RuntimeError):
         _select([])
+
+
+# --- THIRD-PARTY-NOTICES 生成 ---------------------------------------------
+
+
+def test_write_third_party_notices_lists_all_components(tmp_path):
+    """全コンポーネントの名称・ライセンス・対応ソースが告知に含まれる。"""
+    out = download_binaries.write_third_party_notices(str(tmp_path))
+    assert os.path.basename(out) == "THIRD-PARTY-NOTICES.md"
+    text = open(out, encoding="utf-8").read()
+    for component in download_binaries.COMPONENTS:
+        assert component["name"] in text
+        assert component["license"] in text
+        # 対応ソース入手先（GPL の書面オファー）が記載される
+        assert component["source"].split(" ")[0] in text
+    # GPL / MIT の主要コンポーネントを網羅している
+    assert "FFmpeg" in text and "danmaku2ass" in text and "Deno" in text
+
+
+def test_is_license_name_matches_common_filenames():
+    assert download_binaries._is_license_name("foo/bin/LICENSE.txt")
+    assert download_binaries._is_license_name("GPLv3.txt")
+    assert download_binaries._is_license_name("COPYING")
+    assert not download_binaries._is_license_name("ffmpeg.exe")
+    assert not download_binaries._is_license_name("README.md")

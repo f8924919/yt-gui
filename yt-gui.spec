@@ -87,6 +87,19 @@ _extra_datas = [(_png_path, 'assets')] if os.path.isfile(_png_path) else []
 # パッケージのメタデータ（dist-info）を同梱する
 _extra_datas += copy_metadata('yt-gui')
 
+# GPL/MIT 同梱バイナリのライセンス・著作権・対応ソース告知をバンドルに含める。
+# download_binaries.py が bin/licenses/ に抽出・生成済み（上の subprocess 実行で更新される）。
+_license_src = os.path.join(SPECPATH, 'LICENSE')
+if os.path.isfile(_license_src):
+    _extra_datas.append((_license_src, 'licenses'))
+_licenses_dir = os.path.join(_bin_dir, 'licenses')
+if os.path.isdir(_licenses_dir):
+    for _root, _dirs, _files in os.walk(_licenses_dir):
+        _rel = os.path.relpath(_root, _licenses_dir)
+        _dest = 'licenses' if _rel == '.' else os.path.join('licenses', _rel)
+        for _fn in _files:
+            _extra_datas.append((os.path.join(_root, _fn), _dest))
+
 
 def _version_tuple(version: str) -> tuple:
     """"0.1.0" → (0, 1, 0, 0)。Windows バージョンリソースは 4 整数を要求する。"""

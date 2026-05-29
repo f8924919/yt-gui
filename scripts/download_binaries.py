@@ -17,7 +17,17 @@ import urllib.request
 import zipfile
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.join(os.path.dirname(_SCRIPTS_DIR), 'bin')
+_PROJECT_DIR = os.path.dirname(_SCRIPTS_DIR)
+BIN_DIR = os.path.join(_PROJECT_DIR, 'bin')
+# 同梱バイナリのライセンス本文・告知の保存先（バンドル時に licenses/ へ同梱される）
+LICENSES_DIR = os.path.join(BIN_DIR, 'licenses')
+
+# 配布アーカイブ内でライセンス本文とみなすファイル名（basename, 小文字比較）
+_LICENSE_BASENAMES = frozenset({
+    'license', 'license.txt', 'license.md',
+    'copying', 'copying.txt',
+    'gplv3.txt', 'gplv2.txt', 'gpl.txt',
+})
 
 
 def _make_executable(path):
@@ -29,6 +39,19 @@ def _make_executable(path):
 def _download(url, dest):
     print(f'  -> {url}')
     urllib.request.urlretrieve(url, dest)
+
+
+def _is_license_name(name: str) -> bool:
+    """アーカイブ内エントリ名がライセンス本文ファイルかを basename で判定する。"""
+    return os.path.basename(name).lower() in _LICENSE_BASENAMES
+
+
+def _save_license_text(component: str, filename: str, data: bytes) -> None:
+    """抽出したライセンス本文を bin/licenses/<component>/<filename> に保存する。"""
+    dest_dir = os.path.join(LICENSES_DIR, component)
+    os.makedirs(dest_dir, exist_ok=True)
+    with open(os.path.join(dest_dir, os.path.basename(filename)), 'wb') as f:
+        f.write(data)
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +168,10 @@ def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
             entry = next(n for n in z.namelist() if n.endswith(f'/bin/{name}'))
             with open(out, 'wb') as f:
                 f.write(z.read(entry))
+        # BtbN ビルドはアーカイブ直下に LICENSE / COPYING 等を同梱する
+        for entry in z.namelist():
+            if not entry.endswith('/') and _is_license_name(entry):
+                _save_license_text('ffmpeg', entry, z.read(entry))
     os.remove(tmp)
 
 
@@ -185,6 +212,12 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
                 with open(out_path, 'wb') as dst:
                     shutil.copyfileobj(src, dst)
                 _make_executable(out_path)
+        # johnvansickle の tarball は LICENSE.txt / GPLv3.txt 等を同梱する
+        for member in t.getmembers():
+            if member.isfile() and _is_license_name(member.name):
+                src = t.extractfile(member)
+                if src is not None:
+                    _save_license_text('ffmpeg', member.name, src.read())
     os.remove(tmp)
 
 
@@ -239,8 +272,99 @@ def download_danmaku2ass(force=False):
         )
         _make_executable(out_path)
         print(f'[danmaku2ass] Saved: {out_path}')
+
+        # clone したソースからライセンス本文を保存する
+        for name in os.listdir(tmpdir):
+            if _is_license_name(name) and os.path.isfile(os.path.join(tmpdir, name)):
+                with open(os.path.join(tmpdir, name), 'rb') as f:
+                    _save_license_text('danmaku2ass', name, f.read())
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# サードパーティライセンス告知（属性表示 + 対応ソースの書面オファー）
+# ---------------------------------------------------------------------------
+# GPL / MIT の再配布義務に基づき、同梱する各コンポーネントの著作権・ライセンス・
+# 対応ソース入手先を列挙したファイルを生成し、バンドルに同梱する。
+
+COMPONENTS = [
+    {
+        'name': 'FFmpeg (ffmpeg, ffprobe)',
+        'license': 'GPL（同梱ビルドは libx264/x265 等を含む GPL 構成）',
+        'copyright': 'Copyright (c) the FFmpeg developers',
+        'homepage': 'https://ffmpeg.org/',
+        'source': 'https://ffmpeg.org/download.html#get-sources',
+        'distribution': (
+            'Windows: https://github.com/BtbN/FFmpeg-Builds (win64-gpl) / '
+            'macOS: https://evermeet.cx/ffmpeg/ / '
+            'Linux: https://johnvansickle.com/ffmpeg/'
+        ),
+        'note': (
+            '同梱バイナリの正確なライセンス・ビルド構成は '
+            '`ffmpeg -version` の出力で確認できる。'
+        ),
+    },
+    {
+        'name': 'danmaku2ass',
+        'license': 'GPL-3.0',
+        'copyright': 'Copyright (c) Star Brilliant and danmaku2ass contributors',
+        'homepage': 'https://github.com/m13253/danmaku2ass',
+        'source': f'{DANMAKU2ASS_REPO} (ref: {DANMAKU2ASS_REF})',
+        'distribution': 'ソースから PyInstaller でビルドして同梱',
+        'note': 'ニコニコ動画コメント JSON → ASS 字幕変換に使用。',
+    },
+    {
+        'name': 'Deno',
+        'license': 'MIT',
+        'copyright': 'Copyright (c) the Deno authors',
+        'homepage': 'https://deno.com/',
+        'source': 'https://github.com/denoland/deno',
+        'distribution': 'https://github.com/denoland/deno/releases',
+        'note': 'yt-dlp の JavaScript ランタイムとして使用。',
+    },
+]
+
+
+def write_third_party_notices(dest_dir: str = LICENSES_DIR) -> str:
+    """同梱コンポーネントの属性表示・対応ソース入手先を Markdown で書き出す。
+
+    GPL の「対応ソース提供」義務に対する書面のオファーを兼ねる。ネットワークに
+    依存しない純粋関数として実装し、生成パスを返す。
+    """
+    os.makedirs(dest_dir, exist_ok=True)
+    lines = [
+        '# サードパーティライセンス',
+        '',
+        'yt-gui は以下の外部コンポーネントを同梱して配布しています。各ライセンスの',
+        '条件に従い、著作権表示・ライセンス・対応ソースコードの入手先を以下に示します。',
+        '',
+        'GPL コンポーネントの対応ソースコードは、以下「対応ソース」の URL から'
+        '入手できます。',
+        '本ファイルは GPL が要求する対応ソース提供の書面によるオファーを兼ねます。',
+        '各コンポーネントのライセンス全文は、本バンドル内の `licenses/` 配下',
+        '（取得元アーカイブに同梱されていたもの）および本体の `LICENSE`（GPLv3）を'
+        '参照してください。',
+        '',
+    ]
+    for c in COMPONENTS:
+        lines += [
+            f'## {c["name"]}',
+            '',
+            f'- ライセンス: {c["license"]}',
+            f'- 著作権表示: {c["copyright"]}',
+            f'- 公式サイト: {c["homepage"]}',
+            f'- 配布元: {c["distribution"]}',
+            f'- 対応ソース: {c["source"]}',
+            f'- 備考: {c["note"]}',
+            '',
+        ]
+    content = '\n'.join(lines)
+    out_path = os.path.join(dest_dir, 'THIRD-PARTY-NOTICES.md')
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f'[licenses] Wrote: {out_path}')
+    return out_path
 
 
 # ---------------------------------------------------------------------------
@@ -331,3 +455,6 @@ if __name__ == '__main__':
             sys.exit(0)
 
     download_danmaku2ass(force=args.update)
+
+    # 同梱コンポーネントのライセンス告知を生成（属性表示 + 対応ソースの書面オファー）
+    write_third_party_notices()

@@ -43,7 +43,19 @@ uv run pyinstaller yt-gui.spec
 | macOS | `dist/yt-gui.app` |
 | Linux | `dist/yt-gui/yt-gui` + `dist/yt-gui-{arch}.AppImage` |
 
-同梱バイナリ（deno / ffmpeg / ffprobe）は `yt-gui.spec` 実行時に `scripts/download_binaries.py` が自動取得します。詳細は [docs/build.md](docs/build.md) を参照してください。
+同梱バイナリ（deno / ffmpeg / ffprobe / danmaku2ass）は `yt-gui.spec` 実行時に `scripts/download_binaries.py` が自動取得します。詳細は [docs/build.md](docs/build.md) を参照してください。
+
+## ライセンス
+
+本体は GPL-3.0（[LICENSE](LICENSE)）です。配布バイナリには以下の外部コンポーネントを同梱しています。
+
+| コンポーネント | ライセンス | 対応ソース |
+|---|---|---|
+| ffmpeg / ffprobe | GPL（GPL ビルド） | https://ffmpeg.org/download.html |
+| danmaku2ass | GPL-3.0 | https://github.com/m13253/danmaku2ass |
+| deno | MIT | https://github.com/denoland/deno |
+
+各コンポーネントのライセンス全文・著作権表示・対応ソース入手先は、リリース成果物を展開した `licenses/` 配下（`THIRD-PARTY-NOTICES.md` ほか）に同梱しています。`THIRD-PARTY-NOTICES.md` は GPL が要求する対応ソース提供の書面によるオファーを兼ねます。
 
 ## 設定の保存先
 
