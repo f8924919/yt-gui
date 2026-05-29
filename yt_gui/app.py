@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import get_resource_base, i18n
+from . import get_resource_base, get_version, i18n
 from .downloader import Downloader
 from .formats import FORMAT_KEYS
 from .i18n import t
@@ -177,7 +177,7 @@ class App(QMainWindow):
         self._settings = self._settings_manager.load()
         i18n.set_language(self._settings.language)
 
-        self.setWindowTitle(t("app_title"))
+        self.setWindowTitle(self._window_title())
         self.resize(_WIN_W, _WIN_H_DEFAULT)
         self.setMinimumSize(_WIN_W, 380)
 
@@ -288,8 +288,12 @@ class App(QMainWindow):
             self._settings.video_container, self._build_audio_label()
         )
 
+    def _window_title(self) -> str:
+        """ウィンドウタイトル（アプリ名 + バージョン）を返す。"""
+        return f"{t('app_title')} v{get_version()}"
+
     def _retranslate_ui(self):
-        self.setWindowTitle(t("app_title"))
+        self.setWindowTitle(self._window_title())
 
         self._file_menu.setTitle(t("menu_file"))
         self._act_settings.setText(t("menu_settings"))

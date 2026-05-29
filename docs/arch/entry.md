@@ -20,3 +20,7 @@ uv run python -m yt_gui
 | 開発時 | プロジェクトルートディレクトリ |
 
 `downloader.py` が ffmpeg・deno のバイナリパスを解決する際に使用する。
+
+### `get_version() -> str`
+
+`importlib.metadata.version("yt-gui")` でアプリのバージョン（`pyproject.toml` の `[project] version` が単一ソース）を返す。メタデータが見つからない場合は `"unknown"`。`app.py` がウィンドウタイトルに付与する。バージョン管理の全体像は [docs/build.md](../build.md) を参照。

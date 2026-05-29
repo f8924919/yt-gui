@@ -3,6 +3,13 @@ import sys
 import os
 import struct
 import subprocess
+import tomllib
+
+from PyInstaller.utils.hooks import copy_metadata
+
+# バージョンは pyproject.toml を唯一のソースとして読み取る
+with open(os.path.join(SPECPATH, 'pyproject.toml'), 'rb') as _f:
+    _app_version = tomllib.load(_f)['project']['version']
 
 # ビルド前にプラットフォーム向けのバイナリを自動取得する
 subprocess.run(
@@ -76,6 +83,55 @@ else:
     _icon_path = None
 
 _extra_datas = [(_png_path, 'assets')] if os.path.isfile(_png_path) else []
+# importlib.metadata.version("yt-gui") をバンドル実行時にも解決できるよう
+# パッケージのメタデータ（dist-info）を同梱する
+_extra_datas += copy_metadata('yt-gui')
+
+
+def _version_tuple(version: str) -> tuple:
+    """"0.1.0" → (0, 1, 0, 0)。Windows バージョンリソースは 4 整数を要求する。"""
+    parts = []
+    for token in version.split('.'):
+        digits = ''.join(c for c in token if c.isdigit())  # 1rc2 等の接尾辞を除去
+        parts.append(int(digits) if digits else 0)
+    parts = (parts + [0, 0, 0, 0])[:4]
+    return tuple(parts)
+
+
+def _build_win_version_info(version: str):
+    """Windows .exe のバージョンリソース（VSVersionInfo）を組み立てる。"""
+    from PyInstaller.utils.win32.versioninfo import (
+        FixedFileInfo,
+        StringFileInfo,
+        StringStruct,
+        StringTable,
+        VarFileInfo,
+        VarStruct,
+        VSVersionInfo,
+    )
+
+    vt = _version_tuple(version)
+    return VSVersionInfo(
+        ffi=FixedFileInfo(filevers=vt, prodvers=vt),
+        kids=[
+            StringFileInfo([
+                StringTable('040904B0', [
+                    StringStruct('CompanyName', 'yt-gui'),
+                    StringStruct('FileDescription', 'yt-dlp GUI Downloader'),
+                    StringStruct('FileVersion', version),
+                    StringStruct('InternalName', 'yt-gui'),
+                    StringStruct('OriginalFilename', 'yt-gui.exe'),
+                    StringStruct('ProductName', 'yt-gui'),
+                    StringStruct('ProductVersion', version),
+                ]),
+            ]),
+            VarFileInfo([VarStruct('Translation', [0x0409, 1200])]),
+        ],
+    )
+
+
+# Windows ビルド時のみ .exe にバージョンリソースを埋め込む
+_win_version = _build_win_version_info(_app_version) if sys.platform == 'win32' else None
 
 a = Analysis(
     ['main.py'],
@@ -99,6 +155,7 @@ exe = EXE(
     exclude_binaries=True,
     name='yt-gui',
     icon=_icon_path,
+    version=_win_version,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -129,7 +186,7 @@ if sys.platform == 'darwin':
         info_plist={
             'NSPrincipalClass': 'NSApplication',
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '0.1.0',
+            'CFBundleShortVersionString': _app_version,
         },
     )
 elif sys.platform == 'linux':

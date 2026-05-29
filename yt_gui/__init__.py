@@ -1,5 +1,19 @@
+import importlib.metadata
 import os
 import sys
+
+
+def get_version() -> str:
+    """アプリのバージョン文字列を返す。
+
+    pyproject.toml を唯一のソースとし、インストール済みパッケージのメタデータ
+    （PyInstaller バンドル時は spec の copy_metadata で同梱）から取得する。
+    メタデータが見つからない場合は "unknown" を返す。
+    """
+    try:
+        return importlib.metadata.version("yt-gui")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 
 def get_resource_base() -> str:

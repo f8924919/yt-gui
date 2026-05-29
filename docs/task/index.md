@@ -31,3 +31,4 @@
 | [refactor-i18n-combo-sentinel.md](refactor-i18n-combo-sentinel.md) | 完了 | リファクタ フェーズ 5: コンボの sentinel 化 + AUTO/SKIP オフセット隠蔽（候補 G/H） | 2026-05-26 |
 | [refactor-downloader-split.md](refactor-downloader-split.md) | 完了 | リファクタ フェーズ 6: `download_video` 分割 + 依存チェック公開化（候補 I/J） | 2026-05-26 |
 | [refactor-misc-cleanup.md](refactor-misc-cleanup.md) | 完了 | リファクタ フェーズ 7: 小規模クリーンアップ（候補 K/L） | 2026-05-26 |
+| [version-single-source.md](version-single-source.md) | 完了 | バージョンを `pyproject.toml` に単一ソース化（spec へ tomllib 注入 + UI 表示 + copy_metadata 同梱） | 2026-05-29 |

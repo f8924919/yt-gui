@@ -25,6 +25,16 @@ APP_DISPLAY_NAME = "yt-gui"
 APP_COMMENT = "PySide6-based yt-dlp GUI downloader"
 
 
+def _app_version() -> str:
+    """アプリのバージョン（pyproject.toml が単一ソース）を返す。"""
+    try:
+        from yt_gui import get_version
+
+        return get_version()
+    except Exception:
+        return "unknown"
+
+
 def _arch_name() -> str:
     m = platform.machine().lower()
     if m in ("arm64", "aarch64"):
@@ -117,8 +127,9 @@ def build_appimage(force: bool = False) -> str:
         )
 
     arch = _arch_name()
+    version = _app_version()
     appdir = os.path.join(DIST_DIR, f"{APP_NAME}.AppDir")
-    out_path = os.path.join(DIST_DIR, f"{APP_NAME}-{arch}.AppImage")
+    out_path = os.path.join(DIST_DIR, f"{APP_NAME}-{version}-{arch}.AppImage")
 
     if os.path.exists(out_path) and not force:
         print(f"[appimage] {out_path} already exists. Skipping.")
@@ -130,6 +141,8 @@ def build_appimage(force: bool = False) -> str:
     appimagetool = _download_appimagetool()
     env = os.environ.copy()
     env.setdefault("ARCH", arch)
+    # appimagetool は VERSION を更新情報に埋め込む
+    env.setdefault("VERSION", version)
 
     print("[appimage] Running appimagetool...")
     # --appimage-extract-and-run: FUSE が無い環境（CI/コンテナ等）でも動かすため
