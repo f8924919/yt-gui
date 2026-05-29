@@ -27,4 +27,8 @@ GPL（ffmpeg / ffprobe、danmaku2ass）と MIT（deno）の外部バイナリを
 
 ## 進捗
 
-- 進行中
+- 完了（2026-05-29）。PR #13 をマージし v0.1.1 を公開。リリース成果物（macOS zip）を展開して
+  `licenses/LICENSE`（GPLv3）・`licenses/THIRD-PARTY-NOTICES.md`・`licenses/danmaku2ass/COPYING` の
+  同梱を実検証済み。
+- 既出の v0.1.0 はリリースノートにライセンス・対応ソースを追記して是正（ファイル添付はサンドボックスの
+  `uploads.github.com` 制約で不可のため、ホスト側／Web UI からの添付が残作業）。
