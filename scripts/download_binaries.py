@@ -98,19 +98,32 @@ def download_ffmpeg(force=False):
 def _resolve_btbn_ffmpeg_win64_gpl_url() -> str:
     """BtbN/FFmpeg-Builds の最新リリースから win64-gpl の autobuild zip URL を解決する。
 
-    かつては `ffmpeg-master-latest-win64-gpl.zip` という固定名のアセットが提供されて
-    いたが、現在は `ffmpeg-N-{N}-g{hash}-win64-gpl.zip` のようにコミットハッシュ付きの
-    名前に変わっており、固定 URL では 404 になる。Releases API でアセット名を引いて
-    動的に URL を解決する。
+    BtbN のアセット名は過去に何度か変わっている:
+
+    - 固定名 `ffmpeg-master-latest-win64-gpl.zip`（現行）
+    - コミットハッシュ付き `ffmpeg-N-{N}-g{hash}-win64-gpl.zip`（一時期）
+
+    固定 URL 直打ちでは命名変更のたびに 404 になるため、Releases API でアセット名を
+    引いて動的に URL を解決する。shared 版（`-shared`）と安定版（末尾 `-X.Y.zip`）は
+    除外し、master autobuild の static GPL ビルドだけを拾う。
     """
     api = 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest'
     req = urllib.request.Request(api, headers={'Accept': 'application/vnd.github+json'})
     with urllib.request.urlopen(req) as resp:
         data = json.load(resp)
 
-    # master autobuild の win64-gpl (shared / lgpl / 安定版 nX.Y.Z は除外)
-    pattern = re.compile(r'^ffmpeg-N-\d+-g[0-9a-f]+-win64-gpl\.zip$')
-    for asset in data.get('assets', []):
+    return _select_btbn_win64_gpl_asset(data.get('assets', []))
+
+
+def _select_btbn_win64_gpl_asset(assets: list[dict]) -> str:
+    """Releases API のアセット一覧から win64-gpl (static / master) の URL を選ぶ。
+
+    現行の `master-latest` 固定名と過去のハッシュ付き名の両方を許容する。`-shared`
+    と安定版 `nX.Y`（末尾 `-X.Y.zip`）は正規表現の末尾固定（`-win64-gpl.zip` で終わる
+    もののみ）で自然に除外される。
+    """
+    pattern = re.compile(r'^ffmpeg-(?:master-latest|N-\d+-g[0-9a-f]+)-win64-gpl\.zip$')
+    for asset in assets:
         name = asset.get('name', '')
         if pattern.match(name):
             return asset['browser_download_url']
