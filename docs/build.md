@@ -21,9 +21,23 @@ uv run pyinstaller yt-gui.spec
 
 `yt-gui.spec` の `binaries` 設定でこれらをバイナリに同梱する。
 
+## 同梱バイナリのライセンス（GPL/MIT 対応）
+
+ffmpeg / ffprobe・danmaku2ass は GPL、deno は MIT ライセンスである。再配布義務（ライセンス全文・著作権表示の保持、GPL の対応ソース提供）を満たすため、リリース成果物にライセンス類を同梱する。
+
+| 同梱物 | バンドル内パス | 生成元 |
+|---|---|---|
+| 本体 GPLv3 全文 | `licenses/LICENSE` | リポジトリの `LICENSE` |
+| 各バイナリのライセンス本文 | `licenses/<component>/...` | `download_binaries.py` が配布アーカイブから抽出（BtbN zip / johnvansickle tarball / danmaku2ass clone） |
+| サードパーティ告知 | `licenses/THIRD-PARTY-NOTICES.md` | `download_binaries.py` の `write_third_party_notices()` が生成 |
+
+`THIRD-PARTY-NOTICES.md` は各コンポーネントの名称・ライセンス・著作権者・対応ソース入手先を列挙し、GPL が要求する**対応ソース提供の書面によるオファー**を兼ねる。アーカイブにライセンス本文を同梱しない配布元（evermeet の macOS ffmpeg、deno）については、対応ソース入手先を同告知に明記してこれを担保する（GPL 本文自体はバンドル同梱の `licenses/LICENSE` で参照可能）。
+
+`yt-gui.spec` は `bin/licenses/` 配下を再帰的に `licenses/` へ同梱する。これらは `bin/` 配下のためリポジトリにはコミットせず、ビルド時に毎回生成する。
+
 ## バイナリの自動取得
 
-`scripts/download_binaries.py` で deno / ffmpeg / ffprobe / danmaku2ass を自動取得し `bin/` 配下に配置する。`yt-gui.spec` のビルド時に自動呼び出しされる。
+`scripts/download_binaries.py` で deno / ffmpeg / ffprobe / danmaku2ass を自動取得し `bin/` 配下に配置する。あわせて上記のライセンス本文を `bin/licenses/` に抽出し、`THIRD-PARTY-NOTICES.md` を生成する（ライセンス本文の抽出は失敗してもビルドは継続する）。`yt-gui.spec` のビルド時に自動呼び出しされる。
 
 danmaku2ass は GitHub から `git clone` でソースを取得し、`sys.executable -m PyInstaller --onefile` で単独実行ファイルにビルドする。再現性のため master 追従ではなくコミットハッシュ（`DANMAKU2ASS_REF`）で固定する。ライセンスが GPL-3.0 なので ffmpeg と同様に同意プロンプトを通る（CI では `--yes` で省略）。
 
