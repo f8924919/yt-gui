@@ -34,4 +34,21 @@
 
 ### 検証メモ
 
-- Windows のバージョンリソースと AppImage ビルドは、実機/対応 OS ランナーでのみ最終確認可能。サンドボックスでは `_version_tuple()` の変換ロジックと spec のパースまでを確認。
+- **Windows `.exe`**: 実機ビルドで `.exe` のファイルバージョンが `pyproject.toml` の値どおりに埋め込まれることを確認済み（2026-05-29）。
+- **Linux AppImage**: サンドボックス（x86_64 Linux）で `/tmp` にリポジトリをコピーしフルビルドを実施し、以下を確認済み（2026-05-29）。
+  - 出力名が `yt-gui-0.1.0-x86_64.AppImage`（`yt-gui-{version}-{arch}.AppImage`）になり、`pyproject.toml` の version と一致。
+  - 生成物は ELF（static-pie, ~192MB）で、`--appimage-extract-and-run` により **FUSE 無し環境でも起動**（`QT_QPA_PLATFORM=offscreen` で GUI イベントループ起動までクラッシュ無しを確認）。
+  - バンドル内に `copy_metadata('yt-gui')` 由来の `yt_gui-0.1.0.dist-info`（`Version: 0.1.0`）が同梱され、ランタイムの `get_version()` が解決可能。
+  - ffmpeg / ffprobe / deno / danmaku2ass が `_internal/` に同梱。
+
+#### サンドボックスでビルドするのに必要だった追加セットアップ
+
+`/tmp` へコピー → `uv sync`（yt-gui 自身をパッケージ化）→ `uv run pyinstaller yt-gui.spec` の前提として:
+
+- `apt-get install binutils`（PyInstaller が `objdump` を要求）
+- `apt-get install file`（appimagetool が `file` コマンドを要求）
+- ffmpeg: 取得元 `johnvansickle.com`（Linux）がサンドボックスのネットワークフィルタで **HTTP 403**。回避策として `apt-get install ffmpeg` で入れた `/usr/bin/ffmpeg`・`ffprobe` を `bin/ffmpeg/` に配置した（パイプライン検証目的のため実体は apt 版で代替）。
+- deno / appimagetool は GitHub から取得可能（`download_binaries.py` / `build_appimage.py` がそのまま成功）。
+- spec 内の `download_binaries.py` 呼び出しは `--yes` 非対応で GPL 同意プロンプトが EOF→N 扱いになるため、ffmpeg/deno/danmaku2ass は事前に配置しておく必要がある。
+- 入れた OS パッケージ（binutils / file / ffmpeg）はサンドボックス再起動で消える（[Qt UI テスト調査メモ](../research/qt-ui-testing-feasibility.md) §5.3 と同事情）。CI に乗せる場合はワークフローで明示インストールが要る。
+- 注: ディスプレイが無いため **GUI の目視確認は不可**。起動の可否（offscreen）までが限界。
