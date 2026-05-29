@@ -25,6 +25,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Claude Code はこの CLAUDE.md を読み込んだ直後に必ず [docs/task/index.md](docs/task/index.md) を確認し、`未着手` または `進行中` のタスクがある場合は、それらの対応を行うかをユーザーに尋ねること。** タスクを完了したらこのファイルの該当行のステータスを `完了` に更新し、更新日を記入する。新規タスクが発生した場合は `docs/task/{slug}.md` を作成して index.md にも追記する。
 
+GitHub Issue は「起票・仕様・受け入れ条件の正本」、`docs/task/` は「作業中の設計・進捗メモ」として併用する。両者は相互リンクで紐付ける。詳細は [docs/git-workflow.md](docs/git-workflow.md) を参照。
+
+## Git / GitHub 運用ルール
+
+絶対に守るルール（詳細・ブランチ命名表・Issue 起票テンプレは [docs/git-workflow.md](docs/git-workflow.md)）。
+
+- **`main` で直接作業しない**: 必ず `main` からブランチを切り、`main` へ PR を出す（GitHub Flow）。
+- **GitHub 操作は `gh` を使う**: 起票・閲覧・PR 作成は `gh` コマンド経由。
+- **Issue ベース開発**: 修正・機能追加は Issue に基づいて行う。Claude が起票する Issue は、AI が単独で実装・完結できる粒度の技術仕様（背景・受け入れ条件・対象ファイル・関連 spec/arch リンク）まで記述する。
+- **ブランチ命名**: `feature/<issue>-<desc>` / `bugfix/<issue>-<desc>` / `hotfix/<issue>-<desc>`、Issue を伴わない作業は `refactor/<desc>` / `docs/<desc>` / `chore/<desc>`。
+- Issue 本文・PR・コミットメッセージも[言語ルール](#言語ルール)（日本語）に従う。
+
 ## Overview
 
 PySide6製のyt-dlp GUIダウンローダー。YouTubeなどの動画をMP4（最高画質/解像度指定）・MP3/FLAC（音声のみ）・オリジナル形式（映像/音声トラックを個別指定）でダウンロードできるWindows / macOS向けデスクトップアプリ。PyInstallerでスタンドアロンバイナリとしてビルドする。
@@ -102,6 +114,7 @@ uv remove {パッケージ}
 | [docs/spec/index.md](docs/spec/index.md) | 動作仕様・画面仕様の目次 |
 | [docs/arch/index.md](docs/arch/index.md) | モジュール実装の目次 |
 | [docs/build.md](docs/build.md) | PyInstaller ビルド・バンドルバイナリの詳細 |
+| [docs/git-workflow.md](docs/git-workflow.md) | ブランチ運用・Issue ベース開発・PR の詳細ルール |
 | [docs/testing/index.md](docs/testing/index.md) | テスト実行コマンド・方針・カバレッジ運用 |
 | [docs/task/index.md](docs/task/index.md) | タスクの進捗管理（セッション開始時に必ず確認） |
 | [docs/docs-guide.md](docs/docs-guide.md) | CLAUDE.md / docs の更新ルール（ドキュメント編集時に必ず参照） |
