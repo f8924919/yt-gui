@@ -60,7 +60,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 独自実装:
 
 - **ツールチップ**: `viewportEvent` で `QEvent.Type.ToolTip` を捕捉。`QToolTip.showText()` に `rect=self.visualItemRect(item)` を渡してマウスがアイテム行にいる間は持続表示（`rect` なしだとタイムアウトで消える）。サムネイルがキャッシュ済みなら 240×135px の `<img>`（base64 data URI）をツールチップ先頭に挿入。
-- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」は `edit_format_requested.emit(waiting)` を発行し、編集モード中 (`is_editing()`) はメニュー項目を無効化する。
+- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」の対象判定は純粋ヘルパ `_edit_targets(items)` に集約し、メニュー項目の活性判定 (`setEnabled`) と `edit_format_requested.emit(targets)` の発火判定で共用する（`contextMenuEvent` はモーダル `QMenu.exec` を含みヘッドレス検証しにくいため、ロジックをヘルパへ分離してテスト可能にしている）。`_edit_targets` は編集モード中 (`is_editing()`) または `waiting` が無い場合に空リストを返す。
 - **アイテム色リセット**: `setData(col, Qt.ItemDataRole.ForegroundRole, None)` を使用（`setForeground(col, QColor())` は黒固定になりダークモード非対応）。
 
 ## キュー追加経路
