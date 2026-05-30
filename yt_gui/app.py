@@ -103,24 +103,33 @@ class _QueueTree(QTreeWidget):
                 return
         super().mousePressEvent(event)
 
+    def _edit_targets(self, items: list[_QueueItem]) -> list[_QueueItem]:
+        """「形式を変更」の対象となる `waiting` アイテムの部分集合を返す。
+
+        編集モード中、または `waiting` が無い場合は空リスト（＝編集不可）。
+        メニュー項目の活性判定と `edit_format_requested` の発火判定で共用する。
+        """
+        if self._is_editing():
+            return []
+        return [qi for qi in items if qi.status == "waiting"]
+
     def contextMenuEvent(self, event):
         selected = self.selectedItems()
         if not selected:
             return
         items = [qi for ti in selected if (qi := self._get_item(ti)) is not None]
-        waiting = [qi for qi in items if qi.status == "waiting"]
-        editing = self._is_editing()
+        targets = self._edit_targets(items)
         menu = QMenu(self)
         act_copy_url = menu.addAction(t("ctx_copy_url"))
         menu.addSeparator()
         act_edit = menu.addAction(t("ctx_edit_format"))
-        act_edit.setEnabled(bool(waiting) and not editing)
+        act_edit.setEnabled(bool(targets))
         chosen = menu.exec(event.globalPos())
         if chosen == act_copy_url:
             urls = "\n".join(qi.url for qi in items)
             QApplication.clipboard().setText(urls)
-        elif chosen == act_edit and waiting and not editing:
-            self.edit_format_requested.emit(waiting)
+        elif chosen == act_edit and targets:
+            self.edit_format_requested.emit(targets)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.Type.ToolTip:

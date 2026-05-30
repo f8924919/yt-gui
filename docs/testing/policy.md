@@ -22,9 +22,9 @@
 | 純粋関数 | `yt_gui/output_template.py` | ◯ |
 | グローバル状態 | `yt_gui/i18n.py` | ◯ |
 | ファイル I/O | `yt_gui/settings.py` | ◯ |
-| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態） | △ |
+| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従など、モーダルを介さない UI ロジックに限定） | △ |
 | スレッドヘルパ | `yt_gui/threading_utils.py`（コールバック順序） | △ |
-| Qt UI（ウィンドウ統合） | `yt_gui/app.py` ・ `settings_dialog.py` ・ `log_dialog.py` | × |
+| Qt UI（ウィンドウ統合） | `yt_gui/settings_dialog.py` ・ `log_dialog.py` | × |
 | 外部 I/O | `yt_gui/downloader.py`（yt-dlp）・ `thumbnail_cache.py`（HTTP） | △ |
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
@@ -97,8 +97,10 @@ tests/
 ├── test_settings.py
 ├── test_downloader.py
 ├── test_download_binaries.py
-├── test_threading_utils.py   ← Qt（@pytest.mark.qt）
-└── test_queue_controller.py  ← Qt（@pytest.mark.qt）
+├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
+├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
+├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）
+└── test_app.py                    ← Qt（@pytest.mark.qt）
 ```
 
 Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` を呼び、Qt 非導入環境ではモジュールごと skip します（§2.5）。
