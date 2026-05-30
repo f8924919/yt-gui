@@ -103,11 +103,11 @@ GitHub package ではないため Dependabot は直接使えない。現実解�
 
 本メモを正本に、以下の単位で後続 Issue を切る。
 
-| # | 内容 | 対象 |
-|---|---|---|
-| (b) | 台帳 `bin/pins.json` 導入 + `download_binaries.py` に sha256 検証ヘルパー追加（不一致は `raise` で中断）。各バイナリをバージョン固定 | `scripts/download_binaries.py`, `bin/pins.json`, [docs/build.md](../build.md) |
-| (c) | 週次 cron の Workflow で上流更新を検知・検証し、台帳更新 PR を自動起票 | `.github/workflows/`（新規） |
-| 補強 | GitHub Actions の artifact attestation / SLSA provenance（`actions/attest-build-provenance`）でビルド由来を署名 | `release.yml` |
+| # | Issue | 内容 | 対象 |
+|---|---|---|---|
+| (b) | [#32](https://github.com/f8924919/yt-gui/issues/32) | 台帳 `bin/pins.json` 導入 + `download_binaries.py` に sha256 検証ヘルパー追加（不一致は `raise` で中断）。各バイナリをバージョン固定 | `scripts/download_binaries.py`, `bin/pins.json`, [docs/build.md](../build.md) |
+| (c) | [#33](https://github.com/f8924919/yt-gui/issues/33) | 週次 cron の Workflow で上流更新を検知・検証し、台帳更新 PR を自動起票（(b) を前提） | `.github/workflows/`（新規） |
+| 補強 | — | GitHub Actions の artifact attestation / SLSA provenance（`actions/attest-build-provenance`）でビルド由来を署名 | `release.yml` |
 
 danmaku2ass は SHA 固定済みで現状良好。厳密化するならビルド後バイナリのハッシュも台帳化する。
 
