@@ -72,8 +72,10 @@ def test_pins_json_is_valid_and_complete():
 
     # ffmpeg-win / ffmpeg-mac / ffmpeg-linux は sha256 が確定済み（null 不可）
     assert len(pins["ffmpeg-win"]["sha256"]) == 64
-    for tool in ("ffmpeg", "ffprobe"):
-        assert len(pins["ffmpeg-mac"][tool]["sha256"]) == 64
+    # ffmpeg-mac は arch 別（x86_64 / arm64）に ffmpeg/ffprobe を持つ
+    for arch in ("x86_64", "arm64"):
+        for tool in ("ffmpeg", "ffprobe"):
+            assert len(pins["ffmpeg-mac"][arch][tool]["sha256"]) == 64
     for entry in pins["ffmpeg-linux"]["assets"].values():
         assert len(entry["sha256"]) == 64
 

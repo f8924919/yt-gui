@@ -31,7 +31,7 @@ ffmpeg / ffprobe・danmaku2ass は GPL、deno は MIT ライセンスである�
 | 各バイナリのライセンス本文 | `licenses/<component>/...` | `download_binaries.py` が配布アーカイブから抽出（BtbN zip / johnvansickle tarball / danmaku2ass clone） |
 | サードパーティ告知 | `licenses/THIRD-PARTY-NOTICES.md` | `download_binaries.py` の `write_third_party_notices()` が生成 |
 
-`THIRD-PARTY-NOTICES.md` は各コンポーネントの名称・ライセンス・著作権者・対応ソース入手先を列挙し、GPL が要求する**対応ソース提供の書面によるオファー**を兼ねる。アーカイブにライセンス本文を同梱しない配布元（evermeet の macOS ffmpeg、deno）については、対応ソース入手先を同告知に明記してこれを担保する（GPL 本文自体はバンドル同梱の `licenses/LICENSE` で参照可能）。
+`THIRD-PARTY-NOTICES.md` は各コンポーネントの名称・ライセンス・著作権者・対応ソース入手先を列挙し、GPL が要求する**対応ソース提供の書面によるオファー**を兼ねる。アーカイブにライセンス本文を同梱しない配布元（macOS ffmpeg＝evermeet / osxexperts、deno）については、対応ソース入手先を同告知に明記してこれを担保する（GPL 本文自体はバンドル同梱の `licenses/LICENSE` で参照可能）。
 
 `yt-gui.spec` は `bin/licenses/` 配下を再帰的に `licenses/` へ同梱する。これらは `bin/` 配下のためリポジトリにはコミットせず、ビルド時に毎回生成する。
 
@@ -63,7 +63,8 @@ python scripts/download_binaries.py --update
 |---|---|---|---|
 | deno | `deno` | バージョン付きリリースタグ + プラットフォーム別アセット | 上流 `<asset>.zip.sha256sum`（authoritative）と照合 |
 | ffmpeg (Win) | `ffmpeg-win` | BtbN の **n リリースビルド**（master ローリングではなく `nX.Y`） | zip を取得して sha256 算出 |
-| ffmpeg (mac) | `ffmpeg-mac` | evermeet の versioned zip（ffmpeg / ffprobe 個別） | GPG `.sig` 検証が望ましい |
+| ffmpeg (mac x86_64) | `ffmpeg-mac.x86_64` | evermeet の versioned zip（ffmpeg / ffprobe 個別） | `verify: zip`（zip の sha256 を照合）。GPG `.sig` 検証が望ましい |
+| ffmpeg (mac arm64) | `ffmpeg-mac.arm64` | osxexperts.net の Apple Silicon 静的ビルド（evermeet と同一作者） | `verify: binary`（公開値が**展開後バイナリ**の sha256 のため展開後に照合） |
 | ffmpeg (Linux) | `ffmpeg-linux` | johnvansickle の static ビルド（arch 別） | 公開 `.md5` と照合のうえ sha256 算出 |
 | danmaku2ass | `danmaku2ass` | git コミット SHA（`ref`） | 内容アドレス性で担保するため **sha256 検証対象外** |
 
@@ -73,7 +74,7 @@ python scripts/download_binaries.py --update
 
 ピン留めの目的は更新の停止ではなく、**更新を「毎ビルド可変取得」から「レビュー可能な PR 差分」へ移す**ことにある。更新は `bin/pins.json` の差分を含む PR として行い、レビュアはバージョンと sha256 の変化を確認して承認する。
 
-- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（Deno `.sha256sum`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。
+- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（Deno `.sha256sum`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。macOS arm64（osxexperts.net）はページが**展開後バイナリ**の sha256 を公開するため、展開後バイナリと公開値の一致を確認して登録する（`verify: binary`）。osxexperts は API・署名サイドカーが無いため週次自動追従の対象外とし、更新時はページの公開値を人手で確認する。
 - **自動追従（週次）**: `.github/workflows/update-binaries.yml` が毎週 `scripts/refresh_pins.py` を実行し、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する（差分が無ければ PR は作らない）。検証根拠（旧→新・上流チェックサム照合結果）は PR 本文に出力されるため、レビュアは差分の確認だけで承認できる。
 - **手動での差し替え手順**: ①`scripts/refresh_pins.py` を実行（または手動で上流バージョン URL を確認）→ ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。重大 CVE 時は週次を待たず手動で実施する。
 
@@ -125,9 +126,9 @@ python scripts/download_binaries.py --update
 | `macos-15-intel` | x86_64 | `yt-gui-{version}-macos-x86_64.zip`（`dist/yt-gui.app` を `ditto` で圧縮） |
 | `ubuntu-22.04` | x64 | `yt-gui-{version}-x86_64.AppImage`（spec が生成） |
 
-- macOS は arm64 / x86_64 の 2 アーキを別ランナーでビルドする。`PyInstaller` は `target_arch=None`（ランナーのネイティブ arch）でビルドし、deno はダウンロード時に `platform.machine()` で arch を解決するため、ランナーごとに対応 arch のバイナリが同梱される。zip 名は matrix の `macos_arch` で出し分ける。
+- macOS は arm64 / x86_64 の 2 アーキを別ランナーでビルドする。`PyInstaller` は `target_arch=None`（ランナーのネイティブ arch）でビルドし、deno・ffmpeg・ffprobe はダウンロード時に `platform.machine()` で arch を解決するため、ランナーごとに対応 arch のバイナリが同梱される。zip 名は matrix の `macos_arch` で出し分ける。
   - Intel ランナーは `macos-13` 退役後の標準 Intel イメージ `macos-15-intel` を使用する。
-  - ⚠️ 同梱 ffmpeg/ffprobe は evermeet（Intel x86_64 専用）配布のため、arm64 成果物では Rosetta 2 経由で動作する。arm64 ネイティブ化は別途 Issue で対応する。
+  - ffmpeg/ffprobe は arm64 = osxexperts.net（Apple Silicon ネイティブ）、x86_64 = evermeet.cx をそれぞれ取得する（`bin/pins.json` の `ffmpeg-mac.<arch>`）。両 arch ともネイティブで動作し、arm64 成果物の Rosetta 依存は解消済み。
 - `ubuntu-22.04` を採用するのは glibc 互換性のため（新しい glibc でビルドした AppImage は古い環境で起動しない）。
 - ビルド前に `scripts/download_binaries.py --yes` を実行して GPL 同意プロンプトを自動承認する（spec 内の再呼び出しは既存ファイルありでスキップ）。
 - Linux ランナーでは `binutils`（objdump）・`file`（appimagetool）を apt で導入する。
@@ -158,9 +159,9 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | 項目 | 内容 |
 |---|---|
 | トリガー | `schedule`（週次）+ `workflow_dispatch`（手動） |
-| 検証 | deno は上流 `.sha256sum`、johnvansickle は公開 `.md5` と照合。BtbN は GitHub リリースを取得し sha256 算出、evermeet は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
+| 検証 | deno は上流 `.sha256sum`、johnvansickle は公開 `.md5` と照合。BtbN は GitHub リリースを取得し sha256 算出、evermeet（mac x86_64）は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
 | 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
-| 対象外 | danmaku2ass（git の SHA 固定のため） |
+| 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg（osxexperts.net・API/署名無しのため手動更新） |
 | 権限 | `contents: write` / `pull-requests: write` |
 
 > **前提設定**: GITHUB_TOKEN で PR を作成するため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
