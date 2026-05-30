@@ -1,0 +1,53 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同一 ref で連続 push された場合は古い実行をキャンセル
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest      # 現状 24.04。Qt 依存ライブラリは t64 名（§Qt deps 参照）
+    env:
+      # ヘッドレス環境で Qt がウィンドウシステムを要求しないモード。
+      # 現状の対象テストは UI 非依存だが、後続の pytest-qt 製 UI テストが
+      # そのまま乗るよう先行して設定しておく。
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.14   # requires-python>=3.14 のため明示取得
+
+      # Qt の offscreen プラットフォームが依存する OS 側 C ライブラリ。
+      # PySide6 wheel に Qt 本体は同梱されるが C ライブラリは OS 側に必要。
+      # （docs/research/qt-ui-testing-feasibility.md §3.1）
+      # ubuntu-latest(24.04) は time_t 64bit 化で *t64 にリネームされている。
+      - name: Install Qt offscreen libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-0t64 libdbus-1-3 libfontconfig1 libfreetype6 \
+            libxkbcommon0 libgl1 libegl1 libx11-6
+
+      - run: uv sync
+
+      - name: Lint (ruff check)
+        run: uv run ruff check yt_gui/
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check yt_gui/
+
+      - name: Type check (mypy)
+        run: uv run mypy yt_gui/
+
+      - name: Test (pytest)
+        run: uv run pytest
