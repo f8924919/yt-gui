@@ -183,20 +183,39 @@ def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
 
 
 def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
-    # evermeet.cx distributes ffmpeg and ffprobe as separate ZIPs
-    pins = _load_pins()['ffmpeg-mac']
+    # macOS は arch 別に取得元が異なる（pins.json の ffmpeg-mac.<arch>）:
+    #   x86_64 = evermeet.cx（zip の sha256 を検証）
+    #   arm64  = osxexperts.net（公開値が展開後バイナリの sha256 のため展開後に検証）
+    # いずれも ffmpeg / ffprobe を個別 ZIP で配布する。
+    machine = platform.machine().lower()
+    arch = 'arm64' if machine == 'arm64' else 'x86_64'
+    pins = _load_pins()['ffmpeg-mac'][arch]
+    verify_mode = pins.get('verify', 'zip')
     for tool, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
         url = pins[tool]['url']
+        expected = pins[tool]['sha256']
+        label = f'ffmpeg-mac {arch} {tool}'
         tmp = os.path.join(BIN_DIR, f'_{tool}_tmp.zip')
-        print(f'[ffmpeg] Downloading {tool} (macOS {pins["version"]})...')
-        _download_verified(url, tmp, pins[tool]['sha256'], f'ffmpeg-mac {tool}')
+        print(f'[ffmpeg] Downloading {tool} (macOS {arch} {pins["version"]})...')
+        # zip 検証なら DL 時に、binary 検証なら展開後に sha256 を照合する
+        if verify_mode == 'zip':
+            _download_verified(url, tmp, expected, label)
+        else:
+            _download(url, tmp)
         with zipfile.ZipFile(tmp) as z:
-            entry = next(n for n in z.namelist() if os.path.basename(n) == tool)
+            # __MACOSX/._<tool>（AppleDouble）を除外して実体エントリを選ぶ
+            entry = next(
+                n for n in z.namelist()
+                if os.path.basename(n) == tool
+                and not os.path.basename(n).startswith('._')
+            )
             z.extract(entry, ffmpeg_dir)
             extracted = os.path.join(ffmpeg_dir, entry)
             if extracted != out_path:
                 os.replace(extracted, out_path)
         os.remove(tmp)
+        if verify_mode == 'binary':
+            _verify_sha256(out_path, expected, label)
         _make_executable(out_path)
 
 
@@ -308,7 +327,8 @@ COMPONENTS = [
         'source': 'https://ffmpeg.org/download.html#get-sources',
         'distribution': (
             'Windows: https://github.com/BtbN/FFmpeg-Builds (win64-gpl) / '
-            'macOS: https://evermeet.cx/ffmpeg/ / '
+            'macOS x86_64: https://evermeet.cx/ffmpeg/ / '
+            'macOS arm64: https://www.osxexperts.net/ / '
             'Linux: https://johnvansickle.com/ffmpeg/'
         ),
         'note': (

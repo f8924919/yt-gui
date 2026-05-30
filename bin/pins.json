@@ -19,15 +19,34 @@
     "sha256": "c8dc2f24270cf864e0737807f5c7cd77b786be6cd4d0ec433989fc9fc6563838"
   },
   "ffmpeg-mac": {
-    "version": "8.1.1",
-    "comment": "evermeet.cx の versioned zip。GPG .sig が evermeet 鍵 70202E8ED17B372A6D04467B4E7BEC998E920EE1 で署名され、zip サイズも info API の公開値と一致することを確認のうえ登録（完全な鍵検証はキーサーバ到達環境で実施推奨）。",
-    "ffmpeg": {
-      "url": "https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip",
-      "sha256": "4610988e2f54c243c50da73a09e4e2c36d9bb77546f9aa6c84cb328dcb1a98c1"
+    "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
+    "x86_64": {
+      "version": "8.1.1",
+      "source": "evermeet.cx",
+      "verify": "zip",
+      "comment": "evermeet.cx の versioned zip。GPG .sig が evermeet 鍵 70202E8ED17B372A6D04467B4E7BEC998E920EE1 で署名され、zip サイズも info API の公開値と一致することを確認のうえ登録（完全な鍵検証はキーサーバ到達環境で実施推奨）。sha256 は zip のハッシュ。",
+      "ffmpeg": {
+        "url": "https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip",
+        "sha256": "4610988e2f54c243c50da73a09e4e2c36d9bb77546f9aa6c84cb328dcb1a98c1"
+      },
+      "ffprobe": {
+        "url": "https://evermeet.cx/ffmpeg/ffprobe-8.1.1.zip",
+        "sha256": "aeade29dee3c3844e9bcc974f4ae4b29cc4f87994177d77003a8589fa531009e"
+      }
     },
-    "ffprobe": {
-      "url": "https://evermeet.cx/ffmpeg/ffprobe-8.1.1.zip",
-      "sha256": "aeade29dee3c3844e9bcc974f4ae4b29cc4f87994177d77003a8589fa531009e"
+    "arm64": {
+      "version": "8.1",
+      "source": "osxexperts.net",
+      "verify": "binary",
+      "comment": "osxexperts.net の Apple Silicon 静的ビルド。ページが公開する sha256 は zip ではなく展開後バイナリのハッシュのため、展開後に検証する（公開値と展開後バイナリの一致を確認済み）。",
+      "ffmpeg": {
+        "url": "https://www.osxexperts.net/ffmpeg81arm.zip",
+        "sha256": "9a08d61f9328e8164ba560ee7a79958e357307fcfeea6fe626b7d66cdc287028"
+      },
+      "ffprobe": {
+        "url": "https://www.osxexperts.net/ffprobe81arm.zip",
+        "sha256": "aab17ac7379c1178aaf400c3ef36cdb67db0b75b1a23eeef2cb9f658be8844e6"
+      }
     }
   },
   "ffmpeg-linux": {

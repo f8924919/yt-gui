@@ -96,6 +96,7 @@ GitHub package ではないため Dependabot は直接使えない。現実解�
 2. **上流公開のチェックサムと照合** — BtbN は各 zip の隣に `.sha256`、Deno は `*.sha256sum` を同梱。
 3. **チェックサムが無い場合**（evermeet.cx / johnvansickle.com）— TOFU（Trust On First Use）を運用で補完する。
    別ネットワーク／別時刻での再取得一致確認、`ffmpeg -version` のビルド情報突き合わせなど複数経路で確認する。
+   - macOS arm64 の ffmpeg は後日 osxexperts.net（evermeet と同一作者の Apple Silicon 静的ビルド）を追加した（[#42](https://github.com/f8924919/yt-gui/issues/42)）。同サイトは**展開後バイナリ**の sha256 をページ上で公開するため、台帳には zip ではなく展開後バイナリのハッシュを登録し（`ffmpeg-mac.arm64.verify = "binary"`）、展開後に照合する。API・署名サイドカーが無いため週次自動追従の対象外とし、更新はページの公開値を人手で確認する。
 
 つまり **「更新時だけは人＋上流チェックサムで真正性を担保し、以後は台帳のピンで固定」** という二段構えとする。
 

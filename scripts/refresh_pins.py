@@ -141,7 +141,13 @@ def refresh_ffmpeg_win(old: dict) -> tuple[dict, str]:
 
 
 def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
+    # x86_64 は evermeet.cx の info API で自動追従する。arm64（osxexperts.net）は
+    # API も署名サイドカーも無く、公開値はページ HTML 上の展開後バイナリ sha256 の
+    # ため自動スクレイピングはせず、更新はページの公開値を人手で確認する運用とする
+    # （docs/research/binary-supply-chain.md §5）。ここでは arm64 を現状維持する。
     new = dict(old)
+    old_x86 = old["x86_64"]
+    x86 = dict(old_x86)
     changed = False
     detail = []
     for tool in ("ffmpeg", "ffprobe"):
@@ -149,23 +155,25 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
         version = info["version"]
         entry = info["download"]["zip"]
         url = entry["url"]
-        new["version"] = version
-        new[tool] = dict(old[tool])
-        new[tool]["url"] = url
-        if version != old["version"] or old[tool].get("sha256") is None:
+        x86["version"] = version
+        x86[tool] = dict(old_x86[tool])
+        x86[tool]["url"] = url
+        if version != old_x86["version"] or old_x86[tool].get("sha256") is None:
             sha, _md5, size = _hashes_of_url(url)
-            new[tool]["sha256"] = sha
+            x86[tool]["sha256"] = sha
             ok = size == entry.get("size")
             detail.append(
                 f"{tool} {version}（sig: {'有' if entry.get('sig') else '無'} / "
                 f"info size 一致: {'OK' if ok else 'NG'}）"
             )
-            changed = changed or new[tool]["sha256"] != old[tool].get("sha256")
+            changed = changed or x86[tool]["sha256"] != old_x86[tool].get("sha256")
+    new["x86_64"] = x86
+    arm_note = f"arm64={old['arm64']['version']}（osxexperts.net・手動更新）"
     if not changed:
-        return new, f"ffmpeg-mac: {old['version']}（変更なし）"
+        return new, f"ffmpeg-mac: x86_64={old_x86['version']}（変更なし） / {arm_note}"
     return new, (
-        f"ffmpeg-mac: {old['version']} → {new['version']}（TOFU: 別経路確認推奨） "
-        + " / ".join(detail)
+        f"ffmpeg-mac: x86_64 {old_x86['version']} → {x86['version']}"
+        f"（TOFU: 別経路確認推奨） " + " / ".join(detail) + f" / {arm_note}"
     )
 
 
