@@ -105,7 +105,10 @@ jobs:
       # 配布する成果物（zip / AppImage）に来歴署名を付与する。
       # 公開する物と同一バイトを subject にするため、Release 作成の直前に実施する。
       # 検証: gh attestation verify <file> --repo ${{ github.repository }}
+      # actions/attest-build-provenance は個人所有の private リポジトリでは利用できず
+      # 失敗するため、private のときはスキップする（public 化すれば自動で有効化される）。
       - name: Attest build provenance
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |

@@ -139,6 +139,7 @@ python scripts/download_binaries.py --update
 
 - Sigstore のキーレス署名（OIDC + Fulcio + Rekor 透明性ログ）を用いるため秘密鍵管理は不要。`release` ジョブに `id-token: write` / `attestations: write` を付与する。
 - 公開する物と同一バイトを subject にするため、Release 作成の直前に `assets/**/*.{zip,AppImage}` を対象に署名する。
+- **`actions/attest-build-provenance` は個人所有の private リポジトリでは利用できない**ため、`if: ${{ !github.event.repository.private }}` でガードし private のときはスキップする（スキップ時も Release 作成は続行する）。public 化すれば自動で署名が有効になる。
 
 配布物の検証（任意・第三者が実行可能）:
 
