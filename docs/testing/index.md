@@ -30,6 +30,14 @@ HTML レポートは `htmlcov/index.html` に出力されます。
 
 ---
 
+## CI 実行
+
+`pull_request` と `main` への `push` で [`.github/workflows/test.yml`](../../.github/workflows/test.yml) が起動し、Ubuntu ランナー上で `ruff check` / `ruff format --check` / `mypy` / `pytest` を実行します。Python は `requires-python>=3.14` に合わせて `uv python install 3.14` で取得します。
+
+ワークフローには Qt の offscreen 実行に必要な OS 側 C ライブラリ導入と `QT_QPA_PLATFORM=offscreen` を先行して含めており、後続で導入予定の Qt UI テスト（[docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md)）がそのまま乗る構成です。
+
+---
+
 ## テストフレームワーク
 
 | ツール | バージョン | 用途 |
