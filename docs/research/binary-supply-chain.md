@@ -3,9 +3,10 @@
 [← 研究メモ目次](.)
 
 > 本メモは `scripts/download_binaries.py` が取得する外部バイナリ（deno / ffmpeg / ffprobe / danmaku2ass）の
-> 完全性検証とバージョン更新運用の方針を定める。**(b) ピン留め + sha256 検証は実装済み**（`bin/pins.json` +
-> `download_binaries.py` の `_verify_sha256`、運用は [docs/build.md](../build.md) の「ピン留めと sha256 検証」に転記）。
-> 残りは (c) 週次自動更新 Workflow（[6. 実装分解](#6-実装分解)）。本メモは設計経緯の記録として残す。
+> 完全性検証とバージョン更新運用の方針を定める。**(b) ピン留め + sha256 検証・(c) 週次自動更新 Workflow とも
+> 実装済み**（`bin/pins.json` + `download_binaries.py` の `_verify_sha256`、`scripts/refresh_pins.py` +
+> `.github/workflows/update-binaries.yml`）。運用は [docs/build.md](../build.md) に転記済み。
+> 本メモは設計経緯の記録として残す。
 
 ---
 
@@ -107,7 +108,7 @@ GitHub package ではないため Dependabot は直接使えない。現実解�
 | # | Issue | 内容 | 対象 |
 |---|---|---|---|
 | (b) | [#32](https://github.com/f8924919/yt-gui/issues/32) | 台帳 `bin/pins.json` 導入 + `download_binaries.py` に sha256 検証ヘルパー追加（不一致は `raise` で中断）。各バイナリをバージョン固定 | `scripts/download_binaries.py`, `bin/pins.json`, [docs/build.md](../build.md) |
-| (c) | [#33](https://github.com/f8924919/yt-gui/issues/33) | 週次 cron の Workflow で上流更新を検知・検証し、台帳更新 PR を自動起票（(b) を前提） | `.github/workflows/`（新規） |
+| (c) | [#33](https://github.com/f8924919/yt-gui/issues/33) | 週次 cron の Workflow で上流更新を検知・検証し、台帳更新 PR を自動起票（(b) を前提）。**実装済み** | `scripts/refresh_pins.py`, `.github/workflows/update-binaries.yml` |
 | 補強 | — | GitHub Actions の artifact attestation / SLSA provenance（`actions/attest-build-provenance`）でビルド由来を署名 | `release.yml` |
 
 danmaku2ass は SHA 固定済みで現状良好。厳密化するならビルド後バイナリのハッシュも台帳化する。

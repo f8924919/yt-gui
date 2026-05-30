@@ -1,0 +1,54 @@
+name: Update binary pins
+
+# 同梱バイナリ（deno / ffmpeg / ffprobe）の上流更新を週次で検知し、上流チェックサム／署名で
+# 真正性を検証したうえで bin/pins.json を更新する PR を自動起票する。
+# 方針: docs/research/binary-supply-chain.md §4・§5 / 実装: scripts/refresh_pins.py
+#
+# 前提: リポジトリ設定 Settings > Actions > General >
+#   "Allow GitHub Actions to create and approve pull requests" を有効化しておくこと
+#   （GITHUB_TOKEN で PR を作成するため）。
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # 毎週月曜 06:00 UTC
+  workflow_dispatch: {}
+
+# 同時実行を抑止（更新 PR の重複作成を防ぐ）
+concurrency:
+  group: update-binaries
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.14
+
+      - run: uv sync
+
+      # 上流を解決・検証して bin/pins.json を更新する。検証失敗時はここで停止し PR は作らない。
+      - name: Refresh pins
+        run: uv run python scripts/refresh_pins.py --summary-out "${RUNNER_TEMP}/pin-update-body.md"
+
+      # pins.json に差分があるときだけ PR を作成する（差分なしなら no-op）。
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          add-paths: bin/pins.json
+          branch: chore/update-binary-pins
+          base: main
+          title: "chore: 同梱バイナリのピン更新"
+          body-path: ${{ runner.temp }}/pin-update-body.md
+          commit-message: "chore: 同梱バイナリのピン (bin/pins.json) を上流最新へ更新"
+          labels: enhancement
+          delete-branch: true
