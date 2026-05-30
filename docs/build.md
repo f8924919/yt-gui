@@ -43,8 +43,6 @@ danmaku2ass は GitHub から `git clone` でソースを取得し、`sys.execut
 
 クロスビルド非対応のため、ターゲット OS と同じ OS 上でビルドする必要がある（GitHub Actions の OS マトリックスに準拠）。
 
-> **完全性検証は未実装**: 現状 deno / ffmpeg は可変参照（`latest` 等）から無検証で取得している。バージョンのピン留め・sha256 検証・更新運用の方針は [docs/research/binary-supply-chain.md](research/binary-supply-chain.md) を参照（実装着手時に本セクションへ正式版を転記する）。
-
 ```bash
 # 既存ファイルがあればスキップ
 python scripts/download_binaries.py
@@ -52,6 +50,32 @@ python scripts/download_binaries.py
 # 既存ファイルを強制的に再ダウンロード
 python scripts/download_binaries.py --update
 ```
+
+## ピン留めと sha256 検証
+
+サプライチェーン対策として、deno / ffmpeg / ffprobe はバージョンを固定し、取得物を sha256 で検証する。設計の背景・経緯は [docs/research/binary-supply-chain.md](research/binary-supply-chain.md) を参照。
+
+### 台帳 `bin/pins.json`
+
+各バイナリの **バージョン・取得 URL・sha256** をまとめた台帳。`bin/` は `.gitignore` 対象だが、`pins.json` のみ追跡する（`.gitignore` で `bin/*` 除外 + `!bin/pins.json`）。`download_binaries.py` はこの台帳だけを見て取得し、ダウンロード後に sha256 を照合する。**不一致または sha256 未設定のときは取得物を削除して例外送出しビルドを中断する**（`_verify_sha256`、サイレント続行はしない）。
+
+| コンポーネント | 台帳キー | 固定対象 | 備考 |
+|---|---|---|---|
+| deno | `deno` | バージョン付きリリースタグ + プラットフォーム別アセット | 上流 `<asset>.zip.sha256sum`（authoritative）と照合 |
+| ffmpeg (Win) | `ffmpeg-win` | BtbN の **n リリースビルド**（master ローリングではなく `nX.Y`） | zip を取得して sha256 算出 |
+| ffmpeg (mac) | `ffmpeg-mac` | evermeet の versioned zip（ffmpeg / ffprobe 個別） | GPG `.sig` 検証が望ましい |
+| ffmpeg (Linux) | `ffmpeg-linux` | johnvansickle の static ビルド（arch 別） | 公開 `.md5` と照合のうえ sha256 算出 |
+| danmaku2ass | `danmaku2ass` | git コミット SHA（`ref`） | 内容アドレス性で担保するため **sha256 検証対象外** |
+
+`danmaku2ass` の `repo` / `ref` は台帳を単一ソースとし、`download_binaries.py` の定数はここから読む。
+
+### 更新運用
+
+ピン留めの目的は更新の停止ではなく、**更新を「毎ビルド可変取得」から「レビュー可能な PR 差分」へ移す**ことにある。更新は `bin/pins.json` の差分を含む PR として行い、レビュアはバージョンと sha256 の変化を確認して承認する。
+
+- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（BtbN `.sha256`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。
+- **追従**: ffmpeg / deno のセキュリティ更新に追従するため、定期的に上流の新バージョンを確認する。週次 cron での更新 PR 自動起票は別タスク（[research メモ](research/binary-supply-chain.md) §6 (c)）で対応する。
+- **新バージョンへの差し替え手順**: ①上流の対象バージョン URL を確認 → ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。
 
 ## バージョン管理（単一ソース）
 

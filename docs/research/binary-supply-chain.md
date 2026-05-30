@@ -3,8 +3,9 @@
 [← 研究メモ目次](.)
 
 > 本メモは `scripts/download_binaries.py` が取得する外部バイナリ（deno / ffmpeg / ffprobe / danmaku2ass）の
-> 完全性検証とバージョン更新運用の方針を定める。**検証・ピン留めは未実装**であり、実装は本メモを正本とする
-> 後続 Issue で行う（[6. 実装分解](#6-実装分解)）。実装が入った時点で運用部分は [docs/build.md](../build.md) へ正式版を転記する。
+> 完全性検証とバージョン更新運用の方針を定める。**(b) ピン留め + sha256 検証は実装済み**（`bin/pins.json` +
+> `download_binaries.py` の `_verify_sha256`、運用は [docs/build.md](../build.md) の「ピン留めと sha256 検証」に転記）。
+> 残りは (c) 週次自動更新 Workflow（[6. 実装分解](#6-実装分解)）。本メモは設計経緯の記録として残す。
 
 ---
 
