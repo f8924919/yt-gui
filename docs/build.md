@@ -73,9 +73,9 @@ python scripts/download_binaries.py --update
 
 ピン留めの目的は更新の停止ではなく、**更新を「毎ビルド可変取得」から「レビュー可能な PR 差分」へ移す**ことにある。更新は `bin/pins.json` の差分を含む PR として行い、レビュアはバージョンと sha256 の変化を確認して承認する。
 
-- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（BtbN `.sha256`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。
-- **追従**: ffmpeg / deno のセキュリティ更新に追従するため、定期的に上流の新バージョンを確認する。週次 cron での更新 PR 自動起票は別タスク（[research メモ](research/binary-supply-chain.md) §6 (c)）で対応する。
-- **新バージョンへの差し替え手順**: ①上流の対象バージョン URL を確認 → ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。
+- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（Deno `.sha256sum`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。
+- **自動追従（週次）**: `.github/workflows/update-binaries.yml` が毎週 `scripts/refresh_pins.py` を実行し、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する（差分が無ければ PR は作らない）。検証根拠（旧→新・上流チェックサム照合結果）は PR 本文に出力されるため、レビュアは差分の確認だけで承認できる。
+- **手動での差し替え手順**: ①`scripts/refresh_pins.py` を実行（または手動で上流バージョン URL を確認）→ ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。重大 CVE 時は週次を待たず手動で実施する。
 
 ## バージョン管理（単一ソース）
 
@@ -131,6 +131,20 @@ python scripts/download_binaries.py --update
 ### 留意点
 
 - **コード署名なし**: Windows は SmartScreen 警告、macOS は Gatekeeper でブロックされる（未署名アプリのため）。署名・公証は別途対応が必要。
+
+## 同梱バイナリのピン自動更新（GitHub Actions）
+
+`.github/workflows/update-binaries.yml` が週次（毎週月曜 06:00 UTC）と手動実行で `scripts/refresh_pins.py` を走らせ、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する。「ピン留めと sha256 検証」の更新運用を担う。
+
+| 項目 | 内容 |
+|---|---|
+| トリガー | `schedule`（週次）+ `workflow_dispatch`（手動） |
+| 検証 | deno は上流 `.sha256sum`、johnvansickle は公開 `.md5` と照合。BtbN は GitHub リリースを取得し sha256 算出、evermeet は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
+| 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
+| 対象外 | danmaku2ass（git の SHA 固定のため） |
+| 権限 | `contents: write` / `pull-requests: write` |
+
+> **前提設定**: GITHUB_TOKEN で PR を作成するため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
 
 ## yt-gui.spec の構成
 
