@@ -143,8 +143,8 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 
 ### 留意点
 
-- **コード署名なし**: Windows は SmartScreen 警告、macOS は Gatekeeper でブロックされる（未署名アプリのため）。署名・公証は別途対応が必要。
-- **provenance はコード署名ではない**: 上記の来歴署名は `gh attestation verify` による帯域外検証であり、OS の SmartScreen / Gatekeeper 警告は**解消しない**。起動時警告の解消には Authenticode / Apple Developer ID 署名・公証が別途必要（別タスク）。
+- **コード署名なし**: Windows は SmartScreen 警告、macOS は Gatekeeper でブロックされる（未署名アプリのため）。署名・公証は別途対応が必要（バックログ: [#39](https://github.com/f8924919/yt-gui/issues/39)）。
+- **provenance はコード署名ではない**: 上記の来歴署名は `gh attestation verify` による帯域外検証であり、OS の SmartScreen / Gatekeeper 警告は**解消しない**。起動時警告の解消には Authenticode / Apple Developer ID 署名・公証が別途必要（[#39](https://github.com/f8924919/yt-gui/issues/39)）。
 - **検証はオプトイン**: 主な受益者は監査者・再配布者・自動化・インシデント対応。`release.yml` 自体（write 権限）が侵害された場合は防げないが、Rekor に証跡が残る。
 
 ## 同梱バイナリのピン自動更新（GitHub Actions）
