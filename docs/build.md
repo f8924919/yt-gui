@@ -43,6 +43,8 @@ danmaku2ass は GitHub から `git clone` でソースを取得し、`sys.execut
 
 クロスビルド非対応のため、ターゲット OS と同じ OS 上でビルドする必要がある（GitHub Actions の OS マトリックスに準拠）。
 
+> **完全性検証は未実装**: 現状 deno / ffmpeg は可変参照（`latest` 等）から無検証で取得している。バージョンのピン留め・sha256 検証・更新運用の方針は [docs/research/binary-supply-chain.md](research/binary-supply-chain.md) を参照（実装着手時に本セクションへ正式版を転記する）。
+
 ```bash
 # 既存ファイルがあればスキップ
 python scripts/download_binaries.py
