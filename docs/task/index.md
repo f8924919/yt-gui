@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [#22 original_format_panel 排他ロジックのテスト](https://github.com/f8924919/yt-gui/issues/22) | 未着手 | Qt UI テスト後続: `_AudioListWidget` の AUTO/SKIP/音声 ID 排他を検証 | 2026-05-30 |
+| [original_format_panel 排他ロジックのテスト](original-format-panel-tests.md) | 進行中 | #22 / `_AudioListWidget` の AUTO/SKIP/音声 ID 排他を検証 | 2026-05-30 |
 | [#23 App 周辺 UI ロジックのテスト](https://github.com/f8924919/yt-gui/issues/23) | 未着手 | Qt UI テスト後続: コンテキストメニューの `edit_format_requested` 発火条件・設定反映時のコンボ再構築 | 2026-05-30 |
 | [#24 GitHub Actions の Node24 対応](https://github.com/f8924919/yt-gui/issues/24) | 未着手 | `test.yml` / `release.yml` のアクションを Node24 対応版へ更新 | 2026-05-30 |
 
