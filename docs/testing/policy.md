@@ -76,7 +76,7 @@ Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、
 Qt UI（状態機械・ロジック）行のテストを記述・実行する際の取り決めです。具体の `conftest.py` 実装と `pytest-qt` 導入は後続タスクで行います。
 
 - **ヘッドレス**: `QT_QPA_PLATFORM=offscreen` を前提とする（`conftest.py` で `os.environ.setdefault` 固定、CI は [`test.yml`](../../.github/workflows/test.yml) の env で設定済み）。
-- **マーカー分離**: Qt UI テストは `@pytest.mark.qt` を付け、`pytest-qt` / Qt の C ライブラリが無い環境では skip できるようにする（`--strict-markers` のためマーカーは `pyproject.toml` に登録する）。これによりロジック層テストは Qt 非導入環境でも従来どおり通る。
+- **マーカー分離と skip**: Qt UI テストは `@pytest.mark.qt`（選択用。`--strict-markers` のため `pyproject.toml` に登録）を付ける。Qt 非導入環境での skip はモジュール冒頭の `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` で行う（import 失敗より前にモジュール単位で skip され、ロジック層テストは従来どおり通る）。
 - **副作用の抑制**: `offscreen` ではモーダル `QMessageBox.warning/critical/information` が無限ブロックするため no-op 化する。`App` 構築時は `Downloader.missing_dependencies()`（PATH 実走査）が走るため、決定性確保のためモックする。
 - **イベントループ / 後始末**: `qtbot.waitSignal` / `qtbot.waitUntil` で条件待ちする。`run_in_thread` は daemon スレッドで Qt シグナルをキュー発火するため、受信側 QObject がテスト終了時に破棄されないよう、シグナル受信を待ち切ってからテストを終える。
 - 要件の詳細・つまずきポイントは [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) を参照。
@@ -88,14 +88,20 @@ Qt UI（状態機械・ロジック）行のテストを記述・実行する際
 ```
 tests/
 ├── __init__.py
-├── conftest.py            ← 共有フィクスチャ（i18n のグローバル状態復元）
+├── conftest.py            ← 共有フィクスチャ（i18n 復元・offscreen 固定・QMessageBox 抑制）
 ├── test_utils.py
 ├── test_formats.py
 ├── test_job_spec.py
 ├── test_output_template.py
 ├── test_i18n.py
-└── test_settings.py
+├── test_settings.py
+├── test_downloader.py
+├── test_download_binaries.py
+├── test_threading_utils.py   ← Qt（@pytest.mark.qt）
+└── test_queue_controller.py  ← Qt（@pytest.mark.qt）
 ```
+
+Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` を呼び、Qt 非導入環境ではモジュールごと skip します（§2.5）。
 
 **命名規則**
 
