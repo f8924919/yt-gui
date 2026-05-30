@@ -19,7 +19,7 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       should_release: ${{ steps.v.outputs.should_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: v
         run: |
           version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
@@ -38,7 +38,7 @@ jobs:
     if: needs.version-gate.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: |
           v="v${{ needs.version-gate.outputs.version }}"
           git tag "$v"
@@ -56,10 +56,10 @@ jobs:
           - os: ubuntu-22.04        # x64（glibc 互換性のため 22.04）
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: v${{ needs.version-gate.outputs.version }}   # タグ付けしたソースを正確にビルド
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.14
       - name: Install Linux build deps
         if: runner.os == 'Linux'
@@ -77,7 +77,7 @@ jobs:
         if: runner.os == 'macOS'
         run: ditto -c -k --keepParent dist/yt-gui.app "yt-gui-${{ needs.version-gate.outputs.version }}-macos-arm64.zip"
       # Linux は dist/yt-gui-{version}-x86_64.AppImage がそのまま成果物
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.os }}
           path: |
@@ -90,7 +90,7 @@ jobs:
     needs: [version-gate, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
