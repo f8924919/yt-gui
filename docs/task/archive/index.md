@@ -56,6 +56,7 @@
 |---|---|---|
 | [qt-ui-test-ci.md](qt-ui-test-ci.md) | Qt UI テスト導入 (1): `test.yml` 新設で PR/push に ruff・mypy・pytest の CI を追加、Qt offscreen の土台も先行投入（Issue #17） | 2026-05-30 |
 | [qt-ui-test-policy.md](qt-ui-test-policy.md) | Qt UI テスト導入 (2): `policy.md` の Qt UI 行を `△` に格上げ・実行要件（§2.5）を明文化・spec 整合を確認（PR #19） | 2026-05-30 |
+| [qt-ui-test-harness.md](qt-ui-test-harness.md) | Qt UI テスト導入 (3): `pytest-qt` 導入・conftest 整備（offscreen / QMessageBox 抑制 / importorskip）・`threading_utils` / `queue_controller` のテスト追加（Issue #20 / PR #21） | 2026-05-30 |
 
 ## ドキュメント整備
 
