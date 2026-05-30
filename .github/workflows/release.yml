@@ -85,15 +85,29 @@ jobs:
             dist/*.AppImage
           if-no-files-found: error
 
-  # ④ 成果物を集約して GitHub Release を作成
+  # ④ 成果物を集約し、来歴署名（SLSA provenance）を付与して GitHub Release を作成
   release:
     needs: [version-gate, build]
     runs-on: ubuntu-latest
+    # 既定の contents:write に加え、Sigstore キーレス署名（OIDC）と attestation 書き込みを許可
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
+      # 配布する成果物（zip / AppImage）に来歴署名を付与する。
+      # 公開する物と同一バイトを subject にするため、Release 作成の直前に実施する。
+      # 検証: gh attestation verify <file> --repo ${{ github.repository }}
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            assets/**/*.zip
+            assets/**/*.AppImage
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
