@@ -53,6 +53,9 @@ jobs:
         include:
           - os: windows-latest      # x64
           - os: macos-latest        # Apple Silicon (arm64)
+            macos_arch: arm64
+          - os: macos-15-intel      # Intel (x86_64)。macos-13 退役後の標準 Intel イメージ
+            macos_arch: x86_64
           - os: ubuntu-22.04        # x64（glibc 互換性のため 22.04）
     runs-on: ${{ matrix.os }}
     steps:
@@ -75,7 +78,7 @@ jobs:
         run: Compress-Archive -Path dist/yt-gui/* -DestinationPath "yt-gui-${{ needs.version-gate.outputs.version }}-windows-x64.zip"
       - name: Package (macOS)
         if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent dist/yt-gui.app "yt-gui-${{ needs.version-gate.outputs.version }}-macos-arm64.zip"
+        run: ditto -c -k --keepParent dist/yt-gui.app "yt-gui-${{ needs.version-gate.outputs.version }}-macos-${{ matrix.macos_arch }}.zip"
       # Linux は dist/yt-gui-{version}-x86_64.AppImage がそのまま成果物
       - uses: actions/upload-artifact@v7
         with:

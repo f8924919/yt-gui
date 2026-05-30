@@ -122,8 +122,12 @@ python scripts/download_binaries.py --update
 |---|---|---|
 | `windows-latest` | x64 | `yt-gui-{version}-windows-x64.zip`（`dist/yt-gui/` を圧縮） |
 | `macos-latest` | arm64 | `yt-gui-{version}-macos-arm64.zip`（`dist/yt-gui.app` を `ditto` で圧縮） |
+| `macos-15-intel` | x86_64 | `yt-gui-{version}-macos-x86_64.zip`（`dist/yt-gui.app` を `ditto` で圧縮） |
 | `ubuntu-22.04` | x64 | `yt-gui-{version}-x86_64.AppImage`（spec が生成） |
 
+- macOS は arm64 / x86_64 の 2 アーキを別ランナーでビルドする。`PyInstaller` は `target_arch=None`（ランナーのネイティブ arch）でビルドし、deno はダウンロード時に `platform.machine()` で arch を解決するため、ランナーごとに対応 arch のバイナリが同梱される。zip 名は matrix の `macos_arch` で出し分ける。
+  - Intel ランナーは `macos-13` 退役後の標準 Intel イメージ `macos-15-intel` を使用する。
+  - ⚠️ 同梱 ffmpeg/ffprobe は evermeet（Intel x86_64 専用）配布のため、arm64 成果物では Rosetta 2 経由で動作する。arm64 ネイティブ化は別途 Issue で対応する。
 - `ubuntu-22.04` を採用するのは glibc 互換性のため（新しい glibc でビルドした AppImage は古い環境で起動しない）。
 - ビルド前に `scripts/download_binaries.py --yes` を実行して GPL 同意プロンプトを自動承認する（spec 内の再呼び出しは既存ファイルありでスキップ）。
 - Linux ランナーでは `binutils`（objdump）・`file`（appimagetool）を apt で導入する。
