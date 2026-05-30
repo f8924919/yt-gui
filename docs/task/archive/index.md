@@ -49,6 +49,7 @@
 | [version-single-source.md](version-single-source.md) | バージョンを `pyproject.toml` に単一ソース化（spec へ tomllib 注入 + UI 表示 + copy_metadata 同梱） | 2026-05-29 |
 | [release-workflow.md](release-workflow.md) | GitHub Actions でバージョン更新時にタグ作成・3 OS リリースバイナリを自動ビルド（Issue #5） | 2026-05-29 |
 | [bundle-third-party-licenses.md](bundle-third-party-licenses.md) | GPL/MIT 同梱バイナリのライセンス・対応ソースをリリース成果物に同梱（Issue #12） | 2026-05-29 |
+| [actions-node24.md](actions-node24.md) | GitHub Actions を Node24 メジャーへ更新（checkout v6・setup-uv v7・upload v7・download v8）。`test.yml` / `release.yml`（Issue #24 / PR #28） | 2026-05-30 |
 
 ## テスト基盤
 
@@ -57,6 +58,8 @@
 | [qt-ui-test-ci.md](qt-ui-test-ci.md) | Qt UI テスト導入 (1): `test.yml` 新設で PR/push に ruff・mypy・pytest の CI を追加、Qt offscreen の土台も先行投入（Issue #17） | 2026-05-30 |
 | [qt-ui-test-policy.md](qt-ui-test-policy.md) | Qt UI テスト導入 (2): `policy.md` の Qt UI 行を `△` に格上げ・実行要件（§2.5）を明文化・spec 整合を確認（PR #19） | 2026-05-30 |
 | [qt-ui-test-harness.md](qt-ui-test-harness.md) | Qt UI テスト導入 (3): `pytest-qt` 導入・conftest 整備（offscreen / QMessageBox 抑制 / importorskip）・`threading_utils` / `queue_controller` のテスト追加（Issue #20 / PR #21） | 2026-05-30 |
+| [original-format-panel-tests.md](original-format-panel-tests.md) | Qt UI テスト: `_AudioListWidget` の AUTO/SKIP/音声 ID 排他ロジックのテスト追加（Issue #22 / PR #26） | 2026-05-30 |
+| [app-ui-logic-tests.md](app-ui-logic-tests.md) | Qt UI テスト: `_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従のテスト追加（モーダル QMenu.exec 回避のため `_edit_targets` を抽出）（Issue #23 / PR #27） | 2026-05-30 |
 
 ## ドキュメント整備
 

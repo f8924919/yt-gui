@@ -12,9 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [original_format_panel 排他ロジックのテスト](original-format-panel-tests.md) | 進行中 | #22 / `_AudioListWidget` の AUTO/SKIP/音声 ID 排他を検証 | 2026-05-30 |
-| [App 周辺 UI ロジックのテスト](app-ui-logic-tests.md) | 進行中 | #23 / `_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従 | 2026-05-30 |
-| [GitHub Actions の Node24 対応](actions-node24.md) | 進行中 | #24 / `test.yml` / `release.yml` のアクションを Node24 メジャー（checkout v6・setup-uv v7・artifact v7/v8）へ更新 | 2026-05-30 |
+| _現在、進行中・未着手のタスクはありません_ | | | |
 
 ## 完了タスク
 
