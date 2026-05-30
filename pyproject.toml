@@ -31,12 +31,16 @@ dev = [
     "mypy>=2.1.0",
     "pytest>=8.3.0",
     "pytest-cov>=6.0.0",
+    "pytest-qt>=4.5.0",
     "ruff>=0.15.12",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+markers = [
+    "qt: Qt UI テスト（pytest-qt + QT_QPA_PLATFORM=offscreen が必要。Qt 非導入環境では skip される）",
+]
 
 [tool.coverage.run]
 source = ["yt_gui"]
@@ -47,9 +51,7 @@ omit = [
     "yt_gui/settings_dialog.py",
     "yt_gui/log_dialog.py",
     "yt_gui/downloader.py",
-    "yt_gui/queue_controller.py",
     "yt_gui/thumbnail_cache.py",
-    "yt_gui/threading_utils.py",
     "yt_gui/locales/*.py",
 ]
 

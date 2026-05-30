@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [Qt UI テスト導入 (2): テスト方針の格上げ・spec 整合](qt-ui-test-policy.md) | 進行中 | `policy.md` の Qt UI 行を `×`→`△` に格上げし対象振る舞いを明記、spec との対応を整理。後続 (3) pytest-qt 導入・UI テスト本体 | 2026-05-30 |
+| [Qt UI テスト導入 (3): pytest-qt 導入とハーネス・初回 UI テスト](qt-ui-test-harness.md) | 進行中 | #20 / `pytest-qt` 導入・conftest 整備・`threading_utils` / `queue_controller` のテスト追加。後続: `original_format_panel` 排他ロジック等 | 2026-05-30 |
 
 ## 完了タスク
 
