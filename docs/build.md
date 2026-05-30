@@ -128,9 +128,24 @@ python scripts/download_binaries.py --update
 - ビルド前に `scripts/download_binaries.py --yes` を実行して GPL 同意プロンプトを自動承認する（spec 内の再呼び出しは既存ファイルありでスキップ）。
 - Linux ランナーでは `binutils`（objdump）・`file`（appimagetool）を apt で導入する。
 
+### 成果物の来歴署名（SLSA provenance / artifact attestation）
+
+`release` ジョブが GitHub Release を作成する直前に `actions/attest-build-provenance` で配布成果物（zip / AppImage）へ来歴署名を付与する。「この成果物が確かに本リポジトリの `release.yml` が当該 commit から生成した物である」ことを暗号的に検証可能にし、配布物の差し替え・偽造を検知できるようにする（同梱バイナリ＝入力のピン留めと合わせ、供給網の入力・出力の両端を固める）。
+
+- Sigstore のキーレス署名（OIDC + Fulcio + Rekor 透明性ログ）を用いるため秘密鍵管理は不要。`release` ジョブに `id-token: write` / `attestations: write` を付与する。
+- 公開する物と同一バイトを subject にするため、Release 作成の直前に `assets/**/*.{zip,AppImage}` を対象に署名する。
+
+配布物の検証（任意・第三者が実行可能）:
+
+```bash
+gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-gui
+```
+
 ### 留意点
 
 - **コード署名なし**: Windows は SmartScreen 警告、macOS は Gatekeeper でブロックされる（未署名アプリのため）。署名・公証は別途対応が必要。
+- **provenance はコード署名ではない**: 上記の来歴署名は `gh attestation verify` による帯域外検証であり、OS の SmartScreen / Gatekeeper 警告は**解消しない**。起動時警告の解消には Authenticode / Apple Developer ID 署名・公証が別途必要（別タスク）。
+- **検証はオプトイン**: 主な受益者は監査者・再配布者・自動化・インシデント対応。`release.yml` 自体（write 権限）が侵害された場合は防げないが、Rekor に証跡が残る。
 
 ## 同梱バイナリのピン自動更新（GitHub Actions）
 
