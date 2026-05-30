@@ -3,10 +3,10 @@ Script to fetch platform-specific binaries (deno, ffmpeg) before building.
 Called automatically when running: pyinstaller yt-gui.spec
 Can also be run manually.
 """
+import hashlib
 import json
 import os
 import platform
-import re
 import shutil
 import stat
 import subprocess
@@ -19,6 +19,8 @@ import zipfile
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPTS_DIR)
 BIN_DIR = os.path.join(_PROJECT_DIR, 'bin')
+# 同梱バイナリのピン留め台帳（バージョン・URL・sha256）。取得物をこの sha256 で検証。
+PINS_PATH = os.path.join(BIN_DIR, 'pins.json')
 # 同梱バイナリのライセンス本文・告知の保存先（バンドル時に licenses/ へ同梱される）
 LICENSES_DIR = os.path.join(BIN_DIR, 'licenses')
 
@@ -39,6 +41,48 @@ def _make_executable(path):
 def _download(url, dest):
     print(f'  -> {url}')
     urllib.request.urlretrieve(url, dest)
+
+
+def _load_pins() -> dict:
+    """ピン留め台帳 bin/pins.json を読み込む。"""
+    with open(PINS_PATH, encoding='utf-8') as f:
+        return dict(json.load(f))
+
+
+def _sha256_of(path: str) -> str:
+    """ファイルの sha256 を 16 進文字列で返す。"""
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_sha256(path: str, expected: str, label: str) -> None:
+    """取得物の sha256 を台帳の期待値と照合する。
+
+    不一致・期待値未設定のときは取得物を削除して `RuntimeError` を送出し中断する
+    （改ざんまたは上流更新を検知。サイレントに続行しない）。
+    """
+    if not expected:
+        raise RuntimeError(
+            f'[{label}] bin/pins.json に sha256 が未設定です。ネット接続環境で取得物の '
+            f'sha256 を上流チェックサム／署名で確認のうえ台帳へ登録してください。'
+        )
+    actual = _sha256_of(path)
+    if actual.lower() != expected.lower():
+        os.remove(path)
+        raise RuntimeError(
+            f'[{label}] sha256 不一致のため中断します。\n'
+            f'  期待: {expected}\n  実際: {actual}\n'
+            f'取得物が台帳と異なります（改ざん、または上流が更新された可能性）。'
+        )
+
+
+def _download_verified(url: str, dest: str, expected: str, label: str) -> None:
+    """ダウンロード後に sha256 を検証する。不一致なら例外を送出して中断する。"""
+    _download(url, dest)
+    _verify_sha256(dest, expected, label)
 
 
 def _is_license_name(name: str) -> bool:
@@ -79,10 +123,12 @@ def download_deno(force=False):
         print(f'[deno] {binary} already exists. Skipping.')
         return
 
-    url = f'https://github.com/denoland/deno/releases/latest/download/{asset}'
+    pins = _load_pins()['deno']
+    url = f'{pins["base_url"]}/{asset}'
+    expected = pins['assets'].get(asset)
     tmp = os.path.join(BIN_DIR, '_deno_tmp.zip')
-    print('[deno] Downloading...')
-    _download(url, tmp)
+    print(f'[deno] Downloading {pins["version"]}...')
+    _download_verified(url, tmp, expected, f'deno {asset}')
 
     with zipfile.ZipFile(tmp) as z:
         z.extract(binary, BIN_DIR)
@@ -118,50 +164,11 @@ def download_ffmpeg(force=False):
     print(f'[ffmpeg] Saved: {ffmpeg_dir}')
 
 
-def _resolve_btbn_ffmpeg_win64_gpl_url() -> str:
-    """BtbN/FFmpeg-Builds の最新リリースから win64-gpl の autobuild zip URL を解決する。
-
-    BtbN のアセット名は過去に何度か変わっている:
-
-    - 固定名 `ffmpeg-master-latest-win64-gpl.zip`（現行）
-    - コミットハッシュ付き `ffmpeg-N-{N}-g{hash}-win64-gpl.zip`（一時期）
-
-    固定 URL 直打ちでは命名変更のたびに 404 になるため、Releases API でアセット名を
-    引いて動的に URL を解決する。shared 版（`-shared`）と安定版（末尾 `-X.Y.zip`）は
-    除外し、master autobuild の static GPL ビルドだけを拾う。
-    """
-    api = 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest'
-    req = urllib.request.Request(api, headers={'Accept': 'application/vnd.github+json'})
-    with urllib.request.urlopen(req) as resp:
-        data = json.load(resp)
-
-    return _select_btbn_win64_gpl_asset(data.get('assets', []))
-
-
-def _select_btbn_win64_gpl_asset(assets: list[dict]) -> str:
-    """Releases API のアセット一覧から win64-gpl (static / master) の URL を選ぶ。
-
-    現行の `master-latest` 固定名と過去のハッシュ付き名の両方を許容する。`-shared`
-    と安定版 `nX.Y`（末尾 `-X.Y.zip`）は正規表現の末尾固定（`-win64-gpl.zip` で終わる
-    もののみ）で自然に除外される。
-    """
-    pattern = re.compile(r'^ffmpeg-(?:master-latest|N-\d+-g[0-9a-f]+)-win64-gpl\.zip$')
-    for asset in assets:
-        name = asset.get('name', '')
-        if pattern.match(name):
-            return asset['browser_download_url']
-
-    raise RuntimeError(
-        'No matching ffmpeg win64-gpl asset found in '
-        'BtbN/FFmpeg-Builds latest release. Asset naming may have changed again.'
-    )
-
-
 def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
-    url = _resolve_btbn_ffmpeg_win64_gpl_url()
+    pins = _load_pins()['ffmpeg-win']
     tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
-    print('[ffmpeg] Downloading (Windows)...')
-    _download(url, tmp)
+    print(f'[ffmpeg] Downloading (Windows {pins["version"]})...')
+    _download_verified(pins['url'], tmp, pins['sha256'], 'ffmpeg-win')
 
     with zipfile.ZipFile(tmp) as z:
         for name, out in (('ffmpeg.exe', ffmpeg_path), ('ffprobe.exe', ffprobe_path)):
@@ -177,11 +184,12 @@ def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
 
 def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
     # evermeet.cx distributes ffmpeg and ffprobe as separate ZIPs
+    pins = _load_pins()['ffmpeg-mac']
     for tool, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
-        url = f'https://evermeet.cx/ffmpeg/getrelease/{tool}/zip'
+        url = pins[tool]['url']
         tmp = os.path.join(BIN_DIR, f'_{tool}_tmp.zip')
-        print(f'[ffmpeg] Downloading {tool} (macOS)...')
-        _download(url, tmp)
+        print(f'[ffmpeg] Downloading {tool} (macOS {pins["version"]})...')
+        _download_verified(url, tmp, pins[tool]['sha256'], f'ffmpeg-mac {tool}')
         with zipfile.ZipFile(tmp) as z:
             entry = next(n for n in z.namelist() if os.path.basename(n) == tool)
             z.extract(entry, ffmpeg_dir)
@@ -194,10 +202,11 @@ def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
 
 def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
     arch = 'arm64' if machine in ('arm64', 'aarch64') else 'amd64'
-    url = f'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-{arch}-static.tar.xz'
+    pins = _load_pins()['ffmpeg-linux']
+    entry = pins['assets'][arch]
     tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.tar.xz')
-    print(f'[ffmpeg] Downloading (Linux {arch})...')
-    _download(url, tmp)
+    print(f'[ffmpeg] Downloading (Linux {arch} {pins["version"]})...')
+    _download_verified(entry['url'], tmp, entry['sha256'], f'ffmpeg-linux {arch}')
 
     # johnvansickle.com tarball contains both ffmpeg and ffprobe
     with tarfile.open(tmp, 'r:xz') as t:
@@ -227,10 +236,12 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
 # 単一 Python スクリプト danmaku2ass.py を PyInstaller で onefile バイナリ化し
 # bin/ 配下へ配置する。GPL-3.0 ライセンスのため、ffmpeg と同様に同意プロンプト
 # を経由する。
-# 再現性のため master 追従ではなくコミットハッシュで固定する。
+# 再現性のため master 追従ではなくコミットハッシュで固定する（pins.json が単一ソース）。
+# git のコミット SHA は内容アドレスのため、sha256 検証の対象外とする。
 
-DANMAKU2ASS_REPO = 'https://github.com/m13253/danmaku2ass.git'
-DANMAKU2ASS_REF = 'ced881747670c2eb1c0dbd292c2a567f444b056a'  # 2024-08-28
+_danmaku2ass_pin = _load_pins()['danmaku2ass']
+DANMAKU2ASS_REPO = _danmaku2ass_pin['repo']
+DANMAKU2ASS_REF = _danmaku2ass_pin['ref']
 
 
 def download_danmaku2ass(force=False):

@@ -1,0 +1,52 @@
+{
+  "_comment": "同梱バイナリのピン留め台帳。各バイナリのバージョン・取得 URL・sha256 を固定し、scripts/download_binaries.py が取得後に sha256 を検証する（不一致なら中断）。更新方針・信頼の確立は docs/research/binary-supply-chain.md / docs/build.md を参照。sha256 が null の項目は未確定で、ビルド時に検証エラーとなる。",
+  "deno": {
+    "version": "v2.8.1",
+    "base_url": "https://github.com/denoland/deno/releases/download/v2.8.1",
+    "comment": "上流の <asset>.zip.sha256sum（authoritative）と照合済み。",
+    "assets": {
+      "deno-x86_64-pc-windows-msvc.zip": "5fb5bac71f609fb91ec8960fb290885aadc27eeb22f07a8eca0c3db6be38b11a",
+      "deno-aarch64-apple-darwin.zip": "8154e2de0ee8c1cae31fa88e078724aaef0295fab9fd2ad6f8520389cee908f6",
+      "deno-x86_64-apple-darwin.zip": "47473845e0522ba11dd279e3dd318e2d84ee200c56b8280594e0ae0b0f827460",
+      "deno-x86_64-unknown-linux-gnu.zip": "2d7bb6195226ac832e0bf7109a115f0af65ee69ac797a4bbde5b27a06cc242d9",
+      "deno-aarch64-unknown-linux-gnu.zip": "67e9df91870fd0af700df924173e3009ea7ff6956e2c3c3bb86065d6070d0fd6"
+    }
+  },
+  "ffmpeg-win": {
+    "version": "n8.1",
+    "comment": "BtbN/FFmpeg-Builds の win64-gpl リリースビルド（master ローリングではなく n8.1 系）。zip 取得後に sha256 を算出して照合。",
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
+    "sha256": "c8dc2f24270cf864e0737807f5c7cd77b786be6cd4d0ec433989fc9fc6563838"
+  },
+  "ffmpeg-mac": {
+    "version": "8.1.1",
+    "comment": "evermeet.cx の versioned zip。GPG .sig が evermeet 鍵 70202E8ED17B372A6D04467B4E7BEC998E920EE1 で署名され、zip サイズも info API の公開値と一致することを確認のうえ登録（完全な鍵検証はキーサーバ到達環境で実施推奨）。",
+    "ffmpeg": {
+      "url": "https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip",
+      "sha256": "4610988e2f54c243c50da73a09e4e2c36d9bb77546f9aa6c84cb328dcb1a98c1"
+    },
+    "ffprobe": {
+      "url": "https://evermeet.cx/ffmpeg/ffprobe-8.1.1.zip",
+      "sha256": "aeade29dee3c3844e9bcc974f4ae4b29cc4f87994177d77003a8589fa531009e"
+    }
+  },
+  "ffmpeg-linux": {
+    "version": "git-20240629",
+    "comment": "johnvansickle.com の static git ビルド（commit d5e603d）。公開 .md5 と照合のうえ sha256 を算出。",
+    "assets": {
+      "amd64": {
+        "url": "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz",
+        "sha256": "af2c62a95255b2f97f9092a5e86c6356119dba8d7c7e2ee0fe55672dbd71f68f"
+      },
+      "arm64": {
+        "url": "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz",
+        "sha256": "e8641bea818fcbb9ced155a0f194cd2ea3738c08736b4f38abff1591948e348e"
+      }
+    }
+  },
+  "danmaku2ass": {
+    "comment": "ソースから PyInstaller でビルド。git のコミット SHA 固定（内容アドレス性）で完全性を担保するため sha256 検証の対象外。",
+    "repo": "https://github.com/m13253/danmaku2ass.git",
+    "ref": "ced881747670c2eb1c0dbd292c2a567f444b056a"
+  }
+}

@@ -1,8 +1,9 @@
-"""`scripts/download_binaries.py` の BtbN ffmpeg アセット解決ロジックのテスト。
+"""`scripts/download_binaries.py` のピン留め・sha256 検証ロジックのテスト。
 
 `scripts/` はパッケージではないため、ファイルパスから直接ロードする。
 """
 
+import hashlib
 import importlib.util
 import os
 
@@ -17,47 +18,74 @@ _spec = importlib.util.spec_from_file_location("download_binaries", _SCRIPT)
 download_binaries = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(download_binaries)
 
-_select = download_binaries._select_btbn_win64_gpl_asset
+
+# --- sha256 検証ヘルパー ---------------------------------------------------
 
 
-def _asset(name: str) -> dict:
-    return {"name": name, "browser_download_url": f"https://example/{name}"}
+def test_verify_sha256_accepts_matching_hash(tmp_path):
+    """ハッシュが一致すれば例外を送出せず、ファイルも残る。"""
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"hello world")
+    digest = hashlib.sha256(b"hello world").hexdigest()
+    download_binaries._verify_sha256(str(f), digest, "test")  # 例外が出ないこと
+    assert f.exists()
 
 
-def test_selects_master_latest_static_gpl():
-    """現行の固定名 `ffmpeg-master-latest-win64-gpl.zip` を選ぶ。"""
-    assets = [
-        _asset("ffmpeg-master-latest-win64-gpl-shared.zip"),
-        _asset("ffmpeg-master-latest-win64-gpl.zip"),
-        _asset("ffmpeg-n7.1-latest-win64-gpl-7.1.zip"),
-        _asset("ffmpeg-n8.1-latest-win64-gpl-8.1.zip"),
-    ]
-    assert _select(assets) == "https://example/ffmpeg-master-latest-win64-gpl.zip"
+def test_verify_sha256_is_case_insensitive(tmp_path):
+    """期待値が大文字でも一致と判定する（deno の sha256sum は大文字）。"""
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"data")
+    digest = hashlib.sha256(b"data").hexdigest().upper()
+    download_binaries._verify_sha256(str(f), digest, "test")
+    assert f.exists()
 
 
-def test_selects_hash_named_form():
-    """過去のコミットハッシュ付き名にも対応する。"""
-    assets = [
-        _asset("ffmpeg-N-118037-g1234abcd-win64-gpl-shared.zip"),
-        _asset("ffmpeg-N-118037-g1234abcd-win64-gpl.zip"),
-    ]
-    assert _select(assets) == "https://example/ffmpeg-N-118037-g1234abcd-win64-gpl.zip"
+def test_verify_sha256_rejects_mismatch_and_removes_file(tmp_path):
+    """不一致なら RuntimeError を送出し、取得物を削除する。"""
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"tampered")
+    with pytest.raises(RuntimeError, match="sha256"):
+        download_binaries._verify_sha256(str(f), "0" * 64, "test")
+    assert not f.exists()
 
 
-def test_excludes_shared_and_stable():
-    """shared 版・安定版 nX.Y のみの場合はマッチせず RuntimeError。"""
-    assets = [
-        _asset("ffmpeg-master-latest-win64-gpl-shared.zip"),
-        _asset("ffmpeg-n7.1-latest-win64-gpl-7.1.zip"),
-        _asset("ffmpeg-master-latest-win64-lgpl.zip"),
-    ]
-    with pytest.raises(RuntimeError):
-        _select(assets)
+def test_verify_sha256_rejects_missing_expected(tmp_path):
+    """期待値が未設定（None / 空）なら RuntimeError を送出する。"""
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"data")
+    with pytest.raises(RuntimeError, match="pins.json"):
+        download_binaries._verify_sha256(str(f), None, "test")
 
 
-def test_empty_assets_raises():
-    with pytest.raises(RuntimeError):
-        _select([])
+# --- ピン留め台帳 ----------------------------------------------------------
+
+
+def test_pins_json_is_valid_and_complete():
+    """bin/pins.json が読み込めて主要コンポーネントを網羅している。"""
+    pins = download_binaries._load_pins()
+    for key in ("deno", "ffmpeg-win", "ffmpeg-mac", "ffmpeg-linux", "danmaku2ass"):
+        assert key in pins
+
+    # deno: 全アセットに 64 桁 hex の sha256 が入っている
+    for sha in pins["deno"]["assets"].values():
+        assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha.lower())
+
+    # ffmpeg-win / ffmpeg-mac / ffmpeg-linux は sha256 が確定済み（null 不可）
+    assert len(pins["ffmpeg-win"]["sha256"]) == 64
+    for tool in ("ffmpeg", "ffprobe"):
+        assert len(pins["ffmpeg-mac"][tool]["sha256"]) == 64
+    for entry in pins["ffmpeg-linux"]["assets"].values():
+        assert len(entry["sha256"]) == 64
+
+    # danmaku2ass は git の SHA 固定（sha256 検証対象外）
+    assert len(pins["danmaku2ass"]["ref"]) == 40
+
+
+def test_danmaku2ass_constants_come_from_pins():
+    """モジュール定数がピン台帳由来であること（単一ソース）。"""
+    pins = download_binaries._load_pins()
+    assert download_binaries.DANMAKU2ASS_REF == pins["danmaku2ass"]["ref"]
+    assert download_binaries.DANMAKU2ASS_REPO == pins["danmaku2ass"]["repo"]
 
 
 # --- THIRD-PARTY-NOTICES 生成 ---------------------------------------------
