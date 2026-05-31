@@ -11,3 +11,4 @@
 | [Qt UI テストのサンドボックス内実行 可否調査](qt-ui-testing-feasibility.md) | サンドボックス環境での Qt UI テスト可否 |
 | [リファクタリング候補の調査メモ](refactoring-analysis.md) | リファクタリング候補の洗い出し |
 | [同梱バイナリのサプライチェーン対策と更新運用 設計メモ](binary-supply-chain.md) | バイナリのピン留め・ハッシュ検証・更新運用方針 |
+| [リポジトリ public 化と実メール露出 調査レポート](repo-public-email.md) | コミット履歴の実メール露出調査・履歴書き換えのリスク・実行計画草案 |
