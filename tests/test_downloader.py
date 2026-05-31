@@ -266,3 +266,29 @@ def test_no_metadata_no_chapters_skips_ffmpeg_metadata_pp(downloader, tmp_path) 
     )
 
     assert "FFmpegMetadata" not in _pp_keys(opts)
+
+
+def test_concurrent_fragments_default_omits_opt(downloader, tmp_path) -> None:
+    # 既定 (N=1) は yt-dlp 既定と同じなので opt を渡さない
+    opts = downloader._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "concurrent_fragment_downloads" not in opts
+
+
+def test_concurrent_fragments_passed_when_gt_one(tmp_path) -> None:
+    dl = Downloader(output_dir=str(tmp_path), concurrent_fragments=4)
+    opts = dl._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert opts["concurrent_fragment_downloads"] == 4

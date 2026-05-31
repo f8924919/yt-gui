@@ -219,6 +219,7 @@ class App(QMainWindow):
             output_template_video=self._settings.output_template_video,
             output_template_playlist=self._settings.output_template_playlist,
             proxy_url=build_proxy_url(self._settings),
+            concurrent_fragments=self._settings.concurrent_fragments,
         )
 
         self._thumbnail_cache = ThumbnailCache(self)
@@ -884,6 +885,7 @@ class App(QMainWindow):
             self._settings.output_template_playlist
         )
         self.downloader.proxy_url = build_proxy_url(self._settings)
+        self.downloader.concurrent_fragments = self._settings.concurrent_fragments
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

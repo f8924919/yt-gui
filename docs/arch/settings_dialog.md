@@ -47,6 +47,26 @@ OUTPUT TEMPLATE 設定を編集する。
 
 挿入メニューと凡例は同じ `TEMPLATE_FIELDS`（`yt_gui/output_template.py`）から生成する。
 
+### 「ダウンロード」タブ
+
+ダウンロード挙動の設定をまとめるタブ（`_build_download_tab`）。
+
+| 項目 | ウィジェット | 説明 |
+|------|------------|------|
+| 並列フラグメント数 | `QSpinBox` | 範囲 `CONCURRENT_FRAGMENTS_MIN`〜`CONCURRENT_FRAGMENTS_MAX`（= 1〜16、`yt_gui/settings.py`）。`Downloader.concurrent_fragments` に反映 |
+
+読み込み時は永続値を範囲内にクランプして `setValue()` する（範囲外の手書き JSON に対する防御）。
+
+### 「プロキシ」タブ
+
+| 項目 | ウィジェット | 説明 |
+|------|------------|------|
+| プロキシを有効にする | `QCheckBox` | OFF のとき他項目をグレーアウト（`_on_proxy_toggled`） |
+| プロトコル | `QComboBox` | `PROXY_SCHEMES`（http / https / socks4 / socks5 / socks5h） |
+| ホスト | `QLineEdit` | プロキシのホスト名 / IP |
+| ポート | `QLineEdit` + `QIntValidator(1, 65535)` | 空欄可 |
+| ユーザー名 / パスワード | `QLineEdit` | パスワードは `EchoMode.Password` |
+
 ## 保存フロー
 
 1. 「ファイル名」タブのテンプレートを `validate_template()` で検証。エラー時は警告ダイアログを表示し、該当タブに切り替えてダイアログを閉じない

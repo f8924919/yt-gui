@@ -25,6 +25,7 @@ def test_settings_defaults_match_spec() -> None:
     assert s.output_template_playlist == (
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
+    assert s.concurrent_fragments == 1
     assert s.proxy_enabled is False
     assert s.proxy_scheme == "http"
     assert s.proxy_host == ""
@@ -75,6 +76,22 @@ def test_load_ignores_unknown_fields(manager: SettingsManager, tmp_path: Path) -
     loaded = manager.load()
     assert loaded.language == "en"
     assert not hasattr(loaded, "obsolete_field")
+
+
+def test_concurrent_fragments_roundtrips(manager: SettingsManager) -> None:
+    original = Settings(concurrent_fragments=8)
+    manager.save(original)
+    assert manager.load().concurrent_fragments == 8
+
+
+def test_concurrent_fragments_defaults_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    """concurrent_fragments 無しの古い settings.json でも既定 1 で読み込めること。"""
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    assert manager.load().concurrent_fragments == 1
 
 
 def test_proxy_fields_roundtrip(manager: SettingsManager) -> None:

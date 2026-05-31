@@ -31,6 +31,10 @@ STRINGS: dict[str, str] = {
     "filetype_text": "テキストファイル",
     "filetype_all": "すべてのファイル",
     "restart_required": "言語の変更は再起動後に反映されます。",
+    # download settings tab
+    "tab_download": "ダウンロード",
+    "label_concurrent_fragments": "並列フラグメント数:",
+    "concurrent_fragments_note": "フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与します。1 は yt-dlp 既定の単一フラグメントです。",
     # proxy settings tab
     "tab_proxy": "プロキシ",
     "label_proxy_enabled": "プロキシを有効にする",
