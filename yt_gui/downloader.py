@@ -590,7 +590,7 @@ class Downloader:
         if not os.path.exists(json_path):
             if self.log_callback:
                 base = os.path.basename(json_path)
-                self.log_callback(f"⚠️ {base} が見つからないため ASS 変換をスキップ")
+                self.log_callback(t("warn_nico_ass_skip_no_json").format(filename=base))
             return
         if not os.path.exists(self._danmaku2ass_path):
             if self.log_callback:
@@ -624,7 +624,9 @@ class Downloader:
             )
             if self.log_callback:
                 self.log_callback(
-                    f"[danmaku2ass] {os.path.basename(ass_path)} を生成しました"
+                    t("status_danmaku2ass_created").format(
+                        filename=os.path.basename(ass_path)
+                    )
                 )
         except subprocess.CalledProcessError as e:
             if self.log_callback:
@@ -650,16 +652,16 @@ class Downloader:
         if not os.path.exists(video_path):
             if self.log_callback:
                 base = os.path.basename(video_path)
-                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+                self.log_callback(t("warn_nico_mkv_skip_missing").format(filename=base))
             return
         if not os.path.exists(ass_path):
             if self.log_callback:
                 base = os.path.basename(ass_path)
-                self.log_callback(f"⚠️ {base} が見つからないため MKV 統合をスキップ")
+                self.log_callback(t("warn_nico_mkv_skip_missing").format(filename=base))
             return
         if not os.path.exists(self._ffmpeg_path):
             if self.log_callback:
-                self.log_callback("⚠️ ffmpeg が見つからないため MKV 統合をスキップ")
+                self.log_callback(t("warn_nico_mkv_skip_no_ffmpeg"))
             return
 
         out_path = f"{stem}.with-comments.mkv"
@@ -685,7 +687,7 @@ class Downloader:
             "-c:s",
             "ass",
             "-metadata:s:s:0",
-            "title=ニコニコ動画コメント",
+            f"title={t('nico_group_title')}",
             "-metadata:s:s:0",
             "language=jpn",
             out_path,
