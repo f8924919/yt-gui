@@ -12,8 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [Intel Mac ビルド追加](intel-mac-build.md) | 進行中 | リリース CI に macos-15-intel を追加し x86_64 成果物を配布（#41） | 2026-05-30 |
-| [macOS arm64 ffmpeg ネイティブ化](macos-arm64-ffmpeg.md) | 進行中 | arm64 の ffmpeg を osxexperts.net 由来に変更し Rosetta 依存を解消（#42） | 2026-05-30 |
+| （現在、進行中・未着手のタスクはありません） | — | — | — |
 
 ## 完了タスク
 
