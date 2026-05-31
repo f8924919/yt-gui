@@ -1,10 +1,10 @@
 # 並列フラグメントダウンロード対応
 
-対応 Issue: [#53](https://github.com/f8924919/yt-gui/issues/53)
+対応 Issue: [#53](https://github.com/f8924919/yt-gui/issues/53) / PR: [#54](https://github.com/f8924919/yt-gui/pull/54)
 
 ## 背景
 
-yt-dlp の `--concurrent-fragments`（`-N`）を UI から指定できず、フラグメント分割動画（DASH / HLS）の高速化ができなかった。[機能ギャップ調査メモ](../research/yt-dlp-feature-gap.md) の優先候補 2 位。
+yt-dlp の `--concurrent-fragments`（`-N`）を UI から指定できず、フラグメント分割動画（DASH / HLS）の高速化ができなかった。[機能ギャップ調査メモ](../../research/yt-dlp-feature-gap.md) の優先候補 2 位。
 
 ## 設計判断
 
