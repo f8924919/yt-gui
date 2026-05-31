@@ -31,6 +31,10 @@ STRINGS: dict[str, str] = {
     "filetype_text": "Text files",
     "filetype_all": "All files",
     "restart_required": "Language change will take effect after restart.",
+    # download settings tab
+    "tab_download": "Download",
+    "label_concurrent_fragments": "Concurrent fragments:",
+    "concurrent_fragments_note": "Only speeds up videos delivered as fragments (DASH / HLS). 1 is the yt-dlp default of single-fragment downloads.",
     # proxy settings tab
     "tab_proxy": "Proxy",
     "label_proxy_enabled": "Enable proxy",

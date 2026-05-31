@@ -76,6 +76,7 @@ class Downloader:
         output_template_video: str = DEFAULT_VIDEO_TEMPLATE,
         output_template_playlist: str = DEFAULT_PLAYLIST_TEMPLATE,
         proxy_url: str = "",
+        concurrent_fragments: int = 1,
     ):
         self.output_dir = output_dir
         self.status_callback = status_callback
@@ -85,6 +86,7 @@ class Downloader:
         self.output_template_video = output_template_video
         self.output_template_playlist = output_template_playlist
         self.proxy_url = proxy_url
+        self.concurrent_fragments = concurrent_fragments
 
         _ext = ".exe" if sys.platform == "win32" else ""
         base = get_resource_base()
@@ -431,6 +433,11 @@ class Downloader:
             "color": "no_color",
             **self._base_ydl_opts(cookies_path, cookies_browser),
         }
+
+        # フラグメント分割される動画（DASH/HLS）でのみ高速化に寄与する。
+        # N=1 は yt-dlp 既定と同じなので、>1 のときだけ明示的に渡す。
+        if self.concurrent_fragments and self.concurrent_fragments > 1:
+            ydl_opts["concurrent_fragment_downloads"] = self.concurrent_fragments
 
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True

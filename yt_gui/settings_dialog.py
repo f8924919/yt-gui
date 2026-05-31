@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QSpinBox,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
@@ -32,7 +33,12 @@ from .output_template import (
     render_preview,
     validate_template,
 )
-from .settings import PROXY_SCHEMES, SettingsManager
+from .settings import (
+    CONCURRENT_FRAGMENTS_MAX,
+    CONCURRENT_FRAGMENTS_MIN,
+    PROXY_SCHEMES,
+    SettingsManager,
+)
 
 _BROWSERS = [
     ("Brave", "brave"),
@@ -85,6 +91,10 @@ class SettingsDialog(QDialog):
         self._template_tab_index = self._tabs.addTab(
             template_widget, t("tab_output_template")
         )
+
+        download_widget = QWidget()
+        self._build_download_tab(download_widget)
+        self._tabs.addTab(download_widget, t("tab_download"))
 
         proxy_widget = QWidget()
         self._build_proxy_tab(proxy_widget)
@@ -334,6 +344,33 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
 
+    def _build_download_tab(self, parent: QWidget):
+        layout = QGridLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        layout.setColumnStretch(1, 1)
+
+        layout.addWidget(
+            QLabel(t("label_concurrent_fragments")), 0, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._concurrent_fragments_spin = QSpinBox()
+        self._concurrent_fragments_spin.setRange(
+            CONCURRENT_FRAGMENTS_MIN, CONCURRENT_FRAGMENTS_MAX
+        )
+        value = self._settings.concurrent_fragments
+        self._concurrent_fragments_spin.setValue(
+            min(max(value, CONCURRENT_FRAGMENTS_MIN), CONCURRENT_FRAGMENTS_MAX)
+        )
+        layout.addWidget(
+            self._concurrent_fragments_spin, 0, 1, Qt.AlignmentFlag.AlignLeft
+        )
+
+        note = QLabel(t("concurrent_fragments_note"))
+        note.setStyleSheet("color: gray;")
+        note.setWordWrap(True)
+        layout.addWidget(note, 1, 0, 1, 2)
+        layout.setRowStretch(2, 1)
+
     def _build_proxy_tab(self, parent: QWidget):
         layout = QGridLayout(parent)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -506,6 +543,8 @@ class SettingsDialog(QDialog):
         else:
             self._settings.cookies_path = ""
             self._settings.cookies_browser = ""
+
+        self._settings.concurrent_fragments = self._concurrent_fragments_spin.value()
 
         self._settings.proxy_enabled = self._proxy_check.isChecked()
         self._settings.proxy_scheme = self._proxy_scheme_combo.currentText()

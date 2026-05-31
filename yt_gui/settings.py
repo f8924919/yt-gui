@@ -6,6 +6,10 @@ from urllib.parse import quote
 
 PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h")
 
+# 並列フラグメント DL 数の指定可能範囲（UI のスピンボックスにも適用）
+CONCURRENT_FRAGMENTS_MIN = 1
+CONCURRENT_FRAGMENTS_MAX = 16
+
 
 @dataclass
 class Settings:
@@ -21,6 +25,7 @@ class Settings:
     output_template_playlist: str = (
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
+    concurrent_fragments: int = 1  # 並列フラグメント DL 数（1 = 単一フラグメント）
     proxy_enabled: bool = False
     proxy_scheme: str = "http"
     proxy_host: str = ""
