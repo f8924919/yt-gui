@@ -12,6 +12,7 @@
 | [original-audio-only.md](original-audio-only.md) | オリジナル形式パネルの出力形式に「音声のみ」選択肢を追加 | 2026-05-17 |
 | [multi-audio-download.md](multi-audio-download.md) | オリジナル形式パネルの音声を multi-select 化し、複数音声トラックを MKV にマージできるようにする（フェーズ 1） | 2026-05-20 |
 | [proxy-settings.md](proxy-settings.md) | 設定ダイアログにプロキシタブを追加し、yt-dlp の `proxy` オプションを GUI から設定可能にする | 2026-05-22 |
+| [concurrent-fragments.md](concurrent-fragments.md) | 設定ダイアログに「ダウンロード」タブを新設し、並列フラグメント DL（`concurrent-fragments`）を指定可能にする（Issue #53 / PR #54） | 2026-05-31 |
 
 ## バグ修正
 
