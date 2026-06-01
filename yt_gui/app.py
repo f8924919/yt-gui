@@ -220,6 +220,8 @@ class App(QMainWindow):
             output_template_playlist=self._settings.output_template_playlist,
             proxy_url=build_proxy_url(self._settings),
             concurrent_fragments=self._settings.concurrent_fragments,
+            sponsorblock_mode=self._settings.sponsorblock_mode,
+            sponsorblock_categories=self._settings.sponsorblock_categories,
         )
 
         self._thumbnail_cache = ThumbnailCache(self)
@@ -886,6 +888,8 @@ class App(QMainWindow):
         )
         self.downloader.proxy_url = build_proxy_url(self._settings)
         self.downloader.concurrent_fragments = self._settings.concurrent_fragments
+        self.downloader.sponsorblock_mode = self._settings.sponsorblock_mode
+        self.downloader.sponsorblock_categories = self._settings.sponsorblock_categories
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

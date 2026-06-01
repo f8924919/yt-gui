@@ -26,6 +26,8 @@ def test_settings_defaults_match_spec() -> None:
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
     assert s.concurrent_fragments == 1
+    assert s.sponsorblock_mode == ""
+    assert s.sponsorblock_categories == ["sponsor", "selfpromo"]
     assert s.proxy_enabled is False
     assert s.proxy_scheme == "http"
     assert s.proxy_host == ""
@@ -92,6 +94,35 @@ def test_concurrent_fragments_defaults_from_old_json(
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
     assert manager.load().concurrent_fragments == 1
+
+
+def test_sponsorblock_fields_roundtrip(manager: SettingsManager) -> None:
+    original = Settings(
+        sponsorblock_mode="remove",
+        sponsorblock_categories=["sponsor", "intro", "outro"],
+    )
+    manager.save(original)
+    assert manager.load() == original
+
+
+def test_sponsorblock_defaults_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    """sponsorblock_* 無しの古い settings.json でも既定値で読み込めること。"""
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    loaded = manager.load()
+    assert loaded.sponsorblock_mode == ""
+    assert loaded.sponsorblock_categories == ["sponsor", "selfpromo"]
+
+
+def test_sponsorblock_categories_independent_per_instance() -> None:
+    """default_factory により各インスタンスのリストが共有されないこと。"""
+    a = Settings()
+    b = Settings()
+    a.sponsorblock_categories.append("intro")
+    assert b.sponsorblock_categories == ["sponsor", "selfpromo"]
 
 
 def test_proxy_fields_roundtrip(manager: SettingsManager) -> None:

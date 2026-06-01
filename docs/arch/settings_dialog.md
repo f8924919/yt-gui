@@ -57,6 +57,18 @@ OUTPUT TEMPLATE 設定を編集する。
 
 読み込み時は永続値を範囲内にクランプして `setValue()` する（範囲外の手書き JSON に対する防御）。
 
+### 「SponsorBlock」タブ
+
+SponsorBlock の処理方法・対象カテゴリを設定するタブ（`_build_sponsorblock_tab`）。
+
+| 項目 | ウィジェット | 説明 |
+|------|------------|------|
+| 処理方法 | `QRadioButton` グループ（`_sb_btn_group`） | 使用しない / 印を付ける（mark）/ 除去する（remove） |
+| 対象カテゴリ | `QCheckBox` 群（`_sb_category_checks: dict[str, QCheckBox]`） | `SPONSORBLOCK_CATEGORIES`（`yt_gui/settings.py`）から生成 |
+
+- グレーアウト連動: `_sb_btn_group.buttonClicked` → `_on_sponsorblock_mode_changed()` で「使用しない」選択時にカテゴリラベルとチェックボックス群を `setEnabled(False)`。
+- 保存時は mark / remove / 無効を `sponsorblock_mode` に、チェック済みカテゴリのリストを `sponsorblock_categories` に書き込む。
+
 ### 「プロキシ」タブ
 
 | 項目 | ウィジェット | 説明 |

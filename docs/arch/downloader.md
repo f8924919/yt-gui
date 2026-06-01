@@ -17,6 +17,8 @@ yt-dlp のラッパー。バックグラウンドスレッドから呼び出さ�
 | `output_template_playlist` | `str` | プレイリスト用 outtmpl（既定: `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"`） |
 | `proxy_url` | `str` | yt-dlp に渡すプロキシ URL（既定: `""` = 未使用）。`scheme://[user[:password]@]host[:port]` 形式 |
 | `concurrent_fragments` | `int` | 並列フラグメント DL 数（既定: `1` = 単一フラグメント）。`>1` のときだけ `concurrent_fragment_downloads` を渡す |
+| `sponsorblock_mode` | `str` | SponsorBlock 処理方法（既定: `""` = 無効 / `"mark"` / `"remove"`） |
+| `sponsorblock_categories` | `list[str] \| None` | SponsorBlock 対象カテゴリ（既定: `None` → 空リスト） |
 | `status_callback` | `Callable` | ダウンロード進捗を受け取るコールバック |
 | `log_callback` | `Callable` | ログ文字列を受け取るコールバック |
 
@@ -102,6 +104,8 @@ WebM は非対応のため自動スキップ。
 - **映像 (字幕埋め込み無し)**: FFmpegMetadata → EmbedThumbnail
 - **映像 (字幕埋め込みあり)**: FFmpegMetadata → EmbedThumbnail → (json 専用字幕を含む場合 `_StripJsonOnlySubsBeforeEmbedPP`) → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
 
+SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直前に `ModifyChapters` が挿入される（`FFmpegExtractAudio` がある場合はその後段）。`SponsorBlock` PP は `after_filter` フェーズで動くためリスト末尾に追加され、上記の post_process 順には影響しない。詳細は [SponsorBlock](#sponsorblock) を参照。
+
 字幕埋め込み時は `FFmpegSubtitlesConvertor` を先に挟む。これは `json3` しか配信されない動画で `FFmpegEmbedSubtitle` が `JSON subtitles cannot be embedded` で失敗するのを避けるため。変換先はユーザーが選んだフォーマット（`srt` / `vtt`）。`best` 選択時は `srt` をデフォルトに採用する。
 
 `_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` のいずれかがユーザー選択に含まれる場合は、convert/embed の前に `_StripJsonOnlySubsBeforeEmbedPP` を差し込んで `requested_subtitles` から該当 lang を取り除く。これにより、ライブチャット (YouTube) およびニコニコ動画コメント の JSON は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
@@ -155,6 +159,18 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 `self.concurrent_fragments` が `> 1` のとき、`_build_ydl_opts` で `ydl_opts["concurrent_fragment_downloads"] = N` を付与する（yt-dlp CLI の `--concurrent-fragments` / `-N` 相当）。`N=1` は yt-dlp 既定と同じなので opt は渡さない。フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与し、プログレッシブ単一ファイルには影響しない。`_base_ydl_opts` ではなくダウンロード側 (`_build_ydl_opts`) に置くため、メタデータ取得 (`fetch_*`) には付与されない。
 
 設定変更は `App._open_settings()` から `self.downloader.concurrent_fragments = ...` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
+
+### SponsorBlock
+
+`self.sponsorblock_mode`（`""` / `"mark"` / `"remove"`）と `self.sponsorblock_categories`（カテゴリ ID のリスト）に基づき、`_build_ydl_opts` が `_append_sponsorblock_postprocessors` を呼んで PP を積む。
+
+- `mode` が `mark` / `remove` 以外、または `SPONSORBLOCK_CATEGORIES`（`yt_gui/settings.py`）でフィルタした有効カテゴリが 0 件のときは何もしない（未知カテゴリは捨てる）。
+- `SponsorBlock` PP（`when="after_filter"`、`categories` = 選択集合）で区間を検出してチャプタ化する。リスト内位置は実行順に影響しないため末尾に追加する。
+- `ModifyChapters` PP（`remove_sponsor_segments` は remove 時のみ選択集合、`sponsorblock_chapter_title=_SPONSORBLOCK_CHAPTER_TITLE`）は **`FFmpegMetadata` / `EmbedThumbnail` より前**（post_process フェーズ）で動く必要があるため、それらの直前に挿入する。`FFmpegExtractAudio` は常にリスト先頭にあるため自動的に前段になる。
+- `mark` のときは印を出力に反映するため、`_ensure_chapters_embedded` で `FFmpegMetadata` の `add_chapters=True` を立てる（無ければ追加。yt-dlp CLI が `--sponsorblock-mark` 指定時に `addchapters` を自動 ON にするのと同じ）。
+- `_base_ydl_opts` ではなくダウンロード側（`_build_ydl_opts`）に置くため、メタデータ取得（`fetch_*`）には付与されない。
+
+設定変更は `App._open_settings()` から `self.downloader.sponsorblock_mode` / `.sponsorblock_categories` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
 
 ### ロガー: `_YtdlpLogger`
 
