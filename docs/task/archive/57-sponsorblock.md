@@ -32,4 +32,4 @@ YouTube 等のスポンサー区間・自己宣伝・イントロ等を、Sponso
 - [x] テスト（`test_downloader.py` 7 ケース / `test_settings.py` 3 ケース）
 - [x] docs（spec / arch / research）更新
 - [x] lint / format / mypy / pytest（117 passed）
-- [ ] PR 作成・レビュー・マージ
+- [x] PR 作成・レビュー・マージ（PR #58、2026-06-01 マージ）
