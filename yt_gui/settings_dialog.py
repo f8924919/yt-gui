@@ -37,6 +37,7 @@ from .settings import (
     CONCURRENT_FRAGMENTS_MAX,
     CONCURRENT_FRAGMENTS_MIN,
     PROXY_SCHEMES,
+    SPONSORBLOCK_CATEGORIES,
     SettingsManager,
 )
 
@@ -95,6 +96,10 @@ class SettingsDialog(QDialog):
         download_widget = QWidget()
         self._build_download_tab(download_widget)
         self._tabs.addTab(download_widget, t("tab_download"))
+
+        sponsorblock_widget = QWidget()
+        self._build_sponsorblock_tab(sponsorblock_widget)
+        self._tabs.addTab(sponsorblock_widget, t("tab_sponsorblock"))
 
         proxy_widget = QWidget()
         self._build_proxy_tab(proxy_widget)
@@ -371,6 +376,54 @@ class SettingsDialog(QDialog):
         layout.addWidget(note, 1, 0, 1, 2)
         layout.setRowStretch(2, 1)
 
+    def _build_sponsorblock_tab(self, parent: QWidget):
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        layout.addWidget(QLabel(t("label_sponsorblock_mode")))
+        self._sb_btn_group = QButtonGroup(self)
+        self._sb_radio_off = QRadioButton(t("sponsorblock_mode_off"))
+        self._sb_radio_mark = QRadioButton(t("sponsorblock_mode_mark"))
+        self._sb_radio_remove = QRadioButton(t("sponsorblock_mode_remove"))
+        for rb in (self._sb_radio_off, self._sb_radio_mark, self._sb_radio_remove):
+            self._sb_btn_group.addButton(rb)
+            layout.addWidget(rb)
+
+        self._sb_categories_label = QLabel(t("label_sponsorblock_categories"))
+        layout.addWidget(self._sb_categories_label)
+
+        saved = set(self._settings.sponsorblock_categories)
+        self._sb_category_checks: dict[str, QCheckBox] = {}
+        for cat in SPONSORBLOCK_CATEGORIES:
+            check = QCheckBox(t(f"sponsorblock_cat_{cat}"))
+            check.setChecked(cat in saved)
+            layout.addWidget(check)
+            self._sb_category_checks[cat] = check
+
+        note = QLabel(t("sponsorblock_note"))
+        note.setStyleSheet("color: gray;")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        layout.addStretch()
+
+        mode = self._settings.sponsorblock_mode
+        if mode == "mark":
+            self._sb_radio_mark.setChecked(True)
+        elif mode == "remove":
+            self._sb_radio_remove.setChecked(True)
+        else:
+            self._sb_radio_off.setChecked(True)
+
+        self._sb_btn_group.buttonClicked.connect(self._on_sponsorblock_mode_changed)
+        self._on_sponsorblock_mode_changed()
+
+    def _on_sponsorblock_mode_changed(self):
+        enabled = not self._sb_radio_off.isChecked()
+        self._sb_categories_label.setEnabled(enabled)
+        for check in self._sb_category_checks.values():
+            check.setEnabled(enabled)
+
     def _build_proxy_tab(self, parent: QWidget):
         layout = QGridLayout(parent)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -545,6 +598,16 @@ class SettingsDialog(QDialog):
             self._settings.cookies_browser = ""
 
         self._settings.concurrent_fragments = self._concurrent_fragments_spin.value()
+
+        if self._sb_radio_mark.isChecked():
+            self._settings.sponsorblock_mode = "mark"
+        elif self._sb_radio_remove.isChecked():
+            self._settings.sponsorblock_mode = "remove"
+        else:
+            self._settings.sponsorblock_mode = ""
+        self._settings.sponsorblock_categories = [
+            cat for cat, check in self._sb_category_checks.items() if check.isChecked()
+        ]
 
         self._settings.proxy_enabled = self._proxy_check.isChecked()
         self._settings.proxy_scheme = self._proxy_scheme_combo.currentText()

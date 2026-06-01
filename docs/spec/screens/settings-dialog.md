@@ -108,6 +108,38 @@ yt-dlp の OUTPUT TEMPLATE 機能でダウンロードファイル名を設定�
 
 ---
 
+### SponsorBlock タブ
+
+SponsorBlock（コミュニティ提供のスポンサー区間データベース）を使い、スポンサー区間・自己宣伝・イントロ等を **チャプター印付け（mark）** または **動画から除去（remove）** するタブ。
+
+#### 処理方法（3 択ラジオ）
+
+| 選択肢 | 内部値 | 動作 |
+|---|---|---|
+| 使用しない | `""` | SponsorBlock を使わない（既定） |
+| チャプターとして印を付ける | `mark` | 対象区間をチャプター化する（動画は変えない） |
+| 区間を動画から除去する | `remove` | 対象区間を動画から切り取る |
+
+- 「使用しない」を選ぶと、下の「対象カテゴリ」ラベルとチェックボックス群がグレーアウト（無効化）する。
+
+#### 対象カテゴリ（チェックボックス）
+
+| 表示名 | yt-dlp カテゴリ ID | 既定 |
+|---|---|---|
+| スポンサー | `sponsor` | ☑ |
+| 自己宣伝・グッズ紹介 | `selfpromo` | ☑ |
+| 登録 / SNS 誘導 | `interaction` | ☐ |
+| イントロ | `intro` | ☐ |
+| アウトロ | `outro` | ☐ |
+| 雑談・本題外 | `filler` | ☐ |
+| 楽曲外パート | `music_offtopic` | ☐ |
+
+- 注記: 「区間を除去は動画の再エンコード / 分割を伴うため処理時間が増えます。データは SponsorBlock コミュニティ提供で、区間が未登録の動画では何も行われません」。
+- 処理方法が「使用しない」、またはカテゴリが 0 件のときは yt-dlp に SponsorBlock 関連オプションを一切渡さない。
+- `mark` のときは対象区間を出力ファイルに反映するため、チャプター埋め込み（`FFmpegMetadata` の `add_chapters`）を自動的に有効化する。
+
+---
+
 ### プロキシタブ
 
 yt-dlp の通信に使うプロキシを設定する。設定値は yt-dlp の `proxy` オプションとして `scheme://[user[:password]@]host[:port]` 形式に組み立てられ、メタデータ取得・形式取得・ダウンロード本体すべてに適用される。
@@ -155,6 +187,7 @@ yt-dlp の通信に使うプロキシを設定する。設定値は yt-dlp の `
 | 動画コンテナ・音声形式 | 形式コンボボックスの表示名を再生成 |
 | OUTPUT TEMPLATE | `Downloader.output_template_video` / `output_template_playlist` を更新（次のダウンロードから反映） |
 | 並列フラグメント数 | `Downloader.concurrent_fragments` を更新（次のダウンロードから反映） |
+| SponsorBlock | `Downloader.sponsorblock_mode` / `sponsorblock_categories` を更新（次のダウンロードから反映） |
 | プロキシ | `build_proxy_url()` で組み立てた URL を `Downloader.proxy_url` に設定（次のダウンロードから反映） |
 | 言語 | `i18n.set_language()` を呼び出し、UI 全体を即時再翻訳（再起動不要） |
 

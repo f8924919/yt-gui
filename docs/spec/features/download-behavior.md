@@ -122,6 +122,18 @@ YouTube Live など `json3` 形式しか配信されない動画では、`FFmpeg
 
 ---
 
+## SponsorBlock
+
+設定の SponsorBlock タブ（[設定ダイアログ](../screens/settings-dialog.md#sponsorblock-タブ)）で、コミュニティ提供の SponsorBlock データベースを参照してスポンサー区間等を処理します。設定は全ダウンロード共通で、設定保存後の次のダウンロードから（既存キューアイテムも含めて）反映されます。
+
+- **処理方法**: `mark`（チャプター印付け）/ `remove`（区間除去）/ 無効（既定）。
+- **対象カテゴリ**: `sponsor` / `selfpromo` / `interaction` / `intro` / `outro` / `filler` / `music_offtopic` から選択。
+- 無効、またはカテゴリ 0 件のときは yt-dlp に SponsorBlock 関連オプションを渡しません。
+- `mark` のときは印を出力に反映するためチャプター埋め込みを自動的に有効化します。
+- 区間検出は `SponsorBlock` ポストプロセッサ、チャプター化・除去は `ModifyChapters` ポストプロセッサで行います（処理順の詳細は [downloader 実装](../../arch/downloader.md#sponsorblock)）。
+
+---
+
 ## Cookies
 
 認証が必要な動画（会員限定など）のダウンロードに使用します。

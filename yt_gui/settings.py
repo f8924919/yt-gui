@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from urllib.parse import quote
 
 PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h")
@@ -9,6 +9,20 @@ PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h"
 # 並列フラグメント DL 数の指定可能範囲（UI のスピンボックスにも適用）
 CONCURRENT_FRAGMENTS_MIN = 1
 CONCURRENT_FRAGMENTS_MAX = 16
+
+# SponsorBlock の処理モード（"" = 無効）と対象カテゴリ。
+# カテゴリ名は yt-dlp の SponsorBlock カテゴリ ID に対応する。
+SPONSORBLOCK_MODES: tuple[str, ...] = ("", "mark", "remove")
+SPONSORBLOCK_CATEGORIES: tuple[str, ...] = (
+    "sponsor",
+    "selfpromo",
+    "interaction",
+    "intro",
+    "outro",
+    "filler",
+    "music_offtopic",
+)
+SPONSORBLOCK_DEFAULT_CATEGORIES: tuple[str, ...] = ("sponsor", "selfpromo")
 
 
 @dataclass
@@ -26,6 +40,10 @@ class Settings:
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
     concurrent_fragments: int = 1  # 並列フラグメント DL 数（1 = 単一フラグメント）
+    sponsorblock_mode: str = ""  # "" = 無効 / "mark" / "remove"
+    sponsorblock_categories: list[str] = field(
+        default_factory=lambda: list(SPONSORBLOCK_DEFAULT_CATEGORIES)
+    )
     proxy_enabled: bool = False
     proxy_scheme: str = "http"
     proxy_host: str = ""

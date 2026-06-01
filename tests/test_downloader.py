@@ -292,3 +292,116 @@ def test_concurrent_fragments_passed_when_gt_one(tmp_path) -> None:
     )
 
     assert opts["concurrent_fragment_downloads"] == 4
+
+
+def _build(dl: Downloader, job: JobSpec, tmp_path) -> dict:
+    return dl._build_ydl_opts(
+        job,
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+
+def _pp(opts: dict, key: str) -> dict:
+    return next(pp for pp in opts["postprocessors"] if pp["key"] == key)
+
+
+def test_sponsorblock_disabled_adds_no_pp(downloader, tmp_path) -> None:
+    # 既定 (mode="") では SponsorBlock 関連 PP を一切積まない
+    opts = _build(downloader, _job(), tmp_path)
+    assert "SponsorBlock" not in _pp_keys(opts)
+    assert "ModifyChapters" not in _pp_keys(opts)
+
+
+def test_sponsorblock_empty_categories_adds_no_pp(tmp_path) -> None:
+    dl = Downloader(
+        output_dir=str(tmp_path), sponsorblock_mode="mark", sponsorblock_categories=[]
+    )
+    opts = _build(dl, _job(), tmp_path)
+    assert "SponsorBlock" not in _pp_keys(opts)
+    assert "ModifyChapters" not in _pp_keys(opts)
+
+
+def test_sponsorblock_unknown_categories_filtered_out(tmp_path) -> None:
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="mark",
+        sponsorblock_categories=["sponsor", "bogus"],
+    )
+    opts = _build(dl, _job(), tmp_path)
+    assert _pp(opts, "SponsorBlock")["categories"] == {"sponsor"}
+
+
+def test_sponsorblock_mark_adds_pps_without_removal(tmp_path) -> None:
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="mark",
+        sponsorblock_categories=["sponsor", "selfpromo"],
+    )
+    opts = _build(dl, _job(), tmp_path)
+
+    sb = _pp(opts, "SponsorBlock")
+    assert sb["categories"] == {"sponsor", "selfpromo"}
+    assert sb["when"] == "after_filter"
+
+    modify = _pp(opts, "ModifyChapters")
+    assert modify["remove_sponsor_segments"] == set()
+    # mark を可視化するためチャプター埋め込みが有効化される
+    assert _pp(opts, "FFmpegMetadata")["add_chapters"] is True
+
+
+def test_sponsorblock_remove_sets_remove_segments(tmp_path) -> None:
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="remove",
+        sponsorblock_categories=["sponsor"],
+    )
+    opts = _build(dl, _job(), tmp_path)
+
+    assert _pp(opts, "SponsorBlock")["categories"] == {"sponsor"}
+    assert _pp(opts, "ModifyChapters")["remove_sponsor_segments"] == {"sponsor"}
+
+
+def test_sponsorblock_modifychapters_runs_before_metadata(tmp_path) -> None:
+    # ModifyChapters は FFmpegMetadata より前に並ぶ必要がある
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="mark",
+        sponsorblock_categories=["sponsor"],
+    )
+    opts = _build(dl, _job(), tmp_path)
+    keys = _pp_keys(opts)
+    assert keys.index("ModifyChapters") < keys.index("FFmpegMetadata")
+
+
+def test_sponsorblock_audio_modifychapters_after_extract(tmp_path) -> None:
+    # 音声抽出時は FFmpegExtractAudio の後に ModifyChapters が来る
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="remove",
+        sponsorblock_categories=["sponsor"],
+    )
+    opts = _build(
+        dl,
+        _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
+        tmp_path,
+    )
+    keys = _pp_keys(opts)
+    assert keys.index("FFmpegExtractAudio") < keys.index("ModifyChapters")
+
+
+def test_sponsorblock_mark_adds_metadata_pp_when_absent(tmp_path) -> None:
+    # メタデータ / チャプター埋め込みが無効でも mark 用に FFmpegMetadata を補う
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        sponsorblock_mode="mark",
+        sponsorblock_categories=["sponsor"],
+    )
+    opts = _build(dl, _job(embed_metadata=False, embed_chapters=False), tmp_path)
+    meta = _pp(opts, "FFmpegMetadata")
+    assert meta["add_chapters"] is True
+    assert meta["add_metadata"] is False
+    keys = _pp_keys(opts)
+    assert keys.index("ModifyChapters") < keys.index("FFmpegMetadata")

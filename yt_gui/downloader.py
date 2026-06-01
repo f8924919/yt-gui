@@ -10,11 +10,15 @@ from . import get_resource_base
 from .i18n import t
 from .job_spec import JobSpec
 from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
+from .settings import SPONSORBLOCK_CATEGORIES
 from .utils import strip_ansi
 
 _LIVE_CHAT_LANG = "live_chat"
 _COMMENTS_LANG = "comments"
 _JSON_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG})
+
+# SponsorBlock でチャプター化される区間のタイトル（yt-dlp CLI の既定値と同じ）
+_SPONSORBLOCK_CHAPTER_TITLE = "[SponsorBlock]: %(category_names)l"
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
 _THUMBNAIL_EMBED_CONTAINERS = frozenset(
@@ -77,6 +81,8 @@ class Downloader:
         output_template_playlist: str = DEFAULT_PLAYLIST_TEMPLATE,
         proxy_url: str = "",
         concurrent_fragments: int = 1,
+        sponsorblock_mode: str = "",
+        sponsorblock_categories: list[str] | None = None,
     ):
         self.output_dir = output_dir
         self.status_callback = status_callback
@@ -87,6 +93,8 @@ class Downloader:
         self.output_template_playlist = output_template_playlist
         self.proxy_url = proxy_url
         self.concurrent_fragments = concurrent_fragments
+        self.sponsorblock_mode = sponsorblock_mode
+        self.sponsorblock_categories = sponsorblock_categories or []
 
         _ext = ".exe" if sys.platform == "win32" else ""
         base = get_resource_base()
@@ -450,7 +458,74 @@ class Downloader:
         if job.subtitle_opts:
             self._append_subtitle_options(ydl_opts, job.subtitle_opts)
 
+        self._append_sponsorblock_postprocessors(ydl_opts)
+
         return ydl_opts
+
+    def _append_sponsorblock_postprocessors(self, ydl_opts: dict) -> None:
+        """SponsorBlock の mark / remove ポストプロセッサを積む。
+
+        - `sponsorblock_mode` が空、または有効カテゴリが 0 件のときは何もしない。
+        - `SponsorBlock` PP は `after_filter` フェーズで対象区間を検出してチャプタ化する
+          （リスト内での位置は実行順に影響しないため末尾に追加する）。
+        - `ModifyChapters` PP は `FFmpegMetadata` / `EmbedThumbnail` より前
+          （post_process フェーズ）で動く必要があるため、それらの直前へ挿入する。
+          `FFmpegExtractAudio` はリスト先頭にあるため自動的に前段になる。
+        - mark を出力ファイルに反映するにはチャプター埋め込みが要るので、
+          `FFmpegMetadata` の `add_chapters` を有効化する（yt-dlp CLI が
+          `--sponsorblock-mark` 指定時に `addchapters` を自動 ON にするのと同じ）。
+        """
+        mode = self.sponsorblock_mode
+        if mode not in ("mark", "remove"):
+            return
+        categories = [
+            c for c in self.sponsorblock_categories if c in SPONSORBLOCK_CATEGORIES
+        ]
+        if not categories:
+            return
+
+        category_set = set(categories)
+        remove_set = category_set if mode == "remove" else set()
+        pps: list[dict] = ydl_opts.setdefault("postprocessors", [])
+
+        if mode == "mark":
+            self._ensure_chapters_embedded(pps)
+
+        modify_pp = {
+            "key": "ModifyChapters",
+            "remove_sponsor_segments": remove_set,
+            "sponsorblock_chapter_title": _SPONSORBLOCK_CHAPTER_TITLE,
+            "force_keyframes": False,
+        }
+        anchor = next(
+            (
+                i
+                for i, pp in enumerate(pps)
+                if pp.get("key") in ("FFmpegMetadata", "EmbedThumbnail")
+            ),
+            len(pps),
+        )
+        pps.insert(anchor, modify_pp)
+
+        pps.append(
+            {
+                "key": "SponsorBlock",
+                "categories": category_set,
+                "when": "after_filter",
+            }
+        )
+
+    @staticmethod
+    def _ensure_chapters_embedded(pps: list[dict]) -> None:
+        """既存の `FFmpegMetadata` PP に `add_chapters=True` を立てる。
+        無い場合はチャプター埋め込み専用の `FFmpegMetadata` を追加する。"""
+        for pp in pps:
+            if pp.get("key") == "FFmpegMetadata":
+                pp["add_chapters"] = True
+                return
+        pps.append(
+            {"key": "FFmpegMetadata", "add_metadata": False, "add_chapters": True}
+        )
 
     def _append_audio_postprocessors(self, ydl_opts: dict, job: JobSpec) -> None:
         audio_codec = job.audio_codec

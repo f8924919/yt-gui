@@ -27,6 +27,8 @@
 | `output_template_video` | str | `"%(title)s.%(ext)s"` | ファイル名タブ — 単独動画用 OUTPUT TEMPLATE |
 | `output_template_playlist` | str | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | ファイル名タブ — プレイリスト用 OUTPUT TEMPLATE |
 | `concurrent_fragments` | int | `1` | ダウンロードタブ — 並列フラグメント数（1〜16） |
+| `sponsorblock_mode` | str | `""` | SponsorBlock タブ — 処理方法（`""` = 無効 / `"mark"` / `"remove"`） |
+| `sponsorblock_categories` | list[str] | `["sponsor", "selfpromo"]` | SponsorBlock タブ — 対象カテゴリ |
 | `proxy_enabled` | bool | `False` | プロキシタブ — プロキシ有効化チェック |
 | `proxy_scheme` | str | `"http"` | プロキシタブ — プロトコル (`http` / `https` / `socks4` / `socks5` / `socks5h`) |
 | `proxy_host` | str | `""` | プロキシタブ — ホスト |
@@ -87,6 +89,7 @@
 | 音声形式・ビットレート | 次のキュー追加から反映（既存アイテムには影響しない） |
 | OUTPUT TEMPLATE | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 並列フラグメント数 | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
+| SponsorBlock | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | プロキシ | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 言語 | 即座に反映（再起動不要） |
 

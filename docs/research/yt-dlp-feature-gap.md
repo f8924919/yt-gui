@@ -40,7 +40,7 @@ yt-gui は yt-dlp を **Python ライブラリ**として利用している。�
 
 | yt-dlp 機能 | CLI オプション | 現状・備考 |
 |---|---|---|
-| **SponsorBlock**（スポンサー区間のスキップ / 除去） | `--sponsorblock-mark` / `--sponsorblock-remove` | 未対応。対応 PP（`SponsorBlock` / `ModifyChapters`）を一切積んでいない |
+| ~~**SponsorBlock**（スポンサー区間のスキップ / 除去）~~ | `--sponsorblock-mark` / `--sponsorblock-remove` | ✅ 対応済み（設定の「SponsorBlock」タブ、#57）。[設定ダイアログ](../spec/screens/settings-dialog.md#sponsorblock-タブ)参照 |
 | **区間ダウンロード**（時間 / チャプター指定の部分 DL） | `--download-sections` | 未対応 |
 | **ダウンロードアーカイブ**（既 DL 動画を記録してスキップ） | `--download-archive` | 未対応。代わりに同名ファイルは `(n)` リネームで重複保存になる（[重複回避](../spec/features/download-behavior.md#重複回避)） |
 | **速度制限** | `--limit-rate` | 未対応 |
@@ -112,7 +112,7 @@ yt-gui は yt-dlp を **Python ライブラリ**として利用している。�
 
 - §4・§5 の大半は **`_build_ydl_opts` にオプションを足すだけで実装可能**で、API の根本的制約ではない（SponsorBlock・download-sections・concurrent-fragments・recode・write-info-json など）。UI 露出と設定永続化の追加が主作業になる。
 - 利用者メリットが大きい順の機能追加候補:
-  1. **SponsorBlock** — YouTube 視聴体験への要望が強い
+  1. ~~**SponsorBlock**~~ — ✅ 対応済み（#57、設定の「SponsorBlock」タブ）
   2. ~~**並列フラグメント DL（`concurrent_fragments`）**~~ — ✅ 対応済み（#53、設定の「ダウンロード」タブ）
   3. **ダウンロードアーカイブ** — 再 DL 防止・差分取得
   4. **区間ダウンロード（`download_sections`）** — 部分切り出し
