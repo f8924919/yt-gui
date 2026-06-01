@@ -16,7 +16,7 @@
     "version": "n8.1",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl リリースビルド（master ローリングではなく n8.1 系）。zip 取得後に sha256 を算出して照合。",
     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
-    "sha256": "c8dc2f24270cf864e0737807f5c7cd77b786be6cd4d0ec433989fc9fc6563838"
+    "sha256": "48a6c74aafa065a90b421dcf18cf3971476c001efa3df791ac271699c6374ece"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
