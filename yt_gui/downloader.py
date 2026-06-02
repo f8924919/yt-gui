@@ -24,6 +24,11 @@ _JSON_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG})
 _SPONSORBLOCK_CHAPTER_TITLE = "[SponsorBlock]: %(category_names)l"
 
 _DISPLAY_SUB_EXTS = frozenset({"srt", "vtt", "ttml", "ass", "ssa"})
+# 中断時に掃除する字幕サイドカーの拡張子（表示用 + youtube の生フォーマット）。
+# live_chat / comments の json は `.{lang}.json` 形式で別途判定する。
+_SUBTITLE_CLEANUP_EXTS = _DISPLAY_SUB_EXTS | frozenset(
+    {"lrc", "srv1", "srv2", "srv3", "json3"}
+)
 _THUMBNAIL_EMBED_CONTAINERS = frozenset(
     {"mp3", "mkv", "mka", "ogg", "opus", "flac", "m4a", "mp4", "m4v", "mov"}
 )
@@ -693,13 +698,13 @@ class Downloader:
             ydl.extract_info(url, download=True, extra_info=extra_info)
 
     def _cleanup_partial_files(self, effective_stem: str) -> None:
-        """中断時に残る部分ファイルを削除する（非致命: 失敗はログのみ）。
+        """中断時の一時ファイル・字幕サイドカーを削除する（非致命: 失敗はログのみ）。
 
-        `effective_stem` を基に出力ディレクトリ内の一時ファイルだけを掃除する。
-        完成済みの最終ファイルやサイドカー（`.info.json` / サムネイル等）は残す。
+        `effective_stem` を基に出力ディレクトリ内の掃除対象だけを削除する。
+        完成済みの最終ファイル・メタデータ（`.info.json`）・サムネイルは残す。
         """
         for path in glob.glob(glob.escape(effective_stem) + "*"):
-            if not self._is_partial_file(path):
+            if not self._is_cleanup_target(path):
                 continue
             try:
                 os.remove(path)
@@ -708,19 +713,30 @@ class Downloader:
                     self.log_callback(f"⚠️ {strip_ansi(str(e))}")
 
     @staticmethod
-    def _is_partial_file(path: str) -> bool:
-        """ダウンロード途中の一時ファイルか判定する。
+    def _is_cleanup_target(path: str) -> bool:
+        """中断時に削除すべきファイルか判定する。
 
-        - `.part` / `.ytdl` で終わる
-        - `.part-Frag*`（フラグメント）を含む
-        - `.fNNN.`（マージ前の中間フォーマットファイル）形式
+        対象:
+        - 一時ファイル: `.part` / `.ytdl` で終わる・`.part-Frag*` を含む・
+          `.fNNN.`（マージ前の中間フォーマットファイル）形式
+        - 字幕サイドカー: `.{lang}.{ext}`（ext は `_SUBTITLE_CLEANUP_EXTS`）・
+          `.live_chat.json` / `.comments.json`（json 専用字幕）
+
+        非対象（残す）: 最終ファイル・`.info.json`・サムネイル画像。
         """
         name = os.path.basename(path)
         if name.endswith(".part") or name.endswith(".ytdl"):
             return True
         if ".part-Frag" in name:
             return True
-        return bool(re.search(r"\.f\d+\.", name))
+        if re.search(r"\.f\d+\.", name):
+            return True
+        if name.endswith(f".{_LIVE_CHAT_LANG}.json") or name.endswith(
+            f".{_COMMENTS_LANG}.json"
+        ):
+            return True
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        return ext in _SUBTITLE_CLEANUP_EXTS
 
     def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
         """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。

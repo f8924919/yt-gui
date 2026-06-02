@@ -189,12 +189,13 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 - `download_video` は `_run_download` を `except DownloadCancelled` で囲み、中断時に `_cleanup_partial_files(effective_stem)` で部分ファイルを掃除してから例外を再送出する。呼び出し側（`queue_controller._worker`）が `DownloadCancelled` を捕捉してアイテムを `waiting` に戻す。
 - 中断はベストエフォート: `progress_hook` が呼ばれない区間（メタデータ抽出・ポストプロセス）では当該フェーズ完了後に効く。
 
-#### 部分ファイルの削除: `_cleanup_partial_files`
+#### 部分ファイル・字幕の削除: `_cleanup_partial_files`
 
-`effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + "*")` を走査し、一時ファイルだけを削除する。
+`effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + "*")` を走査し、`_is_cleanup_target` が真のファイルだけを削除する。
 
-- 対象: `.part` / `.ytdl` で終わるファイル、`.part-Frag*` を含むファイル、`.fNNN.` 形式の中間フォーマットファイル。
-- 完成済みの最終ファイル・サイドカー（`.info.json` / サムネイル画像等）は対象外（残す）。
+- 一時ファイル: `.part` / `.ytdl` で終わるファイル、`.part-Frag*` を含むファイル、`.fNNN.` 形式の中間フォーマットファイル。
+- 字幕サイドカー: 拡張子が `_SUBTITLE_CLEANUP_EXTS`（`srt` / `vtt` / `ttml` / `ass` / `ssa` / `lrc` / `srv1` / `srv2` / `srv3` / `json3`）のファイル、および `.live_chat.json` / `.comments.json`（json 専用字幕）。中断後に再ダウンロードすると先頭からやり直すため、書き出し済みの字幕を残さない。
+- 完成済みの最終ファイル・メタデータ（`.info.json`）・サムネイル画像は対象外（残す）。
 - 削除失敗（`OSError`）は非致命でログのみ。
 
 ### ロガー: `_YtdlpLogger`

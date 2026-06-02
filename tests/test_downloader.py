@@ -480,6 +480,32 @@ def test_cleanup_partial_files_removes_only_temp_files(downloader, tmp_path) -> 
         assert p.exists(), f"{p.name} は残すべき"
 
 
+def test_cleanup_partial_files_removes_subtitle_sidecars(downloader, tmp_path) -> None:
+    stem = str(tmp_path / "動画")
+    subs = [
+        tmp_path / "動画.en.srt",
+        tmp_path / "動画.ja.vtt",
+        tmp_path / "動画.en.ass",
+        tmp_path / "動画.en.json3",
+        tmp_path / "動画.live_chat.json",  # YouTube ライブチャット
+        tmp_path / "動画.comments.json",  # ニコニコ動画コメント
+    ]
+    keep = [
+        tmp_path / "動画.mp4",  # 完成済み最終ファイル
+        tmp_path / "動画.info.json",  # メタデータ（字幕ではない）
+        tmp_path / "動画.jpg",  # サムネイル
+    ]
+    for p in subs + keep:
+        p.write_text("x")
+
+    downloader._cleanup_partial_files(stem)
+
+    for p in subs:
+        assert not p.exists(), f"{p.name} は削除されるべき"
+    for p in keep:
+        assert p.exists(), f"{p.name} は残すべき"
+
+
 def test_download_video_cleans_up_and_reraises_on_cancel(downloader, tmp_path) -> None:
     from yt_dlp.utils import DownloadCancelled
 
