@@ -54,8 +54,9 @@ OUTPUT TEMPLATE 設定を編集する。
 | 項目 | ウィジェット | 説明 |
 |------|------------|------|
 | 並列フラグメント数 | `QSpinBox` | 範囲 `CONCURRENT_FRAGMENTS_MIN`〜`CONCURRENT_FRAGMENTS_MAX`（= 1〜16、`yt_gui/settings.py`）。`Downloader.concurrent_fragments` に反映 |
+| 速度制限 | `QDoubleSpinBox`（`_rate_limit_spin`）＋ `QComboBox`（`_rate_limit_unit_combo`） | 値は 0〜`RATE_LIMIT_VALUE_MAX`、単位は `RATE_LIMIT_UNITS`（KB/s / MB/s）。`0` = 無制限。`build_rate_limit()` で bytes/sec に換算し `Downloader.rate_limit` に反映 |
 
-読み込み時は永続値を範囲内にクランプして `setValue()` する（範囲外の手書き JSON に対する防御）。
+読み込み時は並列フラグメント数の永続値を範囲内にクランプして `setValue()` する（範囲外の手書き JSON に対する防御）。速度制限値も同様にクランプする。保存時は単位コンボの現在インデックスから `RATE_LIMIT_UNITS` の内部値を書き込む。
 
 ### 「SponsorBlock」タブ
 

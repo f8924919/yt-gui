@@ -102,9 +102,12 @@ yt-dlp の OUTPUT TEMPLATE 機能でダウンロードファイル名を設定�
 | 項目 | 種別 | 説明 |
 |---|---|---|
 | 並列フラグメント数 | スピンボックス（1〜16） | yt-dlp の `concurrent_fragment_downloads`（CLI の `--concurrent-fragments` / `-N`）。フラグメント分割される動画（DASH / HLS）を並列ダウンロードして高速化する。既定 `1`（単一フラグメント = yt-dlp 既定）。`1` のときは yt-dlp にオプションを渡さない |
+| 速度制限 | スピンボックス（小数、0〜）＋ 単位コンボ（KB/s / MB/s） | yt-dlp の `ratelimit`（CLI の `--limit-rate`）。ダウンロード帯域の上限。既定 `0`（無制限）。`0` のときは yt-dlp にオプションを渡さない |
 
-- スピンボックス下に注記を表示: 「フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与します」
+- 並列フラグメント数の下に注記を表示: 「フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与します」
 - プログレッシブ単一ファイルには効果がない
+- 速度制限の下に注記を表示: 「0 で無制限。単位は 2 進接頭辞（KB/s = 1024 bytes/s）」
+- 単位は内部値 `"K"`（×1024）/ `"M"`（×1024×1024）として保存し、bytes/sec に換算して yt-dlp へ渡す
 
 ---
 
@@ -187,6 +190,7 @@ yt-dlp の通信に使うプロキシを設定する。設定値は yt-dlp の `
 | 動画コンテナ・音声形式 | 形式コンボボックスの表示名を再生成 |
 | OUTPUT TEMPLATE | `Downloader.output_template_video` / `output_template_playlist` を更新（次のダウンロードから反映） |
 | 並列フラグメント数 | `Downloader.concurrent_fragments` を更新（次のダウンロードから反映） |
+| 速度制限 | `build_rate_limit()` で換算した bytes/sec を `Downloader.rate_limit` に設定（次のダウンロードから反映） |
 | SponsorBlock | `Downloader.sponsorblock_mode` / `sponsorblock_categories` を更新（次のダウンロードから反映） |
 | プロキシ | `build_proxy_url()` で組み立てた URL を `Downloader.proxy_url` に設定（次のダウンロードから反映） |
 | 言語 | `i18n.set_language()` を呼び出し、UI 全体を即時再翻訳（再起動不要） |

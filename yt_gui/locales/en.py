@@ -35,6 +35,10 @@ STRINGS: dict[str, str] = {
     "tab_download": "Download",
     "label_concurrent_fragments": "Concurrent fragments:",
     "concurrent_fragments_note": "Only speeds up videos delivered as fragments (DASH / HLS). 1 is the yt-dlp default of single-fragment downloads.",
+    "label_rate_limit": "Rate limit:",
+    "rate_limit_unit_k": "KB/s",
+    "rate_limit_unit_m": "MB/s",
+    "rate_limit_note": "Caps the download bandwidth. 0 means unlimited. Units use binary prefixes (KB/s = 1024 bytes/s).",
     # SponsorBlock settings tab
     "tab_sponsorblock": "SponsorBlock",
     "label_sponsorblock_mode": "Action:",

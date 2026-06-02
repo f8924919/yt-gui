@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from yt_gui.settings import Settings, SettingsManager, build_proxy_url
+from yt_gui.settings import (
+    Settings,
+    SettingsManager,
+    build_proxy_url,
+    build_rate_limit,
+)
 
 
 def test_settings_defaults_match_spec() -> None:
@@ -26,6 +31,8 @@ def test_settings_defaults_match_spec() -> None:
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
     assert s.concurrent_fragments == 1
+    assert s.rate_limit_value == 0.0
+    assert s.rate_limit_unit == "M"
     assert s.sponsorblock_mode == ""
     assert s.sponsorblock_categories == ["sponsor", "selfpromo"]
     assert s.proxy_enabled is False
@@ -94,6 +101,52 @@ def test_concurrent_fragments_defaults_from_old_json(
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
     assert manager.load().concurrent_fragments == 1
+
+
+def test_rate_limit_fields_roundtrip(manager: SettingsManager) -> None:
+    original = Settings(rate_limit_value=2.5, rate_limit_unit="K")
+    manager.save(original)
+    loaded = manager.load()
+    assert loaded.rate_limit_value == 2.5
+    assert loaded.rate_limit_unit == "K"
+
+
+def test_rate_limit_defaults_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    """rate_limit_* 無しの古い settings.json でも既定値で読み込めること。"""
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    loaded = manager.load()
+    assert loaded.rate_limit_value == 0.0
+    assert loaded.rate_limit_unit == "M"
+
+
+def test_build_rate_limit_zero_returns_zero() -> None:
+    assert build_rate_limit(Settings(rate_limit_value=0.0)) == 0.0
+
+
+def test_build_rate_limit_negative_returns_zero() -> None:
+    assert build_rate_limit(Settings(rate_limit_value=-5.0, rate_limit_unit="M")) == 0.0
+
+
+def test_build_rate_limit_kb() -> None:
+    assert build_rate_limit(Settings(rate_limit_value=500, rate_limit_unit="K")) == (
+        500 * 1024
+    )
+
+
+def test_build_rate_limit_mb() -> None:
+    assert build_rate_limit(Settings(rate_limit_value=1.5, rate_limit_unit="M")) == (
+        1.5 * 1024 * 1024
+    )
+
+
+def test_build_rate_limit_unknown_unit_falls_back_to_mb() -> None:
+    assert build_rate_limit(Settings(rate_limit_value=2, rate_limit_unit="G")) == (
+        2 * 1024 * 1024
+    )
 
 
 def test_sponsorblock_fields_roundtrip(manager: SettingsManager) -> None:

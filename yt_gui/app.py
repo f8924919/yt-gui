@@ -37,7 +37,7 @@ from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
 from .original_format_dialog import OriginalFormatDialog
 from .queue_controller import QueueController, _QueueItem
-from .settings import SettingsManager, build_proxy_url
+from .settings import SettingsManager, build_proxy_url, build_rate_limit
 from .settings_dialog import SettingsDialog
 from .threading_utils import run_in_thread
 from .thumbnail_cache import ThumbnailCache
@@ -221,6 +221,7 @@ class App(QMainWindow):
             output_template_playlist=self._settings.output_template_playlist,
             proxy_url=build_proxy_url(self._settings),
             concurrent_fragments=self._settings.concurrent_fragments,
+            rate_limit=build_rate_limit(self._settings),
             sponsorblock_mode=self._settings.sponsorblock_mode,
             sponsorblock_categories=self._settings.sponsorblock_categories,
         )
@@ -883,6 +884,7 @@ class App(QMainWindow):
         )
         self.downloader.proxy_url = build_proxy_url(self._settings)
         self.downloader.concurrent_fragments = self._settings.concurrent_fragments
+        self.downloader.rate_limit = build_rate_limit(self._settings)
         self.downloader.sponsorblock_mode = self._settings.sponsorblock_mode
         self.downloader.sponsorblock_categories = self._settings.sponsorblock_categories
 
