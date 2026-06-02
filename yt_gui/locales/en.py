@@ -148,6 +148,8 @@ STRINGS: dict[str, str] = {
     "template_preview_invalid": "(preview unavailable)",
     # download queue
     "btn_add": "Add",
+    "btn_open_detail": "Detailed settings...",
+    "btn_add_to_queue": "Add to queue",
     "btn_adding": "Fetching...",
     "queue_title": "Download Queue",
     "btn_start_queue": "Start Download",

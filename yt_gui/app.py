@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QSplitter,
     QStatusBar,
     QToolTip,
     QTreeWidget,
@@ -36,7 +35,7 @@ from .formats import FORMAT_KEYS
 from .i18n import t
 from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
-from .original_format_panel import OriginalFormatPanel
+from .original_format_dialog import OriginalFormatDialog
 from .queue_controller import QueueController, _QueueItem
 from .settings import SettingsManager, build_proxy_url
 from .settings_dialog import SettingsDialog
@@ -46,9 +45,11 @@ from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
-_WIN_W = 940
+# オリジナル形式の詳細設定を別画面化し、メイン上段が幅を要求しなくなったため
+# 既定幅を狭めた（旧 940）。最小幅は手動で更に絞れるよう既定より小さくする。
+_WIN_W = 760
+_WIN_MIN_W = 560
 _WIN_H_DEFAULT = 480
-_WIN_H_EXPANDED = 700
 
 
 class _AppSignals(QObject):
@@ -188,7 +189,7 @@ class App(QMainWindow):
 
         self.setWindowTitle(self._window_title())
         self.resize(_WIN_W, _WIN_H_DEFAULT)
-        self.setMinimumSize(_WIN_W, 380)
+        self.setMinimumSize(_WIN_MIN_W, 380)
 
         icon_path = os.path.join(get_resource_base(), "assets", "icon.png")
         if os.path.isfile(icon_path):
@@ -295,10 +296,8 @@ class App(QMainWindow):
         if self.queue.edit_mode and len(self.queue.editing_items) > 1:
             self._set_original_format_enabled(False)
         self._on_format_changed(old_idx)
-
-        self._original_panel.retranslate(
-            self._settings.video_container, self._build_audio_label()
-        )
+        # オリジナル形式の詳細設定は別画面（開くたびに現在の言語・設定で生成）の
+        # ため、ここでの永続パネル再翻訳は不要。
 
     def _window_title(self) -> str:
         """ウィンドウタイトル（アプリ名 + バージョン）を返す。"""
@@ -328,6 +327,7 @@ class App(QMainWindow):
             t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
         )
         self._cancel_edit_button.setText(t("btn_cancel_edit"))
+        self._detail_button.setText(t("btn_open_detail"))
         self.start_queue_button.setText(t("btn_start_queue"))
         self.pause_queue_button.setText(t("btn_pause_queue"))
         self.remove_item_button.setText(t("btn_remove_item"))
@@ -421,13 +421,9 @@ class App(QMainWindow):
         self.setCentralWidget(central)
         central_layout = QVBoxLayout(central)
         central_layout.setContentsMargins(10, 10, 10, 10)
-        central_layout.setSpacing(0)
+        central_layout.setSpacing(8)
 
-        self._splitter = QSplitter(Qt.Orientation.Vertical, central)
-        self._splitter.setChildrenCollapsible(False)
-        self._splitter.setHandleWidth(6)
-
-        # Top container: URL / Format / Original panel / Add button
+        # Top container: URL / Format / detail or add button
         top_widget = QWidget()
         layout = QGridLayout(top_widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -449,22 +445,17 @@ class App(QMainWindow):
         self.format_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self.format_combo, 1, 1, 1, 2)
 
-        # Row 2a: Original format detail panel (hidden by default)
-        self._original_panel = OriginalFormatPanel(
-            top_widget,
-            downloader=self.downloader,
-            get_url=lambda: self.url_entry.text().strip(),
-            get_cookies=self._resolve_cookies,
-            update_status=lambda text, pct: self._signals.status_update.emit(text, pct),
-        )
-        self._original_panel.setVisible(False)
-        self._original_panel.retranslate(
-            self._settings.video_container, self._build_audio_label()
-        )
-        # パネル内のレイアウト変化 (ニコニコ動画コメントグループの出現等) で
-        # 上位 QSplitter の上段サイズを再計算する
-        self._original_panel.on_size_hint_changed(self._resync_splitter_to_top_hint)
-        layout.addWidget(self._original_panel, 2, 0, 1, 3)
+        # Row 2a: 「詳細設定...」ボタン（オリジナル形式選択時のみ表示）。
+        # 詳細設定は別画面 (OriginalFormatDialog) に分離されている。
+        detail_frame = QWidget()
+        detail_layout = QHBoxLayout(detail_frame)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self._detail_button = QPushButton(t("btn_open_detail"))
+        self._detail_button.clicked.connect(self._open_original_dialog)
+        self._detail_button.setVisible(False)
+        detail_layout.addWidget(self._detail_button)
+        detail_layout.addStretch()
+        layout.addWidget(detail_frame, 2, 0, 1, 3)
 
         # Row 2b: MP3 thumbnail option (hidden by default)
         self._mp3_frame = QWidget()
@@ -490,7 +481,9 @@ class App(QMainWindow):
         add_layout.addStretch()
         layout.addWidget(add_frame, 3, 0, 1, 3)
 
-        self._splitter.addWidget(top_widget)
+        # 上段は sizeHint 固定。詳細設定が別画面化したため上段は伸縮せず、
+        # 旧 QSplitter（上段/キューの比率調整）は不要になった。
+        central_layout.addWidget(top_widget)
 
         # Bottom: Queue (expands)
         queue_box = QFrame()
@@ -544,11 +537,8 @@ class App(QMainWindow):
         qbfl.addStretch()
         qbl.addWidget(queue_btn_frame)
 
-        self._splitter.addWidget(queue_box)
-        # Top stays at sizeHint, queue stretches to fill extra space
-        self._splitter.setStretchFactor(0, 0)
-        self._splitter.setStretchFactor(1, 1)
-        central_layout.addWidget(self._splitter)
+        # キュー領域が余った縦スペースを埋める（上段は sizeHint 固定）。
+        central_layout.addWidget(queue_box, 1)
 
         # Status bar
         status_bar = QStatusBar()
@@ -564,43 +554,23 @@ class App(QMainWindow):
 
     # ── format / panel visibility ─────────────────────────────────────────────
 
-    def _resync_splitter_to_top_hint(self):
-        """上段 (URL / 形式 / オリジナルパネル) の sizeHint が変わったときに
-        QSplitter のサイズ配分を再計算する。下段（キュー）は上段で確定した
-        残りを受け取り、画面全体の高さが足りなければ全体ウィンドウを伸ばす。"""
-        top = self._splitter.widget(0)
-        bottom = self._splitter.widget(1)
-        if top is None or bottom is None:
-            return
-        top_hint = top.sizeHint().height()
-        cur_top, cur_bottom = self._splitter.sizes()
-        total = cur_top + cur_bottom
-        # 下段の最小確保 (200px 程度) は維持しつつ、上段に必要な高さを与える
-        bottom_min = max(bottom.minimumSizeHint().height(), 200)
-        if top_hint + bottom_min > total:
-            # 画面全体を伸ばして両方を確保
-            extra = top_hint + bottom_min - total
-            self.resize(self.width(), self.height() + extra)
-            self._splitter.setSizes([top_hint, bottom_min])
-        else:
-            self._splitter.setSizes([top_hint, total - top_hint])
-
     def _on_format_changed(self, index: int):
+        """形式選択に応じてボタン・補助ウィジェットの表示を切り替える。
+
+        オリジナル形式の詳細設定は別画面 (OriginalFormatDialog) に分離された
+        ため、ウィンドウ高さは変更しない（メイン高さは固定）。オリジナル形式時は
+        メインの「追加」ボタンを隠し「詳細設定...」ボタンを出す（追加/変更は
+        ダイアログ内で行うため）。"""
         if index < 0 or index >= len(FORMAT_KEYS):
             return
         format_id = FORMAT_KEYS[index]
-        if format_id == _ORIGINAL_KEY:
-            self._original_panel.setVisible(True)
-            self._mp3_frame.setVisible(False)
-            self.resize(_WIN_W, _WIN_H_EXPANDED)
-        elif format_id == _MP3_KEY:
-            self._original_panel.setVisible(False)
+        is_original = format_id == _ORIGINAL_KEY
+        self._detail_button.setVisible(is_original)
+        self.add_button.setVisible(not is_original)
+        if format_id == _MP3_KEY:
             self._mp3_frame.setVisible(self._settings.audio_format == "mp3")
-            self.resize(_WIN_W, _WIN_H_DEFAULT)
         else:
-            self._original_panel.setVisible(False)
             self._mp3_frame.setVisible(False)
-            self.resize(_WIN_W, _WIN_H_DEFAULT)
 
     # ── queue operations ──────────────────────────────────────────────────────
 
@@ -618,41 +588,93 @@ class App(QMainWindow):
         format_label = self.format_combo.currentText()
         cookies_path, cookies_browser = self._resolve_cookies()
 
+        # オリジナル形式の追加は「詳細設定...」ダイアログ側で行う
+        # （その場合この「追加」ボタンは非表示）。
         if format_id == _ORIGINAL_KEY:
-            audio_only = self._original_panel.get_audio_only()
-            if audio_only and self._original_panel.is_audio_skipped():
-                QMessageBox.warning(self, t("warn_title"), t("warn_skip_audio_only"))
-                return
-            if not audio_only and self._original_panel.is_both_skipped():
-                QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
-                return
-            panel = self._original_panel.get_snapshot()
-            job = build_job_spec(format_id, self._settings, panel=panel)
-            self._notify_container_promotion_if_needed(job)
-            self._notify_audio_only_truncated_if_needed(
-                panel.has_multiple_audio, audio_only
-            )
-            if audio_only:
-                format_label = f"{format_label} → {self._build_audio_label()}"
-            if self._original_panel.has_formats_loaded():
-                self.queue.enqueue_single(
-                    url,
-                    self._original_panel.get_fetched_title(),
-                    format_label,
-                    job,
-                )
-                self.url_entry.clear()
-                self._original_panel.reset()
-                return
-            self._start_add_thread(
-                url, cookies_path, cookies_browser, job, format_label
-            )
+            self._open_original_dialog()
+            return
+
+        mp3_thumb = bool(self._mp3_thumb_check.isChecked())
+        job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
+        self._start_add_thread(url, cookies_path, cookies_browser, job, format_label)
+
+    # ── original format dialog ─────────────────────────────────────────────────
+
+    def _open_original_dialog(self) -> OriginalFormatDialog | None:
+        """オリジナル形式の詳細設定ダイアログを開く。
+
+        追加モードでは URL 必須。編集モードでは対象アイテムの `orig_settings` を
+        渡して編集モードのダイアログを生成する。テスト容易性のため、生成した
+        ダイアログ（開けない場合は None）を返す。"""
+        edit_mode = self.queue.edit_mode
+        if not edit_mode and not self.url_entry.text().strip():
+            QMessageBox.warning(self, t("warn_title"), t("warn_no_url"))
+            return None
+
+        restore_settings = None
+        if edit_mode:
+            items = self.queue.editing_items
+            if len(items) == 1 and items[0].format_id == _ORIGINAL_KEY:
+                restore_settings = items[0].job.orig_settings
+
+        dialog = self._make_original_dialog(
+            "edit" if edit_mode else "add", restore_settings
+        )
+        dialog.exec()
+        return dialog
+
+    def _make_original_dialog(
+        self, mode: str, restore_settings: dict | None
+    ) -> OriginalFormatDialog:
+        dialog = OriginalFormatDialog(
+            self,
+            downloader=self.downloader,
+            get_url=lambda: self.url_entry.text().strip(),
+            get_cookies=self._resolve_cookies,
+            update_status=lambda text, pct: self._signals.status_update.emit(text, pct),
+            video_container=self._settings.video_container,
+            audio_label=self._build_audio_label(),
+            mode=mode,
+            restore_settings=restore_settings,
+        )
+        dialog.add_requested.connect(lambda: self._on_dialog_add_requested(dialog))
+        dialog.edit_applied.connect(lambda: self._on_dialog_edit_applied(dialog))
+        dialog.edit_cancelled.connect(self._cancel_edit)
+        return dialog
+
+    def _build_original_job(self, dialog: OriginalFormatDialog) -> tuple[JobSpec, str]:
+        """ダイアログ内包パネルから `JobSpec` と表示用ラベルを組み立て、
+        昇格/トランケートのステータス通知を発火する。検証はダイアログ側で
+        実施済みの前提。"""
+        panel = dialog.panel
+        format_label = self.format_combo.currentText()
+        audio_only = panel.get_audio_only()
+        snapshot = panel.get_snapshot()
+        job = build_job_spec(_ORIGINAL_KEY, self._settings, panel=snapshot)
+        self._notify_container_promotion_if_needed(job)
+        self._notify_audio_only_truncated_if_needed(
+            snapshot.has_multiple_audio, audio_only
+        )
+        if audio_only:
+            format_label = f"{format_label} → {self._build_audio_label()}"
+        return job, format_label
+
+    def _on_dialog_add_requested(self, dialog: OriginalFormatDialog) -> None:
+        panel = dialog.panel
+        url = self.url_entry.text().strip()
+        cookies_path, cookies_browser = self._resolve_cookies()
+        job, format_label = self._build_original_job(dialog)
+        if panel.has_formats_loaded():
+            self.queue.enqueue_single(url, panel.get_fetched_title(), format_label, job)
+            self.url_entry.clear()
         else:
-            mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-            job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
             self._start_add_thread(
                 url, cookies_path, cookies_browser, job, format_label
             )
+
+    def _on_dialog_edit_applied(self, dialog: OriginalFormatDialog) -> None:
+        job, format_label = self._build_original_job(dialog)
+        self.queue.apply_edit(format_label, job)
 
     def _start_add_thread(
         self,
@@ -709,8 +731,6 @@ class App(QMainWindow):
                 thumbnail_url=result.get("thumbnail_url"),
             )
             self.url_entry.clear()
-            if format_id == _ORIGINAL_KEY:
-                self._original_panel.reset()
             self._signals.status_update.emit(t("status_title_added"), 0)
         else:
             if format_id == _ORIGINAL_KEY:
@@ -770,12 +790,9 @@ class App(QMainWindow):
         if target_format_id == _MP3_KEY:
             self._mp3_thumb_check.setChecked(first.job.embed_thumbnail)
 
-        if (
-            target_format_id == _ORIGINAL_KEY
-            and len(items) == 1
-            and first.job.orig_settings
-        ):
-            self._original_panel.restore_from_settings(first.job.orig_settings)
+        # オリジナル形式の設定復元・フォーマット取得は「詳細設定...」で開く
+        # ダイアログ側で行う（編集モードのダイアログが orig_settings を受け取り
+        # restore_from_settings + trigger_fetch を実行する）。
 
         self.add_button.setText(t("btn_apply_edit"))
         self._cancel_edit_button.setVisible(True)
@@ -784,9 +801,6 @@ class App(QMainWindow):
             self.start_queue_button.setEnabled(False)
 
         self._update_status(t("status_edit_mode"), 0)
-
-        if len(items) == 1 and first.format_id == _ORIGINAL_KEY:
-            self._original_panel.trigger_fetch()
 
     def _apply_edit(self):
         idx = self.format_combo.currentIndex()
@@ -799,31 +813,14 @@ class App(QMainWindow):
             QMessageBox.warning(self, t("warn_title"), t("warn_edit_original_multi"))
             return
 
+        # オリジナル形式の変更適用は「詳細設定...」ダイアログ側で行う
+        # （その場合この「変更」ボタンは非表示）。
         if format_id == _ORIGINAL_KEY:
-            if not self._original_panel.has_formats_loaded():
-                QMessageBox.warning(
-                    self, t("warn_title"), t("warn_edit_formats_not_loaded")
-                )
-                return
-            audio_only = self._original_panel.get_audio_only()
-            if audio_only and self._original_panel.is_audio_skipped():
-                QMessageBox.warning(self, t("warn_title"), t("warn_skip_audio_only"))
-                return
-            if not audio_only and self._original_panel.is_both_skipped():
-                QMessageBox.warning(self, t("warn_title"), t("warn_skip_both"))
-                return
-            panel = self._original_panel.get_snapshot()
-            job = build_job_spec(format_id, self._settings, panel=panel)
-            self._notify_container_promotion_if_needed(job)
-            self._notify_audio_only_truncated_if_needed(
-                panel.has_multiple_audio, audio_only
-            )
-            if audio_only:
-                format_label = f"{format_label} → {self._build_audio_label()}"
-        else:
-            mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-            job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
+            self._open_original_dialog()
+            return
 
+        mp3_thumb = bool(self._mp3_thumb_check.isChecked())
+        job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
         self.queue.apply_edit(format_label, job)
 
     def _cancel_edit(self):
@@ -841,8 +838,6 @@ class App(QMainWindow):
 
         if not self.queue.is_running:
             self.start_queue_button.setEnabled(True)
-
-        self._original_panel.reset()
 
         self._on_format_changed(self.format_combo.currentIndex())
         self._update_status(t("status_ready"), 0)

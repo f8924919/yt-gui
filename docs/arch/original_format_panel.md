@@ -4,13 +4,13 @@
 
 ## クラス: `OriginalFormatPanel(QGroupBox)`
 
-「オリジナルの形式」選択時に表示される詳細設定パネル。
+「オリジナルの形式」選択時に [`OriginalFormatDialog`](original_format_dialog.md) 内へ表示される詳細設定パネル。ダイアログにコンポジションで内包される（メインウィンドウへの直接埋め込みは廃止）。
 
 ## シグナル（内部クラス `_PanelSignals(QObject)`）
 
 | シグナル | 引数 | タイミング |
 |----------|------|-----------|
-| `size_hint_changed` | — | 内部レイアウトの sizeHint が変わったとき（親スプリッタへ再計算を促す） |
+| `size_hint_changed` | — | 内部レイアウトの sizeHint が変わったとき（ニコニコ動画コメントグループの出現等）。**内包する `OriginalFormatDialog` が受けて `adjustSize()` でダイアログを再フィットさせる**（旧: 親 `QSplitter` の高さ再計算。インライン埋め込み廃止に伴い消費先が変わった） |
 
 フォーマット取得は [`threading_utils.run_in_thread`](threading_utils.md) に委譲し、`_on_fetch_done` / `_on_fetch_failed` / `_on_fetch_finished` をメインスレッドのコールバックとして受ける。`on_failed` 内でエラー文字列を解析して `is_playlist` を判定する。
 

@@ -14,7 +14,7 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 | サムネイル画像の非同期取得・キャッシュ | [`ThumbnailCache`](thumbnail_cache.md) |
 | `format_id` 派生ロジック | [`build_job_spec`](job_spec.md) |
 | yt-dlp 呼び出し | [`Downloader`](downloader.md) |
-| オリジナル形式パネル | [`OriginalFormatPanel`](original_format_panel.md) |
+| オリジナル形式の詳細設定（別画面） | [`OriginalFormatDialog`](original_format_dialog.md)（[`OriginalFormatPanel`](original_format_panel.md) を内包） |
 
 ## スレッド間通信パターン
 
@@ -63,9 +63,18 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 - **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」の対象判定は純粋ヘルパ `_edit_targets(items)` に集約し、メニュー項目の活性判定 (`setEnabled`) と `edit_format_requested.emit(targets)` の発火判定で共用する（`contextMenuEvent` はモーダル `QMenu.exec` を含みヘッドレス検証しにくいため、ロジックをヘルパへ分離してテスト可能にしている）。`_edit_targets` は編集モード中 (`is_editing()`) または `waiting` が無い場合に空リストを返す。
 - **アイテム色リセット**: `setData(col, Qt.ItemDataRole.ForegroundRole, None)` を使用（`setForeground(col, QColor())` は黒固定になりダークモード非対応）。
 
+## オリジナル形式ダイアログの配線
+
+オリジナル形式の詳細設定は別画面（[`OriginalFormatDialog`](original_format_dialog.md)）に分離されている。`App` はダイアログを**開くたびに生成・破棄**し、生存参照を保持しない。
+
+- 形式コンボで「オリジナルの形式」選択時、`_on_format_changed` は埋め込みパネルではなく **「詳細設定...」ボタン**を表示する（高さ変更・`resize` は行わない）。
+- 「詳細設定...」クリックでダイアログを生成（URL 空なら `warn_no_url` で開かない）。ダイアログの `add_requested` / `edit_applied` / `edit_cancelled` シグナルをハンドラに配線する。
+- `add_requested` ハンドラはダイアログの内包パネル（`dialog.panel`）から `get_snapshot()` 等を読み、検証通過後に下記「キュー追加経路」を実行する。検証 NG はダイアログ側で警告して開いたままにする。
+
 ## キュー追加経路
 
-- `_add_url()` で `build_job_spec()` を呼び出して `JobSpec` を組み立て、URL 取得スレッドへ渡す。`fmt_original` のときは `_original_panel.get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。
+- `add_requested` ハンドラで `build_job_spec()` を呼び出して `JobSpec` を組み立てる。`fmt_original` のときはダイアログ内包パネルの `get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。オリジナル形式以外はメインの「追加」ボタン（`_add_url`）から従来どおり組み立てる。
+- 取得済み（`has_formats_loaded()`）なら `enqueue_single(...)` に即委譲。未取得なら URL 取得スレッドへ渡す（単独動画のみ。オリジナル形式はプレイリスト非対応で、`_on_fetch_for_add_done` がプレイリスト判明時に `warn_playlist_original_fmt` で中止する）。
 - `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str}`。単発は `self.queue.enqueue_single(...)`、プレイリストは `self.queue.enqueue_playlist(...)` に委譲。
 - `_on_queue_item_added(item)` スロット: `QueueController.item_added` シグナルを受けて `self._thumbnail_cache.request(item.thumbnail_url)` を起動する。
 - `_notify_container_promotion_if_needed(job)`: 複数音声で MKV 昇格が起きた場合のステータス通知。`build_job_spec` は UI 通知を行わないため UI 側で発火する。
@@ -80,7 +89,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 | `_cancel_edit()` | `QueueController.cancel_edit()` を呼ぶだけ |
 | `_on_edit_mode_exited()` | `edit_mode_exited` シグナルのスロット。UI を通常モードに戻す |
 
-単一 ORIGINAL_KEY アイテムを編集モードに入れた場合は `_original_panel.restore_from_settings(item.job.orig_settings)` で前回の設定を復元する。
+単一 ORIGINAL_KEY アイテムを編集モードに入れた場合は、対象アイテムの `orig_settings` を渡して [`OriginalFormatDialog`](original_format_dialog.md) を**編集モードで生成**する。設定復元（`restore_from_settings`）とフォーマット取得（`trigger_fetch`）はダイアログ側で行う。`edit_applied` で `QueueController.apply_edit(...)`、`edit_cancelled` で `cancel_edit()` に委譲する。`キャンセル` ボタンはメインウィンドウ側に残る。
 
 ## 主要メソッド
 
@@ -94,7 +103,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 ### `_on_format_changed()`
 
-`OriginalFormatPanel` / `_mp3_frame`（MP3 時のみ表示）を `setVisible()` で切り替え、ウィンドウ高さを `resize()` で調整（オリジナル形式選択時は `_WIN_H_EXPANDED`）。
+「詳細設定...」ボタン（オリジナル形式時）/ `_mp3_frame`（MP3 時のみ表示）/ メインの「追加」ボタン（オリジナル形式時は非表示）を `setVisible()` で切り替える。**ウィンドウ高さの `resize()` 調整は行わない**（詳細設定が別画面に分離されたため、メイン高さは固定。旧 `_WIN_H_EXPANDED` / `_resync_splitter_to_top_hint` / パネルの `on_size_hint_changed` 配線は撤去）。
 
 ### `_retranslate_ui()` / `_refresh_format_labels()`
 

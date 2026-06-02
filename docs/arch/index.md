@@ -21,6 +21,7 @@
 | [thumbnail_cache.md](thumbnail_cache.md) | `thumbnail_cache.py` — 動画サムネイル画像の非同期取得・キャッシュ | — |
 | [threading_utils.md](threading_utils.md) | `threading_utils.py` — バックグラウンドスレッド + Qt シグナル転送の共通ヘルパ | — |
 | [downloader.md](downloader.md) | `downloader.py` — yt-dlp ラッパー・ダウンロード実行 | [ダウンロード動作](../spec/features/download-behavior.md) / [ダウンロード形式](../spec/features/download-formats.md) |
+| [original_format_dialog.md](original_format_dialog.md) | `original_format_dialog.py` — オリジナル形式パネルを内包するモーダルダイアログ | [オリジナル形式ダイアログ](../spec/screens/original-format-dialog.md) |
 | [original_format_panel.md](original_format_panel.md) | `original_format_panel.py` — オリジナル形式パネル | [オリジナル形式パネル](../spec/screens/original-format-panel.md) |
 | [settings_dialog.md](settings_dialog.md) | `settings_dialog.py` — 設定ダイアログ | [設定ダイアログ](../spec/screens/settings-dialog.md) |
 | [log_dialog.md](log_dialog.md) | `log_dialog.py` — ログ表示ダイアログ | [ログダイアログ](../spec/screens/log-dialog.md) |

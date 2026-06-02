@@ -148,6 +148,8 @@ STRINGS: dict[str, str] = {
     "template_preview_invalid": "（プレビュー生成不可）",
     # download queue
     "btn_add": "追加",
+    "btn_open_detail": "詳細設定...",
+    "btn_add_to_queue": "キューに追加",
     "btn_adding": "取得中...",
     "queue_title": "ダウンロードキュー",
     "btn_start_queue": "ダウンロード開始",

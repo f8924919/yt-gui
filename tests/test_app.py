@@ -94,3 +94,47 @@ def test_refresh_format_labels_follows_language(app):
 
     assert en_texts == app._build_format_display()
     assert en_texts != ja_texts
+
+
+def _select_format(app, key: str) -> None:
+    from yt_gui.formats import FORMAT_KEYS
+
+    app.format_combo.setCurrentIndex(FORMAT_KEYS.index(key))
+
+
+def test_original_format_shows_detail_button_hides_add(app):
+    """オリジナル形式選択時は「詳細設定...」を表示し「追加」を隠す。"""
+    _select_format(app, "fmt_original")
+    assert not app._detail_button.isHidden()
+    assert app.add_button.isHidden()
+
+
+def test_non_original_format_shows_add_button_hides_detail(app):
+    _select_format(app, "fmt_original")
+    _select_format(app, "fmt_best_mp4")
+    assert not app.add_button.isHidden()
+    assert app._detail_button.isHidden()
+
+
+def test_window_height_fixed_across_format_change(app):
+    """詳細設定を別画面に分離したため、形式変更で高さは変わらない。"""
+    _select_format(app, "fmt_best_mp4")
+    h_default = app.height()
+    _select_format(app, "fmt_original")
+    assert app.height() == h_default
+
+
+def test_open_original_dialog_warns_on_empty_url(app, monkeypatch):
+    """URL 未入力で詳細設定を開こうとすると警告し、ダイアログを生成しない。"""
+    warned = []
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **kw: warned.append(a) or QMessageBox.StandardButton.Ok
+    )
+    app.url_entry.clear()
+
+    dialog = app._open_original_dialog()
+
+    assert dialog is None
+    assert warned
