@@ -187,6 +187,7 @@ STRINGS: dict[str, str] = {
     "btn_close": "Close",
     "log_queue_started": "▶ Queue started",
     "log_queue_paused": "⏸ Paused",
+    "log_download_cancelled": "⏹ Cancelled (returned to queue): {title}",
     "log_queue_done": "✅ Queue complete",
     # queue tooltip
     "tooltip_title": "Title",

@@ -80,3 +80,48 @@ def test_cancel_edit_restores_waiting_without_changing_job(controller, qtbot):
     assert controller.edit_mode is False
     assert a.status == "waiting"
     assert a.job is original_job
+
+
+# ── 進行中ダウンロードの中断 ──────────────────────────────────────────────
+
+
+def test_pause_requests_downloader_cancel(controller):
+    controller.pause()
+    assert controller._paused is True
+    controller._downloader.request_cancel.assert_called_once()
+
+
+def test_worker_returns_cancelled_item_to_waiting(controller, qtbot):
+    from yt_dlp.utils import DownloadCancelled
+
+    item = _enqueue(controller, "中断対象")
+
+    def _cancel(*a, **k):
+        # pause() が _paused を立て request_cancel した結果を模す
+        controller._paused = True
+        raise DownloadCancelled()
+
+    controller._downloader.download_video.side_effect = _cancel
+
+    assert controller.start(lambda: (None, None)) is True
+    qtbot.waitUntil(
+        lambda: item.status == "waiting" and not controller.is_running, timeout=2000
+    )
+    # 中断は error 化せず waiting に戻す
+    assert item.status == "waiting"
+
+
+def test_worker_real_error_still_marks_error(controller, qtbot):
+    item = _enqueue(controller, "失敗対象")
+
+    def _boom(*a, **k):
+        controller._paused = True  # 1 回で確実にループを抜ける
+        raise RuntimeError("boom")
+
+    controller._downloader.download_video.side_effect = _boom
+
+    assert controller.start(lambda: (None, None)) is True
+    qtbot.waitUntil(
+        lambda: item.status == "error" and not controller.is_running, timeout=2000
+    )
+    assert item.status == "error"

@@ -431,3 +431,112 @@ def test_sponsorblock_mark_adds_metadata_pp_when_absent(tmp_path) -> None:
     assert meta["add_metadata"] is False
     keys = _pp_keys(opts)
     assert keys.index("ModifyChapters") < keys.index("FFmpegMetadata")
+
+
+# ── ダウンロードの中断（DownloadCancelled） ──────────────────────────────
+
+
+def test_progress_hook_raises_download_cancelled_when_requested(downloader) -> None:
+    from yt_dlp.utils import DownloadCancelled
+
+    downloader.status_callback = lambda *a, **k: None
+    downloader.request_cancel()
+    with pytest.raises(DownloadCancelled):
+        downloader._progress_hook({"status": "downloading", "downloaded_bytes": 1})
+
+
+def test_progress_hook_normal_when_not_requested(downloader) -> None:
+    calls = []
+    downloader.status_callback = lambda *a, **k: calls.append(a)
+    # 中断要求なし → 例外を投げず通常の進捗通知
+    downloader._progress_hook(
+        {"status": "downloading", "downloaded_bytes": 5, "total_bytes": 10}
+    )
+    assert calls  # status_callback が呼ばれている
+
+
+def test_cleanup_partial_files_removes_only_temp_files(downloader, tmp_path) -> None:
+    stem = str(tmp_path / "動画")
+    temp = [
+        tmp_path / "動画.mp4.part",
+        tmp_path / "動画.f137.mp4",
+        tmp_path / "動画.f140.m4a.part",
+        tmp_path / "動画.ytdl",
+        tmp_path / "動画.mp4.part-Frag0",
+    ]
+    keep = [
+        tmp_path / "動画.mp4",  # 完成済み最終ファイル
+        tmp_path / "動画.info.json",  # サイドカー
+        tmp_path / "別の動画.mp4.part",  # 別アイテム
+    ]
+    for p in temp + keep:
+        p.write_text("x")
+
+    downloader._cleanup_partial_files(stem)
+
+    for p in temp:
+        assert not p.exists(), f"{p.name} は削除されるべき"
+    for p in keep:
+        assert p.exists(), f"{p.name} は残すべき"
+
+
+def test_cleanup_partial_files_removes_subtitle_sidecars(downloader, tmp_path) -> None:
+    stem = str(tmp_path / "動画")
+    subs = [
+        tmp_path / "動画.en.srt",
+        tmp_path / "動画.ja.vtt",
+        tmp_path / "動画.en.ass",
+        tmp_path / "動画.en.json3",
+        tmp_path / "動画.live_chat.json",  # YouTube ライブチャット
+        tmp_path / "動画.comments.json",  # ニコニコ動画コメント
+    ]
+    keep = [
+        tmp_path / "動画.mp4",  # 完成済み最終ファイル
+        tmp_path / "動画.info.json",  # メタデータ（字幕ではない）
+        tmp_path / "動画.jpg",  # サムネイル
+    ]
+    for p in subs + keep:
+        p.write_text("x")
+
+    downloader._cleanup_partial_files(stem)
+
+    for p in subs:
+        assert not p.exists(), f"{p.name} は削除されるべき"
+    for p in keep:
+        assert p.exists(), f"{p.name} は残すべき"
+
+
+def test_download_video_cleans_up_and_reraises_on_cancel(downloader, tmp_path) -> None:
+    from yt_dlp.utils import DownloadCancelled
+
+    downloader.status_callback = lambda *a, **k: None
+    stem = str(tmp_path / "動画")
+    part = tmp_path / "動画.mp4.part"
+    part.write_text("x")
+
+    downloader._resolve_unique_path = lambda *a, **k: (stem, ".mp4")
+
+    def _raise(*a, **k):
+        raise DownloadCancelled()
+
+    downloader._run_download = _raise
+
+    job = _job()
+    with pytest.raises(DownloadCancelled):
+        downloader.download_video("https://example.com/v", job)
+    assert not part.exists()
+
+
+def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> None:
+    downloader.status_callback = lambda *a, **k: None
+    downloader.request_cancel()  # 前回の中断要求が残っている状態を模す
+
+    seen = {}
+    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+
+    def _run(*a, **k):
+        seen["cancel_set"] = downloader._cancel_requested.is_set()
+
+    downloader._run_download = _run
+    downloader.download_video("https://example.com/v", _job())
+    assert seen["cancel_set"] is False  # ジョブ開始時にクリアされている

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from yt_dlp.utils import DownloadCancelled
 
 from .downloader import Downloader
 from .i18n import t
@@ -256,6 +257,9 @@ class QueueController(QObject):
 
     def pause(self) -> None:
         self._paused = True
+        # 進行中ダウンロードを即座に中断する（DownloadCancelled 経由）。
+        # 中断されたアイテムは _worker 側で waiting に戻る。
+        self._downloader.request_cancel()
         self.log_message.emit(t("log_queue_paused"))
 
     def _worker(self, cookies_resolver: CookiesResolver) -> None:
@@ -304,6 +308,13 @@ class QueueController(QObject):
                 )
                 with self._lock:
                     item.status = "done"
+            except DownloadCancelled:
+                # 一時停止による中断。error 化せず waiting に戻して再開可能にする。
+                with self._lock:
+                    item.status = "waiting"
+                self.log_message.emit(
+                    t("log_download_cancelled").format(title=item.title)
+                )
             except Exception as e:
                 with self._lock:
                     item.status = "error"
