@@ -70,6 +70,7 @@
 - `_WIN_H_EXPANDED`(700) と `_on_format_changed` 内の resize 分岐 → メイン高さ固定。
 - `_resync_splitter_to_top_hint`（app.py:567-586）と `_PanelSignals.size_hint_changed` / `on_size_hint_changed` → 高さ同期機構を丸ごと撤去。ニコグループの `updateGeometry()` ハックも不要。
 - `App` 側のパネル永続参照・retranslate 再配線。`App` が保持するのは「ダイアログを開くファクトリ」と `add_requested` / `edit_applied` / `edit_cancelled` の受け口のみ。
+- **メインの `QSplitter`（上段/キューの高さ比調整）**: 上段がパネル分離で固定高になったため存在意義を失い撤去。`QVBoxLayout` でキュー領域に伸縮 stretch を与える単純構成に置換。`size_hint_changed` の消費先はダイアログの `adjustSize()`。
 
 ## docs 更新対象
 

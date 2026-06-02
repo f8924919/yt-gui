@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QSplitter,
     QStatusBar,
     QToolTip,
     QTreeWidget,
@@ -419,13 +418,9 @@ class App(QMainWindow):
         self.setCentralWidget(central)
         central_layout = QVBoxLayout(central)
         central_layout.setContentsMargins(10, 10, 10, 10)
-        central_layout.setSpacing(0)
+        central_layout.setSpacing(8)
 
-        self._splitter = QSplitter(Qt.Orientation.Vertical, central)
-        self._splitter.setChildrenCollapsible(False)
-        self._splitter.setHandleWidth(6)
-
-        # Top container: URL / Format / Original panel / Add button
+        # Top container: URL / Format / detail or add button
         top_widget = QWidget()
         layout = QGridLayout(top_widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -483,7 +478,9 @@ class App(QMainWindow):
         add_layout.addStretch()
         layout.addWidget(add_frame, 3, 0, 1, 3)
 
-        self._splitter.addWidget(top_widget)
+        # 上段は sizeHint 固定。詳細設定が別画面化したため上段は伸縮せず、
+        # 旧 QSplitter（上段/キューの比率調整）は不要になった。
+        central_layout.addWidget(top_widget)
 
         # Bottom: Queue (expands)
         queue_box = QFrame()
@@ -537,11 +534,8 @@ class App(QMainWindow):
         qbfl.addStretch()
         qbl.addWidget(queue_btn_frame)
 
-        self._splitter.addWidget(queue_box)
-        # Top stays at sizeHint, queue stretches to fill extra space
-        self._splitter.setStretchFactor(0, 0)
-        self._splitter.setStretchFactor(1, 1)
-        central_layout.addWidget(self._splitter)
+        # キュー領域が余った縦スペースを埋める（上段は sizeHint 固定）。
+        central_layout.addWidget(queue_box, 1)
 
         # Status bar
         status_bar = QStatusBar()

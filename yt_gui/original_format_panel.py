@@ -736,7 +736,7 @@ class OriginalFormatPanel(QGroupBox):
 
     def on_size_hint_changed(self, callback: Callable[[], None]) -> None:
         """パネル内部のレイアウトが変わって sizeHint が変化したときに呼ばれる
-        コールバックを登録する（例: 上位の QSplitter のサイズ再計算用）。"""
+        コールバックを登録する（例: 内包する OriginalFormatDialog の再フィット用）。"""
         self._signals.size_hint_changed.connect(callback)
 
     def get_nico_comments_opts(self) -> dict:
@@ -1177,7 +1177,7 @@ class OriginalFormatPanel(QGroupBox):
         self._embed_check.setEnabled(False)
 
         # `comments` lang (ニコニコ動画) が含まれるときだけグループを可視化
-        # 可視化前後でパネルの sizeHint が変わるので親 (スプリッタ) に通知する
+        # 可視化前後でパネルの sizeHint が変わるので親 (ダイアログ) に通知する
         self._nico_group.setVisible(self._has_nico_comments_lang())
         self.updateGeometry()
         self._signals.size_hint_changed.emit()
