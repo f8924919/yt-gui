@@ -179,6 +179,24 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 設定変更は `App._open_settings()` から `self.downloader.sponsorblock_mode` / `.sponsorblock_categories` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
 
+### ダウンロードの中断
+
+進行中ダウンロードの中断は yt-dlp の `progress_hooks` 経由でのみ差し込める（唯一の協調ポイント）。
+
+- `request_cancel()` が `threading.Event`（`_cancel_requested`）をセットする。
+- `_progress_hook` の先頭で `_cancel_requested.is_set()` を判定し、立っていれば `yt_dlp.utils.DownloadCancelled` を raise してその場のダウンロードを中断する。
+- `download_video` はジョブ開始時に `_cancel_requested.clear()` で前回の中断要求をリセットするため、中断後の再ダウンロードに影響しない。
+- `download_video` は `_run_download` を `except DownloadCancelled` で囲み、中断時に `_cleanup_partial_files(effective_stem)` で部分ファイルを掃除してから例外を再送出する。呼び出し側（`queue_controller._worker`）が `DownloadCancelled` を捕捉してアイテムを `waiting` に戻す。
+- 中断はベストエフォート: `progress_hook` が呼ばれない区間（メタデータ抽出・ポストプロセス）では当該フェーズ完了後に効く。
+
+#### 部分ファイルの削除: `_cleanup_partial_files`
+
+`effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + "*")` を走査し、一時ファイルだけを削除する。
+
+- 対象: `.part` / `.ytdl` で終わるファイル、`.part-Frag*` を含むファイル、`.fNNN.` 形式の中間フォーマットファイル。
+- 完成済みの最終ファイル・サイドカー（`.info.json` / サムネイル画像等）は対象外（残す）。
+- 削除失敗（`OSError`）は非致命でログのみ。
+
 ### ロガー: `_YtdlpLogger`
 
 yt-dlp の `logger` インタフェース実装。`[debug] ` プレフィックスのメッセージとダウンロード進捗行（`[download]  \d`）をスキップし、意味のあるログのみ `log_callback` へ渡す。

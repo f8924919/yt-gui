@@ -187,6 +187,7 @@ STRINGS: dict[str, str] = {
     "btn_close": "閉じる",
     "log_queue_started": "▶ キュー開始",
     "log_queue_paused": "⏸ 一時停止",
+    "log_download_cancelled": "⏹ 中断しました（待機に戻しました）: {title}",
     "log_queue_done": "✅ キュー完了",
     # queue tooltip
     "tooltip_title": "タイトル",

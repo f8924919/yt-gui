@@ -40,7 +40,7 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 | メソッド | 説明 |
 |---|---|
 | `start(cookies_resolver) -> bool` | ワーカースレッド起動。`cookies_resolver: () -> (cookies_path, cookies_browser)` を毎イテレーション呼ぶことで生きた設定変更を反映する。起動できないとき (待機項目無し / 実行中) は `False` |
-| `pause() -> None` | `_paused=True` をセット。次のイテレーション境界でワーカーが停止 |
+| `pause() -> None` | `_paused=True` をセットし、`downloader.request_cancel()` で進行中ダウンロードに中断を要求する。進行中アイテムは `DownloadCancelled` で中断され `waiting` に戻り、次のイテレーション境界でワーカーが停止する |
 | `is_running` (property) | ワーカースレッドが走行中か |
 
 ### 編集モード
@@ -78,10 +78,12 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 ```
 waiting → downloading → done
-            ↓
-          error
+            ↓   ↓
+        error   waiting (一時停止による中断)
 waiting → editing → waiting (apply or cancel)
 ```
+
+`_worker` の download 呼び出しは `DownloadCancelled`（一時停止による中断）を `except Exception`（→`error`）より**前**で個別捕捉し、アイテムを `waiting` に戻す。`error` 扱いにはしない。中断後はループ先頭の `_paused` 判定でワーカーが停止する。
 
 `downloading` / `editing` 中のアイテムは `remove_selected()` の対象外。
 

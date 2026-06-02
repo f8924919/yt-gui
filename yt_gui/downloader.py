@@ -1,10 +1,13 @@
+import glob
 import os
 import re
 import subprocess
 import sys
+import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
+from yt_dlp.utils import DownloadCancelled
 
 from . import get_resource_base
 from .i18n import t
@@ -97,6 +100,9 @@ class Downloader:
         self.rate_limit = rate_limit
         self.sponsorblock_mode = sponsorblock_mode
         self.sponsorblock_categories = sponsorblock_categories or []
+        # 進行中ダウンロードの中断要求。`_progress_hook` が立っていれば
+        # DownloadCancelled を投げる。`download_video` 開始時にクリアする。
+        self._cancel_requested = threading.Event()
 
         _ext = ".exe" if sys.platform == "win32" else ""
         base = get_resource_base()
@@ -124,7 +130,18 @@ class Downloader:
             missing.append("deno")
         return missing
 
+    def request_cancel(self) -> None:
+        """進行中ダウンロードに中断を要求する（別スレッドから呼ぶ）。
+
+        次に `_progress_hook` が呼ばれた時点で `DownloadCancelled` が投げられる。
+        ベストエフォート: progress_hook が呼ばれない区間
+        （メタデータ抽出・ポストプロセス）では当該フェーズ完了後に効く。
+        """
+        self._cancel_requested.set()
+
     def _progress_hook(self, d):
+        if self._cancel_requested.is_set():
+            raise DownloadCancelled()
         if self.status_callback is None:
             return
 
@@ -375,6 +392,9 @@ class Downloader:
         out_dir = output_dir_override or self.output_dir
         os.makedirs(out_dir, exist_ok=True)
 
+        # 前回ジョブの中断要求が残っていてもこのジョブには影響させない。
+        self._cancel_requested.clear()
+
         is_playlist = playlist_title is not None
         extra_info: dict | None = None
         if is_playlist:
@@ -401,7 +421,12 @@ class Downloader:
             ydl_opts, url, job, extra_info=extra_info
         )
 
-        self._run_download(ydl_opts, url, job, extra_info=extra_info)
+        try:
+            self._run_download(ydl_opts, url, job, extra_info=extra_info)
+        except DownloadCancelled:
+            # 中断時は部分ファイルを掃除してから呼び出し側へ再送出する。
+            self._cleanup_partial_files(effective_stem)
+            raise
 
         nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
@@ -666,6 +691,36 @@ class Downloader:
                 pp_list = ydl._pps["post_process"]
                 pp_list.insert(0, pp_list.pop())
             ydl.extract_info(url, download=True, extra_info=extra_info)
+
+    def _cleanup_partial_files(self, effective_stem: str) -> None:
+        """中断時に残る部分ファイルを削除する（非致命: 失敗はログのみ）。
+
+        `effective_stem` を基に出力ディレクトリ内の一時ファイルだけを掃除する。
+        完成済みの最終ファイルやサイドカー（`.info.json` / サムネイル等）は残す。
+        """
+        for path in glob.glob(glob.escape(effective_stem) + "*"):
+            if not self._is_partial_file(path):
+                continue
+            try:
+                os.remove(path)
+            except OSError as e:
+                if self.log_callback:
+                    self.log_callback(f"⚠️ {strip_ansi(str(e))}")
+
+    @staticmethod
+    def _is_partial_file(path: str) -> bool:
+        """ダウンロード途中の一時ファイルか判定する。
+
+        - `.part` / `.ytdl` で終わる
+        - `.part-Frag*`（フラグメント）を含む
+        - `.fNNN.`（マージ前の中間フォーマットファイル）形式
+        """
+        name = os.path.basename(path)
+        if name.endswith(".part") or name.endswith(".ytdl"):
+            return True
+        if ".part-Frag" in name:
+            return True
+        return bool(re.search(r"\.f\d+\.", name))
 
     def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
         """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
