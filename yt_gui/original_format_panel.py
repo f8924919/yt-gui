@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
 )
 
 from .downloader import Downloader
@@ -260,7 +262,8 @@ class _NicoCommentsGroup(QGroupBox):
         self._set_controls_enabled(False)
 
     def _build(self):
-        # コンパクト 2 行構成: チェック行 + パラメータ 1 行（縦圧迫を最小化）
+        # チェック行 + パラメータグリッド（2 列 × 2 行）。詳細設定が別画面化して
+        # 高さに余裕が出たため、横一列をやめて折り返し横幅を抑える。
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(4)
@@ -276,59 +279,64 @@ class _NicoCommentsGroup(QGroupBox):
         check_row.addStretch()
         layout.addLayout(check_row)
 
-        params_row = QHBoxLayout()
-        params_row.setSpacing(8)
-
         self._auto_res_check = QCheckBox(t("nico_auto_resolution"))
         self._auto_res_check.setChecked(True)
         self._auto_res_check.toggled.connect(self._on_auto_res_toggled)
-        params_row.addWidget(self._auto_res_check)
+        layout.addWidget(self._auto_res_check)
 
+        params = QGridLayout()
+        params.setHorizontalSpacing(8)
+        params.setVerticalSpacing(4)
+
+        # 行1: 解像度 (幅 × 高さ) | 表示時間
         self._resolution_label = QLabel(t("nico_resolution"))
-        params_row.addWidget(self._resolution_label)
+        params.addWidget(self._resolution_label, 0, 0)
+        res_widget = QWidget()
+        res_row = QHBoxLayout(res_widget)
+        res_row.setContentsMargins(0, 0, 0, 0)
+        res_row.setSpacing(4)
         self._width_spin = QSpinBox()
         self._width_spin.setRange(320, 7680)
         self._width_spin.setSingleStep(2)
         self._width_spin.setValue(_NICO_DEFAULT_WIDTH)
         self._width_spin.setSuffix(" px")
-        params_row.addWidget(self._width_spin)
-        params_row.addWidget(QLabel("×"))
+        res_row.addWidget(self._width_spin)
+        res_row.addWidget(QLabel("×"))
         self._height_spin = QSpinBox()
         self._height_spin.setRange(240, 4320)
         self._height_spin.setSingleStep(2)
         self._height_spin.setValue(_NICO_DEFAULT_HEIGHT)
         self._height_spin.setSuffix(" px")
-        params_row.addWidget(self._height_spin)
+        res_row.addWidget(self._height_spin)
+        params.addWidget(res_widget, 0, 1)
 
-        params_row.addSpacing(12)
         self._duration_label = QLabel(t("nico_duration"))
-        params_row.addWidget(self._duration_label)
+        params.addWidget(self._duration_label, 0, 2)
         self._duration_spin = QDoubleSpinBox()
         self._duration_spin.setRange(1.0, 60.0)
         self._duration_spin.setSingleStep(0.5)
         self._duration_spin.setValue(_NICO_DEFAULT_DURATION)
-        params_row.addWidget(self._duration_spin)
+        params.addWidget(self._duration_spin, 0, 3)
 
-        params_row.addSpacing(12)
+        # 行2: 不透明度 | フォントサイズ
         self._opacity_label = QLabel(t("nico_opacity"))
-        params_row.addWidget(self._opacity_label)
+        params.addWidget(self._opacity_label, 1, 0)
         self._opacity_spin = QDoubleSpinBox()
         self._opacity_spin.setRange(0.1, 1.0)
         self._opacity_spin.setSingleStep(0.1)
         self._opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
-        params_row.addWidget(self._opacity_spin)
+        params.addWidget(self._opacity_spin, 1, 1)
 
-        params_row.addSpacing(12)
         self._font_label = QLabel(t("nico_font_size"))
-        params_row.addWidget(self._font_label)
+        params.addWidget(self._font_label, 1, 2)
         self._font_spin = QSpinBox()
         self._font_spin.setRange(8, 128)
         self._font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
         self._font_spin.setSuffix(" px")
-        params_row.addWidget(self._font_spin)
+        params.addWidget(self._font_spin, 1, 3)
 
-        params_row.addStretch()
-        layout.addLayout(params_row)
+        params.setColumnStretch(4, 1)  # 余白を右に逃がして左寄せ
+        layout.addLayout(params)
 
         self.setLayout(layout)
 

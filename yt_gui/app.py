@@ -45,7 +45,10 @@ from .utils import strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
-_WIN_W = 940
+# オリジナル形式の詳細設定を別画面化し、メイン上段が幅を要求しなくなったため
+# 既定幅を狭めた（旧 940）。最小幅は手動で更に絞れるよう既定より小さくする。
+_WIN_W = 760
+_WIN_MIN_W = 560
 _WIN_H_DEFAULT = 480
 
 
@@ -186,7 +189,7 @@ class App(QMainWindow):
 
         self.setWindowTitle(self._window_title())
         self.resize(_WIN_W, _WIN_H_DEFAULT)
-        self.setMinimumSize(_WIN_W, 380)
+        self.setMinimumSize(_WIN_MIN_W, 380)
 
         icon_path = os.path.join(get_resource_base(), "assets", "icon.png")
         if os.path.isfile(icon_path):
