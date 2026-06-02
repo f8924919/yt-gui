@@ -85,4 +85,4 @@
 - [x] テスト先書き（`test_original_format_dialog.py` 11 ケース / `test_app.py` にボタン表示・高さ固定・URL ガード 4 ケース追加）
 - [x] 実装（`OriginalFormatDialog` 新設・`app.py` 改修・i18n キー `btn_open_detail` / `btn_add_to_queue` 追加）
 - [x] lint / format / mypy / pytest（132 passed）
-- [ ] PR 作成・レビュー・マージ
+- [x] PR 作成・レビュー・マージ（PR #62、2026-06-02 マージ）。追加調整: メイン QSplitter 撤去・既定幅 940→760・最小幅 560 分離・ニコ動コメント設定を 2 列折り返し

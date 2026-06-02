@@ -14,6 +14,7 @@
 | [proxy-settings.md](proxy-settings.md) | 設定ダイアログにプロキシタブを追加し、yt-dlp の `proxy` オプションを GUI から設定可能にする | 2026-05-22 |
 | [concurrent-fragments.md](concurrent-fragments.md) | 設定ダイアログに「ダウンロード」タブを新設し、並列フラグメント DL（`concurrent-fragments`）を指定可能にする（Issue #53 / PR #54） | 2026-05-31 |
 | [57-sponsorblock.md](57-sponsorblock.md) | 設定ダイアログに「SponsorBlock」タブを新設し、スポンサー区間の印付け（mark）/ 除去（remove）に対応（Issue #57 / PR #58） | 2026-06-01 |
+| [original-format-dialog.md](original-format-dialog.md) | オリジナル形式パネルをモーダルダイアログへ分離。メイン QSplitter 撤去・幅縮小・ニコ動コメント設定の折り返しも実施（Issue #61 / PR #62） | 2026-06-02 |
 
 ## バグ修正
 
