@@ -1,6 +1,6 @@
 # 速度制限（--limit-rate）対応
 
-対応 Issue: [#64](https://github.com/f8924919/yt-gui/issues/64)
+対応 Issue: [#64](https://github.com/f8924919/yt-gui/issues/64) / PR: [#65](https://github.com/f8924919/yt-gui/pull/65)
 
 ## 背景
 
