@@ -294,6 +294,32 @@ def test_concurrent_fragments_passed_when_gt_one(tmp_path) -> None:
     assert opts["concurrent_fragment_downloads"] == 4
 
 
+def test_rate_limit_default_omits_opt(downloader, tmp_path) -> None:
+    # 既定 (0 = 無制限) は yt-dlp 既定と同じなので opt を渡さない
+    opts = downloader._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "ratelimit" not in opts
+
+
+def test_rate_limit_passed_when_positive(tmp_path) -> None:
+    dl = Downloader(output_dir=str(tmp_path), rate_limit=1024 * 1024)
+    opts = dl._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert opts["ratelimit"] == 1024 * 1024
+
+
 def _build(dl: Downloader, job: JobSpec, tmp_path) -> dict:
     return dl._build_ydl_opts(
         job,

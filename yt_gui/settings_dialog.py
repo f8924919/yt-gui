@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
@@ -37,6 +38,8 @@ from .settings import (
     CONCURRENT_FRAGMENTS_MAX,
     CONCURRENT_FRAGMENTS_MIN,
     PROXY_SCHEMES,
+    RATE_LIMIT_UNITS,
+    RATE_LIMIT_VALUE_MAX,
     SPONSORBLOCK_CATEGORIES,
     SettingsManager,
 )
@@ -374,7 +377,35 @@ class SettingsDialog(QDialog):
         note.setStyleSheet("color: gray;")
         note.setWordWrap(True)
         layout.addWidget(note, 1, 0, 1, 2)
-        layout.setRowStretch(2, 1)
+
+        layout.addWidget(
+            QLabel(t("label_rate_limit")), 2, 0, Qt.AlignmentFlag.AlignRight
+        )
+        rate_row = QHBoxLayout()
+        self._rate_limit_spin = QDoubleSpinBox()
+        self._rate_limit_spin.setRange(0.0, RATE_LIMIT_VALUE_MAX)
+        self._rate_limit_spin.setDecimals(1)
+        self._rate_limit_spin.setValue(
+            min(max(self._settings.rate_limit_value, 0.0), RATE_LIMIT_VALUE_MAX)
+        )
+        rate_row.addWidget(self._rate_limit_spin)
+        self._rate_limit_unit_combo = QComboBox()
+        self._rate_limit_unit_combo.addItems(
+            [t(f"rate_limit_unit_{u.lower()}") for u in RATE_LIMIT_UNITS]
+        )
+        unit = self._settings.rate_limit_unit
+        unit_index = RATE_LIMIT_UNITS.index(unit) if unit in RATE_LIMIT_UNITS else 1
+        self._rate_limit_unit_combo.setCurrentIndex(unit_index)
+        rate_row.addWidget(self._rate_limit_unit_combo)
+        rate_row.addStretch()
+        layout.addLayout(rate_row, 2, 1, Qt.AlignmentFlag.AlignLeft)
+
+        rate_note = QLabel(t("rate_limit_note"))
+        rate_note.setStyleSheet("color: gray;")
+        rate_note.setWordWrap(True)
+        layout.addWidget(rate_note, 3, 0, 1, 2)
+
+        layout.setRowStretch(4, 1)
 
     def _build_sponsorblock_tab(self, parent: QWidget):
         layout = QVBoxLayout(parent)
@@ -598,6 +629,10 @@ class SettingsDialog(QDialog):
             self._settings.cookies_browser = ""
 
         self._settings.concurrent_fragments = self._concurrent_fragments_spin.value()
+        self._settings.rate_limit_value = self._rate_limit_spin.value()
+        self._settings.rate_limit_unit = RATE_LIMIT_UNITS[
+            self._rate_limit_unit_combo.currentIndex()
+        ]
 
         if self._sb_radio_mark.isChecked():
             self._settings.sponsorblock_mode = "mark"

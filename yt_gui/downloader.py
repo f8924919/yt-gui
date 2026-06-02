@@ -81,6 +81,7 @@ class Downloader:
         output_template_playlist: str = DEFAULT_PLAYLIST_TEMPLATE,
         proxy_url: str = "",
         concurrent_fragments: int = 1,
+        rate_limit: float = 0,
         sponsorblock_mode: str = "",
         sponsorblock_categories: list[str] | None = None,
     ):
@@ -93,6 +94,7 @@ class Downloader:
         self.output_template_playlist = output_template_playlist
         self.proxy_url = proxy_url
         self.concurrent_fragments = concurrent_fragments
+        self.rate_limit = rate_limit
         self.sponsorblock_mode = sponsorblock_mode
         self.sponsorblock_categories = sponsorblock_categories or []
 
@@ -446,6 +448,10 @@ class Downloader:
         # N=1 は yt-dlp 既定と同じなので、>1 のときだけ明示的に渡す。
         if self.concurrent_fragments and self.concurrent_fragments > 1:
             ydl_opts["concurrent_fragment_downloads"] = self.concurrent_fragments
+
+        # 0（既定）は無制限なので opt を渡さない。yt-dlp の --limit-rate 相当。
+        if self.rate_limit and self.rate_limit > 0:
+            ydl_opts["ratelimit"] = self.rate_limit
 
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True

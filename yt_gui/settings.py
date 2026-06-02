@@ -10,6 +10,12 @@ PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h"
 CONCURRENT_FRAGMENTS_MIN = 1
 CONCURRENT_FRAGMENTS_MAX = 16
 
+# 速度制限の単位（"K" = KB/s, "M" = MB/s）と換算係数（2 進接頭辞）。
+# yt-dlp の --limit-rate と同じく K=1024, M=1024*1024 bytes/sec。
+RATE_LIMIT_UNITS: tuple[str, ...] = ("K", "M")
+RATE_LIMIT_VALUE_MAX = 100000.0
+_RATE_LIMIT_UNIT_FACTORS = {"K": 1024, "M": 1024 * 1024}
+
 # SponsorBlock の処理モード（"" = 無効）と対象カテゴリ。
 # カテゴリ名は yt-dlp の SponsorBlock カテゴリ ID に対応する。
 SPONSORBLOCK_MODES: tuple[str, ...] = ("", "mark", "remove")
@@ -40,6 +46,8 @@ class Settings:
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
     concurrent_fragments: int = 1  # 並列フラグメント DL 数（1 = 単一フラグメント）
+    rate_limit_value: float = 0.0  # 速度制限値（0 = 無制限）
+    rate_limit_unit: str = "M"  # 速度制限の単位（"K" = KB/s, "M" = MB/s）
     sponsorblock_mode: str = ""  # "" = 無効 / "mark" / "remove"
     sponsorblock_categories: list[str] = field(
         default_factory=lambda: list(SPONSORBLOCK_DEFAULT_CATEGORIES)
@@ -72,6 +80,19 @@ def build_proxy_url(settings: Settings) -> str:
     port = settings.proxy_port.strip()
     port_part = f":{port}" if port else ""
     return f"{scheme}://{auth}{host}{port_part}"
+
+
+def build_rate_limit(settings: Settings) -> float:
+    """yt-dlp の `ratelimit`（bytes/sec）を組み立てて返す。
+    `rate_limit_value` が 0 以下のときは 0.0 を返す（= 無制限、opt を渡さない）。
+    未知の単位は "M"（×1024×1024）相当にフォールバックする。"""
+    value = settings.rate_limit_value
+    if value <= 0:
+        return 0.0
+    factor = _RATE_LIMIT_UNIT_FACTORS.get(
+        settings.rate_limit_unit, _RATE_LIMIT_UNIT_FACTORS["M"]
+    )
+    return value * factor
 
 
 def _get_config_dir() -> str:

@@ -27,6 +27,8 @@
 | `output_template_video` | str | `"%(title)s.%(ext)s"` | ファイル名タブ — 単独動画用 OUTPUT TEMPLATE |
 | `output_template_playlist` | str | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | ファイル名タブ — プレイリスト用 OUTPUT TEMPLATE |
 | `concurrent_fragments` | int | `1` | ダウンロードタブ — 並列フラグメント数（1〜16） |
+| `rate_limit_value` | float | `0.0` | ダウンロードタブ — 速度制限値（`0` = 無制限） |
+| `rate_limit_unit` | str | `"M"` | ダウンロードタブ — 速度制限の単位（`"K"` = KB/s / `"M"` = MB/s） |
 | `sponsorblock_mode` | str | `""` | SponsorBlock タブ — 処理方法（`""` = 無効 / `"mark"` / `"remove"`） |
 | `sponsorblock_categories` | list[str] | `["sponsor", "selfpromo"]` | SponsorBlock タブ — 対象カテゴリ |
 | `proxy_enabled` | bool | `False` | プロキシタブ — プロキシ有効化チェック |
@@ -39,6 +41,10 @@
 ### プロキシ URL の組み立て
 
 `build_proxy_url(settings)` (`yt_gui/settings.py`) が `proxy_*` フィールドを `scheme://[user[:password]@]host[:port]` 形式の URL に組み立てて返す。`proxy_enabled=False` または `proxy_host` が空のときは空文字を返し、yt-dlp に `proxy` オプションを渡さない動作になる。ユーザー名・パスワードは `urllib.parse.quote(..., safe="")` でエンコードされる。
+
+### 速度制限の組み立て
+
+`build_rate_limit(settings)` (`yt_gui/settings.py`) が `rate_limit_value` / `rate_limit_unit` を yt-dlp の `ratelimit`（bytes/sec の float）に換算して返す。`rate_limit_value` が 0 以下のときは `0.0` を返し、yt-dlp に `ratelimit` オプションを渡さない動作（無制限）になる。単位は 2 進接頭辞（`"K"` = ×1024、`"M"` = ×1024×1024）で `--limit-rate` と同じ。
 
 ### Cookies の優先順位
 
@@ -89,6 +95,7 @@
 | 音声形式・ビットレート | 次のキュー追加から反映（既存アイテムには影響しない） |
 | OUTPUT TEMPLATE | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 並列フラグメント数 | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
+| 速度制限 | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | SponsorBlock | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | プロキシ | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | 言語 | 即座に反映（再起動不要） |

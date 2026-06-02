@@ -35,6 +35,10 @@ STRINGS: dict[str, str] = {
     "tab_download": "ダウンロード",
     "label_concurrent_fragments": "並列フラグメント数:",
     "concurrent_fragments_note": "フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与します。1 は yt-dlp 既定の単一フラグメントです。",
+    "label_rate_limit": "速度制限:",
+    "rate_limit_unit_k": "KB/s",
+    "rate_limit_unit_m": "MB/s",
+    "rate_limit_note": "ダウンロード帯域の上限です。0 で無制限。単位は 2 進接頭辞（KB/s = 1024 bytes/s）。",
     # SponsorBlock settings tab
     "tab_sponsorblock": "SponsorBlock",
     "label_sponsorblock_mode": "処理方法:",

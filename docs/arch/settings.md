@@ -18,6 +18,9 @@
 | `video_container` | `str` | `"mp4"` | 映像コンテナ（`"mp4"` / `"mkv"` / `"webm"`） |
 | `output_template_video` | `str` | `"%(title)s.%(ext)s"` | 単独動画の OUTPUT TEMPLATE |
 | `output_template_playlist` | `str` | `"%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"` | プレイリストの OUTPUT TEMPLATE |
+| `concurrent_fragments` | `int` | `1` | 並列フラグメント DL 数（`CONCURRENT_FRAGMENTS_MIN`〜`MAX`） |
+| `rate_limit_value` | `float` | `0.0` | 速度制限値（`0` = 無制限） |
+| `rate_limit_unit` | `str` | `"M"` | 速度制限の単位（`RATE_LIMIT_UNITS` のいずれか） |
 | `proxy_enabled` | `bool` | `False` | プロキシの有効化トグル |
 | `proxy_scheme` | `str` | `"http"` | プロキシのプロトコル (`PROXY_SCHEMES` のいずれか) |
 | `proxy_host` | `str` | `""` | プロキシのホスト名または IP |
@@ -28,6 +31,17 @@
 ## 定数: `PROXY_SCHEMES`
 
 `("http", "https", "socks4", "socks5", "socks5h")`。設定ダイアログのプロトコル選択肢として使用。
+
+## 定数: `RATE_LIMIT_UNITS` / `RATE_LIMIT_VALUE_MAX`
+
+`RATE_LIMIT_UNITS = ("K", "M")` は速度制限の単位（`"K"` = KB/s、`"M"` = MB/s）。`RATE_LIMIT_VALUE_MAX` はスピンボックスの上限値。換算は 2 進接頭辞（`"K"` = ×1024、`"M"` = ×1024×1024）。
+
+## 関数: `build_rate_limit(settings: Settings) -> float`
+
+`rate_limit_value` / `rate_limit_unit` を yt-dlp の `ratelimit`（bytes/sec の float）に換算する純粋関数。
+
+- `rate_limit_value` が 0 以下のときは `0.0` を返す（呼び出し側で `ratelimit` オプションを付けない = 無制限）
+- 未知の単位は `"M"` 相当（×1024×1024）にフォールバック
 
 ## 関数: `build_proxy_url(settings: Settings) -> str`
 
