@@ -23,7 +23,8 @@
 - ダイアログの追加ボタンは取得済み/未取得を区別せず snapshot + URL を emit。`App` 側で現状の `has_formats_loaded()` 分岐（app.py:637-649）をそのまま使う。
   - 取得済み → 選択値で即 enqueue（単独動画）。
   - 未取得 → 既存のバックグラウンド取得→enqueue 経路（`_start_add_thread`）に委譲。
-- 根拠: この経路はプレイリスト URL でオリジナル形式を使う唯一の手段。`fetch_formats` はプレイリストを弾く（`warn_fetch_formats_playlist`）ため、プレイリストでは「未取得＝auto 選択のまま一括追加」が成立する。取得必須にするとプレイリスト対応が壊れる。
+- 根拠: この経路は単独動画でフォーマット取得を省き、auto 選択のまま出力モード・埋め込み等だけ指定して追加するユースケースを担う。取得必須にするとこの素早い追加経路が失われる。
+- **注意（コード裏取りで判明・当初想定の訂正）**: オリジナル形式はプレイリスト非対応。`_on_fetch_for_add_done`（app.py:716-719）がプレイリスト判明時に `warn_playlist_original_fmt` で中止する。当初「未取得追加でプレイリスト対応を維持」と書いていたが誤りで、未取得追加は単独動画のための経路。
 - 移動するのはボタンの場所と検証 2 種（`warn_skip_both` / `warn_skip_audio_only`、app.py:622-628）のみ。判定ロジックは `App` に残す。
 
 ### 編集モードの扱い（docs 化に伴い確定）
@@ -80,7 +81,7 @@
 - [x] 設計検討（方式・課題1〜3 の方針確定）
 - [x] Issue 起票（#61）・task doc 作成
 - [x] docs（spec / arch）先行更新（dialog spec/arch 新規 + main-window / panel / app の改訂 + 目次）
-- [ ] テスト先書き
-- [ ] 実装（`OriginalFormatDialog` 新設・`app.py` 改修）
-- [ ] lint / format / mypy / pytest
+- [x] テスト先書き（`test_original_format_dialog.py` 11 ケース / `test_app.py` にボタン表示・高さ固定・URL ガード 4 ケース追加）
+- [x] 実装（`OriginalFormatDialog` 新設・`app.py` 改修・i18n キー `btn_open_detail` / `btn_add_to_queue` 追加）
+- [x] lint / format / mypy / pytest（132 passed）
 - [ ] PR 作成・レビュー・マージ

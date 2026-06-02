@@ -74,7 +74,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 ## キュー追加経路
 
 - `add_requested` ハンドラで `build_job_spec()` を呼び出して `JobSpec` を組み立てる。`fmt_original` のときはダイアログ内包パネルの `get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。オリジナル形式以外はメインの「追加」ボタン（`_add_url`）から従来どおり組み立てる。
-- 取得済み（`has_formats_loaded()`）なら `enqueue_single(...)` に即委譲。未取得なら URL 取得スレッドへ渡す（単独 / プレイリスト両対応。プレイリストでのオリジナル形式利用を維持）。
+- 取得済み（`has_formats_loaded()`）なら `enqueue_single(...)` に即委譲。未取得なら URL 取得スレッドへ渡す（単独動画のみ。オリジナル形式はプレイリスト非対応で、`_on_fetch_for_add_done` がプレイリスト判明時に `warn_playlist_original_fmt` で中止する）。
 - `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str}`。単発は `self.queue.enqueue_single(...)`、プレイリストは `self.queue.enqueue_playlist(...)` に委譲。
 - `_on_queue_item_added(item)` スロット: `QueueController.item_added` シグナルを受けて `self._thumbnail_cache.request(item.thumbnail_url)` を起動する。
 - `_notify_container_promotion_if_needed(job)`: 複数音声で MKV 昇格が起きた場合のステータス通知。`build_job_spec` は UI 通知を行わないため UI 側で発火する。
