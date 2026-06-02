@@ -1,8 +1,11 @@
 # 進行中ダウンロードの中断
 
 - **Issue**: [#67](https://github.com/f8924919/yt-gui/issues/67)
+- **PR**: [#68](https://github.com/f8924919/yt-gui/pull/68)
 - **ブランチ**: `feature/67-cancel-downloading`
-- **ステータス**: 進行中
+- **ステータス**: 完了（2026-06-02）
+
+> 中断時の掃除対象は実装中に拡張し、`.part` 等の一時ファイルに加えて字幕サイドカー（`.srt` / `.vtt` / `.live_chat.json` / `.comments.json` 等）も削除する。`.info.json`（メタデータ）とサムネイル画像は残す。
 
 ## ゴール
 
