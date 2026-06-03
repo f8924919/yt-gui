@@ -30,7 +30,7 @@ yt-gui はダウンロードキューを持ち、URL と形式を複数登録し
 | `remux_only` | bool | remux のみフラグ |
 | `playlist_folder` | str \| None | プレイリスト用サブフォルダ名 |
 | `thumbnail_url` | str \| None | サムネイル画像の URL |
-| `status` | str | `waiting` / `downloading` / `done` / `error` / `editing` |
+| `status` | str | `waiting` / `downloading` / `done` / `error` / `editing` / `skipped` |
 | `tree_item` | QTreeWidgetItem \| None | 対応するツリーウィジェットの行 |
 
 ---
@@ -83,6 +83,10 @@ _worker() ループ:
 
 実行中でも新しいアイテムをキューに追加できます（追加されたアイテムは次のループで処理されます）。
 
+### ステータス
+
+`done`（完了）/ `error`（エラー）のほか、ダウンロードアーカイブ（[ダウンロード動作 — ダウンロードアーカイブ](download-behavior.md#ダウンロードアーカイブ)）が有効で対象が記録済みの場合は `skipped`（スキップ（アーカイブ済み））になります。`skipped` は `error` 化せず、実ダウンロードも記録も行いません。
+
 ---
 
 ## 一時停止・再開
@@ -109,7 +113,7 @@ _worker() ループ:
 
 - `downloading`（ダウンロード中）のアイテムは削除不可
 - `editing`（編集中）のアイテムは削除不可
-- `waiting`・`done`・`error` のアイテムは削除可能
+- `waiting`・`done`・`error`・`skipped` のアイテムは削除可能
 
 ---
 

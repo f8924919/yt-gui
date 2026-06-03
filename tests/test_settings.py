@@ -13,6 +13,9 @@ from yt_gui.settings import (
     SettingsManager,
     build_proxy_url,
     build_rate_limit,
+    count_download_archive_entries,
+    default_download_archive_path,
+    resolve_download_archive_path,
 )
 
 
@@ -41,6 +44,8 @@ def test_settings_defaults_match_spec() -> None:
     assert s.proxy_port == ""
     assert s.proxy_username == ""
     assert s.proxy_password == ""
+    assert s.download_archive_enabled is False
+    assert s.download_archive_path == ""
 
 
 @pytest.fixture
@@ -273,3 +278,57 @@ def test_build_proxy_url_encodes_special_chars() -> None:
     assert (
         build_proxy_url(s) == "http://user%40corp:p%40ss%3Aword@proxy.example.com:8080"
     )
+
+
+# ── ダウンロードアーカイブ ──────────────────────────────────────────────────
+
+
+def test_download_archive_fields_roundtrip(manager: SettingsManager) -> None:
+    s = Settings(download_archive_enabled=True, download_archive_path="/tmp/a.txt")
+    manager.save(s)
+    loaded = manager.load()
+    assert loaded.download_archive_enabled is True
+    assert loaded.download_archive_path == "/tmp/a.txt"
+
+
+def test_download_archive_defaults_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    loaded = manager.load()
+    assert loaded.download_archive_enabled is False
+    assert loaded.download_archive_path == ""
+
+
+def test_resolve_download_archive_path_disabled_returns_empty() -> None:
+    s = Settings(download_archive_enabled=False, download_archive_path="/tmp/a.txt")
+    assert resolve_download_archive_path(s) == ""
+
+
+def test_resolve_download_archive_path_uses_explicit_path() -> None:
+    s = Settings(download_archive_enabled=True, download_archive_path="/tmp/a.txt")
+    assert resolve_download_archive_path(s) == "/tmp/a.txt"
+
+
+def test_resolve_download_archive_path_defaults_when_blank(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        "yt_gui.settings._get_config_dir", lambda: str(tmp_path / "yt-gui")
+    )
+    s = Settings(download_archive_enabled=True, download_archive_path="")
+    assert resolve_download_archive_path(s) == default_download_archive_path()
+
+
+def test_count_download_archive_entries(tmp_path: Path) -> None:
+    archive = tmp_path / "archive.txt"
+    archive.write_text("youtube a\nyoutube b\n\nyoutube c\n", encoding="utf-8")
+    # 空行はカウントしない
+    assert count_download_archive_entries(str(archive)) == 3
+
+
+def test_count_download_archive_entries_missing_returns_zero(tmp_path: Path) -> None:
+    assert count_download_archive_entries(str(tmp_path / "nope.txt")) == 0
+    assert count_download_archive_entries("") == 0

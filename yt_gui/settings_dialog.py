@@ -1,3 +1,4 @@
+import os
 import sys
 
 from PySide6.QtCore import Qt, QUrl
@@ -42,6 +43,8 @@ from .settings import (
     RATE_LIMIT_VALUE_MAX,
     SPONSORBLOCK_CATEGORIES,
     SettingsManager,
+    count_download_archive_entries,
+    default_download_archive_path,
 )
 
 _BROWSERS = [
@@ -405,7 +408,105 @@ class SettingsDialog(QDialog):
         rate_note.setWordWrap(True)
         layout.addWidget(rate_note, 3, 0, 1, 2)
 
-        layout.setRowStretch(4, 1)
+        # ── ダウンロードアーカイブ ──────────────────────────────────────────
+        layout.addWidget(
+            QLabel(t("label_download_archive")), 4, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._archive_check = QCheckBox(t("download_archive_enabled"))
+        self._archive_check.setChecked(self._settings.download_archive_enabled)
+        layout.addWidget(self._archive_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
+
+        layout.addWidget(
+            QLabel(t("label_download_archive_path")),
+            5,
+            0,
+            Qt.AlignmentFlag.AlignRight,
+        )
+        archive_row = QHBoxLayout()
+        self._archive_path_edit = QLineEdit(self._settings.download_archive_path)
+        self._archive_path_edit.setPlaceholderText(default_download_archive_path())
+        archive_row.addWidget(self._archive_path_edit)
+        self._archive_browse_btn = QPushButton(t("btn_browse"))
+        self._archive_browse_btn.clicked.connect(self._browse_archive)
+        archive_row.addWidget(self._archive_browse_btn)
+        layout.addLayout(archive_row, 5, 1)
+
+        count_row = QHBoxLayout()
+        self._archive_count_label = QLabel()
+        count_row.addWidget(self._archive_count_label)
+        count_row.addStretch()
+        self._archive_clear_btn = QPushButton(t("btn_download_archive_clear"))
+        self._archive_clear_btn.clicked.connect(self._clear_archive)
+        count_row.addWidget(self._archive_clear_btn)
+        layout.addLayout(count_row, 6, 1)
+
+        archive_note = QLabel(t("download_archive_note"))
+        archive_note.setStyleSheet("color: gray;")
+        archive_note.setWordWrap(True)
+        layout.addWidget(archive_note, 7, 0, 1, 2)
+
+        self._archive_check.toggled.connect(self._on_archive_toggled)
+        self._archive_path_edit.textChanged.connect(self._refresh_archive_count)
+        self._on_archive_toggled()
+
+        layout.setRowStretch(8, 1)
+
+    def _effective_archive_path(self) -> str:
+        """ダイアログの現在入力から実効アーカイブパスを返す（無効時は空）。"""
+        if not self._archive_check.isChecked():
+            return ""
+        path = self._archive_path_edit.text().strip()
+        return path or default_download_archive_path()
+
+    def _refresh_archive_count(self) -> None:
+        path = self._effective_archive_path()
+        count = count_download_archive_entries(path) if path else 0
+        self._archive_count_label.setText(
+            t("download_archive_count").format(count=count)
+        )
+
+    def _on_archive_toggled(self) -> None:
+        enabled = self._archive_check.isChecked()
+        self._archive_path_edit.setEnabled(enabled)
+        self._archive_browse_btn.setEnabled(enabled)
+        self._archive_clear_btn.setEnabled(enabled)
+        self._refresh_archive_count()
+
+    def _browse_archive(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            t("label_download_archive_path"),
+            self._archive_path_edit.text().strip() or default_download_archive_path(),
+            f"{t('filetype_text')} (*.txt);;{t('filetype_all')} (*.*)",
+        )
+        if path:
+            self._archive_path_edit.setText(path)
+
+    def _clear_archive(self) -> None:
+        path = self._effective_archive_path()
+        count = count_download_archive_entries(path)
+        if not path or count == 0:
+            self._refresh_archive_count()
+            return
+        reply = QMessageBox.question(
+            self,
+            t("warn_title"),
+            t("download_archive_clear_confirm").format(count=count),
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError as e:
+            QMessageBox.warning(
+                self,
+                t("warn_title"),
+                t("download_archive_clear_failed").format(error=str(e)),
+            )
+            return
+        self._refresh_archive_count()
+        QMessageBox.information(self, t("info_title"), t("download_archive_cleared"))
 
     def _build_sponsorblock_tab(self, parent: QWidget):
         layout = QVBoxLayout(parent)
@@ -643,6 +744,9 @@ class SettingsDialog(QDialog):
         self._settings.sponsorblock_categories = [
             cat for cat, check in self._sb_category_checks.items() if check.isChecked()
         ]
+
+        self._settings.download_archive_enabled = self._archive_check.isChecked()
+        self._settings.download_archive_path = self._archive_path_edit.text().strip()
 
         self._settings.proxy_enabled = self._proxy_check.isChecked()
         self._settings.proxy_scheme = self._proxy_scheme_combo.currentText()

@@ -125,3 +125,22 @@ def test_worker_real_error_still_marks_error(controller, qtbot):
         lambda: item.status == "error" and not controller.is_running, timeout=2000
     )
     assert item.status == "error"
+
+
+def test_worker_archived_item_marked_skipped(controller, qtbot):
+    """DownloadSkipped はアイテムを skipped にし、error 化しないこと。"""
+    from yt_gui.downloader import DownloadSkipped
+
+    item = _enqueue(controller, "アーカイブ済み")
+
+    def _skip(*a, **k):
+        controller._paused = True  # 1 回で確実にループを抜ける
+        raise DownloadSkipped("https://example.com/v")
+
+    controller._downloader.download_video.side_effect = _skip
+
+    assert controller.start(lambda: (None, None)) is True
+    qtbot.waitUntil(
+        lambda: item.status == "skipped" and not controller.is_running, timeout=2000
+    )
+    assert item.status == "skipped"

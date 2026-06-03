@@ -20,6 +20,7 @@ yt-dlp のラッパー。バックグラウンドスレッドから呼び出さ�
 | `rate_limit` | `float` | ダウンロード速度上限 bytes/sec（既定: `0` = 無制限）。`>0` のときだけ `ratelimit` を渡す |
 | `sponsorblock_mode` | `str` | SponsorBlock 処理方法（既定: `""` = 無効 / `"mark"` / `"remove"`） |
 | `sponsorblock_categories` | `list[str] \| None` | SponsorBlock 対象カテゴリ（既定: `None` → 空リスト） |
+| `download_archive_path` | `str` | ダウンロードアーカイブの記録ファイルパス（既定: `""` = 無効、opt を渡さない） |
 | `status_callback` | `Callable` | ダウンロード進捗を受け取るコールバック |
 | `log_callback` | `Callable` | ログ文字列を受け取るコールバック |
 
@@ -34,8 +35,10 @@ URL 種別を判別して返す。
 {'type': 'single', 'url': str, 'title': str, 'thumbnail_url': str | None}
 
 # プレイリスト
-{'type': 'playlist', 'entries': [{'url': str, 'title': str, 'thumbnail_url': str | None}, ...], 'title': str}
+{'type': 'playlist', 'entries': [{'url': str, 'title': str, 'thumbnail_url': str | None, 'id': str | None, 'ie_key': str | None}, ...], 'title': str}
 ```
+
+エントリの `id` / `ie_key` はダウンロードアーカイブの[プレフィルタ](#ダウンロードアーカイブ)用（flat 抽出時の動画 ID と抽出器名）。
 
 #### `fetch_formats(url, ...) -> dict`
 
@@ -178,6 +181,19 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 - `_base_ydl_opts` ではなくダウンロード側（`_build_ydl_opts`）に置くため、メタデータ取得（`fetch_*`）には付与されない。
 
 設定変更は `App._open_settings()` から `self.downloader.sponsorblock_mode` / `.sponsorblock_categories` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
+
+### ダウンロードアーカイブ
+
+`self.download_archive_path`（空 = 無効）に基づき、既 DL 動画を記録して再 DL をスキップする（yt-dlp の `--download-archive` 相当）。動作仕様は[ダウンロードアーカイブ](../spec/features/download-behavior.md#ダウンロードアーカイブ)。
+
+- **opt 付与**: `_build_ydl_opts` で `self.download_archive_path` が非空のとき `ydl_opts["download_archive"]` を付与する。記録は本オプション経由でのみ行われるため、有効時は実ダウンロード経路に常に渡す。`_base_ydl_opts` ではなくダウンロード側に置くため、メタデータ取得（`fetch_*`）には付与されない。
+- **DL 時スキップ検出**: `download_archive` を渡しても yt-dlp は記録済み動画を黙ってスキップ（`finished` フック非発火）するだけで例外を投げないため、`done` と誤判定しないよう自前で判定する。衝突回避のための `_resolve_unique_path` のドライラン抽出（`extract_info(download=False)`）の中で `ydl.in_download_archive(info)`（yt-dlp 内部 API・ネットワーク不要）を呼び、記録済みなら `DownloadSkipped` を送出する。追加の抽出は発生しない。`download_video` は本例外を捕捉せず呼び出し側（`queue_controller._worker`）へ伝播させ、worker が `skipped` ステータスに遷移させる。
+- **プレフィルタ**: `filter_unarchived_entries(entries)` がプレイリスト展開エントリのうちアーカイブ済みを除外して返す（差分取得）。flat 抽出エントリの `id` / `ie_key` から `in_download_archive` で照合するベストエフォート（`_old_archive_ids` 非考慮・`id`/`ie_key` 欠落は残す）。`download_archive` パスを与えた `YoutubeDL` を 1 つ生成してアーカイブ集合を読み込むのみで、ネットワークは行わない。`App._on_fetch_for_add_done` がプレイリスト追加時に呼ぶ。
+- `fetch_title_or_entries` はプレフィルタ用に各エントリへ `id` / `ie_key`（flat 抽出の抽出器名）を含めて返す。
+
+`DownloadSkipped` は `downloader.py` で定義する専用例外。`DownloadCancelled`（一時停止による中断）とは別物で、`error` 化せずキューを `skipped` にするために worker 側で個別捕捉する。
+
+設定変更は `App._open_settings()` から `self.downloader.download_archive_path = resolve_download_archive_path(...)` で即時反映され、DL 時のスキップ・記録は次のジョブから、プレフィルタは次の追加から反映される。
 
 ### ダウンロードの中断
 
