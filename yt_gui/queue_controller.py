@@ -25,7 +25,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 from yt_dlp.utils import DownloadCancelled
 
-from .downloader import Downloader
+from .downloader import Downloader, DownloadSkipped
 from .i18n import t
 from .job_spec import JobSpec
 from .utils import strip_ansi
@@ -56,12 +56,14 @@ _STATUS_KEY_MAP: dict[str, str] = {
     "done": "queue_status_done",
     "error": "queue_status_error",
     "editing": "queue_status_editing",
+    "skipped": "queue_status_skipped",
 }
 _STATUS_COLORS: dict[str, str] = {
     "downloading": "#1565c0",
     "done": "#2e7d32",
     "error": "#c62828",
     "editing": "#e65100",
+    "skipped": "#757575",
 }
 
 
@@ -314,6 +316,13 @@ class QueueController(QObject):
                     item.status = "waiting"
                 self.log_message.emit(
                     t("log_download_cancelled").format(title=item.title)
+                )
+            except DownloadSkipped:
+                # ダウンロードアーカイブに記録済み。error 化せず skipped にする。
+                with self._lock:
+                    item.status = "skipped"
+                self.log_message.emit(
+                    t("log_download_skipped").format(title=item.title)
                 )
             except Exception as e:
                 with self._lock:

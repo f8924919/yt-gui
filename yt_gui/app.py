@@ -37,7 +37,12 @@ from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
 from .original_format_dialog import OriginalFormatDialog
 from .queue_controller import QueueController, _QueueItem
-from .settings import SettingsManager, build_proxy_url, build_rate_limit
+from .settings import (
+    SettingsManager,
+    build_proxy_url,
+    build_rate_limit,
+    resolve_download_archive_path,
+)
 from .settings_dialog import SettingsDialog
 from .threading_utils import run_in_thread
 from .thumbnail_cache import ThumbnailCache
@@ -224,6 +229,7 @@ class App(QMainWindow):
             rate_limit=build_rate_limit(self._settings),
             sponsorblock_mode=self._settings.sponsorblock_mode,
             sponsorblock_categories=self._settings.sponsorblock_categories,
+            download_archive_path=resolve_download_archive_path(self._settings),
         )
 
         self._thumbnail_cache = ThumbnailCache(self)
@@ -746,6 +752,20 @@ class App(QMainWindow):
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
 
+            # ダウンロードアーカイブ有効時は既 DL 分を除外（差分取得）。
+            total = len(entries)
+            entries = self.downloader.filter_unarchived_entries(entries)
+            skipped = total - len(entries)
+            if skipped:
+                self._log(t("log_playlist_archived_skipped").format(count=skipped))
+            if not entries:
+                self.url_entry.clear()
+                QMessageBox.information(
+                    self, t("info_title"), t("info_playlist_all_archived")
+                )
+                self._signals.status_update.emit(t("status_ready"), 0)
+                return
+
             playlist_title = result.get("title", "")
             added = self.queue.enqueue_playlist(
                 entries, playlist_title, format_label, job
@@ -887,6 +907,9 @@ class App(QMainWindow):
         self.downloader.rate_limit = build_rate_limit(self._settings)
         self.downloader.sponsorblock_mode = self._settings.sponsorblock_mode
         self.downloader.sponsorblock_categories = self._settings.sponsorblock_categories
+        self.downloader.download_archive_path = resolve_download_archive_path(
+            self._settings
+        )
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

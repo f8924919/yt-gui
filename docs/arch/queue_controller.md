@@ -78,12 +78,19 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 ```
 waiting → downloading → done
-            ↓   ↓
-        error   waiting (一時停止による中断)
+            ↓   ↓   ↓
+      error  waiting  skipped
+        (waiting = 一時停止による中断)
+        (skipped = ダウンロードアーカイブに記録済み)
 waiting → editing → waiting (apply or cancel)
 ```
 
-`_worker` の download 呼び出しは `DownloadCancelled`（一時停止による中断）を `except Exception`（→`error`）より**前**で個別捕捉し、アイテムを `waiting` に戻す。`error` 扱いにはしない。中断後はループ先頭の `_paused` 判定でワーカーが停止する。
+`_worker` の download 呼び出しは、`except Exception`（→`error`）より**前**で次の 2 例外を個別捕捉する。いずれも `error` 扱いにはしない。
+
+- `DownloadCancelled`（一時停止による中断）→ アイテムを `waiting` に戻す。中断後はループ先頭の `_paused` 判定でワーカーが停止する。
+- `DownloadSkipped`（ダウンロードアーカイブに記録済み・[downloader](downloader.md#ダウンロードアーカイブ)が送出）→ アイテムを `skipped` にする。実ダウンロードも記録も行われない。
+
+`skipped` は `_STATUS_KEY_MAP` / `_STATUS_COLORS` に登録され、ラベル `queue_status_skipped`・グレー表示で再描画される。`downloading` / `editing` 以外は `remove_selected` の対象なので `skipped` は削除可能。
 
 `downloading` / `editing` 中のアイテムは `remove_selected()` の対象外。
 

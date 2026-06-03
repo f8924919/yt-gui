@@ -37,6 +37,8 @@
 | `proxy_port` | str | `""` | プロキシタブ — ポート（空欄時はプロトコル既定ポート） |
 | `proxy_username` | str | `""` | プロキシタブ — ユーザー名（任意） |
 | `proxy_password` | str | `""` | プロキシタブ — パスワード（任意、平文保存） |
+| `download_archive_enabled` | bool | `False` | ダウンロードタブ — ダウンロードアーカイブ有効化 |
+| `download_archive_path` | str | `""` | ダウンロードタブ — アーカイブ記録ファイル（空欄時は設定ディレクトリの `download_archive.txt`） |
 
 ### プロキシ URL の組み立て
 
@@ -45,6 +47,10 @@
 ### 速度制限の組み立て
 
 `build_rate_limit(settings)` (`yt_gui/settings.py`) が `rate_limit_value` / `rate_limit_unit` を yt-dlp の `ratelimit`（bytes/sec の float）に換算して返す。`rate_limit_value` が 0 以下のときは `0.0` を返し、yt-dlp に `ratelimit` オプションを渡さない動作（無制限）になる。単位は 2 進接頭辞（`"K"` = ×1024、`"M"` = ×1024×1024）で `--limit-rate` と同じ。
+
+### ダウンロードアーカイブパスの解決
+
+`resolve_download_archive_path(settings)` (`yt_gui/settings.py`) が yt-dlp の `download_archive` に渡す実効パスを返す。`download_archive_enabled=False` のときは空文字を返し、yt-dlp に `download_archive` オプションを渡さない（機能無効）。有効かつ `download_archive_path` が空のときは `default_download_archive_path()`（設定ディレクトリの `download_archive.txt`）を使う。`count_download_archive_entries(path)` は記録件数（非空行数）を返し、設定画面の件数表示に使う。動作仕様は[ダウンロードアーカイブ](features/download-behavior.md#ダウンロードアーカイブ)を参照。
 
 ### Cookies の優先順位
 
@@ -98,6 +104,7 @@
 | 速度制限 | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | SponsorBlock | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
 | プロキシ | 次のダウンロードから即座に反映（既存キューアイテムにも適用される） |
+| ダウンロードアーカイブ | DL 時のスキップ・記録は次のダウンロードから即座に反映（既存キューアイテムにも適用）。プレイリスト展開時のプレフィルタは次の追加から反映 |
 | 言語 | 即座に反映（再起動不要） |
 
 既存のキューアイテムは追加時のスナップショット（`audio_codec`・`video_container`・`embed_metadata`・`embed_chapters`）でダウンロードされます。

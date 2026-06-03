@@ -58,6 +58,8 @@ class Settings:
     proxy_port: str = ""
     proxy_username: str = ""
     proxy_password: str = ""
+    download_archive_enabled: bool = False  # 既 DL 動画を記録して再 DL をスキップ
+    download_archive_path: str = ""  # 空 = 設定ディレクトリの download_archive.txt
 
 
 def build_proxy_url(settings: Settings) -> str:
@@ -93,6 +95,37 @@ def build_rate_limit(settings: Settings) -> float:
         settings.rate_limit_unit, _RATE_LIMIT_UNIT_FACTORS["M"]
     )
     return value * factor
+
+
+def default_download_archive_path() -> str:
+    """ダウンロードアーカイブの既定ファイルパス（設定ディレクトリ直下）。"""
+    return os.path.join(_get_config_dir(), "download_archive.txt")
+
+
+def resolve_download_archive_path(settings: Settings) -> str:
+    """yt-dlp の `download_archive` に渡す実効パスを返す。
+
+    `download_archive_enabled` が False のときは空文字を返す（= opt を渡さない）。
+    有効かつ `download_archive_path` が空のときは設定ディレクトリの既定パスを使う。
+    """
+    if not settings.download_archive_enabled:
+        return ""
+    path = settings.download_archive_path.strip()
+    return path or default_download_archive_path()
+
+
+def count_download_archive_entries(path: str) -> int:
+    """アーカイブファイルに記録されている件数（非空行数）を返す。
+
+    ファイルが無い・読めない場合は 0 を返す（非致命）。
+    """
+    if not path:
+        return 0
+    try:
+        with open(path, encoding="utf-8") as f:
+            return sum(1 for line in f if line.strip())
+    except OSError:
+        return 0
 
 
 def _get_config_dir() -> str:

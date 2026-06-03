@@ -320,6 +320,64 @@ def test_rate_limit_passed_when_positive(tmp_path) -> None:
     assert opts["ratelimit"] == 1024 * 1024
 
 
+def test_download_archive_default_omits_opt(downloader, tmp_path) -> None:
+    # 既定 (パス未設定 = 無効) は opt を渡さない
+    opts = downloader._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "download_archive" not in opts
+
+
+def test_download_archive_passed_when_set(tmp_path) -> None:
+    archive = str(tmp_path / "archive.txt")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
+    opts = dl._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert opts["download_archive"] == archive
+
+
+def test_filter_unarchived_entries_disabled_returns_all(tmp_path) -> None:
+    dl = Downloader(output_dir=str(tmp_path))  # アーカイブ無効
+    entries = [
+        {"url": "u1", "title": "t1", "id": "id1", "ie_key": "Youtube"},
+        {"url": "u2", "title": "t2", "id": "id2", "ie_key": "Youtube"},
+    ]
+    assert dl.filter_unarchived_entries(entries) == entries
+
+
+def test_filter_unarchived_entries_excludes_recorded(tmp_path) -> None:
+    archive = tmp_path / "archive.txt"
+    # yt-dlp の記録形式は "{extractor_lower} {id}"
+    archive.write_text("youtube id1\n", encoding="utf-8")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=str(archive))
+    entries = [
+        {"url": "u1", "title": "t1", "id": "id1", "ie_key": "Youtube"},
+        {"url": "u2", "title": "t2", "id": "id2", "ie_key": "Youtube"},
+    ]
+    result = dl.filter_unarchived_entries(entries)
+    assert [e["id"] for e in result] == ["id2"]
+
+
+def test_filter_unarchived_entries_keeps_entries_without_id(tmp_path) -> None:
+    archive = tmp_path / "archive.txt"
+    archive.write_text("youtube id1\n", encoding="utf-8")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=str(archive))
+    # id / ie_key 欠落エントリは判定できないため残す（ベストエフォート）
+    entries = [{"url": "u1", "title": "t1", "id": None, "ie_key": None}]
+    assert dl.filter_unarchived_entries(entries) == entries
+
+
 def _build(dl: Downloader, job: JobSpec, tmp_path) -> dict:
     return dl._build_ydl_opts(
         job,

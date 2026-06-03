@@ -27,6 +27,8 @@
 | `proxy_port` | `str` | `""` | プロキシのポート（空欄時はプロトコル既定ポート） |
 | `proxy_username` | `str` | `""` | プロキシ認証のユーザー名（任意） |
 | `proxy_password` | `str` | `""` | プロキシ認証のパスワード（任意、平文保存） |
+| `download_archive_enabled` | `bool` | `False` | ダウンロードアーカイブの有効化トグル |
+| `download_archive_path` | `str` | `""` | アーカイブ記録ファイルのパス（空 = 設定ディレクトリの `download_archive.txt`） |
 
 ## 定数: `PROXY_SCHEMES`
 
@@ -50,6 +52,16 @@
 - `proxy_enabled=False` または `proxy_host` が空のときは `""` を返す（呼び出し側で `proxy` オプションを付けない）
 - ユーザー名・パスワードは `urllib.parse.quote(..., safe="")` でパーセントエンコード
 - 戻り値は `scheme://[user[:password]@]host[:port]`
+
+## ダウンロードアーカイブ関連の関数
+
+| 関数 | 説明 |
+|---|---|
+| `default_download_archive_path() -> str` | 既定のアーカイブファイルパス（設定ディレクトリ直下の `download_archive.txt`） |
+| `resolve_download_archive_path(settings) -> str` | yt-dlp の `download_archive` に渡す実効パス。`download_archive_enabled=False` のとき `""`（無効）、有効かつパス空欄なら既定パス |
+| `count_download_archive_entries(path) -> int` | アーカイブファイルの記録件数（非空行数）。ファイル不在・読み込み失敗時は `0`（非致命） |
+
+動作仕様は[ダウンロードアーカイブ](../spec/features/download-behavior.md#ダウンロードアーカイブ)、opt 付与・スキップ検出・プレフィルタは [downloader](downloader.md#ダウンロードアーカイブ)を参照。
 
 ## クラス: `SettingsManager`
 

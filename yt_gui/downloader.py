@@ -35,6 +35,14 @@ _THUMBNAIL_EMBED_CONTAINERS = frozenset(
 _DOWNLOAD_PROGRESS_RE = re.compile(r"\[download\]\s+\d")
 
 
+class DownloadSkipped(Exception):
+    """ダウンロードアーカイブに記録済みのため、ダウンロードをスキップしたことを表す。
+
+    `DownloadCancelled`（一時停止による中断）とは別物で、`error` 化せず
+    キューを `skipped` 状態に遷移させるために worker 側で個別捕捉する。
+    """
+
+
 class _YtdlpLogger:
     """yt-dlp logger that routes significant messages to app's log_callback.
 
@@ -92,6 +100,7 @@ class Downloader:
         rate_limit: float = 0,
         sponsorblock_mode: str = "",
         sponsorblock_categories: list[str] | None = None,
+        download_archive_path: str = "",
     ):
         self.output_dir = output_dir
         self.status_callback = status_callback
@@ -105,6 +114,8 @@ class Downloader:
         self.rate_limit = rate_limit
         self.sponsorblock_mode = sponsorblock_mode
         self.sponsorblock_categories = sponsorblock_categories or []
+        # yt-dlp の download_archive に渡すパス。空 = 機能無効（opt を渡さない）。
+        self.download_archive_path = download_archive_path
         # 進行中ダウンロードの中断要求。`_progress_hook` が立っていれば
         # DownloadCancelled を投げる。`download_video` 開始時にクリアする。
         self._cancel_requested = threading.Event()
@@ -235,6 +246,10 @@ class Downloader:
                         "url": entry_url,
                         "title": entry.get("title") or entry_url,
                         "thumbnail_url": entry.get("thumbnail"),
+                        # ダウンロードアーカイブのプレフィルタ用。flat 抽出時の
+                        # id / ie_key（抽出器名）から archive ID を組み立てる。
+                        "id": entry.get("id"),
+                        "ie_key": entry.get("ie_key") or entry.get("extractor_key"),
                     }
                 )
             return {
@@ -251,6 +266,34 @@ class Downloader:
             "title": title,
             "thumbnail_url": info.get("thumbnail"),
         }
+
+    def filter_unarchived_entries(self, entries: list[dict]) -> list[dict]:
+        """ダウンロードアーカイブ済みのエントリを除外して返す（差分取得用）。
+
+        アーカイブ無効時（`download_archive_path` が空）はそのまま返す。
+        判定は yt-dlp の `in_download_archive` を用い、flat 抽出エントリの
+        `id` / `ie_key` から archive ID を組み立てる。アーカイブファイルの
+        読み込みだけでネットワークは行わない。
+
+        プレフィルタはベストエフォート（`id` / `ie_key` 欠落や `_old_archive_ids`
+        非考慮のケースを取りこぼし得る）。最終的な記録済み判定は実 DL 時の
+        `_resolve_unique_path` が完全な info で再判定する。
+        """
+        if not self.download_archive_path:
+            return entries
+        with YoutubeDL(
+            {"download_archive": self.download_archive_path, "quiet": True}
+        ) as ydl:
+            result: list[dict] = []
+            for entry in entries:
+                vid = entry.get("id")
+                ie_key = entry.get("ie_key")
+                if vid and ie_key:
+                    archive_info = {"id": vid, "extractor_key": ie_key, "ie_key": ie_key}
+                    if ydl.in_download_archive(archive_info):
+                        continue
+                result.append(entry)
+        return result
 
     def fetch_formats(self, url, cookies_path=None, cookies_browser=None):
         ydl_opts = {
@@ -483,6 +526,11 @@ class Downloader:
         if self.rate_limit and self.rate_limit > 0:
             ydl_opts["ratelimit"] = self.rate_limit
 
+        # 空（既定）は機能無効なので opt を渡さない。yt-dlp の --download-archive 相当。
+        # 有効時は完全成功した動画を ID 単位でこのファイルに記録し、再 DL を防ぐ。
+        if self.download_archive_path:
+            ydl_opts["download_archive"] = self.download_archive_path
+
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True
 
@@ -639,9 +687,19 @@ class Downloader:
 
         戻り値: `(effective_stem, final_ext)` — ニコニコ動画コメントの
         後処理がファイル名を組み立てるのに使う。
+
+        ダウンロードアーカイブが有効で、対象がアーカイブ済みの場合は
+        ここで `DownloadSkipped` を送出する。`download_archive` opt を渡すと
+        yt-dlp は記録済み動画を黙ってスキップ（`finished` フック非発火）する
+        ため、`done` と誤判定しないよう、実ダウンロード前に自前で判定する。
+        ドライラン抽出はもともと衝突回避のために行うため追加コストは無い。
         """
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False, extra_info=extra_info)
+            # yt-dlp 内部 API: in_download_archive は info の id / extractor_key と
+            # ロード済みアーカイブ集合を突き合わせる（ネットワーク不要）。
+            if self.download_archive_path and ydl.in_download_archive(info):
+                raise DownloadSkipped(url)
             raw_path = ydl.prepare_filename(info)
 
         stem, raw_ext = os.path.splitext(raw_path)
