@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 調査ルール: docs 先・コード裏取り
 
-新しいタスクの設計・実装に着手する前に、必ず以下の順序でドキュメントを先に確認する。コードの探索（grep / Explore エージェント / ファイル読み込み）は **docs に書かれている内容の裏取り** として使うこと。
+新しいタスクの設計・実装に着手する前に、必ず以下の順序でドキュメントを先に確認する。コードの探索（grep / ファイル読み込み）は **docs に書かれている内容の裏取り** として使うこと。
 
 1. このファイル（CLAUDE.md）
 2. [docs/task/index.md](docs/task/index.md) — 既存タスクの状況
@@ -19,6 +19,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. 上記で当たりを付けた箇所をコードで確認
 
 このリポジトリは spec ↔ arch ↔ コードのマッピングが整備されており、コード変更時は docs も同時更新する運用なので、docs の鮮度は高い前提で読んでよい。docs が薄いトピック、または docs と実装が乖離している箇所を見つけた場合は、コード優先に切り替えたうえで docs の更新も提案すること。
+
+### 調査の委譲
+
+この調査フェーズ（上記 1〜5）は、読み取り専用の **`investigate` サブエージェント（[.claude/agents/investigate.md](.claude/agents/investigate.md)、Sonnet）へ委譲**し、主エージェントは結論（要点・関連 `path:line`・裏取りメモ）だけを受け取ること。大量のファイル読み込みで主エージェントの文脈を占有しないための運用。**設計・実装方針の判断は委譲せず主エージェントが行い、設計外の問題はユーザーに確認する**（[docs/git-workflow.md](docs/git-workflow.md) §5.1）。複数観点での広い探索や、特定ファイルをピンポイントで読むだけの軽い確認は、委譲せず主エージェントが直接行ってよい。
 
 ## タスク管理ルール
 
