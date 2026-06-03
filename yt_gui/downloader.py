@@ -289,7 +289,11 @@ class Downloader:
                 vid = entry.get("id")
                 ie_key = entry.get("ie_key")
                 if vid and ie_key:
-                    archive_info = {"id": vid, "extractor_key": ie_key, "ie_key": ie_key}
+                    archive_info = {
+                        "id": vid,
+                        "extractor_key": ie_key,
+                        "ie_key": ie_key,
+                    }
                     if ydl.in_download_archive(archive_info):
                         continue
                 result.append(entry)
