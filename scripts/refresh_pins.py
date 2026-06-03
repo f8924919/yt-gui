@@ -20,6 +20,7 @@ import re
 import sys
 import tempfile
 import urllib.request
+from typing import Any
 
 import download_binaries as db
 
@@ -42,24 +43,44 @@ def _parse_sha256sum(text: str) -> str:
     return m.group(0).lower()
 
 
-def _select_btbn_versioned_asset(assets: list[dict]) -> tuple[str, str]:
-    """BtbN のアセット一覧から最新の安定版 win64-gpl（`nX.Y`）を選ぶ。
+def _select_latest_autobuild(releases: list[dict]) -> dict:
+    """BtbN の releases 一覧から最新の不変 `autobuild-*` リリースを選ぶ。
 
-    `ffmpeg-nX.Y-latest-win64-gpl-X.Y.zip` のうち X.Y が最大のものを採用し、
-    `("nX.Y", url)` を返す。master ローリング・shared 版・lgpl は除外する。
+    ローリングの `latest` タグは除外し、`autobuild-YYYY-MM-DD-HH-MM` のうち
+    タグ名（ゼロ埋め日時のため辞書順 = 時系列順）が最大のものを返す。これにより
+    取得 URL が日付固定タグ配下＝不変アセットを指すようになる（#72）。
     """
-    pattern = re.compile(r"^ffmpeg-n(\d+)\.(\d+)-latest-win64-gpl-\d+\.\d+\.zip$")
+    autobuilds = [
+        r for r in releases if str(r.get("tag_name", "")).startswith("autobuild-")
+    ]
+    if not autobuilds:
+        raise RuntimeError("BtbN に autobuild-* リリースが見つかりません")
+    return max(autobuilds, key=lambda r: r["tag_name"])
+
+
+def _select_btbn_versioned_asset(assets: list[dict]) -> tuple[str, str]:
+    """autobuild リリースのアセット一覧から最新の安定版 win64-gpl を選ぶ。
+
+    autobuild タグのアセットは `ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip`
+    形式（正確なバージョン+commit 入り。`latest` タグの `-latest-` 名とは異なる）。
+    末尾のリリースブランチ `X.Y` が最大のものを採用し、`(version, url)` を返す。
+    version はアセット名のバージョントークン（例 `n8.1.1-9-g58d4114d36`）。
+    master ローリング・shared 版・lgpl は除外する。
+    """
+    pattern = re.compile(
+        r"^ffmpeg-(n\d+\.\d+(?:\.\d+)?(?:-\d+-g[0-9a-f]+)?)-win64-gpl-(\d+)\.(\d+)\.zip$"
+    )
     best: tuple[tuple[int, int], str, str] | None = None
     for asset in assets:
         name = asset.get("name", "")
         m = pattern.match(name)
         if not m:
             continue
-        ver = (int(m.group(1)), int(m.group(2)))
-        if best is None or ver > best[0]:
-            best = (ver, f"n{m.group(1)}.{m.group(2)}", asset["browser_download_url"])
+        branch = (int(m.group(2)), int(m.group(3)))
+        if best is None or branch > best[0]:
+            best = (branch, m.group(1), asset["browser_download_url"])
     if best is None:
-        raise RuntimeError("BtbN に nX.Y 安定版 win64-gpl アセットが見つかりません")
+        raise RuntimeError("autobuild に安定版 win64-gpl アセットが見つかりません")
     return best[1], best[2]
 
 
@@ -78,7 +99,9 @@ def _http_text(url: str, headers: dict | None = None) -> str:
         return resp.read().decode("utf-8", "replace")
 
 
-def _http_json(url: str, headers: dict | None = None) -> dict:
+def _http_json(url: str, headers: dict | None = None) -> Any:
+    # GitHub API はエンドポイントにより dict（単一リリース）/ list（リリース一覧）の
+    # 双方を返すため戻り値は Any とし、呼び出し側で適切に扱う。
     return json.loads(_http_text(url, {**_GH_HEADERS, **(headers or {})}))
 
 
@@ -125,16 +148,20 @@ def refresh_deno(old: dict) -> tuple[dict, str]:
 
 
 def refresh_ffmpeg_win(old: dict) -> tuple[dict, str]:
-    rel = _http_json(
-        "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
+    # `releases/latest`（ローリング）ではなく、不変な `autobuild-*` タグの最新
+    # リリースを解決する。これにより取得 URL が日付固定タグ配下＝不変アセットを
+    # 指し、上流の再ビルドによる sha256 ドリフトでリリース CI が失敗しない（#72）。
+    releases = _http_json(
+        "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases?per_page=20"
     )
-    version, url = _select_btbn_versioned_asset(rel.get("assets", []))
+    release = _select_latest_autobuild(releases)
+    version, url = _select_btbn_versioned_asset(release.get("assets", []))
     sha, _md5, _size = _hashes_of_url(url)
     new = dict(old)
     new["version"] = version
     new["url"] = url
     new["sha256"] = sha
-    note = "（GitHub リリースを取得し sha256 算出。上流サイドカー無し）"
+    note = f"（不変タグ {release['tag_name']} のアセットを取得し sha256 算出）"
     if version == old["version"] and sha == old["sha256"]:
         return new, f"ffmpeg-win: {version}（変更なし）"
     return new, f"ffmpeg-win: {old['version']} → {version} {note}"
@@ -229,7 +256,9 @@ def refresh_pins(pins: dict) -> tuple[dict, list[str], list[str]]:
 def _build_summary(changes: list[str], statuses: list[str]) -> str:
     lines = ["## 同梱バイナリのピン更新", ""]
     if changes:
-        lines.append("以下のコンポーネントを更新しました。**マージ前に上流の真正性を確認してください**。")
+        lines.append(
+            "以下のコンポーネントを更新しました。**マージ前に上流の真正性を確認してください**。"
+        )
         lines.append("")
         lines += [f"- {c}" for c in changes]
     else:
@@ -246,9 +275,7 @@ def _build_summary(changes: list[str], statuses: list[str]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--summary-out", help="PR 本文用サマリ Markdown の出力先パス"
-    )
+    parser.add_argument("--summary-out", help="PR 本文用サマリ Markdown の出力先パス")
     args = parser.parse_args()
 
     pins = db._load_pins()

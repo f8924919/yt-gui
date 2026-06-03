@@ -62,7 +62,7 @@ python scripts/download_binaries.py --update
 | コンポーネント | 台帳キー | 固定対象 | 備考 |
 |---|---|---|---|
 | deno | `deno` | バージョン付きリリースタグ + プラットフォーム別アセット | 上流 `<asset>.zip.sha256sum`（authoritative）と照合 |
-| ffmpeg (Win) | `ffmpeg-win` | BtbN の **n リリースビルド**（master ローリングではなく `nX.Y`） | zip を取得して sha256 算出 |
+| ffmpeg (Win) | `ffmpeg-win` | BtbN の **n リリースビルド**を**日付固定の不変 `autobuild-*` タグ**にピン（master ローリング・`latest` タグは不可） | zip を取得して sha256 算出 |
 | ffmpeg (mac x86_64) | `ffmpeg-mac.x86_64` | evermeet の versioned zip（ffmpeg / ffprobe 個別） | `verify: zip`（zip の sha256 を照合）。GPG `.sig` 検証が望ましい |
 | ffmpeg (mac arm64) | `ffmpeg-mac.arm64` | osxexperts.net の Apple Silicon 静的ビルド（evermeet と同一作者） | `verify: binary`（公開値が**展開後バイナリ**の sha256 のため展開後に照合） |
 | ffmpeg (Linux) | `ffmpeg-linux` | johnvansickle の static ビルド（arch 別） | 公開 `.md5` と照合のうえ sha256 算出 |
@@ -77,6 +77,7 @@ python scripts/download_binaries.py --update
 - **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名（Deno）・公開チェックサム（Deno `.sha256sum`、johnvansickle `.md5`）と照合する。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。macOS arm64（osxexperts.net）はページが**展開後バイナリ**の sha256 を公開するため、展開後バイナリと公開値の一致を確認して登録する（`verify: binary`）。osxexperts は API・署名サイドカーが無いため週次自動追従の対象外とし、更新時はページの公開値を人手で確認する。
 - **自動追従（週次）**: `.github/workflows/update-binaries.yml` が毎週 `scripts/refresh_pins.py` を実行し、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する（差分が無ければ PR は作らない）。検証根拠（旧→新・上流チェックサム照合結果）は PR 本文に出力されるため、レビュアは差分の確認だけで承認できる。
 - **手動での差し替え手順**: ①`scripts/refresh_pins.py` を実行（または手動で上流バージョン URL を確認）→ ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。重大 CVE 時は週次を待たず手動で実施する。
+- **ffmpeg-win の不変ピン（ドリフト対策）**: BtbN の `latest` はローリングタグで、同一バージョン（例 `n8.1`）でも上流が再ビルドするたびに同名アセットの中身＝ sha256 が変わる。これを `pins.json` に固定するとリリース CI が sha256 不一致で失敗するため、**日付固定の不変 `autobuild-YYYY-MM-DD-HH-MM` タグ配下のアセット URL にピンする**。`refresh_pins.py` は `releases/latest` ではなく最新の `autobuild-*` リリースを解決し（`_select_latest_autobuild`）、その中の最新ブランチ `win64-gpl` アセット（`ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip`）を選んで不変 URL を書き込む。新バージョン追従時もこの仕組みで自動的に新しい不変タグへ再ピンされる。
 
 ## バージョン管理（単一ソース）
 
@@ -160,7 +161,7 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | 項目 | 内容 |
 |---|---|
 | トリガー | `schedule`（週次）+ `workflow_dispatch`（手動） |
-| 検証 | deno は上流 `.sha256sum`、johnvansickle は公開 `.md5` と照合。BtbN は GitHub リリースを取得し sha256 算出、evermeet（mac x86_64）は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
+| 検証 | deno は上流 `.sha256sum`、johnvansickle は公開 `.md5` と照合。BtbN は最新の不変 `autobuild-*` タグのアセットを取得し sha256 算出（`latest` ローリングは使わない）、evermeet（mac x86_64）は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
 | 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
 | 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg（osxexperts.net・API/署名無しのため手動更新） |
 | 権限 | `contents: write` / `pull-requests: write` |

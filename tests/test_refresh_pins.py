@@ -45,6 +45,33 @@ def test_parse_sha256sum_rejects_garbage():
         refresh_pins._parse_sha256sum("no hash here")
 
 
+# --- _select_latest_autobuild ---------------------------------------------
+
+
+def _release(tag: str, names: list[str] | None = None) -> dict:
+    return {
+        "tag_name": tag,
+        "assets": [_asset(n) for n in (names or [])],
+    }
+
+
+def test_select_latest_autobuild_picks_newest_dated_tag():
+    """ローリングの latest を除外し、日時タグが最大の autobuild を選ぶ。"""
+    releases = [
+        _release("latest"),
+        _release("autobuild-2026-06-02-14-20"),
+        _release("autobuild-2026-05-31-13-22"),
+        _release("autobuild-2026-06-01-15-02"),
+    ]
+    rel = refresh_pins._select_latest_autobuild(releases)
+    assert rel["tag_name"] == "autobuild-2026-06-02-14-20"
+
+
+def test_select_latest_autobuild_raises_when_no_autobuild():
+    with pytest.raises(RuntimeError):
+        refresh_pins._select_latest_autobuild([_release("latest")])
+
+
 # --- _select_btbn_versioned_asset -----------------------------------------
 
 
@@ -53,32 +80,43 @@ def _asset(name: str) -> dict:
 
 
 def test_select_btbn_picks_highest_stable_version():
-    """master / shared を除外し、最大の nX.Y を選ぶ。"""
+    """master / shared / lgpl を除外し、最大のリリースブランチ X.Y を選ぶ。
+
+    autobuild タグのアセットは `ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip` 形式。
+    """
     assets = [
-        _asset("ffmpeg-master-latest-win64-gpl.zip"),
-        _asset("ffmpeg-n7.1-latest-win64-gpl-7.1.zip"),
-        _asset("ffmpeg-n8.1-latest-win64-gpl-8.1.zip"),
-        _asset("ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip"),
+        _asset("ffmpeg-N-124739-gbb5c461a47-win64-gpl.zip"),
+        _asset("ffmpeg-n7.1.4-7-gadcf20da26-win64-gpl-7.1.zip"),
+        _asset("ffmpeg-n8.1.1-9-g58d4114d36-win64-gpl-8.1.zip"),
+        _asset("ffmpeg-n8.1.1-9-g58d4114d36-win64-gpl-shared-8.1.zip"),
+        _asset("ffmpeg-n8.1.1-9-g58d4114d36-win64-lgpl-8.1.zip"),
     ]
     version, url = refresh_pins._select_btbn_versioned_asset(assets)
-    assert version == "n8.1"
-    assert url == "https://example/ffmpeg-n8.1-latest-win64-gpl-8.1.zip"
+    assert version == "n8.1.1-9-g58d4114d36"
+    assert url == "https://example/ffmpeg-n8.1.1-9-g58d4114d36-win64-gpl-8.1.zip"
 
 
 def test_select_btbn_compares_minor_numerically():
-    """文字列比較ではなく数値比較（n8.10 > n8.9）。"""
+    """ブランチ X.Y は文字列比較ではなく数値比較（8.10 > 8.9）。"""
     assets = [
-        _asset("ffmpeg-n8.9-latest-win64-gpl-8.9.zip"),
-        _asset("ffmpeg-n8.10-latest-win64-gpl-8.10.zip"),
+        _asset("ffmpeg-n8.9.1-3-gabcdef0123-win64-gpl-8.9.zip"),
+        _asset("ffmpeg-n8.10.1-3-gabcdef0123-win64-gpl-8.10.zip"),
     ]
     version, _ = refresh_pins._select_btbn_versioned_asset(assets)
-    assert version == "n8.10"
+    assert version == "n8.10.1-3-gabcdef0123"
+
+
+def test_select_btbn_accepts_exact_tag_without_git_describe():
+    """git-describe サフィックスが無いタグ直上のアセットも採用する。"""
+    assets = [_asset("ffmpeg-n8.1-win64-gpl-8.1.zip")]
+    version, _ = refresh_pins._select_btbn_versioned_asset(assets)
+    assert version == "n8.1"
 
 
 def test_select_btbn_raises_when_no_stable():
     with pytest.raises(RuntimeError):
         refresh_pins._select_btbn_versioned_asset(
-            [_asset("ffmpeg-master-latest-win64-gpl.zip")]
+            [_asset("ffmpeg-N-124739-gbb5c461a47-win64-gpl.zip")]
         )
 
 
