@@ -7,8 +7,7 @@ import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
-from yt_dlp.utils import DownloadCancelled, download_range_func, parse_duration
+from yt_dlp.utils import DownloadCancelled
 
 from . import get_resource_base
 from .i18n import t
@@ -448,13 +447,6 @@ class Downloader:
         # 前回ジョブの中断要求が残っていてもこのジョブには影響させない。
         self._cancel_requested.clear()
 
-        # 区間 DL の事前チェック FFmpegFD.available() は downloader を渡さずに
-        # FFmpegPostProcessor() を生成するため ydl_opts の ffmpeg_location を
-        # 読めず、contextvar 経由でしかバンドル ffmpeg を見つけられない。CLI が
-        # __init__.py で行うのと同じく、このスレッドの contextvar に明示設定する。
-        # （未設定だと PATH に ffmpeg が無いバンドル環境で「ffmpeg not installed」）。
-        FFmpegPostProcessor._ffmpeg_location.set(self._ffmpeg_path)
-
         is_playlist = playlist_title is not None
         extra_info: dict | None = None
         if is_playlist:
@@ -487,6 +479,12 @@ class Downloader:
             # 中断時は部分ファイルを掃除してから呼び出し側へ再送出する。
             self._cleanup_partial_files(effective_stem)
             raise
+
+        # 区間指定があれば、取得済みファイルからローカル ffmpeg で切り出す。
+        # （yt-dlp のネイティブ区間 DL は https/DASH で ffmpeg にネットワーク取得を
+        #  任せる経路となりバンドル ffmpeg では不安定なため、フル取得後に切り出す。）
+        if job.section_start and job.section_end:
+            self._cut_section(effective_stem, final_ext, job)
 
         nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
@@ -545,15 +543,6 @@ class Downloader:
 
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True
-
-        # 区間ダウンロード（yt-dlp --download-sections 相当）。生の時刻文字列を
-        # 秒へ変換し download_ranges を設定する。区間未指定なら opt を渡さない。
-        if job.section_start or job.section_end:
-            start = parse_duration(job.section_start) or 0.0
-            end = parse_duration(job.section_end)
-            ydl_opts["download_ranges"] = download_range_func([], [(start, end)])
-            if job.section_force_keyframes:
-                ydl_opts["force_keyframes_at_cuts"] = True
 
         if job.is_audio_extraction:
             self._append_audio_postprocessors(ydl_opts, job)
@@ -874,6 +863,86 @@ class Downloader:
             # _danmaku2ass_path が exists() を通ったあとに消えた等のレース
             if self.log_callback:
                 self.log_callback(t("warn_danmaku2ass_missing"))
+
+    @staticmethod
+    def _build_cut_cmd(
+        ffmpeg: str,
+        infile: str,
+        outfile: str,
+        start: str,
+        end: str,
+        force_keyframes: bool,
+    ) -> list[str]:
+        """区間切り出しの ffmpeg コマンドを組み立てる（純関数・テスト用に分離）。
+
+        - `force_keyframes=False`（既定）: 入力側シーク + stream copy。高速・無劣化
+          だがカット境界は最寄りのキーフレームに揃う。
+        - `force_keyframes=True`: 出力側シーク + 再エンコード。指定時刻に正確だが遅い。
+
+        `start` / `end` は ffmpeg がそのまま解釈できる時刻文字列（`HH:MM:SS` 等）。
+        """
+        cmd = [ffmpeg, "-y", "-loglevel", "error"]
+        if force_keyframes:
+            cmd += ["-i", infile, "-ss", start, "-to", end]
+        else:
+            cmd += ["-ss", start, "-to", end, "-i", infile, "-c", "copy"]
+        cmd += [outfile]
+        return cmd
+
+    def _cut_section(self, stem: str, final_ext: str, job: JobSpec) -> None:
+        """取得済みファイルから指定区間をローカル ffmpeg で切り出し、原本を置き換える。
+
+        前提ファイル不在・ffmpeg 欠如・切り出し失敗はいずれも非致命としてログのみ
+        （フル動画は残す）。
+        """
+        infile = f"{stem}{final_ext}"
+        if not os.path.exists(infile):
+            if self.log_callback:
+                base = os.path.basename(infile)
+                self.log_callback(t("warn_section_skip_missing").format(filename=base))
+            return
+        if not os.path.exists(self._ffmpeg_path):
+            if self.log_callback:
+                self.log_callback(t("warn_section_skip_no_ffmpeg"))
+            return
+
+        msg = t("status_section_cutting")
+        self.status_callback(msg, 0)
+        if self.log_callback:
+            self.log_callback(msg)
+
+        outfile = f"{stem}.section{final_ext}"
+        cmd = self._build_cut_cmd(
+            self._ffmpeg_path,
+            infile,
+            outfile,
+            job.section_start or "",
+            job.section_end or "",
+            job.section_force_keyframes,
+        )
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            os.replace(outfile, infile)
+        except (subprocess.CalledProcessError, OSError) as e:
+            if os.path.exists(outfile):
+                try:
+                    os.remove(outfile)
+                except OSError:
+                    pass
+            if self.log_callback:
+                detail = (
+                    e.stderr.strip()
+                    if isinstance(e, subprocess.CalledProcessError) and e.stderr
+                    else str(e)
+                )
+                self.log_callback(t("warn_section_failed").format(error=detail))
 
     def _embed_nico_comments_into_mkv(
         self, stem: str, final_ext: str, opts: dict

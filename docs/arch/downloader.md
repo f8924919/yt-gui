@@ -172,18 +172,18 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 ### 区間ダウンロード
 
-`JobSpec.section_start` / `section_end`（生の時刻文字列）が指定されているとき、`_build_ydl_opts` が `download_ranges` を付与する（yt-dlp CLI の `--download-sections` 相当）。
+指定区間だけを取得する機能だが、**yt-dlp のネイティブ区間 DL（`download_ranges`）は使わない**。`download_ranges` は YouTube の `https` / DASH フォーマットでは部分取得を `FFmpegFD`（ffmpeg にネットワークから直接取得させる経路）に委ねるが、バンドル ffmpeg のネットワーク入力は不安定で、環境によってクラッシュ / ハングするため。
 
-- 時刻文字列は `yt_dlp.utils.parse_duration` で秒（float）へ変換し、`yt_dlp.utils.download_range_func([], [(start, end)])` を `ydl_opts["download_ranges"]` に設定する（チャプター正規表現は未対応のため第 1 引数は空リスト）。
-- `JobSpec.section_force_keyframes` が `True` のとき `ydl_opts["force_keyframes_at_cuts"] = True` を付与する。カット境界を再エンコードして指定時刻に正確に合わせる（既定 `False` はキーフレーム境界で高速・無劣化）。
-- 上記 3 オプション（`concurrent_fragments` / `rate_limit` / `sponsorblock`）と異なり、**`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec` に持つ**。区間は動画固有・形式非依存の実行設定であり、アイテムごとにスナップショットされるため。
-- 区間未指定（両方 `None`）のときは opt を渡さない。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
+代わりに **フル取得 → ローカル ffmpeg 切り出し** の 2 段構えで実装する。
 
-#### バンドル ffmpeg の contextvar 設定
-
-区間 DL では yt-dlp が部分ダウンロードの事前チェックで `FFmpegFD.available()` を呼ぶが、これは **downloader を渡さずに** `FFmpegPostProcessor()` を生成するため `ydl_opts["ffmpeg_location"]` を読めず、contextvar `FFmpegPostProcessor._ffmpeg_location`（または PATH）でしかバンドル ffmpeg を見つけられない。この contextvar は yt-dlp の CLI 経路（`yt_dlp/__init__.py`）でしか設定されず、`YoutubeDL` を直接使う本アプリでは未設定のままになる。
-
-そのため `download_video` の冒頭で `FFmpegPostProcessor._ffmpeg_location.set(self._ffmpeg_path)` を実行し、CLI と同じくバンドル ffmpeg を大域的に発見可能にする。これをしないと、PATH に ffmpeg が無いバンドル環境で「ffmpeg is not installed」エラーになる（通常のフォーマット結合は downloader 付きの `FFmpegMergerPP` を使うため影響しない）。contextvar はスレッドごとに独立するため、ワーカースレッドで実行される `download_video` 内で設定する必要がある。
+- `_build_ydl_opts` は区間関連の opt を一切付与しない（`download_ranges` / `force_keyframes_at_cuts` を渡さない）。動画は従来どおりの安定した経路でフル取得・結合する。
+- `download_video` は `_run_download` 成功後、`JobSpec.section_start` と `section_end` が両方あるとき `_cut_section(stem, final_ext, job)` を呼ぶ。最終出力ファイル（`{stem}{final_ext}`）から区間を切り出し、原本を置き換える。ネットワークを伴わないローカル ffmpeg 処理のため安定する。
+- 切り出しコマンドは純関数 `_build_cut_cmd(ffmpeg, infile, outfile, start, end, force_keyframes)` で生成する（テスト容易性のため分離）。
+  - `force_keyframes=False`（既定）: `-ss start -to end -i infile -c copy`。入力側シーク + stream copy で高速・無劣化だが、カット境界は最寄りのキーフレームに揃う。
+  - `force_keyframes=True`: `-i infile -ss start -to end`（再エンコード）。出力側シークで指定時刻に正確だが遅い。
+- 一時ファイル `{stem}.section{final_ext}` に書き出し、成功時のみ `os.replace` で原本へ上書きする。前提ファイル不在・ffmpeg 欠如・切り出し失敗はいずれも**非致命**としてログのみ残し、フル動画は保持する。
+- 区間は動画固有・形式非依存の実行設定なので、`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec`（`section_start` / `section_end` / `section_force_keyframes`）に持つ。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
+- **トレードオフ**: フル動画をダウンロードしてから切り出すため**通信量の節約にはならない**。出力は区間クリップだが、取得量は動画全体。これは安定性（ネットワーク ffmpeg を避ける）を優先した結果。
 
 ### SponsorBlock
 

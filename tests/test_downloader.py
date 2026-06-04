@@ -606,13 +606,14 @@ def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> 
     assert seen["cancel_set"] is False  # ジョブ開始時にクリアされている
 
 
-# ── 区間ダウンロード (download_ranges) ─────────────────────────────────────
+# ── 区間ダウンロード（フル取得 → ローカル切り出し） ─────────────────────────
 
 
-def test_download_sections_default_omits_opts(downloader, tmp_path) -> None:
-    # 区間未指定 (両方 None) のときは download_ranges / force_keyframes を渡さない
+def test_section_omits_native_download_ranges(downloader, tmp_path) -> None:
+    """方針 A ではフル取得後にローカルで切り出すため、yt-dlp の
+    download_ranges / force_keyframes_at_cuts は一切渡さない。"""
     opts = downloader._build_ydl_opts(
-        _job(),
+        _job(section_start="00:01:30", section_end="00:04:00"),
         out_dir=str(tmp_path),
         is_playlist=False,
         cookies_path=None,
@@ -623,71 +624,109 @@ def test_download_sections_default_omits_opts(downloader, tmp_path) -> None:
     assert "force_keyframes_at_cuts" not in opts
 
 
-def test_download_sections_sets_download_ranges(downloader, tmp_path) -> None:
-    opts = downloader._build_ydl_opts(
-        _job(section_start="00:01:30", section_end="00:04:00"),
-        out_dir=str(tmp_path),
-        is_playlist=False,
-        cookies_path=None,
-        cookies_browser=None,
+def test_build_cut_cmd_copy_mode_uses_input_seek_and_copy() -> None:
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg", "in.mp4", "out.mp4", "00:01:00", "00:01:05", force_keyframes=False
     )
+    # 入力側シーク（-i より前に -ss/-to）+ stream copy
+    assert cmd == [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        "00:01:00",
+        "-to",
+        "00:01:05",
+        "-i",
+        "in.mp4",
+        "-c",
+        "copy",
+        "out.mp4",
+    ]
 
-    # download_ranges は callable (yt_dlp.utils.download_range_func の戻り値)
-    assert callable(opts["download_ranges"])
-    # 既定では force_keyframes_at_cuts は付かない
-    assert "force_keyframes_at_cuts" not in opts
 
-    # 解決された区間 (秒) を info_dict 経由で検証する
-    ranges = list(opts["download_ranges"]({"duration": 600}, None))
-    assert len(ranges) == 1
-    assert ranges[0]["start_time"] == 90.0
-    assert ranges[0]["end_time"] == 240.0
-
-
-def test_download_sections_accepts_mm_ss_and_seconds(downloader, tmp_path) -> None:
-    opts = downloader._build_ydl_opts(
-        _job(section_start="90", section_end="4:00"),
-        out_dir=str(tmp_path),
-        is_playlist=False,
-        cookies_path=None,
-        cookies_browser=None,
+def test_build_cut_cmd_force_keyframes_uses_output_seek_and_reencode() -> None:
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg", "in.mp4", "out.mp4", "10", "20", force_keyframes=True
     )
-
-    ranges = list(opts["download_ranges"]({"duration": 600}, None))
-    assert ranges[0]["start_time"] == 90.0
-    assert ranges[0]["end_time"] == 240.0
-
-
-def test_download_sections_force_keyframes_when_enabled(downloader, tmp_path) -> None:
-    opts = downloader._build_ydl_opts(
-        _job(
-            section_start="00:00:10",
-            section_end="00:00:20",
-            section_force_keyframes=True,
-        ),
-        out_dir=str(tmp_path),
-        is_playlist=False,
-        cookies_path=None,
-        cookies_browser=None,
-    )
-
-    assert opts["force_keyframes_at_cuts"] is True
+    # 出力側シーク（-i の後に -ss/-to）・-c copy なし（再エンコード）
+    assert cmd == [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        "in.mp4",
+        "-ss",
+        "10",
+        "-to",
+        "20",
+        "out.mp4",
+    ]
+    assert "copy" not in cmd
 
 
-def test_download_video_sets_ffmpeg_location_contextvar(downloader, tmp_path) -> None:
-    """区間 DL の事前チェック (FFmpegFD.available、downloader 非依存) のため、
-    download_video はバンドル ffmpeg のパスを contextvar に設定する。"""
-    from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypatch):
+    downloader.status_callback = lambda *a, **k: None
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
 
+    captured = {}
+
+    def _fake_run(cmd, **kwargs):
+        # ffmpeg の代わりに out ファイルを生成
+        captured["cmd"] = cmd
+        with open(cmd[-1], "w") as f:
+            f.write("CUT")
+
+        class _R:
+            returncode = 0
+
+        return _R()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+
+    downloader._cut_section(stem, ".mp4", _job(section_start="00:00:01", section_end="00:00:02"))
+
+    assert infile.read_text() == "CUT"  # 原本が切り出し結果で置換された
+    assert not (tmp_path / "動画.section.mp4").exists()  # 一時ファイルは残らない
+
+
+def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
+    downloader.status_callback = lambda *a, **k: None
+    logs = []
+    downloader.log_callback = logs.append
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    import subprocess as _sp
+
+    def _fail_run(cmd, **kwargs):
+        raise _sp.CalledProcessError(1, cmd, stderr="boom")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fail_run)
+
+    downloader._cut_section(stem, ".mp4", _job(section_start="1", section_end="2"))
+
+    assert infile.read_text() == "ORIGINAL"  # 失敗時はフル動画を保持
+    assert any("boom" in m for m in logs)
+
+
+def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_path):
     downloader.status_callback = lambda *a, **k: None
     downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+    downloader._run_download = lambda *a, **k: None
 
-    seen = {}
+    calls = []
+    downloader._cut_section = lambda stem, ext, job: calls.append((stem, ext, job))
 
-    def _run(*a, **k):
-        seen["loc"] = FFmpegPostProcessor._ffmpeg_location.get()
+    job = _job(section_start="00:00:01", section_end="00:00:02")
+    downloader.download_video("https://example.com/v", job)
+    assert len(calls) == 1
 
-    downloader._run_download = _run
-    downloader.download_video("https://example.com/v", _job())
-
-    assert seen["loc"] == downloader._ffmpeg_path
+    calls.clear()
+    downloader.download_video("https://example.com/v", _job())  # 区間なし
+    assert calls == []

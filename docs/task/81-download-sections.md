@@ -47,6 +47,19 @@
 - tests/ — `test_job_spec.py` / `test_downloader.py`（+ 必要なら `test_app.py`）
 - docs/ — spec / arch / feature-gap
 
+## 実装方式の変更（2026-06-04）
+
+当初は yt-dlp ネイティブの `download_ranges`（`--download-sections` 相当）で実装したが、
+YouTube の `https` / DASH フォーマットでは部分取得が `FFmpegFD`（ffmpeg にネットワーク
+取得を委ねる経路）になり、バンドル ffmpeg が**サンドボックスでクラッシュ（SIGSEGV）・
+ユーザー環境（Windows）でハング**することが判明。ユーザー判断のもと、方針を
+**フル取得 → ローカル ffmpeg 切り出し** に変更（通信量節約は犠牲、安定性を優先）。
+
+- `_build_ydl_opts` は区間 opt を渡さない。`download_video` が DL 成功後に
+  `_cut_section` でローカル切り出し（`_build_cut_cmd` で copy / 再エンコードを分岐）。
+- 当初入れた contextvar 修正（`FFmpegPostProcessor._ffmpeg_location`）は不要になり撤去。
+- サンドボックスでエンドツーエンド検証済み（mp3 5 秒区間 = 122KB を確認）。
+
 ## 進捗
 
 - [x] Issue #81 起票
