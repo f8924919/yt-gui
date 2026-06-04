@@ -672,3 +672,22 @@ def test_download_sections_force_keyframes_when_enabled(downloader, tmp_path) ->
     )
 
     assert opts["force_keyframes_at_cuts"] is True
+
+
+def test_download_video_sets_ffmpeg_location_contextvar(downloader, tmp_path) -> None:
+    """区間 DL の事前チェック (FFmpegFD.available、downloader 非依存) のため、
+    download_video はバンドル ffmpeg のパスを contextvar に設定する。"""
+    from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+
+    downloader.status_callback = lambda *a, **k: None
+    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+
+    seen = {}
+
+    def _run(*a, **k):
+        seen["loc"] = FFmpegPostProcessor._ffmpeg_location.get()
+
+    downloader._run_download = _run
+    downloader.download_video("https://example.com/v", _job())
+
+    assert seen["loc"] == downloader._ffmpeg_path

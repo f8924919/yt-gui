@@ -179,6 +179,12 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 - 上記 3 オプション（`concurrent_fragments` / `rate_limit` / `sponsorblock`）と異なり、**`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec` に持つ**。区間は動画固有・形式非依存の実行設定であり、アイテムごとにスナップショットされるため。
 - 区間未指定（両方 `None`）のときは opt を渡さない。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
 
+#### バンドル ffmpeg の contextvar 設定
+
+区間 DL では yt-dlp が部分ダウンロードの事前チェックで `FFmpegFD.available()` を呼ぶが、これは **downloader を渡さずに** `FFmpegPostProcessor()` を生成するため `ydl_opts["ffmpeg_location"]` を読めず、contextvar `FFmpegPostProcessor._ffmpeg_location`（または PATH）でしかバンドル ffmpeg を見つけられない。この contextvar は yt-dlp の CLI 経路（`yt_dlp/__init__.py`）でしか設定されず、`YoutubeDL` を直接使う本アプリでは未設定のままになる。
+
+そのため `download_video` の冒頭で `FFmpegPostProcessor._ffmpeg_location.set(self._ffmpeg_path)` を実行し、CLI と同じくバンドル ffmpeg を大域的に発見可能にする。これをしないと、PATH に ffmpeg が無いバンドル環境で「ffmpeg is not installed」エラーになる（通常のフォーマット結合は downloader 付きの `FFmpegMergerPP` を使うため影響しない）。contextvar はスレッドごとに独立するため、ワーカースレッドで実行される `download_video` 内で設定する必要がある。
+
 ### SponsorBlock
 
 `self.sponsorblock_mode`（`""` / `"mark"` / `"remove"`）と `self.sponsorblock_categories`（カテゴリ ID のリスト）に基づき、`_build_ydl_opts` が `_append_sponsorblock_postprocessors` を呼んで PP を積む。

@@ -7,6 +7,7 @@ import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
+from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 from yt_dlp.utils import DownloadCancelled, download_range_func, parse_duration
 
 from . import get_resource_base
@@ -446,6 +447,13 @@ class Downloader:
 
         # 前回ジョブの中断要求が残っていてもこのジョブには影響させない。
         self._cancel_requested.clear()
+
+        # 区間 DL の事前チェック FFmpegFD.available() は downloader を渡さずに
+        # FFmpegPostProcessor() を生成するため ydl_opts の ffmpeg_location を
+        # 読めず、contextvar 経由でしかバンドル ffmpeg を見つけられない。CLI が
+        # __init__.py で行うのと同じく、このスレッドの contextvar に明示設定する。
+        # （未設定だと PATH に ffmpeg が無いバンドル環境で「ffmpeg not installed」）。
+        FFmpegPostProcessor._ffmpeg_location.set(self._ffmpeg_path)
 
         is_playlist = playlist_title is not None
         extra_info: dict | None = None
