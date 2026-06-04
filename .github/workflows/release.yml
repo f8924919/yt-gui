@@ -87,6 +87,9 @@ jobs:
             *.zip
             dist/*.AppImage
           if-no-files-found: error
+          # 同一実行内の release ジョブへ橋渡しするだけの中間成果物。配布物は Release
+          # アセットに残るため、ストレージ枠を圧迫しないよう短期で自動失効させる。
+          retention-days: 1
 
   # ④ 成果物を集約し、来歴署名（SLSA provenance）を付与して GitHub Release を作成
   release:

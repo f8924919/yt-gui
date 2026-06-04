@@ -116,6 +116,8 @@ python scripts/download_binaries.py --update
 
 `GITHUB_TOKEN` で作成したタグは別ワークフローを再トリガーしない仕様のため、`tag` → `build` → `release` を `needs` で同一実行内に連結している（PAT 不要）。
 
+`build` がアップロードする `dist-*` artifact は、同一実行内の `release` ジョブが `download-artifact` で集約するためだけの中間成果物である。配布物は GitHub Release のアセットとして恒久的に残り（Actions ストレージ枠とは別カウント）、実行完了後に artifact 自体は不要になる。private リポジトリは Actions ストレージの無料枠が小さく、リリースごとに数百 MB の artifact が蓄積すると容量警告に達するため、`upload-artifact` に `retention-days: 1` を設定して翌日に自動失効させている。
+
 ### OS マトリックスと成果物
 
 クロスビルド非対応のため各 OS ランナーでビルドする。
