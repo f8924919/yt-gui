@@ -130,7 +130,9 @@ def test_open_original_dialog_warns_on_empty_url(app, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
 
     monkeypatch.setattr(
-        QMessageBox, "warning", lambda *a, **kw: warned.append(a) or QMessageBox.StandardButton.Ok
+        QMessageBox,
+        "warning",
+        lambda *a, **kw: warned.append(a) or QMessageBox.StandardButton.Ok,
     )
     app.url_entry.clear()
 
@@ -138,3 +140,123 @@ def test_open_original_dialog_warns_on_empty_url(app, monkeypatch):
 
     assert dialog is None
     assert warned
+
+
+# ── 区間ダウンロード（download sections） ───────────────────────────────────
+
+
+def _enable_section(app, start: str, end: str, force: bool = False) -> None:
+    app._section_check.setChecked(True)
+    app._section_start.setText(start)
+    app._section_end.setText(end)
+    app._section_keyframe_check.setChecked(force)
+
+
+def test_section_inputs_hidden_until_enabled(app):
+    assert app._section_inputs.isHidden()
+    app._section_check.setChecked(True)
+    assert not app._section_inputs.isHidden()
+    app._section_check.setChecked(False)
+    assert app._section_inputs.isHidden()
+
+
+def test_read_section_none_when_disabled(app):
+    app._section_check.setChecked(False)
+    assert app._read_section() == (None, None, False)
+
+
+def test_read_section_returns_values_when_enabled(app):
+    _enable_section(app, "00:01:30", "00:04:00", force=True)
+    assert app._read_section() == ("00:01:30", "00:04:00", True)
+
+
+def test_validate_section_ok_when_disabled(app):
+    app._section_check.setChecked(False)
+    assert app._validate_section() is True
+
+
+def test_validate_section_rejects_invalid_time(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    warned = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
+    )
+    _enable_section(app, "abc", "00:04:00")
+    assert app._validate_section() is False
+    assert warned
+
+
+def test_validate_section_rejects_start_after_end(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from yt_gui.i18n import t
+
+    warned = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
+    )
+    _enable_section(app, "00:05:00", "00:04:00")
+    assert app._validate_section() is False
+    assert warned == [t("warn_section_range")]
+
+
+def test_validate_section_ok_with_valid_range(app):
+    _enable_section(app, "90", "4:00")
+    assert app._validate_section() is True
+
+
+def test_playlist_with_section_warns_and_aborts(app, monkeypatch):
+    """取得後にプレイリストと判明し区間指定がある場合は警告して中断する。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    from yt_gui.i18n import t
+
+    warned = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
+    )
+    calls = []
+    monkeypatch.setattr(
+        app.queue, "enqueue_playlist", lambda *a, **k: calls.append(a) or []
+    )
+
+    job = build_job_spec(
+        "fmt_best_mp4", Settings(), section_start="10", section_end="20"
+    )
+    payload = {
+        "result": {
+            "type": "playlist",
+            "entries": [{"id": "a"}],
+            "title": "PL",
+        },
+        "job": job,
+        "format_label": "MP4",
+    }
+    app._on_fetch_for_add_done(payload)
+
+    assert warned == [t("warn_playlist_section")]
+    assert calls == []  # enqueue されない
+
+
+def test_restore_section_from_job_single_edit(app):
+    job = build_job_spec(
+        "fmt_best_mp4",
+        Settings(),
+        section_start="00:01:00",
+        section_end="00:02:00",
+        section_force_keyframes=True,
+    )
+    app._restore_section_from_job(job)
+    assert app._section_check.isChecked() is True
+    assert app._section_start.text() == "00:01:00"
+    assert app._section_end.text() == "00:02:00"
+    assert app._section_keyframe_check.isChecked() is True
+
+
+def test_restore_section_clears_when_no_section(app):
+    _enable_section(app, "10", "20")
+    app._restore_section_from_job(build_job_spec("fmt_best_mp4", Settings()))
+    assert app._section_check.isChecked() is False
+    assert app._section_start.text() == ""
+    assert app._section_inputs.isHidden()

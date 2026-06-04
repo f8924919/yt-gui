@@ -12,7 +12,7 @@
 |---|---|
 | `JobSpec` (`@dataclass(frozen=True)`) | 1 ジョブの実行設定。`Downloader.download_video()` の入力 |
 | `PanelSnapshot` (`@dataclass(frozen=True)`) | `OriginalFormatPanel.get_snapshot()` が返す UI 非依存スナップショット |
-| `build_job_spec(format_id, settings, *, panel=None, mp3_thumb_check=False)` | format_id から JobSpec を組み立てる pure function |
+| `build_job_spec(format_id, settings, *, panel=None, mp3_thumb_check=False, section_start=None, section_end=None, section_force_keyframes=False)` | format_id から JobSpec を組み立てる pure function |
 
 ### `JobSpec` の主要プロパティ
 
@@ -31,6 +31,9 @@
 | `remux_only` | `bool` | コンテナのみ変換 (再エンコ無し) |
 | `orig_settings` | `dict \| None` | panel snapshot の raw dict (復元・nico_comments 取り出し用) |
 | `is_multi_audio` | `bool` | 複数音声ストリーム結合モード (downloader 側の `allow_multiple_audio_streams` 制御) |
+| `section_start` | `str \| None` | 区間ダウンロードの開始時刻（生の入力文字列。`HH:MM:SS` 等）。未指定なら `None` |
+| `section_end` | `str \| None` | 区間ダウンロードの終了時刻（生の入力文字列）。未指定なら `None` |
+| `section_force_keyframes` | `bool` | 区間カット時にキーフレーム境界を再エンコードして正確に合わせるか（既定 `False`） |
 | `is_audio_extraction` (property) | `bool` | `audio_only or format_id == "fmt_mp3"` の派生プロパティ |
 
 ### `build_job_spec` の入力
@@ -41,8 +44,10 @@
 | `settings` | `Settings` | アプリ設定 (解像度・コンテナ・音声形式・ビットレート) |
 | `panel` | `PanelSnapshot \| None` | `fmt_original` のとき必須。`OriginalFormatPanel.get_snapshot()` の返り値 |
 | `mp3_thumb_check` | `bool` | `fmt_mp3` のときのサムネ埋め込みチェック状態。他形式では無視 |
+| `section_start` / `section_end` | `str \| None` | 区間ダウンロードの開始 / 終了時刻（生の文字列）。全 format_id に一律で透過 |
+| `section_force_keyframes` | `bool` | 区間カット時の再エンコード指定。全 format_id に一律で透過 |
 
-`fmt_original` 以外で `panel` を渡しても無視される。`fmt_original` で `panel=None` のときは `ValueError`。
+`fmt_original` 以外で `panel` を渡しても無視される。`fmt_original` で `panel=None` のときは `ValueError`。区間引数は形式非依存で、`build_job_spec` の末尾で `dataclasses.replace` により（区間が指定されていれば）全 format_id の `JobSpec` へ一律付与する。
 
 ### `PanelSnapshot` の構造
 

@@ -32,6 +32,9 @@ def _job(
     subtitle_opts: dict | None = None,
     orig_settings: dict | None = None,
     is_multi_audio: bool = False,
+    section_start: str | None = None,
+    section_end: str | None = None,
+    section_force_keyframes: bool = False,
 ) -> JobSpec:
     return JobSpec(
         format_id=format_id,
@@ -47,6 +50,9 @@ def _job(
         remux_only=remux_only,
         orig_settings=orig_settings,
         is_multi_audio=is_multi_audio,
+        section_start=section_start,
+        section_end=section_end,
+        section_force_keyframes=section_force_keyframes,
     )
 
 
@@ -598,3 +604,136 @@ def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> 
     downloader._run_download = _run
     downloader.download_video("https://example.com/v", _job())
     assert seen["cancel_set"] is False  # ジョブ開始時にクリアされている
+
+
+# ── 区間ダウンロード（フル取得 → ローカル切り出し） ─────────────────────────
+
+
+def test_section_omits_native_download_ranges(downloader, tmp_path) -> None:
+    """方針 A ではフル取得後にローカルで切り出すため、yt-dlp の
+    download_ranges / force_keyframes_at_cuts は一切渡さない。"""
+    opts = downloader._build_ydl_opts(
+        _job(section_start="00:01:30", section_end="00:04:00"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "download_ranges" not in opts
+    assert "force_keyframes_at_cuts" not in opts
+
+
+def test_build_cut_cmd_copy_mode_uses_input_seek_and_copy() -> None:
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg", "in.mp4", "out.mp4", "00:01:00", "00:01:05", force_keyframes=False
+    )
+    # 入力側シーク（-i より前に -ss/-to）+ stream copy
+    assert cmd == [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        "00:01:00",
+        "-to",
+        "00:01:05",
+        "-i",
+        "in.mp4",
+        "-c",
+        "copy",
+        "out.mp4",
+    ]
+
+
+def test_build_cut_cmd_force_keyframes_uses_output_seek_and_reencode() -> None:
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg", "in.mp4", "out.mp4", "10", "20", force_keyframes=True
+    )
+    # 出力側シーク（-i の後に -ss/-to）・-c copy なし（再エンコード）
+    assert cmd == [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        "in.mp4",
+        "-ss",
+        "10",
+        "-to",
+        "20",
+        "out.mp4",
+    ]
+    assert "copy" not in cmd
+
+
+def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypatch):
+    downloader.status_callback = lambda *a, **k: None
+    # CI にはバンドル ffmpeg が無いため、実在するダミーを指す
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    captured = {}
+
+    def _fake_run(cmd, **kwargs):
+        # ffmpeg の代わりに out ファイルを生成
+        captured["cmd"] = cmd
+        with open(cmd[-1], "w") as f:
+            f.write("CUT")
+
+        class _R:
+            returncode = 0
+
+        return _R()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+
+    downloader._cut_section(stem, ".mp4", _job(section_start="00:00:01", section_end="00:00:02"))
+
+    assert infile.read_text() == "CUT"  # 原本が切り出し結果で置換された
+    assert not (tmp_path / "動画.section.mp4").exists()  # 一時ファイルは残らない
+
+
+def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
+    downloader.status_callback = lambda *a, **k: None
+    logs = []
+    downloader.log_callback = logs.append
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    import subprocess as _sp
+
+    def _fail_run(cmd, **kwargs):
+        raise _sp.CalledProcessError(1, cmd, stderr="boom")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fail_run)
+
+    downloader._cut_section(stem, ".mp4", _job(section_start="1", section_end="2"))
+
+    assert infile.read_text() == "ORIGINAL"  # 失敗時はフル動画を保持
+    assert any("boom" in m for m in logs)
+
+
+def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_path):
+    downloader.status_callback = lambda *a, **k: None
+    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+    downloader._run_download = lambda *a, **k: None
+
+    calls = []
+    downloader._cut_section = lambda stem, ext, job: calls.append((stem, ext, job))
+
+    job = _job(section_start="00:00:01", section_end="00:00:02")
+    downloader.download_video("https://example.com/v", job)
+    assert len(calls) == 1
+
+    calls.clear()
+    downloader.download_video("https://example.com/v", _job())  # 区間なし
+    assert calls == []

@@ -170,6 +170,21 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 設定変更は `App._open_settings()` から `self.downloader.rate_limit = build_rate_limit(...)` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
 
+### 区間ダウンロード
+
+指定区間だけを取得する機能だが、**yt-dlp のネイティブ区間 DL（`download_ranges`）は使わない**。`download_ranges` は YouTube の `https` / DASH フォーマットでは部分取得を `FFmpegFD`（ffmpeg にネットワークから直接取得させる経路）に委ねるが、バンドル ffmpeg のネットワーク入力は不安定で、環境によってクラッシュ / ハングするため。
+
+代わりに **フル取得 → ローカル ffmpeg 切り出し** の 2 段構えで実装する。
+
+- `_build_ydl_opts` は区間関連の opt を一切付与しない（`download_ranges` / `force_keyframes_at_cuts` を渡さない）。動画は従来どおりの安定した経路でフル取得・結合する。
+- `download_video` は `_run_download` 成功後、`JobSpec.section_start` と `section_end` が両方あるとき `_cut_section(stem, final_ext, job)` を呼ぶ。最終出力ファイル（`{stem}{final_ext}`）から区間を切り出し、原本を置き換える。ネットワークを伴わないローカル ffmpeg 処理のため安定する。
+- 切り出しコマンドは純関数 `_build_cut_cmd(ffmpeg, infile, outfile, start, end, force_keyframes)` で生成する（テスト容易性のため分離）。
+  - `force_keyframes=False`（既定）: `-ss start -to end -i infile -c copy`。入力側シーク + stream copy で高速・無劣化だが、カット境界は最寄りのキーフレームに揃う。
+  - `force_keyframes=True`: `-i infile -ss start -to end`（再エンコード）。出力側シークで指定時刻に正確だが遅い。
+- 一時ファイル `{stem}.section{final_ext}` に書き出し、成功時のみ `os.replace` で原本へ上書きする。前提ファイル不在・ffmpeg 欠如・切り出し失敗はいずれも**非致命**としてログのみ残し、フル動画は保持する。
+- 区間は動画固有・形式非依存の実行設定なので、`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec`（`section_start` / `section_end` / `section_force_keyframes`）に持つ。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
+- **トレードオフ**: フル動画をダウンロードしてから切り出すため**通信量の節約にはならない**。出力は区間クリップだが、取得量は動画全体。これは安定性（ネットワーク ffmpeg を避ける）を優先した結果。
+
 ### SponsorBlock
 
 `self.sponsorblock_mode`（`""` / `"mark"` / `"remove"`）と `self.sponsorblock_categories`（カテゴリ ID のリスト）に基づき、`_build_ydl_opts` が `_append_sponsorblock_postprocessors` を呼んで PP を積む。

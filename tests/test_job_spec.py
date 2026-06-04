@@ -287,3 +287,42 @@ def test_jobspec_eq() -> None:
         orig_settings=None,
         is_multi_audio=False,
     )
+
+
+# ── 区間ダウンロード (section_*) ───────────────────────────────────────────
+
+
+def test_section_defaults_to_none() -> None:
+    # 区間引数を渡さなければ全 format_id で None / None / False
+    for fmt in ("fmt_best_mp4", "fmt_720p", "fmt_mp3"):
+        job = build_job_spec(fmt, Settings())
+        assert job.section_start is None
+        assert job.section_end is None
+        assert job.section_force_keyframes is False
+
+
+@pytest.mark.parametrize("fmt", ["fmt_best_mp4", "fmt_720p", "fmt_mp3"])
+def test_section_passed_through_all_formats(fmt: str) -> None:
+    job = build_job_spec(
+        fmt,
+        Settings(),
+        section_start="00:01:30",
+        section_end="00:04:00",
+        section_force_keyframes=True,
+    )
+    assert job.section_start == "00:01:30"
+    assert job.section_end == "00:04:00"
+    assert job.section_force_keyframes is True
+
+
+def test_section_passed_through_original() -> None:
+    job = build_job_spec(
+        "fmt_original",
+        Settings(),
+        panel=_panel(),
+        section_start="10",
+        section_end="20",
+    )
+    assert job.section_start == "10"
+    assert job.section_end == "20"
+    assert job.section_force_keyframes is False

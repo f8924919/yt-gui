@@ -13,7 +13,7 @@ pure function とする (UI 依存ゼロ、テスト容易)。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .formats import build_720p_spec, build_best_spec
@@ -62,6 +62,11 @@ class JobSpec:
     remux_only: bool
     orig_settings: dict | None
     is_multi_audio: bool
+    # 区間ダウンロード (yt-dlp --download-sections 相当)。生の入力文字列を保持し、
+    # 秒への変換は downloader 側で行う。形式非依存・アイテム単位。
+    section_start: str | None = None
+    section_end: str | None = None
+    section_force_keyframes: bool = False
 
     @property
     def is_audio_extraction(self) -> bool:
@@ -75,13 +80,35 @@ def build_job_spec(
     *,
     panel: PanelSnapshot | None = None,
     mp3_thumb_check: bool = False,
+    section_start: str | None = None,
+    section_end: str | None = None,
+    section_force_keyframes: bool = False,
 ) -> JobSpec:
     """`format_id` から `JobSpec` を組み立てる pure function。
 
     - `fmt_original` のときは `panel` 必須。
     - `fmt_mp3` のときは `mp3_thumb_check` がサムネ埋め込みチェック状態。
+    - `section_*` は区間ダウンロードの設定。形式非依存で、指定されていれば
+      末尾で全 format_id の JobSpec へ一律付与する。
     - その他の format_id でも防御的に値を返す (catch-all)。
     """
+    spec = _dispatch_job_spec(format_id, settings, panel, mp3_thumb_check)
+    if section_start or section_end or section_force_keyframes:
+        spec = replace(
+            spec,
+            section_start=section_start,
+            section_end=section_end,
+            section_force_keyframes=section_force_keyframes,
+        )
+    return spec
+
+
+def _dispatch_job_spec(
+    format_id: str,
+    settings: Settings,
+    panel: PanelSnapshot | None,
+    mp3_thumb_check: bool,
+) -> JobSpec:
     if format_id == _ORIGINAL_KEY:
         if panel is None:
             raise ValueError("panel is required for fmt_original")
