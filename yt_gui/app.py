@@ -46,7 +46,7 @@ from .settings import (
 from .settings_dialog import SettingsDialog
 from .threading_utils import run_in_thread
 from .thumbnail_cache import ThumbnailCache
-from .utils import strip_ansi
+from .utils import parse_time_to_seconds, strip_ansi
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
@@ -168,6 +168,10 @@ class _QueueTree(QTreeWidget):
                         )
                         sub_lbl = t("tooltip_subtitle")
                         lines.append(f"<b>{sub_lbl}:</b> {langs}  {fmt}  {embed_lbl}")
+                    if qi.job.section_start or qi.job.section_end:
+                        s = qi.job.section_start or ""
+                        e = qi.job.section_end or ""
+                        lines.append(f"<b>{t('tooltip_section')}:</b> {s}〜{e}")
                     if qi.format_id == _ORIGINAL_KEY and qi.job.format_spec:
                         lines.append(
                             f"<b>{t('tooltip_format_spec')}:</b> {qi.job.format_spec}"
@@ -474,7 +478,11 @@ class App(QMainWindow):
         self._mp3_frame.setVisible(False)
         layout.addWidget(self._mp3_frame, 2, 1, 1, 2)
 
-        # Row 3: Add / Apply-edit button + Cancel-edit button
+        # Row 3: 区間ダウンロード（形式非依存・常時表示）。チェック時のみ入力群を表示。
+        self._section_frame = self._build_section_widget()
+        layout.addWidget(self._section_frame, 3, 0, 1, 3)
+
+        # Row 4: Add / Apply-edit button + Cancel-edit button
         add_frame = QWidget()
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(0, 8, 0, 2)
@@ -486,7 +494,7 @@ class App(QMainWindow):
         self._cancel_edit_button.setVisible(False)
         add_layout.addWidget(self._cancel_edit_button)
         add_layout.addStretch()
-        layout.addWidget(add_frame, 3, 0, 1, 3)
+        layout.addWidget(add_frame, 4, 0, 1, 3)
 
         # 上段は sizeHint 固定。詳細設定が別画面化したため上段は伸縮せず、
         # 旧 QSplitter（上段/キューの比率調整）は不要になった。
@@ -579,6 +587,85 @@ class App(QMainWindow):
         else:
             self._mp3_frame.setVisible(False)
 
+    # ── download sections (区間ダウンロード) ────────────────────────────────────
+
+    def _build_section_widget(self) -> QWidget:
+        """区間ダウンロードの入力群を組み立てる。
+
+        有効化チェック（常時表示）と、チェック時のみ表示する入力群（開始 / 終了 /
+        再エンコードトグル）からなる。"""
+        frame = QWidget()
+        vbox = QVBoxLayout(frame)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(2)
+
+        self._section_check = QCheckBox(t("section_enable"))
+        self._section_check.toggled.connect(self._on_section_toggled)
+        vbox.addWidget(self._section_check)
+
+        self._section_inputs = QWidget()
+        row = QHBoxLayout(self._section_inputs)
+        row.setContentsMargins(16, 0, 0, 0)
+        row.addWidget(QLabel(t("section_start")))
+        self._section_start = QLineEdit()
+        self._section_start.setPlaceholderText("00:01:30")
+        self._section_start.setMaximumWidth(110)
+        row.addWidget(self._section_start)
+        row.addWidget(QLabel(t("section_end")))
+        self._section_end = QLineEdit()
+        self._section_end.setPlaceholderText("00:04:00")
+        self._section_end.setMaximumWidth(110)
+        row.addWidget(self._section_end)
+        self._section_keyframe_check = QCheckBox(t("section_force_keyframes"))
+        row.addWidget(self._section_keyframe_check)
+        row.addStretch()
+        self._section_inputs.setVisible(False)
+        vbox.addWidget(self._section_inputs)
+
+        return frame
+
+    def _on_section_toggled(self, checked: bool) -> None:
+        self._section_inputs.setVisible(checked)
+
+    def _read_section(self) -> tuple[str | None, str | None, bool]:
+        """UI から区間設定を読み取る。チェック無効なら (None, None, False)。"""
+        if not self._section_check.isChecked():
+            return None, None, False
+        return (
+            self._section_start.text().strip() or None,
+            self._section_end.text().strip() or None,
+            self._section_keyframe_check.isChecked(),
+        )
+
+    def _validate_section(self) -> bool:
+        """区間チェック時の入力検証。OK（または無効）なら True。
+
+        不正時は警告を表示して False を返す。"""
+        if not self._section_check.isChecked():
+            return True
+        start = parse_time_to_seconds(self._section_start.text())
+        end = parse_time_to_seconds(self._section_end.text())
+        if start is None or end is None:
+            QMessageBox.warning(self, t("warn_title"), t("warn_section_invalid"))
+            return False
+        if start >= end:
+            QMessageBox.warning(self, t("warn_title"), t("warn_section_range"))
+            return False
+        return True
+
+    def _set_section_enabled(self, enabled: bool) -> None:
+        """区間 UI 全体の有効 / 無効を切り替える（複数アイテム編集時に無効化）。"""
+        self._section_frame.setEnabled(enabled)
+
+    def _restore_section_from_job(self, job: JobSpec) -> None:
+        """編集モードで対象アイテムの区間設定を UI へ復元する。"""
+        has_section = bool(job.section_start or job.section_end)
+        self._section_check.setChecked(has_section)
+        self._section_start.setText(job.section_start or "")
+        self._section_end.setText(job.section_end or "")
+        self._section_keyframe_check.setChecked(job.section_force_keyframes)
+        self._section_inputs.setVisible(has_section)
+
     # ── queue operations ──────────────────────────────────────────────────────
 
     def _add_url(self):
@@ -596,13 +683,24 @@ class App(QMainWindow):
         cookies_path, cookies_browser = self._resolve_cookies()
 
         # オリジナル形式の追加は「詳細設定...」ダイアログ側で行う
-        # （その場合この「追加」ボタンは非表示）。
+        # （その場合この「追加」ボタンは非表示）。区間検証はダイアログ側で実施。
         if format_id == _ORIGINAL_KEY:
             self._open_original_dialog()
             return
 
+        if not self._validate_section():
+            return
+
         mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-        job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
+        section_start, section_end, section_force = self._read_section()
+        job = build_job_spec(
+            format_id,
+            self._settings,
+            mp3_thumb_check=mp3_thumb,
+            section_start=section_start,
+            section_end=section_end,
+            section_force_keyframes=section_force,
+        )
         self._start_add_thread(url, cookies_path, cookies_browser, job, format_label)
 
     # ── original format dialog ─────────────────────────────────────────────────
@@ -616,6 +714,9 @@ class App(QMainWindow):
         edit_mode = self.queue.edit_mode
         if not edit_mode and not self.url_entry.text().strip():
             QMessageBox.warning(self, t("warn_title"), t("warn_no_url"))
+            return None
+
+        if not self._validate_section():
             return None
 
         restore_settings = None
@@ -657,7 +758,15 @@ class App(QMainWindow):
         format_label = self.format_combo.currentText()
         audio_only = panel.get_audio_only()
         snapshot = panel.get_snapshot()
-        job = build_job_spec(_ORIGINAL_KEY, self._settings, panel=snapshot)
+        section_start, section_end, section_force = self._read_section()
+        job = build_job_spec(
+            _ORIGINAL_KEY,
+            self._settings,
+            panel=snapshot,
+            section_start=section_start,
+            section_end=section_end,
+            section_force_keyframes=section_force,
+        )
         self._notify_container_promotion_if_needed(job)
         self._notify_audio_only_truncated_if_needed(
             snapshot.has_multiple_audio, audio_only
@@ -740,6 +849,11 @@ class App(QMainWindow):
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
         else:
+            # 区間指定はプレイリストに適用できない（取得後に判明するため後追いで弾く）。
+            if job.section_start or job.section_end:
+                QMessageBox.warning(self, t("warn_title"), t("warn_playlist_section"))
+                self._signals.status_update.emit(t("status_ready"), 0)
+                return
             if format_id == _ORIGINAL_KEY:
                 QMessageBox.warning(
                     self, t("warn_title"), t("warn_playlist_original_fmt")
@@ -796,10 +910,17 @@ class App(QMainWindow):
 
         first = items[0]
         target_format_id = first.format_id
-        if len(items) > 1:
+        is_multi = len(items) > 1
+        if is_multi:
             self._set_original_format_enabled(False)
             if target_format_id == _ORIGINAL_KEY:
                 target_format_id = FORMAT_KEYS[0]
+
+        # 区間: 単一編集なら復元、複数編集なら無効化（1 区間を複数動画へ適用させない）。
+        if is_multi:
+            self._set_section_enabled(False)
+        else:
+            self._restore_section_from_job(first.job)
 
         if target_format_id in FORMAT_KEYS:
             idx = FORMAT_KEYS.index(target_format_id)
@@ -840,8 +961,19 @@ class App(QMainWindow):
             self._open_original_dialog()
             return
 
+        if not self._validate_section():
+            return
+
         mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-        job = build_job_spec(format_id, self._settings, mp3_thumb_check=mp3_thumb)
+        section_start, section_end, section_force = self._read_section()
+        job = build_job_spec(
+            format_id,
+            self._settings,
+            mp3_thumb_check=mp3_thumb,
+            section_start=section_start,
+            section_end=section_end,
+            section_force_keyframes=section_force,
+        )
         self.queue.apply_edit(format_label, job)
 
     def _cancel_edit(self):
@@ -856,6 +988,7 @@ class App(QMainWindow):
         self._cancel_edit_button.setVisible(False)
 
         self._set_original_format_enabled(True)
+        self._set_section_enabled(True)
 
         if not self.queue.is_running:
             self.start_queue_button.setEnabled(True)

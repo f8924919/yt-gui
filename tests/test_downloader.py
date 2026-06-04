@@ -32,6 +32,9 @@ def _job(
     subtitle_opts: dict | None = None,
     orig_settings: dict | None = None,
     is_multi_audio: bool = False,
+    section_start: str | None = None,
+    section_end: str | None = None,
+    section_force_keyframes: bool = False,
 ) -> JobSpec:
     return JobSpec(
         format_id=format_id,
@@ -47,6 +50,9 @@ def _job(
         remux_only=remux_only,
         orig_settings=orig_settings,
         is_multi_audio=is_multi_audio,
+        section_start=section_start,
+        section_end=section_end,
+        section_force_keyframes=section_force_keyframes,
     )
 
 
@@ -598,3 +604,71 @@ def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> 
     downloader._run_download = _run
     downloader.download_video("https://example.com/v", _job())
     assert seen["cancel_set"] is False  # ジョブ開始時にクリアされている
+
+
+# ── 区間ダウンロード (download_ranges) ─────────────────────────────────────
+
+
+def test_download_sections_default_omits_opts(downloader, tmp_path) -> None:
+    # 区間未指定 (両方 None) のときは download_ranges / force_keyframes を渡さない
+    opts = downloader._build_ydl_opts(
+        _job(),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "download_ranges" not in opts
+    assert "force_keyframes_at_cuts" not in opts
+
+
+def test_download_sections_sets_download_ranges(downloader, tmp_path) -> None:
+    opts = downloader._build_ydl_opts(
+        _job(section_start="00:01:30", section_end="00:04:00"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    # download_ranges は callable (yt_dlp.utils.download_range_func の戻り値)
+    assert callable(opts["download_ranges"])
+    # 既定では force_keyframes_at_cuts は付かない
+    assert "force_keyframes_at_cuts" not in opts
+
+    # 解決された区間 (秒) を info_dict 経由で検証する
+    ranges = list(opts["download_ranges"]({"duration": 600}, None))
+    assert len(ranges) == 1
+    assert ranges[0]["start_time"] == 90.0
+    assert ranges[0]["end_time"] == 240.0
+
+
+def test_download_sections_accepts_mm_ss_and_seconds(downloader, tmp_path) -> None:
+    opts = downloader._build_ydl_opts(
+        _job(section_start="90", section_end="4:00"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    ranges = list(opts["download_ranges"]({"duration": 600}, None))
+    assert ranges[0]["start_time"] == 90.0
+    assert ranges[0]["end_time"] == 240.0
+
+
+def test_download_sections_force_keyframes_when_enabled(downloader, tmp_path) -> None:
+    opts = downloader._build_ydl_opts(
+        _job(
+            section_start="00:00:10",
+            section_end="00:00:20",
+            section_force_keyframes=True,
+        ),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert opts["force_keyframes_at_cuts"] is True

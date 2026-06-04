@@ -7,7 +7,7 @@ import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.utils import DownloadCancelled
+from yt_dlp.utils import DownloadCancelled, download_range_func, parse_duration
 
 from . import get_resource_base
 from .i18n import t
@@ -537,6 +537,15 @@ class Downloader:
 
         if job.is_multi_audio:
             ydl_opts["allow_multiple_audio_streams"] = True
+
+        # 区間ダウンロード（yt-dlp --download-sections 相当）。生の時刻文字列を
+        # 秒へ変換し download_ranges を設定する。区間未指定なら opt を渡さない。
+        if job.section_start or job.section_end:
+            start = parse_duration(job.section_start) or 0.0
+            end = parse_duration(job.section_end)
+            ydl_opts["download_ranges"] = download_range_func([], [(start, end)])
+            if job.section_force_keyframes:
+                ydl_opts["force_keyframes_at_cuts"] = True
 
         if job.is_audio_extraction:
             self._append_audio_postprocessors(ydl_opts, job)

@@ -170,6 +170,15 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 設定変更は `App._open_settings()` から `self.downloader.rate_limit = build_rate_limit(...)` で即時反映され、次のジョブから反映される（既存キューアイテムのスナップショットには含めない）。
 
+### 区間ダウンロード
+
+`JobSpec.section_start` / `section_end`（生の時刻文字列）が指定されているとき、`_build_ydl_opts` が `download_ranges` を付与する（yt-dlp CLI の `--download-sections` 相当）。
+
+- 時刻文字列は `yt_dlp.utils.parse_duration` で秒（float）へ変換し、`yt_dlp.utils.download_range_func([], [(start, end)])` を `ydl_opts["download_ranges"]` に設定する（チャプター正規表現は未対応のため第 1 引数は空リスト）。
+- `JobSpec.section_force_keyframes` が `True` のとき `ydl_opts["force_keyframes_at_cuts"] = True` を付与する。カット境界を再エンコードして指定時刻に正確に合わせる（既定 `False` はキーフレーム境界で高速・無劣化）。
+- 上記 3 オプション（`concurrent_fragments` / `rate_limit` / `sponsorblock`）と異なり、**`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec` に持つ**。区間は動画固有・形式非依存の実行設定であり、アイテムごとにスナップショットされるため。
+- 区間未指定（両方 `None`）のときは opt を渡さない。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
+
 ### SponsorBlock
 
 `self.sponsorblock_mode`（`""` / `"mark"` / `"remove"`）と `self.sponsorblock_categories`（カテゴリ ID のリスト）に基づき、`_build_ydl_opts` が `_append_sponsorblock_postprocessors` を呼んで PP を積む。
