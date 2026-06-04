@@ -669,6 +669,10 @@ def test_build_cut_cmd_force_keyframes_uses_output_seek_and_reencode() -> None:
 
 def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypatch):
     downloader.status_callback = lambda *a, **k: None
+    # CI にはバンドル ffmpeg が無いため、実在するダミーを指す
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
     stem = str(tmp_path / "動画")
     infile = tmp_path / "動画.mp4"
     infile.write_text("ORIGINAL")
@@ -698,6 +702,9 @@ def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
     downloader.status_callback = lambda *a, **k: None
     logs = []
     downloader.log_callback = logs.append
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
     stem = str(tmp_path / "動画")
     infile = tmp_path / "動画.mp4"
     infile.write_text("ORIGINAL")
