@@ -68,7 +68,7 @@ on: push (branches: main)
 ### 次セッションの再開手順
 
 1. トークンに `workflow` スコープが付いていることを確認（`gh auth status`）。
-2. ブランチ確認: `git checkout feature/5-release-workflow`（ローカルコミット `617a0c6` が残っているはず）。
+2. ブランチ確認: `git checkout feature/5-release-workflow`（当時の WIP ローカルコミットが残っているはず）。
 3. **コミット時の注意（重要・環境固有）**: `/c/` マウント FS は `O_TRUNC`（`>` 上書き）が効かず、`.git/COMMIT_EDITMSG` に旧メッセージのしっぽが残留し、新コミットへ混入する（実害確認済み）。加えて locale が `POSIX` のため heredoc 経由だと日本語が壊れる。日本語メッセージは必ず次の手順でコミットすること:
    1. メッセージを `/tmp/`（linux 側 FS）にファイルとして用意（Write ツール推奨）。
    2. **`rm -f .git/COMMIT_EDITMSG`** で削除（truncate は効かないので `rm` する）。
