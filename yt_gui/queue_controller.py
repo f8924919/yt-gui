@@ -410,5 +410,7 @@ class QueueController(QObject):
         for item in marked:
             self.refresh_tree_item(item)
         if marked:
-            self.log_message.emit(t("log_ignore_archive_marked").format(count=len(marked)))
+            self.log_message.emit(
+                t("log_ignore_archive_marked").format(count=len(marked))
+            )
         return len(marked)
