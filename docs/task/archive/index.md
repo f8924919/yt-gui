@@ -78,3 +78,4 @@
 | [refine-docs.md](refine-docs.md) | CLAUDE.md と docs 構成の改善（言語ルール追加・arch/build ハブ新設・双方向リンク） | 2026-05-16 |
 | [evaluator-agent.md](evaluator-agent.md) | evaluator サブエージェント新設（計画・生成・評価の3分離）。受け入れ条件・spec の充足を独立評価（Opus）、feature/bugfix/hotfix で必須（Issue #99 / PR #100） | 2026-06-07 |
 | [skill-layer.md](skill-layer.md) | Skills 層の新設。PR 前検証ゲート `/verify-gate` とマージ後処理 `/finish-task` を追加し git-workflow §5.3 に位置づけ。skill はルールを再定義せず正本を参照（Issue #102 / PR #103） | 2026-06-07 |
+| [start-task-skill.md](start-task-skill.md) | ワークフロー前半（§5 step 1-6）の入口 skill `/start-task` を新設。docs 先・テスト先の順序ゲートで実装先行を防止。判断ステップは確認ゲートに留め自動化しない（Issue #105 / PR #106） | 2026-06-07 |
