@@ -44,3 +44,18 @@ def test_t_falls_back_to_japanese_when_key_missing_in_current_language(
 def test_t_returns_key_when_missing_everywhere() -> None:
     set_language("ja")
     assert t("nonexistent_key_xyz") == "nonexistent_key_xyz"
+
+
+def test_all_locales_share_identical_keys() -> None:
+    """全言語ファイルは同一キー集合を持つ（翻訳漏れがフォールバックで隠れるのを防ぐ）。
+
+    対応仕様: docs/spec/i18n.md § キーの整合性（全言語で同一キー）
+    """
+    key_sets = {lang: set(strings) for lang, strings in i18n._LANGUAGES.items()}
+    base_lang, base_keys = next(iter(key_sets.items()))
+    for lang, keys in key_sets.items():
+        assert keys == base_keys, (
+            f"{lang} のキーが {base_lang} と不一致: "
+            f"{base_lang}のみ={sorted(base_keys - keys)} / "
+            f"{lang}のみ={sorted(keys - base_keys)}"
+        )
