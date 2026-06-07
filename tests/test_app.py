@@ -39,11 +39,12 @@ def _make_item(status: str, url: str = "https://example.com/v") -> _QueueItem:
 @pytest.fixture
 def queue_tree(qtbot):
     """`_QueueTree` を単体構築する。`is_editing` は `state["editing"]` を返す。"""
-    state = {"editing": False}
+    state = {"editing": False, "archive_enabled": False}
     tree = _QueueTree(
         get_item=lambda ti: None,
         get_thumbnail_b64=lambda url: None,
         is_editing=lambda: state["editing"],
+        is_archive_enabled=lambda: state["archive_enabled"],
     )
     qtbot.addWidget(tree)
     return tree, state

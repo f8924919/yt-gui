@@ -35,6 +35,7 @@ def _job(
     section_start: str | None = None,
     section_end: str | None = None,
     section_force_keyframes: bool = False,
+    ignore_archive: bool = False,
 ) -> JobSpec:
     return JobSpec(
         format_id=format_id,
@@ -53,6 +54,7 @@ def _job(
         section_start=section_start,
         section_end=section_end,
         section_force_keyframes=section_force_keyframes,
+        ignore_archive=ignore_archive,
     )
 
 
@@ -351,6 +353,99 @@ def test_download_archive_passed_when_set(tmp_path) -> None:
     )
 
     assert opts["download_archive"] == archive
+
+
+def test_download_archive_omitted_when_ignore_archive(tmp_path) -> None:
+    # アイテム単位の ignore_archive=True なら、アーカイブ有効でも opt を渡さない
+    archive = str(tmp_path / "archive.txt")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
+    opts = dl._build_ydl_opts(
+        _job(ignore_archive=True),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "download_archive" not in opts
+
+
+def test_resolve_unique_path_skips_archive_check_when_ignore_archive(
+    tmp_path, monkeypatch
+) -> None:
+    # ignore_archive=True のときは in_download_archive を見ず DownloadSkipped を出さない
+    import yt_gui.downloader as dl_mod
+
+    archive = str(tmp_path / "archive.txt")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
+
+    in_archive_called = {"n": 0}
+
+    class _FakeYDL:
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def extract_info(self, url, download, extra_info=None):
+            return {"id": "vid", "extractor_key": "Youtube"}
+
+        def in_download_archive(self, info):
+            in_archive_called["n"] += 1
+            return True  # 記録済みを模す
+
+        def prepare_filename(self, info):
+            return str(tmp_path / "動画.mp4")
+
+    monkeypatch.setattr(dl_mod, "YoutubeDL", _FakeYDL)
+
+    # ignore_archive=True: 記録済みでも DownloadSkipped を出さない
+    stem, ext = dl._resolve_unique_path(
+        {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
+    )
+    assert ext == ".mp4"
+    assert in_archive_called["n"] == 0  # 照合自体をスキップ
+
+
+def test_resolve_unique_path_raises_skipped_when_recorded(
+    tmp_path, monkeypatch
+) -> None:
+    # 対照: ignore_archive=False なら従来どおり記録済みで DownloadSkipped
+    import yt_gui.downloader as dl_mod
+    from yt_gui.downloader import DownloadSkipped
+
+    archive = str(tmp_path / "archive.txt")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
+
+    class _FakeYDL:
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def extract_info(self, url, download, extra_info=None):
+            return {"id": "vid", "extractor_key": "Youtube"}
+
+        def in_download_archive(self, info):
+            return True
+
+        def prepare_filename(self, info):
+            return str(tmp_path / "動画.mp4")
+
+    monkeypatch.setattr(dl_mod, "YoutubeDL", _FakeYDL)
+
+    with pytest.raises(DownloadSkipped):
+        dl._resolve_unique_path(
+            {}, "https://example.com/v", _job(ignore_archive=False), extra_info=None
+        )
 
 
 def test_filter_unarchived_entries_disabled_returns_all(tmp_path) -> None:
@@ -692,7 +787,9 @@ def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypa
 
     monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
 
-    downloader._cut_section(stem, ".mp4", _job(section_start="00:00:01", section_end="00:00:02"))
+    downloader._cut_section(
+        stem, ".mp4", _job(section_start="00:00:01", section_end="00:00:02")
+    )
 
     assert infile.read_text() == "CUT"  # 原本が切り出し結果で置換された
     assert not (tmp_path / "動画.section.mp4").exists()  # 一時ファイルは残らない

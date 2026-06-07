@@ -53,6 +53,14 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 | `edit_mode` (property) | 現在編集モードか |
 | `editing_items` (property) | 編集中アイテムリスト (コピー) |
 
+### アーカイブ無視（再取得）
+
+| メソッド | 説明 |
+|---|---|
+| `mark_ignore_archive(items) -> int` | 引数のうち `waiting` のアイテムの `job` を `dataclasses.replace(job, ignore_archive=True)` に差し替え、ダウンロードアーカイブの照合・スキップ対象から外す。差し替えた行を再描画し、件数をログ出力して返す。`downloading` / `editing` 等は対象外。動作仕様は[アイテム単位でアーカイブを無視して再取得](../spec/features/download-behavior.md#アイテム単位でアーカイブを無視して再取得) |
+
+「形式を変更」で編集すると `apply_edit` が `build_job_spec` 由来の新 `job` で差し替えるため、`ignore_archive` は `False` に戻る（[job_spec.md](job_spec.md)）。
+
 ### 表示更新
 
 | メソッド | 説明 |

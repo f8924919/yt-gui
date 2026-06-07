@@ -83,6 +83,7 @@ class _QueueTree(QTreeWidget):
     """
 
     edit_format_requested = Signal(list)  # list[_QueueItem]
+    ignore_archive_refetch_requested = Signal(list)  # list[_QueueItem]
 
     def __init__(
         self,
@@ -91,11 +92,13 @@ class _QueueTree(QTreeWidget):
         get_item: Callable[[object], _QueueItem | None],
         get_thumbnail_b64: Callable[[str], str | None],
         is_editing: Callable[[], bool],
+        is_archive_enabled: Callable[[], bool],
     ):
         super().__init__(parent)
         self._get_item = get_item
         self._get_thumbnail_b64 = get_thumbnail_b64
         self._is_editing = is_editing
+        self._is_archive_enabled = is_archive_enabled
 
     def mousePressEvent(self, event):
         # 修飾キーなしの左クリックで選択済みアイテムを再クリックした場合は解除する
@@ -130,12 +133,20 @@ class _QueueTree(QTreeWidget):
         menu.addSeparator()
         act_edit = menu.addAction(t("ctx_edit_format"))
         act_edit.setEnabled(bool(targets))
+        act_ignore_archive = None
+        if self._is_archive_enabled():
+            act_ignore_archive = menu.addAction(t("ctx_ignore_archive_refetch"))
+            act_ignore_archive.setEnabled(bool(targets))
         chosen = menu.exec(event.globalPos())
         if chosen == act_copy_url:
             urls = "\n".join(qi.url for qi in items)
             QApplication.clipboard().setText(urls)
         elif chosen == act_edit and targets:
             self.edit_format_requested.emit(targets)
+        elif (
+            act_ignore_archive is not None and chosen == act_ignore_archive and targets
+        ):
+            self.ignore_archive_refetch_requested.emit(targets)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.Type.ToolTip:
@@ -175,6 +186,11 @@ class _QueueTree(QTreeWidget):
                     if qi.format_id == _ORIGINAL_KEY and qi.job.format_spec:
                         lines.append(
                             f"<b>{t('tooltip_format_spec')}:</b> {qi.job.format_spec}"
+                        )
+                    if qi.job.ignore_archive:
+                        lines.append(
+                            f"<b>{t('tooltip_ignore_archive')}:</b> "
+                            f"{t('tooltip_ignore_archive_on')}"
                         )
                     QToolTip.showText(
                         event.globalPos(),
@@ -515,8 +531,12 @@ class App(QMainWindow):
             get_item=lambda ti: self.queue.find_item_for(ti),
             get_thumbnail_b64=self._thumbnail_cache.get,
             is_editing=lambda: self.queue.edit_mode,
+            is_archive_enabled=lambda: self._settings.download_archive_enabled,
         )
         self._queue_tree.edit_format_requested.connect(self._enter_edit_mode)
+        self._queue_tree.ignore_archive_refetch_requested.connect(
+            self._ignore_archive_refetch
+        )
         self._queue_tree.setColumnCount(4)
         self._queue_tree.setHeaderLabels(
             ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
@@ -899,6 +919,10 @@ class App(QMainWindow):
     def _enter_edit_mode(self, items: list[_QueueItem]):
         """`_QueueTree` のコンテキストメニューから呼ばれる。"""
         self.queue.enter_edit_mode(items)
+
+    def _ignore_archive_refetch(self, items: list[_QueueItem]):
+        """`_QueueTree` の「アーカイブを無視して再取得」から呼ばれる（#76）。"""
+        self.queue.mark_ignore_archive(items)
 
     def _on_edit_mode_entered(self, items: list[_QueueItem]) -> None:
         """QueueController からの通知を受けて UI を編集モードに整える。"""

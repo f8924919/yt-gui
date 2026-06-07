@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QColor
@@ -389,3 +389,26 @@ class QueueController(QObject):
         self._edit_mode = False
         self._editing_items = []
         self.edit_mode_exited.emit()
+
+    # ── アーカイブ無視（再取得） ──────────────────────────────────────────
+
+    def mark_ignore_archive(self, items: list[_QueueItem]) -> int:
+        """待機中アイテムに ignore_archive フラグを立て、再取得対象にする（#76）。
+
+        対象は `waiting` のアイテムのみ。`job` を
+        `replace(job, ignore_archive=True)` で差し替え、ツリー行を再描画する。
+        返り値は実際にフラグを立てた件数。
+        """
+        marked: list[_QueueItem] = []
+        with self._lock:
+            for item in items:
+                if item.status != "waiting" or item.job.ignore_archive:
+                    continue
+                item.job = replace(item.job, ignore_archive=True)
+                marked.append(item)
+
+        for item in marked:
+            self.refresh_tree_item(item)
+        if marked:
+            self.log_message.emit(t("log_ignore_archive_marked").format(count=len(marked)))
+        return len(marked)

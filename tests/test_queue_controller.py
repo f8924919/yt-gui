@@ -144,3 +144,30 @@ def test_worker_archived_item_marked_skipped(controller, qtbot):
         lambda: item.status == "skipped" and not controller.is_running, timeout=2000
     )
     assert item.status == "skipped"
+
+
+# ── アーカイブ無視（再取得） ──────────────────────────────────────────────
+
+
+def test_mark_ignore_archive_sets_flag_on_waiting(controller):
+    a = _enqueue(controller, "A")
+    b = _enqueue(controller, "B")
+    assert a.job.ignore_archive is False
+
+    n = controller.mark_ignore_archive([a, b])
+
+    assert n == 2
+    assert a.job.ignore_archive is True
+    assert b.job.ignore_archive is True
+
+
+def test_mark_ignore_archive_skips_non_waiting(controller):
+    a = _enqueue(controller, "A")
+    b = _enqueue(controller, "B")
+    b.status = "downloading"
+
+    n = controller.mark_ignore_archive([a, b])
+
+    assert n == 1
+    assert a.job.ignore_archive is True
+    assert b.job.ignore_archive is False  # downloading は対象外
