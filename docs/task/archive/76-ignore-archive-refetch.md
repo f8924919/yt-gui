@@ -2,7 +2,7 @@
 
 - GitHub Issue: [#76](https://github.com/f8924919/yt-gui/issues/76)
 - ブランチ: `feature/76-ignore-archive-refetch`
-- ステータス: 進行中
+- ステータス: 完了（PR #91、2026-06-07）
 
 ## 目的
 

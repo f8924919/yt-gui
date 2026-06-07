@@ -19,6 +19,7 @@
 | [67-cancel-downloading.md](67-cancel-downloading.md) | 「一時停止」で進行中ダウンロードを即中断し `waiting` へ戻す。中断時に部分ファイル・字幕サイドカーを削除（Issue #67 / PR #68） | 2026-06-02 |
 | [75-download-archive.md](75-download-archive.md) | ダウンロードアーカイブ（`--download-archive` 相当）を追加。差分取得・再 DL 防止、新ステータス `skipped`。アイテム単位再取得は #76 へ分離（Issue #75 / PR #77） | 2026-06-03 |
 | [81-download-sections.md](81-download-sections.md) | 区間ダウンロード（時間範囲の切り出し）を追加。安定性優先でフル取得→ローカル ffmpeg 切り出し方式。チャプター指定は #83、通信量節約版は #84 へ分離（Issue #81 / PR #82） | 2026-06-04 |
+| [76-ignore-archive-refetch.md](76-ignore-archive-refetch.md) | アイテム単位でダウンロードアーカイブを無視して再取得する手段を追加。右クリック「アーカイブを無視して再取得」、再記録せず既存記録は保持（Issue #76 / PR #91） | 2026-06-07 |
 
 ## バグ修正
 
