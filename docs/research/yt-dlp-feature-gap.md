@@ -45,7 +45,7 @@ yt-gui は yt-dlp を **Python ライブラリ**として利用している。�
 | ~~**ダウンロードアーカイブ**（既 DL 動画を記録してスキップ）~~ | `--download-archive` | ✅ 対応済み（設定の「ダウンロード」タブ、#75）。[ダウンロードアーカイブ](../spec/features/download-behavior.md#ダウンロードアーカイブ)参照 |
 | ~~**速度制限**~~ | `--limit-rate` | ✅ 対応済み（設定の「ダウンロード」タブ、#64）。[設定ダイアログ](../spec/screens/settings-dialog.md#ダウンロードタブ)参照 |
 | ~~**並列フラグメント DL（高速化）**~~ | `--concurrent-fragments` (`-N`) | ✅ 対応済み（設定の「ダウンロード」タブ、#53）。[設定ダイアログ](../spec/screens/settings-dialog.md#ダウンロードタブ)参照 |
-| **ライブ配信を最初から / 配信待ち** | `--live-from-start` / `--wait-for-video` | 未対応 |
+| **ライブ配信を最初から / 配信待ち** | `--live-from-start` / `--wait-for-video` | 未対応。仕様案・課題は[ライブ配信を最初から / 配信待ち 調査メモ](live-stream-download.md)参照 |
 | **再エンコード**（remux ではなく実変換） | `--recode-video` | 未対応。app は merge / remux のみ |
 | **プレイリストの部分選択** | `--playlist-items` / `--max-downloads` | 未対応。`noplaylist:True` で全件展開し、キューから手動削除するしかない |
 
