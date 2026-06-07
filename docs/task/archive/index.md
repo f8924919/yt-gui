@@ -76,3 +76,4 @@
 | タスク | 概要 | 更新日 |
 |---|---|---|
 | [refine-docs.md](refine-docs.md) | CLAUDE.md と docs 構成の改善（言語ルール追加・arch/build ハブ新設・双方向リンク） | 2026-05-16 |
+| [evaluator-agent.md](evaluator-agent.md) | evaluator サブエージェント新設（計画・生成・評価の3分離）。受け入れ条件・spec の充足を独立評価（Opus）、feature/bugfix/hotfix で必須（Issue #99 / PR #100） | 2026-06-07 |
