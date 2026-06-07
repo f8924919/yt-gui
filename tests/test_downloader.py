@@ -840,3 +840,394 @@ def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_pat
     calls.clear()
     downloader.download_video("https://example.com/v", _job())  # 区間なし
     assert calls == []
+
+
+# ── fetch_formats / fetch_title_or_entries（YoutubeDL スタブ） ───────────────
+
+
+class _StubYDL:
+    """`extract_info` が固定 info を返す YoutubeDL スタブ。"""
+
+    info: dict | None = {}
+
+    def __init__(self, opts):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def extract_info(self, url, download=False, extra_info=None):
+        return type(self).info
+
+
+def _patch_stub_ydl(monkeypatch, info):
+    import yt_gui.downloader as dl_mod
+
+    _StubYDL.info = info
+    monkeypatch.setattr(dl_mod, "YoutubeDL", _StubYDL)
+
+
+def test_fetch_formats_classifies_video_audio_and_muxed(
+    downloader, monkeypatch
+) -> None:
+    info = {
+        "title": "T",
+        "formats": [
+            # 映像のみ（音声なし）
+            {
+                "format_id": "137",
+                "ext": "mp4",
+                "vcodec": "avc1",
+                "acodec": "none",
+                "height": 1080,
+                "width": 1920,
+                "tbr": 4000,
+            },
+            # 音声のみ
+            {
+                "format_id": "140",
+                "ext": "m4a",
+                "vcodec": "none",
+                "acodec": "mp4a",
+                "abr": 128,
+                "language": "en",
+            },
+            # muxed（映像 + 音声）
+            {
+                "format_id": "18",
+                "ext": "mp4",
+                "vcodec": "avc1",
+                "acodec": "mp4a",
+                "height": 360,
+                "width": 640,
+            },
+            # codec 情報なし → muxed 救済
+            {"format_id": "raw", "ext": "flv"},
+        ],
+    }
+    _patch_stub_ydl(monkeypatch, info)
+
+    result = downloader.fetch_formats("u")
+
+    video_ids = {fid for (_lbl, fid, _ha) in result["video"]}
+    audio_ids = {fid for (_lbl, fid) in result["audio"]}
+    has_audio = {fid: ha for (_lbl, fid, ha) in result["video"]}
+
+    assert video_ids == {"137", "18", "raw"}
+    assert audio_ids == {"140"}
+    assert has_audio["137"] is False  # 音声なし映像
+    assert has_audio["18"] is True  # muxed
+    assert has_audio["raw"] is True  # codec 不明 → muxed 救済
+    assert result["title"] == "T"
+    # video_resolutions は width/height のある映像のみ
+    assert result["video_resolutions"]["137"] == (1920, 1080)
+    assert result["video_resolutions"]["18"] == (640, 360)
+    assert "raw" not in result["video_resolutions"]
+
+
+def test_fetch_formats_subtitle_classification(downloader, monkeypatch) -> None:
+    info = {
+        "title": "T",
+        "formats": [],
+        "language": "en",
+        "subtitles": {
+            "en": [{"ext": "vtt"}],
+            "live_chat": [{"ext": "json"}],
+            "comments": [{"ext": "json"}],
+        },
+        "automatic_captions": {
+            "en": [{"ext": "vtt"}],  # 主言語 → 残す（auto=True）
+            "fr": [{"ext": "vtt"}],  # 非主言語かつ手動に無い → 除外
+            "live_chat": [{"ext": "json"}],  # json 専用 → auto からは除外
+        },
+    }
+    _patch_stub_ydl(monkeypatch, info)
+
+    result = downloader.fetch_formats("u")
+    langs = [(lang, auto) for (_lbl, lang, auto) in result["subtitles"]]
+
+    assert ("en", False) in langs  # 手動字幕
+    assert ("live_chat", False) in langs  # json 専用（手動扱い）
+    assert ("comments", False) in langs  # json 専用（手動扱い）
+    assert ("en", True) in langs  # 自動字幕（主言語）
+    assert all(lang != "fr" for (lang, _a) in langs)  # 非主言語は除外
+    # live_chat は自動字幕としては重複追加されない（手動扱いの 1 件のみ）
+    assert sum(1 for (lang, _a) in langs if lang == "live_chat") == 1
+
+
+def test_fetch_title_or_entries_single(downloader, monkeypatch) -> None:
+    info = {"title": "Video", "webpage_url": "https://x/v", "thumbnail": "t.jpg"}
+    _patch_stub_ydl(monkeypatch, info)
+
+    assert downloader.fetch_title_or_entries("u") == {
+        "type": "single",
+        "url": "https://x/v",
+        "title": "Video",
+        "thumbnail_url": "t.jpg",
+    }
+
+
+def test_fetch_title_or_entries_playlist_skips_empty_and_falls_back(
+    downloader, monkeypatch
+) -> None:
+    info = {
+        "title": "PL",
+        "entries": [
+            {
+                "webpage_url": "https://x/1",
+                "title": "A",
+                "thumbnail": None,
+                "id": "1",
+                "ie_key": "Youtube",
+            },
+            None,  # 空エントリはスキップ
+            {
+                "url": "https://x/2",
+                "title": None,
+                "id": None,
+            },  # title は url にフォールバック
+            {"title": "no-url"},  # url 無しはスキップ
+        ],
+    }
+    _patch_stub_ydl(monkeypatch, info)
+
+    result = downloader.fetch_title_or_entries("u")
+    assert result["type"] == "playlist"
+    assert result["title"] == "PL"
+    assert [e["url"] for e in result["entries"]] == ["https://x/1", "https://x/2"]
+    assert result["entries"][1]["title"] == "https://x/2"  # タイトル欠落 → url
+
+
+def test_fetch_title_or_entries_empty_info_returns_url(downloader, monkeypatch) -> None:
+    _patch_stub_ydl(monkeypatch, None)
+
+    assert downloader.fetch_title_or_entries("theurl") == {
+        "type": "single",
+        "url": "theurl",
+        "title": "theurl",
+        "thumbnail_url": None,
+    }
+
+
+# ── missing_dependencies / cookies / base opts / logger ────────────────────
+
+
+def test_missing_dependencies_all_present(downloader, monkeypatch) -> None:
+    monkeypatch.setattr("yt_gui.downloader.os.path.isfile", lambda p: True)
+    assert downloader.missing_dependencies() == []
+
+
+def test_missing_dependencies_reports_absent(downloader, monkeypatch) -> None:
+    monkeypatch.setattr("yt_gui.downloader.os.path.isfile", lambda p: False)
+    assert downloader.missing_dependencies() == ["ffmpeg", "ffprobe", "deno"]
+
+
+def test_cookies_opts_browser_takes_precedence() -> None:
+    assert Downloader._cookies_opts("c.txt", "firefox") == {
+        "cookiesfrombrowser": ("firefox",)
+    }
+
+
+def test_cookies_opts_file_only() -> None:
+    assert Downloader._cookies_opts("c.txt", None) == {"cookies": "c.txt"}
+
+
+def test_cookies_opts_none() -> None:
+    assert Downloader._cookies_opts(None, None) == {}
+
+
+def test_base_ydl_opts_includes_proxy_logger_and_cookies(tmp_path) -> None:
+    logs: list[str] = []
+    dl = Downloader(
+        output_dir=str(tmp_path),
+        proxy_url="http://p:8080",
+        log_callback=logs.append,
+    )
+    opts = dl._base_ydl_opts(cookies_path="c.txt")
+    assert opts["proxy"] == "http://p:8080"
+    assert "logger" in opts
+    assert opts["cookies"] == "c.txt"
+    assert "ejs:github" in opts["remote_components"]
+
+
+def test_base_ydl_opts_omits_proxy_and_logger_by_default(tmp_path) -> None:
+    dl = Downloader(output_dir=str(tmp_path))  # proxy/log_callback なし
+    opts = dl._base_ydl_opts()
+    assert "proxy" not in opts
+    assert "logger" not in opts
+
+
+def test_ytdlp_logger_filters_debug_and_progress() -> None:
+    from yt_gui.downloader import _YtdlpLogger
+
+    msgs: list[str] = []
+    lg = _YtdlpLogger(msgs.append)
+    lg.debug("[debug] internal")  # スキップ
+    lg.debug("[download]  45.2% of 10MiB")  # 進捗 → スキップ
+    lg.debug("plain debug-routed info")  # 通す
+    lg.info("info message")  # 通す
+    lg.info("")  # 空 → 無視
+    lg.warning("careful")
+    lg.error("boom")
+
+    assert "plain debug-routed info" in msgs
+    assert "info message" in msgs
+    assert "⚠️ careful" in msgs
+    assert "❌ boom" in msgs
+    assert not any("[debug]" in m or "45.2%" in m for m in msgs)
+
+
+# ── _progress_hook の各分岐 ────────────────────────────────────────────────
+
+
+def test_progress_hook_finished_reports_100(downloader) -> None:
+    seen: list[tuple[str, float]] = []
+    downloader.status_callback = lambda msg, pct: seen.append((msg, pct))
+    downloader._progress_hook({"status": "finished", "filename": "/p/動画.mp4"})
+    assert seen and seen[-1][1] == 100
+
+
+def test_progress_hook_downloading_with_total_reports_percent(downloader) -> None:
+    seen: list[tuple[str, float]] = []
+    downloader.status_callback = lambda msg, pct: seen.append((msg, pct))
+    downloader._progress_hook(
+        {"status": "downloading", "total_bytes": 200, "downloaded_bytes": 50}
+    )
+    assert seen and seen[-1][1] == pytest.approx(25.0)
+
+
+def test_progress_hook_downloading_without_total_reports_zero(downloader) -> None:
+    seen: list[tuple[str, float]] = []
+    downloader.status_callback = lambda msg, pct: seen.append((msg, pct))
+    downloader._progress_hook({"status": "downloading", "downloaded_bytes": 50})
+    assert seen and seen[-1][1] == 0
+
+
+def test_progress_hook_error_and_other_status(downloader) -> None:
+    seen: list[tuple[str, float]] = []
+    downloader.status_callback = lambda msg, pct: seen.append((msg, pct))
+    downloader._progress_hook({"status": "error"})
+    downloader._progress_hook({"status": "extracting"})
+    assert len(seen) == 2
+
+
+# ── ニコ動コメント / 区間カットのガード分岐（ファイル/バイナリ不在 → ログのみ） ──
+
+
+def test_convert_nico_comments_skips_when_json_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "stem"), {})
+    assert called["run"] is False
+    assert len(logs) == 1  # 警告ログのみ
+
+
+def test_cut_section_skips_when_infile_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    downloader.status_callback = lambda *a: None
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._cut_section(
+        str(tmp_path / "nope"), ".mp4", _job(section_start="0", section_end="1")
+    )
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+def test_embed_nico_comments_skips_when_video_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._embed_nico_comments_into_mkv(str(tmp_path / "nope"), ".mp4", {})
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+# ── 追加: 純ロジックの未カバー分 ────────────────────────────────────────────
+
+
+def test_strip_json_only_subs_pp_removes_json_langs() -> None:
+    from yt_gui.downloader import _StripJsonOnlySubsBeforeEmbedPP
+
+    pp = _StripJsonOnlySubsBeforeEmbedPP()
+    info = {"requested_subtitles": {"en": {}, "live_chat": {}, "comments": {}}}
+    _ret, out = pp.run(info)
+    assert set(out["requested_subtitles"]) == {"en"}
+
+
+def test_strip_json_only_subs_pp_noop_without_json_langs() -> None:
+    from yt_gui.downloader import _StripJsonOnlySubsBeforeEmbedPP
+
+    pp = _StripJsonOnlySubsBeforeEmbedPP()
+    info = {"requested_subtitles": {"en": {}, "ja": {}}}
+    _ret, out = pp.run(info)
+    assert set(out["requested_subtitles"]) == {"en", "ja"}
+
+
+def test_resolve_unique_path_audio_extraction_uses_codec_ext(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    _stem, ext = downloader._resolve_unique_path(
+        {},
+        "https://example.com/v",
+        _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
+        extra_info=None,
+    )
+    assert ext == ".mp3"
+
+
+def test_resolve_unique_path_appends_suffix_on_collision(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    (tmp_path / "動画.mp4").write_text("x")  # 既存ファイルで衝突を起こす
+    opts: dict = {}
+    stem, ext = downloader._resolve_unique_path(
+        opts, "https://example.com/v", _job(remux_only=True), extra_info=None
+    )
+    assert ext == ".mp4"
+    assert stem.endswith("動画 (1)")
+    assert opts["outtmpl"].endswith("動画 (1).%(ext)s")
+
+
+def test_cut_section_skips_when_ffmpeg_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "動画.mp4").write_text("x")  # infile は存在
+    downloader._ffmpeg_path = str(tmp_path / "no-ffmpeg")  # ffmpeg は不在
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    downloader.status_callback = lambda *a: None
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._cut_section(
+        str(tmp_path / "動画"), ".mp4", _job(section_start="0", section_end="1")
+    )
+    assert called["run"] is False
+    assert len(logs) == 1

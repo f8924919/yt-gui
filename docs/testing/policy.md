@@ -25,14 +25,14 @@
 | Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従など、モーダルを介さない UI ロジックに限定） | △ |
 | スレッドヘルパ | `yt_gui/threading_utils.py`（コールバック順序） | △ |
 | Qt UI（ウィンドウ統合） | `yt_gui/settings_dialog.py` ・ `log_dialog.py` | × |
-| 外部 I/O | `yt_gui/downloader.py`（yt-dlp）・ `thumbnail_cache.py`（HTTP） | △ |
-| 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` | ◯ |
+| 外部 I/O | `yt_gui/downloader.py`（yt-dlp、`omit` 解除済み・#95）・ `thumbnail_cache.py`（HTTP・未） | △ |
+| 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 
 Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイントは [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) を参照）。
 
-> **段階導入**: 上表の Qt UI / スレッドヘルパ行は方針として `△` に格上げ済みですが、実テストと `pytest-qt` 導入・`pyproject.toml` の `omit` 解除は後続タスクで行います。テストが存在しないモジュールは当面 `omit` に残し、テスト追加と同時に該当モジュールのみ `omit` から外します（一括解除でカバレッジが急落しないようにするため）。
+> **段階導入**: テストが存在しないモジュールは当面 `omit` に残し、テスト追加と同時に該当モジュールのみ `omit` から外します（一括解除でカバレッジが急落しないようにするため）。`downloader.py` はネットワーク・subprocess に依存しないロジック（フォーマット分類・パス解決・ログ整形等）を `YoutubeDL` スタブでテストし、`omit` から解除済み（#95）。実 DL・ffmpeg/danmaku2ass の subprocess 正常系は外部 I/O のため引き続きカバレッジ対象外（`△`）。`app.py` ほか Qt UI のウィンドウ統合系は `pytest-qt` ベースの UI ロジックテストに限定し、`omit` 解除は後続タスク。
 
 スコープ拡張時は本ドキュメントと `pyproject.toml` の `[tool.coverage.run] omit` を併せて更新してください。
 
@@ -130,7 +130,7 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 
 - **数値閾値は初期は設けません**（計測のみ）
 - 数サイクル運用後、実績値からプロジェクト全体・モジュール別に最低ラインを設定します
-- 計測対象は `yt_gui` 全体ですが、UI / Downloader / locales は `omit` で除外し **ロジック層のみが対象** になります
+- 計測対象は `yt_gui` 全体ですが、UI ウィンドウ統合（`app.py` / `settings_dialog.py` / `original_format_panel.py` / `log_dialog.py`）・`thumbnail_cache.py`・`locales` は `omit` で除外し **ロジック層が対象** になります。`downloader.py` はロジック部分をテスト済みのため `omit` から外しています（#95）
 - カバレッジが急に下がった場合、テスト未追加の改修が無いかをレビューで確認します
 
 ---
