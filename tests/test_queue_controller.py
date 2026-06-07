@@ -171,3 +171,45 @@ def test_mark_ignore_archive_skips_non_waiting(controller):
     assert n == 1
     assert a.job.ignore_archive is True
     assert b.job.ignore_archive is False  # downloading は対象外
+
+
+# ── 削除規則（remove_selected） ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "status, removable",
+    [
+        ("waiting", True),
+        ("done", True),
+        ("error", True),
+        ("skipped", True),
+        ("downloading", False),
+        ("editing", False),
+    ],
+)
+def test_remove_selected_honors_status_rules(controller, status, removable):
+    """downloading / editing は削除不可、それ以外は削除可能（queue.md の削除規則）。"""
+    item = _enqueue(controller, status)
+    item.status = status
+    item.tree_item.setSelected(True)
+
+    controller.remove_selected()
+
+    remaining = controller.find_item_for(item.tree_item)
+    if removable:
+        assert remaining is None
+    else:
+        assert remaining is item
+
+
+def test_remove_selected_removes_only_eligible_in_mixed_selection(controller):
+    waiting = _enqueue(controller, "W")
+    downloading = _enqueue(controller, "D")
+    downloading.status = "downloading"
+    waiting.tree_item.setSelected(True)
+    downloading.tree_item.setSelected(True)
+
+    controller.remove_selected()
+
+    assert controller.find_item_for(waiting.tree_item) is None
+    assert controller.find_item_for(downloading.tree_item) is downloading
