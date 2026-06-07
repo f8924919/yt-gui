@@ -326,3 +326,10 @@ def test_section_passed_through_original() -> None:
     assert job.section_start == "10"
     assert job.section_end == "20"
     assert job.section_force_keyframes is False
+
+
+def test_ignore_archive_defaults_false() -> None:
+    # build_job_spec は ignore_archive を立てない（既定 False）。
+    # フラグは QueueController.mark_ignore_archive が後付けする。
+    job = build_job_spec("fmt_best_mp4", Settings())
+    assert job.ignore_archive is False

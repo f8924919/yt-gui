@@ -223,9 +223,13 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "字幕",
     "tooltip_sub_file": "ファイル保存",
     "tooltip_format_spec": "形式仕様",
+    "tooltip_ignore_archive": "アーカイブ無視",
+    "tooltip_ignore_archive_on": "有効",
     # edit mode
     "ctx_copy_url": "URLをコピー",
     "ctx_edit_format": "形式を変更...",
+    "ctx_ignore_archive_refetch": "アーカイブを無視して再取得",
+    "log_ignore_archive_marked": "♻ {count} 件をアーカイブ無視で再取得対象にしました",
     "btn_apply_edit": "変更",
     "btn_cancel_edit": "キャンセル",
     "status_edit_mode": "✏️ 編集モード — 形式を選んで「変更」を押してください",

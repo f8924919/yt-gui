@@ -538,7 +538,10 @@ class Downloader:
 
         # 空（既定）は機能無効なので opt を渡さない。yt-dlp の --download-archive 相当。
         # 有効時は完全成功した動画を ID 単位でこのファイルに記録し、再 DL を防ぐ。
-        if self.download_archive_path:
+        # job.ignore_archive=True のアイテムは opt を外して記録済みでも再取得する
+        # （#76）。opt を渡すと yt-dlp が内部スキップするため、再取得には外すしかない
+        # （= 再記録もしない）。
+        if self.download_archive_path and not job.ignore_archive:
             ydl_opts["download_archive"] = self.download_archive_path
 
         if job.is_multi_audio:
@@ -708,7 +711,13 @@ class Downloader:
             info = ydl.extract_info(url, download=False, extra_info=extra_info)
             # yt-dlp 内部 API: in_download_archive は info の id / extractor_key と
             # ロード済みアーカイブ集合を突き合わせる（ネットワーク不要）。
-            if self.download_archive_path and ydl.in_download_archive(info):
+            # job.ignore_archive=True のアイテムは照合をスキップして再取得させる
+            # （#76）。
+            if (
+                self.download_archive_path
+                and not job.ignore_archive
+                and ydl.in_download_archive(info)
+            ):
                 raise DownloadSkipped(url)
             raw_path = ydl.prepare_filename(info)
 

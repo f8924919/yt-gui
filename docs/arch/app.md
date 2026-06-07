@@ -54,13 +54,14 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 | `get_item` | `Callable[[QTreeWidgetItem], _QueueItem | None]` | `QueueController.find_item_for` |
 | `get_thumbnail_b64` | `Callable[[str], str | None]` | `ThumbnailCache.get` |
 | `is_editing` | `Callable[[], bool]` | `lambda: self.queue.edit_mode` |
+| `is_archive_enabled` | `Callable[[], bool]` | `lambda: self._settings.download_archive_enabled` |
 
-「形式を変更」コンテキストメニュー操作は `edit_format_requested(list)` シグナルで通知し、`App._enter_edit_mode` に接続する。
+「形式を変更」コンテキストメニュー操作は `edit_format_requested(list)` シグナルで通知し、`App._enter_edit_mode` に接続する。「アーカイブを無視して再取得」操作は `ignore_archive_refetch_requested(list)` シグナルで通知し、`App._ignore_archive_refetch`（`QueueController.mark_ignore_archive` を呼ぶ）に接続する。
 
 独自実装:
 
-- **ツールチップ**: `viewportEvent` で `QEvent.Type.ToolTip` を捕捉。`QToolTip.showText()` に `rect=self.visualItemRect(item)` を渡してマウスがアイテム行にいる間は持続表示（`rect` なしだとタイムアウトで消える）。サムネイルがキャッシュ済みなら 240×135px の `<img>`（base64 data URI）をツールチップ先頭に挿入。
-- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」の対象判定は純粋ヘルパ `_edit_targets(items)` に集約し、メニュー項目の活性判定 (`setEnabled`) と `edit_format_requested.emit(targets)` の発火判定で共用する（`contextMenuEvent` はモーダル `QMenu.exec` を含みヘッドレス検証しにくいため、ロジックをヘルパへ分離してテスト可能にしている）。`_edit_targets` は編集モード中 (`is_editing()`) または `waiting` が無い場合に空リストを返す。
+- **ツールチップ**: `viewportEvent` で `QEvent.Type.ToolTip` を捕捉。`QToolTip.showText()` に `rect=self.visualItemRect(item)` を渡してマウスがアイテム行にいる間は持続表示（`rect` なしだとタイムアウトで消える）。サムネイルがキャッシュ済みなら 240×135px の `<img>`（base64 data URI）をツールチップ先頭に挿入。`job.ignore_archive` が立っているアイテムは「アーカイブ無視: 有効」を 1 行追加する。
+- **コンテキストメニュー**: `contextMenuEvent` で実装。「URL をコピー」（複数選択時は改行区切りで `QApplication.clipboard()` へ書き込み）と「形式を変更」を提供。「形式を変更」の対象判定は純粋ヘルパ `_edit_targets(items)` に集約し、メニュー項目の活性判定 (`setEnabled`) と `edit_format_requested.emit(targets)` の発火判定で共用する（`contextMenuEvent` はモーダル `QMenu.exec` を含みヘッドレス検証しにくいため、ロジックをヘルパへ分離してテスト可能にしている）。`_edit_targets` は編集モード中 (`is_editing()`) または `waiting` が無い場合に空リストを返す。「アーカイブを無視して再取得」は `is_archive_enabled()` が真のときだけメニューに出し、対象は `_edit_targets` と同じ `waiting` 部分集合を使う。
 - **アイテム色リセット**: `setData(col, Qt.ItemDataRole.ForegroundRole, None)` を使用（`setForeground(col, QColor())` は黒固定になりダークモード非対応）。
 
 ## オリジナル形式ダイアログの配線

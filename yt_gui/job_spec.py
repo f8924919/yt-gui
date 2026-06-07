@@ -67,6 +67,9 @@ class JobSpec:
     section_start: str | None = None
     section_end: str | None = None
     section_force_keyframes: bool = False
+    # アイテム単位でダウンロードアーカイブを無視して再取得するか。build_job_spec では
+    # 立てず、QueueController.mark_ignore_archive が後付けで replace する（#76）。
+    ignore_archive: bool = False
 
     @property
     def is_audio_extraction(self) -> bool:

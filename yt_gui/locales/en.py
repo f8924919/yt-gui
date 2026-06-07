@@ -223,9 +223,13 @@ STRINGS: dict[str, str] = {
     "tooltip_subtitle": "Subtitle",
     "tooltip_sub_file": "Save to file",
     "tooltip_format_spec": "Format spec",
+    "tooltip_ignore_archive": "Ignore archive",
+    "tooltip_ignore_archive_on": "On",
     # edit mode
     "ctx_copy_url": "Copy URL",
     "ctx_edit_format": "Change format...",
+    "ctx_ignore_archive_refetch": "Re-download (ignore archive)",
+    "log_ignore_archive_marked": "♻ Marked {count} item(s) to re-download ignoring the archive",
     "btn_apply_edit": "Apply",
     "btn_cancel_edit": "Cancel",
     "status_edit_mode": "✏️ Edit mode — select a format and click Apply",

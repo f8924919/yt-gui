@@ -203,6 +203,7 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 - **opt 付与**: `_build_ydl_opts` で `self.download_archive_path` が非空のとき `ydl_opts["download_archive"]` を付与する。記録は本オプション経由でのみ行われるため、有効時は実ダウンロード経路に常に渡す。`_base_ydl_opts` ではなくダウンロード側に置くため、メタデータ取得（`fetch_*`）には付与されない。
 - **DL 時スキップ検出**: `download_archive` を渡しても yt-dlp は記録済み動画を黙ってスキップ（`finished` フック非発火）するだけで例外を投げないため、`done` と誤判定しないよう自前で判定する。衝突回避のための `_resolve_unique_path` のドライラン抽出（`extract_info(download=False)`）の中で `ydl.in_download_archive(info)`（yt-dlp 内部 API・ネットワーク不要）を呼び、記録済みなら `DownloadSkipped` を送出する。追加の抽出は発生しない。`download_video` は本例外を捕捉せず呼び出し側（`queue_controller._worker`）へ伝播させ、worker が `skipped` ステータスに遷移させる。
+- **アイテム単位のアーカイブ無視（`job.ignore_archive`）**: `True` のとき、`_build_ydl_opts` は `download_archive` opt を**付与せず**、`_resolve_unique_path` は `in_download_archive` チェックを**スキップ**する（`self.download_archive_path and not job.ignore_archive` で両分岐を制御）。これにより記録済み動画でも再ダウンロードされる。opt を外すため**この再取得は記録されず、既存の記録はそのまま残る**（次回フラグ無しでは再びスキップ）。yt-dlp は `download_archive` を渡すと記録済み動画を内部スキップするため、再取得には opt を外すのが必須で、結果として「skip も record もしない」一回限りの上書きになる。動作仕様は[アイテム単位でアーカイブを無視して再取得](../spec/features/download-behavior.md#アイテム単位でアーカイブを無視して再取得)。
 - **プレフィルタ**: `filter_unarchived_entries(entries)` がプレイリスト展開エントリのうちアーカイブ済みを除外して返す（差分取得）。flat 抽出エントリの `id` / `ie_key` から `in_download_archive` で照合するベストエフォート（`_old_archive_ids` 非考慮・`id`/`ie_key` 欠落は残す）。`download_archive` パスを与えた `YoutubeDL` を 1 つ生成してアーカイブ集合を読み込むのみで、ネットワークは行わない。`App._on_fetch_for_add_done` がプレイリスト追加時に呼ぶ。
 - `fetch_title_or_entries` はプレフィルタ用に各エントリへ `id` / `ie_key`（flat 抽出の抽出器名）を含めて返す。
 
