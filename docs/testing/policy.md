@@ -97,9 +97,11 @@ tests/
 ├── test_settings.py
 ├── test_downloader.py
 ├── test_download_binaries.py
+├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）
+├── test_original_format_dialog.py ← Qt（@pytest.mark.qt）
 └── test_app.py                    ← Qt（@pytest.mark.qt）
 ```
 
