@@ -64,7 +64,7 @@ main ──┬──────────────────┬──→
 
 ## 5. 作業フロー（標準）
 
-**docs（設計）先行・テストファースト**を基本とする。設計をドキュメントで固めてから実装に入り、テストは仕様に基づいて先に書く。
+**docs（設計）先行・テストファースト**を基本とする。設計をドキュメントで固めてから実装に入り、テストは仕様に基づいて先に書く。step 1〜6（前半）は `/start-task` skill で順序を強制しながら立ち上げられる（§5.3）。
 
 1. 対象 Issue を確認（無ければ §3 の要件で起票）。
 2. `main` を最新化し、§4 の規則でブランチを作成。
@@ -107,6 +107,7 @@ main ──┬──────────────────┬──→
 
 | skill | 役割 | 対応するフロー |
 |---|---|---|
+| [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
 | [`verify-gate`](../.claude/skills/verify-gate/SKILL.md) | ブランチ種別を判定し `verify` →（docs 変更時）`docs-check` →（feature/bugfix/hotfix のみ）`evaluator` を順に起動・集約 | step 7 |
 | [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・完了タスクの archive 移動（docs ブランチ＋PR） | step 9 |
 
