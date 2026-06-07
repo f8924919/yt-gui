@@ -194,6 +194,7 @@ STRINGS: dict[str, str] = {
     "status_fetching_title": "🔍 Fetching video info...",
     "status_title_added": "✅ Added to queue",
     "err_fetch_title": "An error occurred while fetching video info:\n{error}",
+    "err_extract_info_none": "Could not retrieve video info (empty extraction result).",
     "warn_playlist_original_fmt": '"Original format" is not supported for playlist batch-add.\nPlease select a different format.',
     "warn_playlist_empty": "No videos found in the playlist. Please check the URL.",
     "warn_queue_empty": "Queue is empty. Add items with URL and format selection.",
