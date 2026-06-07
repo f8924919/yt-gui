@@ -194,6 +194,7 @@ STRINGS: dict[str, str] = {
     "status_fetching_title": "🔍 動画情報を取得中...",
     "status_title_added": "✅ キューに追加しました",
     "err_fetch_title": "動画情報の取得中にエラーが発生しました:\n{error}",
+    "err_extract_info_none": "動画情報を取得できませんでした（抽出結果が空）。",
     "warn_playlist_original_fmt": "「オリジナルの形式」はプレイリスト一括追加に対応していません。\n別の形式を選択してください。",
     "warn_playlist_empty": "再生リストに動画が見つかりませんでした。プレイリストのURLを確認してください。",
     "warn_queue_empty": "キューにアイテムがありません。URLと形式を選んで追加してください。",

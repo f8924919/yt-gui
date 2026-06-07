@@ -370,82 +370,88 @@ def test_download_archive_omitted_when_ignore_archive(tmp_path) -> None:
     assert "download_archive" not in opts
 
 
-def test_resolve_unique_path_skips_archive_check_when_ignore_archive(
-    tmp_path, monkeypatch
-) -> None:
-    # ignore_archive=True のときは in_download_archive を見ず DownloadSkipped を出さない
+class _FakeYDL:
+    """`_resolve_unique_path` 用の最小スタブ。`extract_info` の戻り値を注入する。"""
+
+    _next_info = None  # クラス属性で各テストが差し替える
+
+    def __init__(self, opts):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def extract_info(self, url, download, extra_info=None):
+        return type(self)._next_info
+
+    def in_download_archive(self, info):
+        # #93: アーカイブ済みでは extract_info が None を返すため本来呼ばれない。
+        # 呼ばれたら AttributeError 再発を検知できるよう記録する。
+        _FakeYDL.calls.append("in_download_archive")
+        return False
+
+    def prepare_filename(self, info):
+        return str(self._stem)
+
+
+def _patch_fake_ydl(monkeypatch, tmp_path, *, info):
     import yt_gui.downloader as dl_mod
 
-    archive = str(tmp_path / "archive.txt")
-    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
-
-    in_archive_called = {"n": 0}
-
-    class _FakeYDL:
-        def __init__(self, opts):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def extract_info(self, url, download, extra_info=None):
-            return {"id": "vid", "extractor_key": "Youtube"}
-
-        def in_download_archive(self, info):
-            in_archive_called["n"] += 1
-            return True  # 記録済みを模す
-
-        def prepare_filename(self, info):
-            return str(tmp_path / "動画.mp4")
-
+    _FakeYDL._next_info = info
+    _FakeYDL._stem = tmp_path / "動画.mp4"
+    _FakeYDL.calls = []
     monkeypatch.setattr(dl_mod, "YoutubeDL", _FakeYDL)
 
-    # ignore_archive=True: 記録済みでも DownloadSkipped を出さない
-    stem, ext = dl._resolve_unique_path(
-        {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
-    )
-    assert ext == ".mp4"
-    assert in_archive_called["n"] == 0  # 照合自体をスキップ
 
-
-def test_resolve_unique_path_raises_skipped_when_recorded(
+def test_resolve_unique_path_skipped_when_archived_info_none(
     tmp_path, monkeypatch
 ) -> None:
-    # 対照: ignore_archive=False なら従来どおり記録済みで DownloadSkipped
-    import yt_gui.downloader as dl_mod
+    # #93 回帰: アーカイブ済み動画は extract_info(download=False) が None を返す。
+    # in_download_archive(None) を呼ばず DownloadSkipped を送出すること。
     from yt_gui.downloader import DownloadSkipped
 
     archive = str(tmp_path / "archive.txt")
     dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
-
-    class _FakeYDL:
-        def __init__(self, opts):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def extract_info(self, url, download, extra_info=None):
-            return {"id": "vid", "extractor_key": "Youtube"}
-
-        def in_download_archive(self, info):
-            return True
-
-        def prepare_filename(self, info):
-            return str(tmp_path / "動画.mp4")
-
-    monkeypatch.setattr(dl_mod, "YoutubeDL", _FakeYDL)
+    _patch_fake_ydl(monkeypatch, tmp_path, info=None)
 
     with pytest.raises(DownloadSkipped):
         dl._resolve_unique_path(
             {}, "https://example.com/v", _job(ignore_archive=False), extra_info=None
         )
+    # in_download_archive(None) を呼んでいない（AttributeError を出さない）
+    assert _FakeYDL.calls == []
+
+
+def test_resolve_unique_path_no_skip_when_ignore_archive(tmp_path, monkeypatch) -> None:
+    # ignore_archive=True のときは download_archive opt を渡さないため extract_info は
+    # 通常どおり info を返す。スキップせず通常のパス解決を行う。
+    archive = str(tmp_path / "archive.txt")
+    dl = Downloader(output_dir=str(tmp_path), download_archive_path=archive)
+    _patch_fake_ydl(
+        monkeypatch, tmp_path, info={"id": "vid", "extractor_key": "Youtube"}
+    )
+
+    stem, ext = dl._resolve_unique_path(
+        {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
+    )
+    assert ext == ".mp4"
+
+
+def test_resolve_unique_path_clear_error_when_info_none_not_archive(
+    tmp_path, monkeypatch
+) -> None:
+    # アーカイブ無効で info=None になるのは想定外。AttributeError ではなく
+    # 原因の分かる DownloadError を送出すること。
+    from yt_dlp.utils import DownloadError
+
+    dl = Downloader(output_dir=str(tmp_path))  # アーカイブ無効
+    _patch_fake_ydl(monkeypatch, tmp_path, info=None)
+
+    with pytest.raises(DownloadError):
+        dl._resolve_unique_path({}, "https://example.com/v", _job(), extra_info=None)
 
 
 def test_filter_unarchived_entries_disabled_returns_all(tmp_path) -> None:

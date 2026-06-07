@@ -7,7 +7,7 @@ import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.utils import DownloadCancelled
+from yt_dlp.utils import DownloadCancelled, DownloadError
 
 from . import get_resource_base
 from .i18n import t
@@ -709,16 +709,20 @@ class Downloader:
         """
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False, extra_info=extra_info)
-            # yt-dlp 内部 API: in_download_archive は info の id / extractor_key と
-            # ロード済みアーカイブ集合を突き合わせる（ネットワーク不要）。
-            # job.ignore_archive=True のアイテムは照合をスキップして再取得させる
-            # （#76）。
-            if (
-                self.download_archive_path
-                and not job.ignore_archive
-                and ydl.in_download_archive(info)
-            ):
-                raise DownloadSkipped(url)
+            # #93: download_archive 有効時、yt-dlp は記録済み動画に対して
+            # extract_info(download=False) でも None を返す（_match_entry が
+            # in_download_archive でスキップ判定し process_video_result が早期 return
+            # するため）。このとき in_download_archive(info) は呼べない（None.get で
+            # AttributeError になる）ので、info is None 自体を skip シグナルとして扱う。
+            # job.ignore_archive=True のときは download_archive opt を渡しておらず
+            # （#76）、記録済みでも info は返るため None にはならない。
+            if info is None:
+                if self.download_archive_path and not job.ignore_archive:
+                    raise DownloadSkipped(url)
+                # アーカイブ以外で None になるのは想定外（抽出失敗は通常例外を
+                # 送出する）。後続の prepare_filename(None) で不明瞭な
+                # AttributeError を出す前に、原因の分かるエラーにする。
+                raise DownloadError(t("err_extract_info_none"))
             raw_path = ydl.prepare_filename(info)
 
         stem, raw_ext = os.path.splitext(raw_path)
