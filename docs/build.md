@@ -170,6 +170,37 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 
 > **前提設定**: GITHUB_TOKEN で PR を作成するため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
 
+## ワークフロー権限とリポジトリのセキュリティ設定
+
+public リポジトリでは GITHUB_TOKEN の既定権限が外部 PR にも及ぶため、各ワークフローに**最小権限**を明示する。
+
+| ワークフロー | `permissions` | 理由 |
+|---|---|---|
+| `test.yml` | `contents: read` | checkout・依存取得・テストのみで書き込み不要 |
+| `release.yml`（ジョブ単位） | `contents: write` / `release` のみ `id-token: write` `attestations: write` | タグ・リリース作成と来歴署名（provenance）に必要 |
+| `update-binaries.yml` | `contents: write` `pull-requests: write` | `bin/pins.json` 更新 PR の作成に必要 |
+
+### 依存の自動更新（Dependabot）
+
+`.github/dependabot.yml` が週次で 2 つのエコシステムを追従し、更新 PR を起票する。
+
+| エコシステム | 対象 | 目的 |
+|---|---|---|
+| `github-actions` | ワークフローが参照する action のバージョン | action のサプライチェーン追従（タグピンの更新） |
+| `uv` | `pyproject.toml` / `uv.lock` | Python 依存（yt-dlp 等）の更新・脆弱性対応 |
+
+> 同梱バイナリ（ffmpeg / deno 等）のピンは Dependabot の対象外で、前述の `update-binaries.yml` が別途追従する。
+
+### public 化後に有効化するリポジトリ設定
+
+public 化（`gh repo edit f8924919/yt-gui --visibility public`）後、public で無料解放される以下を有効化する。
+
+- **Secret scanning + Push protection**: 認証情報の誤コミット検知・ブロック。
+- **Dependabot alerts / security updates**: 脆弱性アラートと自動修正 PR（上記 version updates と併用）。
+- **Private Vulnerability Reporting**: [SECURITY.md](../SECURITY.md) の報告導線。Settings > Code security で有効化。
+- **`main` のブランチ保護**: PR 必須・ステータスチェック（`Test`）必須。GitHub Flow（[git-workflow.md](git-workflow.md)）と整合。
+- **Auto-delete merged branches**: マージ済みブランチの自動削除。
+
 ## yt-gui.spec の構成
 
 - PySide6 向けに設定済み。`pyinstaller-hooks-contrib` が PySide6 プラグイン・データを自動検出するため追加設定は最小限。

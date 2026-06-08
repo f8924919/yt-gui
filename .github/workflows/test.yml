@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# このワークフローは checkout / 依存取得 / テストのみで書き込み権限を要さないため、
+# 既定トークンを読み取り専用に絞る（public 化に伴う最小権限化）。
+permissions:
+  contents: read
+
 # 同一 ref で連続 push された場合は古い実行をキャンセル
 concurrency:
   group: test-${{ github.ref }}
