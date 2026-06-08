@@ -3,6 +3,7 @@
 対応 spec: [編集モード](../docs/spec/features/queue.md) 節。
 """
 
+import threading
 from unittest.mock import MagicMock
 
 import pytest
@@ -144,6 +145,160 @@ def test_worker_archived_item_marked_skipped(controller, qtbot):
         lambda: item.status == "skipped" and not controller.is_running, timeout=2000
     )
     assert item.status == "skipped"
+
+
+# ── 並列ダウンロード（同時実行）・進捗表示 ──────────────────────────────────
+
+
+def _make_parallel_controller(qtbot, concurrency, *, on_download=None):
+    """distinct な Downloader を返すファクトリ付きのコントローラを作る。
+
+    返り値は (controller, created_downloaders)。`on_download(*a, **k)` は
+    各 worker の download_video 呼び出し時に実行される副作用。
+    """
+    tree = QTreeWidget()
+    tree.setColumnCount(4)
+    qtbot.addWidget(tree)
+    created: list[MagicMock] = []
+
+    def make_dl() -> MagicMock:
+        dl = MagicMock()
+        if on_download is not None:
+            dl.download_video.side_effect = on_download
+        created.append(dl)
+        return dl
+
+    ctrl = QueueController(
+        MagicMock(),
+        tree,
+        make_downloader=make_dl,
+        get_concurrency=lambda: concurrency,
+    )
+    return ctrl, created
+
+
+def test_concurrent_workers_run_items_in_parallel(qtbot):
+    """N>1 のとき複数アイテムが同時に downloading になること。"""
+    release = threading.Event()
+    started: list[int] = []
+    started_lock = threading.Lock()
+
+    def _block(*a, **k):
+        with started_lock:
+            started.append(1)
+        release.wait(timeout=2)
+
+    ctrl, _ = _make_parallel_controller(qtbot, 2, on_download=_block)
+    a = _enqueue(ctrl, "A")
+    b = _enqueue(ctrl, "B")
+
+    assert ctrl.start(lambda: (None, None)) is True
+    # 2 件が同時に download_video に入る（release 前に両方 started）
+    qtbot.waitUntil(lambda: len(started) == 2, timeout=2000)
+    assert sorted([a.status, b.status]) == ["downloading", "downloading"]
+
+    release.set()
+    qtbot.waitUntil(lambda: not ctrl.is_running, timeout=2000)
+    assert a.status == "done" and b.status == "done"
+
+
+def test_each_waiting_item_processed_exactly_once(qtbot):
+    """取り出し排他: 各アイテムがちょうど 1 回ずつ処理される（二重処理なし）。"""
+    counts: dict[str, int] = {}
+    counts_lock = threading.Lock()
+
+    def _count(url, job, *a, **k):
+        with counts_lock:
+            counts[url] = counts.get(url, 0) + 1
+
+    tree = QTreeWidget()
+    tree.setColumnCount(4)
+    qtbot.addWidget(tree)
+
+    def make_dl():
+        dl = MagicMock()
+        dl.download_video.side_effect = _count
+        return dl
+
+    ctrl = QueueController(
+        MagicMock(), tree, make_downloader=make_dl, get_concurrency=lambda: 3
+    )
+    items = []
+    for i in range(6):
+        job = build_job_spec("fmt_best_mp4", Settings())
+        items.append(ctrl.enqueue_single(f"https://example.com/{i}", f"V{i}", "MP4", job))
+
+    assert ctrl.start(lambda: (None, None)) is True
+    qtbot.waitUntil(lambda: not ctrl.is_running, timeout=3000)
+    assert all(it.status == "done" for it in items)
+    assert counts == {f"https://example.com/{i}": 1 for i in range(6)}
+
+
+def test_pause_cancels_all_active_downloaders(qtbot):
+    """同時ダウンロード時、走行中の全 Downloader に request_cancel が呼ばれること。"""
+    release = threading.Event()
+    started: list[int] = []
+    started_lock = threading.Lock()
+
+    def _block(*a, **k):
+        with started_lock:
+            started.append(1)
+        release.wait(timeout=2)
+
+    ctrl, created = _make_parallel_controller(qtbot, 2, on_download=_block)
+    _enqueue(ctrl, "A")
+    _enqueue(ctrl, "B")
+
+    assert ctrl.start(lambda: (None, None)) is True
+    qtbot.waitUntil(lambda: len(started) == 2, timeout=2000)
+
+    ctrl.pause()
+    # 走行中の 2 つのワーカー Downloader それぞれに中断要求
+    active = [dl for dl in created if dl.download_video.called]
+    assert len(active) == 2
+    for dl in active:
+        dl.request_cancel.assert_called()
+
+    release.set()
+    qtbot.waitUntil(lambda: not ctrl.is_running, timeout=2000)
+
+
+def test_progress_callback_routes_to_item(controller, qtbot):
+    """worker が設定した status_callback で該当 item.progress が更新されること。"""
+
+    def _dv(*a, **k):
+        cb = controller._downloader.status_callback
+        cb("ダウンロード中", 42.0)
+        controller._paused = True  # 1 回で抜ける
+
+    controller._downloader.download_video.side_effect = _dv
+    item = _enqueue(controller, "進捗")
+
+    assert controller.start(lambda: (None, None)) is True
+    qtbot.waitUntil(lambda: not controller.is_running, timeout=2000)
+    assert item.progress == 42.0
+
+
+def test_refresh_tree_item_shows_progress_for_downloading(controller):
+    """downloading 行のステータス列に進捗 % が表示されること。"""
+    item = _enqueue(controller, "x")
+    item.status = "downloading"
+    item.progress = 33.3
+    controller.refresh_tree_item(item)
+    assert "33.3" in item.tree_item.text(3)
+
+
+def test_overall_progress_reflects_finished_ratio(controller, qtbot):
+    """全体進捗 = finished/total。done 1 / 全 2 → 50%。"""
+    a = _enqueue(controller, "A")
+    _enqueue(controller, "B")
+    a.status = "done"
+
+    with qtbot.waitSignal(controller.status_update, timeout=1000) as blocker:
+        controller._emit_overall_progress()
+
+    _, pct = blocker.args
+    assert pct == 50.0
 
 
 # ── アーカイブ無視（再取得） ──────────────────────────────────────────────

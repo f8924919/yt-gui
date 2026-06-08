@@ -259,7 +259,13 @@ class App(QMainWindow):
 
         # Queue controller の生成は _queue_tree 構築後でないといけないため、
         # _create_widgets の後で行う。
-        self.queue = QueueController(self.downloader, self._queue_tree, self)
+        self.queue = QueueController(
+            self.downloader,
+            self._queue_tree,
+            self,
+            make_downloader=self._build_download_worker,
+            get_concurrency=lambda: self._settings.max_concurrent_downloads,
+        )
         self._wire_queue_signals()
 
         QTimer.singleShot(0, self._check_dependencies)
@@ -279,6 +285,29 @@ class App(QMainWindow):
         self.queue.item_added.connect(self._on_queue_item_added)
         self.queue.edit_mode_entered.connect(self._on_edit_mode_entered)
         self.queue.edit_mode_exited.connect(self._on_edit_mode_exited)
+
+    def _build_download_worker(self) -> Downloader:
+        """並列ワーカー用の専用 Downloader を現在の設定から生成する。
+
+        `QueueController` がワーカーごとに呼び出す。`status_callback` は
+        ワーカー側でアイテム単位に設定するため None。primary の
+        `self.downloader`（タイトル取得・パネル参照用）とは別インスタンス。
+        """
+        return Downloader(
+            self._resolve_download_path(),
+            status_callback=None,
+            video_resolution=self._settings.video_resolution,
+            mp3_bitrate=self._settings.mp3_bitrate,
+            log_callback=self._on_downloader_log,
+            output_template_video=self._settings.output_template_video,
+            output_template_playlist=self._settings.output_template_playlist,
+            proxy_url=build_proxy_url(self._settings),
+            concurrent_fragments=self._settings.concurrent_fragments,
+            rate_limit=build_rate_limit(self._settings),
+            sponsorblock_mode=self._settings.sponsorblock_mode,
+            sponsorblock_categories=self._settings.sponsorblock_categories,
+            download_archive_path=resolve_download_archive_path(self._settings),
+        )
 
     # ── helpers ──────────────────────────────────────────────────────────────
 

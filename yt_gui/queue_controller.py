@@ -28,6 +28,7 @@ from yt_dlp.utils import DownloadCancelled
 from .downloader import Downloader, DownloadSkipped
 from .i18n import t
 from .job_spec import JobSpec
+from .settings import MAX_CONCURRENT_DOWNLOADS_MAX
 from .utils import strip_ansi
 
 
@@ -43,6 +44,7 @@ class _QueueItem:
     playlist_index: int | None = None
     thumbnail_url: str | None = None
     status: str = "waiting"
+    progress: float = 0.0  # ダウンロード進捗（0〜100）。行のステータス列に表示
     tree_item: QTreeWidgetItem | None = None
 
     @property
@@ -92,14 +94,24 @@ class QueueController(QObject):
         downloader: Downloader,
         queue_tree: QTreeWidget,
         parent: QObject | None = None,
+        *,
+        make_downloader: Callable[[], Downloader] | None = None,
+        get_concurrency: Callable[[], int] | None = None,
     ) -> None:
         super().__init__(parent)
         self._downloader = downloader
         self._queue_tree = queue_tree
+        # ワーカーごとに専用 Downloader を得るファクトリ。既定は単一インスタンスを
+        # 返す（後方互換）。並列時に進捗コールバック/中断フラグの混線を避けるため、
+        # App は現在の設定から distinct なインスタンスを生成するファクトリを渡す。
+        self._make_downloader = make_downloader or (lambda: downloader)
+        # 同時ダウンロード数（ワーカー数）を返す。既定は 1（逐次）。
+        self._get_concurrency = get_concurrency or (lambda: 1)
 
         self._items: list[_QueueItem] = []
         self._lock = threading.Lock()
-        self._worker_running = False
+        self._active_workers = 0
+        self._active_downloaders: list[Downloader] = []
         self._paused = False
         self._item_counter = 0
 
@@ -118,7 +130,7 @@ class QueueController(QObject):
 
     @property
     def is_running(self) -> bool:
-        return self._worker_running
+        return self._active_workers > 0
 
     def has_waiting(self) -> bool:
         with self._lock:
@@ -218,11 +230,14 @@ class QueueController(QObject):
         if item is None or item.tree_item is None:
             return
         tree_item = item.tree_item
-        status_text = (
-            t(_STATUS_KEY_MAP[item.status])
-            if item.status in _STATUS_KEY_MAP
-            else item.status
-        )
+        if item.status == "downloading":
+            status_text = t("queue_status_downloading_pct").format(
+                percent=item.progress
+            )
+        elif item.status in _STATUS_KEY_MAP:
+            status_text = t(_STATUS_KEY_MAP[item.status])
+        else:
+            status_text = item.status
         tree_item.setText(3, status_text)
         color_hex = _STATUS_COLORS.get(item.status)
         if color_hex:
@@ -243,53 +258,107 @@ class QueueController(QObject):
     # ── ワーカースレッド ─────────────────────────────────────────────────
 
     def start(self, cookies_resolver: CookiesResolver) -> bool:
-        """ワーカーが起動できれば True、待機項目が無い・実行中なら False。"""
+        """ワーカーが起動できれば True、待機項目が無い・実行中なら False。
+
+        設定の同時ダウンロード数だけワーカースレッドを起動する。
+        """
         if not self.has_waiting():
             return False
-        if self._worker_running:
+        if self.is_running:
             return False
 
+        n = max(1, min(self._get_concurrency(), MAX_CONCURRENT_DOWNLOADS_MAX))
         self._paused = False
-        self._worker_running = True
         self.log_message.emit(t("log_queue_started"))
-        threading.Thread(
-            target=self._worker, args=(cookies_resolver,), daemon=True
-        ).start()
+        with self._lock:
+            self._active_workers = n
+        for _ in range(n):
+            downloader = self._make_downloader()
+            threading.Thread(
+                target=self._worker,
+                args=(cookies_resolver, downloader),
+                daemon=True,
+            ).start()
         return True
 
     def pause(self) -> None:
         self._paused = True
         # 進行中ダウンロードを即座に中断する（DownloadCancelled 経由）。
-        # 中断されたアイテムは _worker 側で waiting に戻る。
-        self._downloader.request_cancel()
+        # 走行中の全ワーカーの Downloader に中断要求を出す（dedupe）。primary も
+        # フォールバックとして含める（ワーカー未起動でも中断要求が届くように）。
+        with self._lock:
+            downloaders = [self._downloader, *self._active_downloaders]
+        for downloader in dict.fromkeys(downloaders):
+            downloader.request_cancel()
         self.log_message.emit(t("log_queue_paused"))
 
-    def _worker(self, cookies_resolver: CookiesResolver) -> None:
+    def _emit_overall_progress(self) -> None:
+        """キュー全体の進捗（完了数 / 総数）を status_update で通知する。"""
+        with self._lock:
+            statuses = [i.status for i in self._items]
+        counted = [
+            s
+            for s in statuses
+            if s in ("waiting", "downloading", "done", "error", "skipped")
+        ]
+        total = len(counted)
+        if total == 0:
+            self.status_update.emit(t("status_ready"), 0)
+            return
+        finished = sum(1 for s in counted if s in ("done", "error", "skipped"))
+        percent = finished / total * 100
+        self.status_update.emit(
+            t("status_overall_progress").format(done=finished, total=total), percent
+        )
+
+    def _worker(
+        self, cookies_resolver: CookiesResolver, downloader: Downloader
+    ) -> None:
+        with self._lock:
+            self._active_downloaders.append(downloader)
+        try:
+            self._worker_loop(cookies_resolver, downloader)
+        finally:
+            with self._lock:
+                if downloader in self._active_downloaders:
+                    self._active_downloaders.remove(downloader)
+                self._active_workers -= 1
+                last = self._active_workers == 0
+                paused = self._paused
+            if last:
+                self.worker_done.emit()
+                if paused:
+                    self._emit_overall_progress()
+                else:
+                    self.status_update.emit(t("status_ready"), 0)
+                    self.log_message.emit(t("log_queue_done"))
+
+    def _worker_loop(
+        self, cookies_resolver: CookiesResolver, downloader: Downloader
+    ) -> None:
         while True:
             with self._lock:
                 if self._paused:
-                    self._worker_running = False
                     return
                 item = next((i for i in self._items if i.status == "waiting"), None)
                 if item is None:
-                    self._worker_running = False
-                    self.status_update.emit(t("status_ready"), 0)
-                    self.log_message.emit(t("log_queue_done"))
-                    self.worker_done.emit()
                     return
                 item.status = "downloading"
+                item.progress = 0.0
 
             self.item_refresh.emit(item)
+            self._emit_overall_progress()
             self.log_message.emit(f"⬇️ {item.title}  [{item.format_label}]")
 
             def make_cb(qi: _QueueItem) -> Callable[[str, float], None]:
                 def cb(text: str, percent: float) -> None:
-                    self.status_update.emit(text, percent)
+                    qi.progress = percent
                     self.item_refresh.emit(qi)
+                    self._emit_overall_progress()
 
                 return cb
 
-            self._downloader.status_callback = make_cb(item)
+            downloader.status_callback = make_cb(item)
 
             cookies_path, cookies_browser = cookies_resolver()
             if cookies_path and not os.path.isfile(cookies_path):
@@ -300,7 +369,7 @@ class QueueController(QObject):
                 cookies_path = None
 
             try:
-                self._downloader.download_video(
+                downloader.download_video(
                     item.url,
                     item.job,
                     cookies_path,
@@ -334,6 +403,7 @@ class QueueController(QObject):
                 )
 
             self.item_refresh.emit(item)
+            self._emit_overall_progress()
 
     # ── 編集モード ────────────────────────────────────────────────────────
 

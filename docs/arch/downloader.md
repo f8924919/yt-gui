@@ -222,6 +222,7 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 - `download_video` はジョブ開始時に `_cancel_requested.clear()` で前回の中断要求をリセットするため、中断後の再ダウンロードに影響しない。
 - `download_video` は `_run_download` を `except DownloadCancelled` で囲み、中断時に `_cleanup_partial_files(effective_stem)` で部分ファイルを掃除してから例外を再送出する。呼び出し側（`queue_controller._worker`）が `DownloadCancelled` を捕捉してアイテムを `waiting` に戻す。
 - 中断はベストエフォート: `progress_hook` が呼ばれない区間（メタデータ抽出・ポストプロセス）では当該フェーズ完了後に効く。
+- `_cancel_requested` と `status_callback` は **`Downloader` インスタンス単位**の状態である。そのため複数ダウンロードを**並列実行する場合は `Downloader` インスタンスを分ける**（同時ダウンロード機能では `QueueController` がワーカーごとに専用インスタンスを使い、中断要求と進捗コールバックがアイテム間で混線しないようにしている。[queue_controller.md](queue_controller.md)）。
 
 #### 部分ファイル・字幕の削除: `_cleanup_partial_files`
 
