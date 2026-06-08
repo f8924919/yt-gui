@@ -1,0 +1,42 @@
+name: 機能要望・改善提案
+description: 新機能の追加や既存挙動の改善を提案する
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案ありがとうございます。本プロジェクトは Issue ベースで開発します
+        （[docs/git-workflow.md](../../docs/git-workflow.md) §3）。実装に着手しやすいよう、
+        背景・受け入れ条件・対象範囲をできる範囲でご記入ください。
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景 / 目的
+      description: なぜ必要か・どんな課題を解決するか
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案内容
+      description: 望む挙動・UI・仕様の案
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      description: 完了の判定基準（チェックリスト形式が望ましい）
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: 対象ファイル・モジュール / 関連ドキュメント
+      description: 変更が想定される箇所、関連する docs/spec・docs/arch があれば
+    validations:
+      required: false

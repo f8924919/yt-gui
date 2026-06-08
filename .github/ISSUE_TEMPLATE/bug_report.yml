@@ -1,0 +1,60 @@
+name: バグ報告
+description: 不具合・期待どおり動かない挙動を報告する
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ご報告ありがとうございます。再現に必要な情報をできる範囲でご記入ください。
+        セキュリティ上の脆弱性は公開せず [SECURITY.md](../../SECURITY.md) の手順で報告してください。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: どのような不具合かを簡潔に
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 不具合が発生するまでの操作手順
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する挙動
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の挙動
+      description: エラーメッセージ・ログがあれば添付
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: バージョン
+      description: アプリのバージョン（リリースタグ）またはコミット
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - macOS (Apple Silicon / arm64)
+        - macOS (Intel / x86_64)
+        - Linux
+        - その他
+    validations:
+      required: true
