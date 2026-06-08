@@ -38,6 +38,8 @@ from .output_template import (
 from .settings import (
     CONCURRENT_FRAGMENTS_MAX,
     CONCURRENT_FRAGMENTS_MIN,
+    MAX_CONCURRENT_DOWNLOADS_MAX,
+    MAX_CONCURRENT_DOWNLOADS_MIN,
     PROXY_SCHEMES,
     RATE_LIMIT_UNITS,
     RATE_LIMIT_VALUE_MAX,
@@ -362,7 +364,28 @@ class SettingsDialog(QDialog):
         layout.setColumnStretch(1, 1)
 
         layout.addWidget(
-            QLabel(t("label_concurrent_fragments")), 0, 0, Qt.AlignmentFlag.AlignRight
+            QLabel(t("label_max_concurrent_downloads")),
+            0,
+            0,
+            Qt.AlignmentFlag.AlignRight,
+        )
+        self._max_concurrent_spin = QSpinBox()
+        self._max_concurrent_spin.setRange(
+            MAX_CONCURRENT_DOWNLOADS_MIN, MAX_CONCURRENT_DOWNLOADS_MAX
+        )
+        mcd = self._settings.max_concurrent_downloads
+        self._max_concurrent_spin.setValue(
+            min(max(mcd, MAX_CONCURRENT_DOWNLOADS_MIN), MAX_CONCURRENT_DOWNLOADS_MAX)
+        )
+        layout.addWidget(self._max_concurrent_spin, 0, 1, Qt.AlignmentFlag.AlignLeft)
+
+        mcd_note = QLabel(t("max_concurrent_downloads_note"))
+        mcd_note.setStyleSheet("color: gray;")
+        mcd_note.setWordWrap(True)
+        layout.addWidget(mcd_note, 1, 0, 1, 2)
+
+        layout.addWidget(
+            QLabel(t("label_concurrent_fragments")), 2, 0, Qt.AlignmentFlag.AlignRight
         )
         self._concurrent_fragments_spin = QSpinBox()
         self._concurrent_fragments_spin.setRange(
@@ -373,16 +396,16 @@ class SettingsDialog(QDialog):
             min(max(value, CONCURRENT_FRAGMENTS_MIN), CONCURRENT_FRAGMENTS_MAX)
         )
         layout.addWidget(
-            self._concurrent_fragments_spin, 0, 1, Qt.AlignmentFlag.AlignLeft
+            self._concurrent_fragments_spin, 2, 1, Qt.AlignmentFlag.AlignLeft
         )
 
         note = QLabel(t("concurrent_fragments_note"))
         note.setStyleSheet("color: gray;")
         note.setWordWrap(True)
-        layout.addWidget(note, 1, 0, 1, 2)
+        layout.addWidget(note, 3, 0, 1, 2)
 
         layout.addWidget(
-            QLabel(t("label_rate_limit")), 2, 0, Qt.AlignmentFlag.AlignRight
+            QLabel(t("label_rate_limit")), 4, 0, Qt.AlignmentFlag.AlignRight
         )
         rate_row = QHBoxLayout()
         self._rate_limit_spin = QDoubleSpinBox()
@@ -401,24 +424,24 @@ class SettingsDialog(QDialog):
         self._rate_limit_unit_combo.setCurrentIndex(unit_index)
         rate_row.addWidget(self._rate_limit_unit_combo)
         rate_row.addStretch()
-        layout.addLayout(rate_row, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(rate_row, 4, 1, Qt.AlignmentFlag.AlignLeft)
 
         rate_note = QLabel(t("rate_limit_note"))
         rate_note.setStyleSheet("color: gray;")
         rate_note.setWordWrap(True)
-        layout.addWidget(rate_note, 3, 0, 1, 2)
+        layout.addWidget(rate_note, 5, 0, 1, 2)
 
         # ── ダウンロードアーカイブ ──────────────────────────────────────────
         layout.addWidget(
-            QLabel(t("label_download_archive")), 4, 0, Qt.AlignmentFlag.AlignRight
+            QLabel(t("label_download_archive")), 6, 0, Qt.AlignmentFlag.AlignRight
         )
         self._archive_check = QCheckBox(t("download_archive_enabled"))
         self._archive_check.setChecked(self._settings.download_archive_enabled)
-        layout.addWidget(self._archive_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self._archive_check, 6, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addWidget(
             QLabel(t("label_download_archive_path")),
-            5,
+            7,
             0,
             Qt.AlignmentFlag.AlignRight,
         )
@@ -429,7 +452,7 @@ class SettingsDialog(QDialog):
         self._archive_browse_btn = QPushButton(t("btn_browse"))
         self._archive_browse_btn.clicked.connect(self._browse_archive)
         archive_row.addWidget(self._archive_browse_btn)
-        layout.addLayout(archive_row, 5, 1)
+        layout.addLayout(archive_row, 7, 1)
 
         count_row = QHBoxLayout()
         self._archive_count_label = QLabel()
@@ -438,7 +461,7 @@ class SettingsDialog(QDialog):
         self._archive_clear_btn = QPushButton(t("btn_download_archive_clear"))
         self._archive_clear_btn.clicked.connect(self._clear_archive)
         count_row.addWidget(self._archive_clear_btn)
-        layout.addLayout(count_row, 6, 1)
+        layout.addLayout(count_row, 8, 1)
 
         archive_note = QLabel(t("download_archive_note"))
         archive_note.setStyleSheet("color: gray;")
@@ -729,6 +752,7 @@ class SettingsDialog(QDialog):
             self._settings.cookies_path = ""
             self._settings.cookies_browser = ""
 
+        self._settings.max_concurrent_downloads = self._max_concurrent_spin.value()
         self._settings.concurrent_fragments = self._concurrent_fragments_spin.value()
         self._settings.rate_limit_value = self._rate_limit_spin.value()
         self._settings.rate_limit_unit = RATE_LIMIT_UNITS[

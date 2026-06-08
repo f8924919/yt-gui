@@ -46,6 +46,7 @@ def test_settings_defaults_match_spec() -> None:
     assert s.proxy_password == ""
     assert s.download_archive_enabled is False
     assert s.download_archive_path == ""
+    assert s.max_concurrent_downloads == 1
 
 
 @pytest.fixture
@@ -106,6 +107,22 @@ def test_concurrent_fragments_defaults_from_old_json(
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
     assert manager.load().concurrent_fragments == 1
+
+
+def test_max_concurrent_downloads_roundtrips(manager: SettingsManager) -> None:
+    original = Settings(max_concurrent_downloads=3)
+    manager.save(original)
+    assert manager.load().max_concurrent_downloads == 3
+
+
+def test_max_concurrent_downloads_defaults_from_old_json(
+    manager: SettingsManager, tmp_path: Path
+) -> None:
+    """max_concurrent_downloads 無しの古い settings.json でも既定 1 で読み込めること。"""
+    config_file = tmp_path / "yt-gui" / "settings.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    assert manager.load().max_concurrent_downloads == 1
 
 
 def test_rate_limit_fields_roundtrip(manager: SettingsManager) -> None:

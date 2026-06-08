@@ -101,12 +101,14 @@ yt-dlp の OUTPUT TEMPLATE 機能でダウンロードファイル名を設定�
 
 | 項目 | 種別 | 説明 |
 |---|---|---|
+| 同時ダウンロード数 | スピンボックス（1〜5） | キューを **複数アイテム同時** に処理するワーカー数。既定 `1`（逐次 = 現行挙動）。`N>1` で最大 N 件を並行ダウンロードする。yt-dlp オプションではなくアプリのキュー実行モデル（[ダウンロードキュー — キューの実行](../features/queue.md#キューの実行)）の設定。並列フラグメント数（下記）とは別物（あちらは 1 動画内のフラグメント並列） |
 | 並列フラグメント数 | スピンボックス（1〜16） | yt-dlp の `concurrent_fragment_downloads`（CLI の `--concurrent-fragments` / `-N`）。フラグメント分割される動画（DASH / HLS）を並列ダウンロードして高速化する。既定 `1`（単一フラグメント = yt-dlp 既定）。`1` のときは yt-dlp にオプションを渡さない |
 | 速度制限 | スピンボックス（小数、0〜）＋ 単位コンボ（KB/s / MB/s） | yt-dlp の `ratelimit`（CLI の `--limit-rate`）。ダウンロード帯域の上限。既定 `0`（無制限）。`0` のときは yt-dlp にオプションを渡さない |
 | ダウンロードアーカイブ 有効化 | チェックボックス | yt-dlp の `download_archive`（CLI の `--download-archive`）。既 DL 動画を記録して再 DL をスキップする。既定オフ。動作仕様は[ダウンロードアーカイブ](../features/download-behavior.md#ダウンロードアーカイブ) |
 | 記録ファイル | テキスト入力 ＋「参照...」ボタン | アーカイブ記録ファイルのパス。空欄時のプレースホルダに既定パス（設定ディレクトリの `download_archive.txt`）を表示。参照は保存ファイルダイアログ |
 | 登録件数 ＋「クリア」ボタン | ラベル ＋ ボタン | 現在の記録件数（非空行数）を表示。「クリア」で確認ダイアログののち記録ファイルを削除する |
 
+- 同時ダウンロード数の下に注記を表示: 「複数の動画を同時にダウンロードします（1 = 逐次）。各動画の進捗はキューの各行に表示されます」
 - 並列フラグメント数の下に注記を表示: 「フラグメント分割される動画（DASH / HLS）でのみ高速化に寄与します」
 - プログレッシブ単一ファイルには効果がない
 - 速度制限の下に注記を表示: 「0 で無制限。単位は 2 進接頭辞（KB/s = 1024 bytes/s）」
@@ -194,6 +196,7 @@ yt-dlp の通信に使うプロキシを設定する。設定値は yt-dlp の `
 | MP3 ビットレート | `Downloader.mp3_bitrate` を更新 |
 | 動画コンテナ・音声形式 | 形式コンボボックスの表示名を再生成 |
 | OUTPUT TEMPLATE | `Downloader.output_template_video` / `output_template_playlist` を更新（次のダウンロードから反映） |
+| 同時ダウンロード数 | `Settings.max_concurrent_downloads` を保存。`QueueController` は次の「ダウンロード開始」時にこの値を読んでワーカー数を決める（走行中の変更は次回開始から反映） |
 | 並列フラグメント数 | `Downloader.concurrent_fragments` を更新（次のダウンロードから反映） |
 | 速度制限 | `build_rate_limit()` で換算した bytes/sec を `Downloader.rate_limit` に設定（次のダウンロードから反映） |
 | SponsorBlock | `Downloader.sponsorblock_mode` / `sponsorblock_categories` を更新（次のダウンロードから反映） |

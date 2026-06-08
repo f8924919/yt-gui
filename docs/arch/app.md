@@ -37,13 +37,17 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 ## 初期化順序
 
 1. `Settings` 読み込み・i18n 初期化
-2. `Downloader` 生成
+2. `Downloader` 生成（primary。タイトル取得・アーカイブ事前フィルタ・依存チェック・オリジナル形式パネル参照に使う）
 3. `ThumbnailCache` 生成
 4. `_create_menu()` / `_create_widgets()` → `_queue_tree` を含むウィジェット構築
-5. `QueueController` 生成（引数: `downloader`, `queue_tree`）
+5. `QueueController` 生成（引数: `downloader`, `queue_tree`, `make_downloader=self._build_download_worker`, `get_concurrency=lambda: self._settings.max_concurrent_downloads`）
 6. `_wire_queue_signals()` でコントローラのシグナルをスロットに配線
 
 `QueueController` は `_queue_tree` 構築後にしか作れないため、`_create_widgets()` の後で生成する。`_QueueTree` への依存はコンストラクタ DI で渡し、`self.queue` 未生成の段階の参照は lambda 経由で遅延化する (`get_item=lambda ti: self.queue.find_item_for(ti)`)。
+
+### 並列ダウンロード用 Downloader ファクトリ
+
+`_build_download_worker() -> Downloader` は、現在の設定から `status_callback=None` / `log_callback=self._on_downloader_log` の `Downloader` を生成する（`__init__` の生成ブロックと同じ設定を共通化）。`QueueController` は各ワーカーごとにこのファクトリで**専用インスタンス**を得て使う（進捗コールバック・中断フラグの混線を避けるため。[queue_controller.md](queue_controller.md)）。primary の `self.downloader` はキュー実行には使わず、`_open_settings` でのミューテートは従来どおり維持する（メタデータ系操作・パネル参照のため）。
 
 ## 内部クラス: `_QueueTree(QTreeWidget)`
 

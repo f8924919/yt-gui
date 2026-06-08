@@ -10,6 +10,10 @@ PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h"
 CONCURRENT_FRAGMENTS_MIN = 1
 CONCURRENT_FRAGMENTS_MAX = 16
 
+# 同時ダウンロード数（キューを並行処理するワーカー数）の指定可能範囲
+MAX_CONCURRENT_DOWNLOADS_MIN = 1
+MAX_CONCURRENT_DOWNLOADS_MAX = 5
+
 # 速度制限の単位（"K" = KB/s, "M" = MB/s）と換算係数（2 進接頭辞）。
 # yt-dlp の --limit-rate と同じく K=1024, M=1024*1024 bytes/sec。
 RATE_LIMIT_UNITS: tuple[str, ...] = ("K", "M")
@@ -45,6 +49,7 @@ class Settings:
     output_template_playlist: str = (
         "%(playlist_title)s/%(playlist_index)03d - %(title)s.%(ext)s"
     )
+    max_concurrent_downloads: int = 1  # 同時ダウンロード数（1 = 逐次）
     concurrent_fragments: int = 1  # 並列フラグメント DL 数（1 = 単一フラグメント）
     rate_limit_value: float = 0.0  # 速度制限値（0 = 無制限）
     rate_limit_unit: str = "M"  # 速度制限の単位（"K" = KB/s, "M" = MB/s）

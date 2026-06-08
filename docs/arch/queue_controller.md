@@ -10,7 +10,7 @@
 
 | 名前 | 役割 |
 |---|---|
-| `_QueueItem` (`@dataclass`) | 1 キュー項目。`url` / `title` / `format_label` / `job: JobSpec` / `playlist_*` / `thumbnail_url` / `status` / `tree_item` を保持 |
+| `_QueueItem` (`@dataclass`) | 1 キュー項目。`url` / `title` / `format_label` / `job: JobSpec` / `playlist_*` / `thumbnail_url` / `status` / `progress: float` / `tree_item` を保持 |
 | `QueueController(QObject)` | キューの所有とライフサイクル管理 |
 
 `_QueueItem.format_id` は `job.format_id` のエイリアスプロパティ。
@@ -39,9 +39,16 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 | メソッド | 説明 |
 |---|---|
-| `start(cookies_resolver) -> bool` | ワーカースレッド起動。`cookies_resolver: () -> (cookies_path, cookies_browser)` を毎イテレーション呼ぶことで生きた設定変更を反映する。起動できないとき (待機項目無し / 実行中) は `False` |
-| `pause() -> None` | `_paused=True` をセットし、`downloader.request_cancel()` で進行中ダウンロードに中断を要求する。進行中アイテムは `DownloadCancelled` で中断され `waiting` に戻り、次のイテレーション境界でワーカーが停止する |
-| `is_running` (property) | ワーカースレッドが走行中か |
+| `start(cookies_resolver) -> bool` | `get_concurrency()` を `[1, MAX_CONCURRENT_DOWNLOADS_MAX]` にクランプした数だけワーカースレッドを起動する。`cookies_resolver: () -> (cookies_path, cookies_browser)` を毎イテレーション呼ぶことで生きた設定変更を反映する。起動できないとき (待機項目無し / 実行中) は `False` |
+| `pause() -> None` | `_paused=True` をセットし、走行中の **全ワーカーの `Downloader`**（`_active_downloaders`、dedupe）に `request_cancel()` で中断を要求する。進行中アイテムは `DownloadCancelled` で中断され `waiting` に戻り、各ワーカーは次のイテレーション境界で停止する |
+| `is_running` (property) | 走行中ワーカーが 1 つ以上あるか（`_active_workers > 0`） |
+
+#### 並列ワーカーと Downloader プール
+
+- 各ワーカーは `make_downloader()` で得た**専用 `Downloader` インスタンス**を使う。`Downloader` は `status_callback` と `_cancel_requested`（中断フラグ）を**インスタンス属性**で持つため（[downloader.md](downloader.md)）、単一インスタンスを並列共有すると進捗コールバックと中断が混線する。インスタンスを分けることで、`downloader.py` の中断ロジックを無改修のままアイテム間で隔離する。
+- 既定の `make_downloader` は `lambda: downloader`（コンストラクタ引数の単一インスタンス）。`App` は現在の設定から distinct な `Downloader` を生成するファクトリ（`_build_download_worker`）を渡す（[app.md](app.md)）。
+- `_worker(cookies_resolver, downloader)` は `finally` で自分を `_active_downloaders` / `_active_workers` から外し、**最後の 1 本**だけが全体進捗の確定・`worker_done` / `log_queue_done`（pause 時は出さない）を emit する。
+- 進捗ルーティング: `make_cb(item)` が percent を `item.progress` に格納して `item_refresh.emit(item)`（該当行のみ再描画）し、`_emit_overall_progress()` で全体進捗を `status_update` に流す。全体進捗 = `finished / total`（`finished = {done,error,skipped}`、`total = {waiting,downloading,done,error,skipped}`）。
 
 ### 編集モード
 
@@ -65,7 +72,7 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 | メソッド | 説明 |
 |---|---|
-| `refresh_tree_item(item)` | 単一行を再描画 (`status` テキスト・色) |
+| `refresh_tree_item(item)` | 単一行を再描画 (`status` テキスト・色)。`downloading` のときはステータス列に進捗 %（`queue_status_downloading_pct` を `item.progress` で書式化）を表示する |
 | `refresh_all_tree_items()` | 全行を再描画 (言語切替時用) |
 
 ## シグナル
@@ -107,9 +114,12 @@ waiting → editing → waiting (apply or cancel)
 | 属性 | 用途 |
 |---|---|
 | `_items: list[_QueueItem]` | キュー本体 |
-| `_lock: threading.Lock` | `_items` と各 `item.status` の排他制御 |
-| `_worker_running: bool` | ワーカー走行中フラグ |
-| `_paused: bool` | 一時停止フラグ (次イテレーションで `_worker_running=False`) |
+| `_lock: threading.Lock` | `_items` / 各 `item.status` / `_active_workers` / `_active_downloaders` の排他制御 |
+| `_active_workers: int` | 走行中ワーカー数（`is_running` の基。`0` で全停止） |
+| `_active_downloaders: list[Downloader]` | 走行中ワーカーが使用中の `Downloader`（`pause()` の中断対象） |
+| `_make_downloader: Callable[[], Downloader]` | ワーカー用 `Downloader` ファクトリ（既定は単一インスタンスを返す） |
+| `_get_concurrency: Callable[[], int]` | 同時ダウンロード数を返す（既定 `1`） |
+| `_paused: bool` | 一時停止フラグ (次イテレーションで各ワーカーが停止) |
 | `_item_counter: int` | キュー追加時の連番 (表示列 `#`) |
 | `_edit_mode: bool` | 編集モードフラグ |
 | `_editing_items: list[_QueueItem]` | 編集中アイテム |
