@@ -2,11 +2,11 @@
 
 [← 目次](../index.md)
 
-> 関連実装: [yt_gui/app.py](../../arch/app.md)
+> 関連実装: [yt_gui/app.py](../../arch/app.md) ・ [yt_gui/queue_controller.py](../../arch/queue_controller.md)
 
 ## 概要
 
-yt-gui はダウンロードキューを持ち、URL と形式を複数登録してからまとめて実行できます。`_QueueItem` dataclass がキューの各アイテムを表し、`App` が `_queue_items: list[_QueueItem]` でキュー全体を管理します。
+yt-gui はダウンロードキューを持ち、URL と形式を複数登録してからまとめて実行できます。各アイテムはキュー項目（`_QueueItem`）として表され、キュー全体の所有・走行・状態遷移は `QueueController` が管理します（実装は [arch/queue_controller.md](../../arch/queue_controller.md)）。
 
 ---
 
@@ -164,5 +164,5 @@ yt-gui はダウンロードキューを持ち、URL と形式を複数登録し
 
 ## スレッド安全性
 
-- `_queue_items` の読み書きはすべて `_queue_lock`（`threading.Lock`）で保護。同時ダウンロード時は複数ワーカーが同じロックで `waiting` の取り出し・ステータス遷移を直列化するため、二重処理や競合は起きない
-- バックグラウンドスレッドから GUI を更新する場合は `_AppSignals` のシグナルを emit し、メインスレッドのスロットで処理（直接 Qt ウィジェットを操作しない）
+- キュー本体の読み書きはすべて単一のロック（`threading.Lock`）で保護される。同時ダウンロード時は複数ワーカーが同じロックで `waiting` の取り出し・ステータス遷移を直列化するため、二重処理や競合は起きない
+- バックグラウンドスレッドから GUI を更新する場合はシグナルを emit し、メインスレッドのスロットで処理する（直接 Qt ウィジェットを操作しない）。具体的なロック名・シグナル一覧は [arch/queue_controller.md](../../arch/queue_controller.md) を参照
