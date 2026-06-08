@@ -42,7 +42,7 @@ jobs:
 
       # pins.json に差分があるときだけ PR を作成する（差分なしなら no-op）。
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           add-paths: bin/pins.json
           branch: chore/update-binary-pins
