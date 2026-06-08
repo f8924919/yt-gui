@@ -466,7 +466,7 @@ class SettingsDialog(QDialog):
         archive_note = QLabel(t("download_archive_note"))
         archive_note.setStyleSheet("color: gray;")
         archive_note.setWordWrap(True)
-        layout.addWidget(archive_note, 7, 0, 1, 2)
+        layout.addWidget(archive_note, 9, 0, 1, 2)
 
         self._archive_check.toggled.connect(self._on_archive_toggled)
         self._archive_path_edit.textChanged.connect(self._refresh_archive_count)
