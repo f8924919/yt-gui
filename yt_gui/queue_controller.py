@@ -287,10 +287,8 @@ class QueueController(QObject):
         # 走行中の全ワーカーの Downloader に中断要求を出す（dedupe）。primary も
         # フォールバックとして含める（ワーカー未起動でも中断要求が届くように）。
         with self._lock:
-            targets = list(
-                dict.fromkeys([self._downloader, *self._active_downloaders])
-            )
-        for downloader in targets:
+            downloaders = [self._downloader, *self._active_downloaders]
+        for downloader in dict.fromkeys(downloaders):
             downloader.request_cancel()
         self.log_message.emit(t("log_queue_paused"))
 
