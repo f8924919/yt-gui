@@ -20,6 +20,7 @@
 | [75-download-archive.md](75-download-archive.md) | ダウンロードアーカイブ（`--download-archive` 相当）を追加。差分取得・再 DL 防止、新ステータス `skipped`。アイテム単位再取得は #76 へ分離（Issue #75 / PR #77） | 2026-06-03 |
 | [81-download-sections.md](81-download-sections.md) | 区間ダウンロード（時間範囲の切り出し）を追加。安定性優先でフル取得→ローカル ffmpeg 切り出し方式。チャプター指定は #83、通信量節約版は #84 へ分離（Issue #81 / PR #82） | 2026-06-04 |
 | [76-ignore-archive-refetch.md](76-ignore-archive-refetch.md) | アイテム単位でダウンロードアーカイブを無視して再取得する手段を追加。右クリック「アーカイブを無視して再取得」、再記録せず既存記録は保持（Issue #76 / PR #91） | 2026-06-07 |
+| [108-parallel-downloads.md](108-parallel-downloads.md) | 並列ダウンロード（複数アイテム同時実行）＋キュー行単位の進捗表示。Downloader を N プール化・ステータス列に進捗 %・ステータスバーを全体進捗に変更（Issue #108 / PR #110） | 2026-06-08 |
 
 ## バグ修正
 
