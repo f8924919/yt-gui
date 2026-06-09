@@ -68,14 +68,15 @@
 
 ## 内部クラス: `_NicoCommentsGroup`
 
-ニコニコ動画コメント (ASS 変換 / MKV 統合) 設定を担う `QGroupBox` サブクラス。`OriginalFormatPanel._build_widgets` でインスタンス化される。
+ニコニコ動画コメント (ASS 変換 / MKV 統合 / ハードサブ焼きこみ) 設定を担う `QGroupBox` サブクラス。`OriginalFormatPanel._build_widgets` でインスタンス化される。
 
 責務:
 
-- コメント ASS 変換チェック / MKV 統合チェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・フォントサイズの各 SpinBox の保持
+- コメント ASS 変換チェック / MKV 統合チェック / ハードサブ焼きこみチェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・フォントサイズの各 SpinBox の保持
 - ASS 変換 ↔ MKV 統合の連動制御（OFF 時に MKV を解除 / MKV ON 時に ASS を強制 ON）
+- ASS 変換 ↔ ハードサブ焼きこみの連動制御（OFF 時に焼きこみを解除 / 焼きこみ ON 時に ASS を強制 ON）
 - 解像度自動追従 OFF 時のみ手動解像度 SpinBox を有効化
-- 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェックの有効/無効切替
+- 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェック・ハードサブ焼きこみチェックの有効/無効切替
 
 親パネルとの委譲経路:
 
@@ -108,7 +109,7 @@
 | `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
-| `get_nico_comments_opts()` | `dict` | ニコニコ動画コメント → ASS 変換 / MKV 統合オプション（`convert_to_ass` / `embed_to_mkv` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す |
+| `get_nico_comments_opts()` | `dict` | ニコニコ動画コメント → ASS 変換 / MKV 統合 / ハードサブ焼きこみオプション（`convert_to_ass` / `embed_to_mkv` / `burn_in` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す |
 | `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]`、ニコニコ動画コメント設定は `nico_comments: dict` を含む） |
 | `get_snapshot()` | `PanelSnapshot` | `build_job_spec` ([job_spec.md](job_spec.md)) に渡すための UI 非依存スナップショット。`get_format_spec` / `get_subtitle_opts` / 各 `get_embed_*` / `get_remux_only` / `get_audio_only` / `get_recode_video` / `has_multiple_audio_selected` / `get_raw_settings` を 1 つの dataclass にまとめたもの |
 | `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる。`nico_comments` 欠如時はデフォルト値を採用 |

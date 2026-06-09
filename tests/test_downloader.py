@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
 from yt_gui.downloader import Downloader
@@ -1258,6 +1260,146 @@ def test_embed_nico_comments_skips_when_video_missing(
     downloader._embed_nico_comments_into_mkv(str(tmp_path / "nope"), ".mp4", {})
     assert called["run"] is False
     assert len(logs) == 1
+
+
+# ── ハードサブ焼きこみ (#120 Phase 2) ──────────────────────────────────────
+
+
+def test_escape_ass_filter_value_wraps_and_escapes() -> None:
+    # 通常のベース名は単一引用符で囲むだけ
+    assert Downloader._escape_ass_filter_value("v.comments.ass") == "'v.comments.ass'"
+    # 単一引用符は \' にエスケープ
+    assert Downloader._escape_ass_filter_value("a'b.ass") == "'a\\'b.ass'"
+    # バックスラッシュは \\ にエスケープ
+    assert Downloader._escape_ass_filter_value("a\\b.ass") == "'a\\\\b.ass'"
+
+
+def test_build_hardsub_cmd_uses_ass_filter_and_h264_aac() -> None:
+    cmd = Downloader._build_hardsub_cmd(
+        "/bin/ffmpeg",
+        "/out/動画.mp4",
+        "'動画.comments.ass'",
+        "/out/動画.hardsub.mp4",
+    )
+    assert cmd == [
+        "/bin/ffmpeg",
+        "-y",
+        "-i",
+        "/out/動画.mp4",
+        "-vf",
+        "ass='動画.comments.ass'",
+        "-c:v",
+        "libx264",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        "/out/動画.hardsub.mp4",
+    ]
+
+
+def test_burn_nico_comments_skips_when_video_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._burn_nico_comments_into_video(str(tmp_path / "nope"), ".mp4", {})
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+def test_burn_nico_comments_skips_when_ass_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "v.mp4").write_text("x")  # 動画はあるが ASS が無い
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+def test_burn_nico_comments_invokes_ffmpeg_with_cwd_and_basename(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    (tmp_path / "動画.mp4").write_text("v")
+    (tmp_path / "動画.comments.ass").write_text("a")
+    fake_ffmpeg = tmp_path / "ffmpeg"
+    fake_ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(fake_ffmpeg)
+    downloader.log_callback = lambda m: None
+
+    captured: dict = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["cwd"] = kwargs.get("cwd")
+
+        class _R:
+            pass
+
+        return _R()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+
+    downloader._burn_nico_comments_into_video(str(tmp_path / "動画"), ".mp4", {})
+
+    # filtergraph のパス問題回避: cwd を動画ディレクトリにしてベース名のみ渡す
+    assert captured["cwd"] == str(tmp_path)
+    vf_idx = captured["cmd"].index("-vf")
+    assert captured["cmd"][vf_idx + 1] == "ass='動画.comments.ass'"
+    assert captured["cmd"][-1].endswith("動画.hardsub.mp4")
+
+
+def test_burn_nico_comments_skips_when_no_ffmpeg(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ffmpeg バイナリ不在では subprocess を呼ばず非致命ログのみ。"""
+    (tmp_path / "v.mp4").write_text("x")
+    (tmp_path / "v.comments.ass").write_text("a")
+    downloader._ffmpeg_path = str(tmp_path / "no-ffmpeg")  # 存在しない
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+def test_burn_nico_comments_ffmpeg_failure_is_non_fatal(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ffmpeg が非 0 終了しても例外を投げず、警告ログのみ（非致命）。"""
+    (tmp_path / "v.mp4").write_text("x")
+    (tmp_path / "v.comments.ass").write_text("a")
+    fake_ffmpeg = tmp_path / "ffmpeg"
+    fake_ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(fake_ffmpeg)
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+
+    def _raise(*a, **k):
+        raise subprocess.CalledProcessError(1, "ffmpeg", stderr="boom")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _raise)
+
+    # 例外が伝播しないこと
+    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    assert any("boom" in m for m in logs)
 
 
 # ── 追加: 純ロジックの未カバー分 ────────────────────────────────────────────

@@ -276,6 +276,10 @@ class _NicoCommentsGroup(QGroupBox):
         self._embed_mkv_check = QCheckBox(t("nico_embed_mkv"))
         self._embed_mkv_check.toggled.connect(self._on_embed_mkv_toggled)
         check_row.addWidget(self._embed_mkv_check)
+        self._hardsub_check = QCheckBox(t("nico_burn_in"))
+        self._hardsub_check.setToolTip(t("nico_burn_in_tooltip"))
+        self._hardsub_check.toggled.connect(self._on_hardsub_toggled)
+        check_row.addWidget(self._hardsub_check)
         check_row.addStretch()
         layout.addLayout(check_row)
 
@@ -345,6 +349,7 @@ class _NicoCommentsGroup(QGroupBox):
         self.setVisible(False)
         self._convert_check.setChecked(False)
         self._embed_mkv_check.setChecked(False)
+        self._hardsub_check.setChecked(False)
         self._auto_res_check.setChecked(True)
         self._width_spin.setValue(_NICO_DEFAULT_WIDTH)
         self._height_spin.setValue(_NICO_DEFAULT_HEIGHT)
@@ -357,6 +362,8 @@ class _NicoCommentsGroup(QGroupBox):
         self.setTitle(t("nico_group_title"))
         self._convert_check.setText(t("nico_convert_ass"))
         self._embed_mkv_check.setText(t("nico_embed_mkv"))
+        self._hardsub_check.setText(t("nico_burn_in"))
+        self._hardsub_check.setToolTip(t("nico_burn_in_tooltip"))
         self._auto_res_check.setText(t("nico_auto_resolution"))
         self._resolution_label.setText(t("nico_resolution"))
         self._duration_label.setText(t("nico_duration"))
@@ -379,6 +386,7 @@ class _NicoCommentsGroup(QGroupBox):
         return {
             "convert_to_ass": bool(self._convert_check.isChecked()),
             "embed_to_mkv": bool(self._embed_mkv_check.isChecked()),
+            "burn_in": bool(self._hardsub_check.isChecked()),
             "auto_resolution": auto_res,
             "resolution_w": w,
             "resolution_h": h,
@@ -402,28 +410,37 @@ class _NicoCommentsGroup(QGroupBox):
         self._font_spin.setValue(int(nico.get("font_size", _NICO_DEFAULT_FONT_SIZE)))
         self._convert_check.setChecked(bool(nico.get("convert_to_ass", False)))
         self._embed_mkv_check.setChecked(bool(nico.get("embed_to_mkv", False)))
+        self._hardsub_check.setChecked(bool(nico.get("burn_in", False)))
 
     def update_output_mode(self, *, audio_only: bool, remux_only: bool):
-        """出力モードに応じて MKV 統合チェックの利用可否を更新する。"""
+        """出力モードに応じて MKV 統合 / 焼きこみチェックの利用可否を更新する。"""
         self._output_audio_only = audio_only
         self._output_remux_only = remux_only
-        self._refresh_embed_mkv_enabled()
+        self._refresh_integration_enabled()
 
     def _on_convert_toggled(self, checked: bool):
         """ASS 変換チェック切替: 子コントロールを enable/disable し、
         ON 時には親に `comments` lang 自動選択を要求する。OFF にしたとき
-        は MKV 統合チェックも連動して OFF にする (MKV 統合は ASS 変換に
-        依存するため)。"""
+        は MKV 統合 / 焼きこみチェックも連動して OFF にする (どちらも ASS
+        変換に依存するため)。"""
         self._set_controls_enabled(checked)
-        if not checked and self._embed_mkv_check.isChecked():
-            self._embed_mkv_check.blockSignals(True)
-            self._embed_mkv_check.setChecked(False)
-            self._embed_mkv_check.blockSignals(False)
+        if not checked:
+            for check in (self._embed_mkv_check, self._hardsub_check):
+                if check.isChecked():
+                    check.blockSignals(True)
+                    check.setChecked(False)
+                    check.blockSignals(False)
         if checked:
             self.request_select_comments.emit()
 
     def _on_embed_mkv_toggled(self, checked: bool):
         """MKV 統合チェック切替: ON 時は ASS 変換チェックを強制 ON にする。"""
+        if checked and not self._convert_check.isChecked():
+            self._convert_check.setChecked(True)
+
+    def _on_hardsub_toggled(self, checked: bool):
+        """焼きこみチェック切替: ON 時は ASS 変換チェックを強制 ON にする
+        (焼きこみは ASS 変換に依存するため)。"""
         if checked and not self._convert_check.isChecked():
             self._convert_check.setChecked(True)
 
@@ -444,24 +461,26 @@ class _NicoCommentsGroup(QGroupBox):
         manual_res_enabled = enabled and not self._auto_res_check.isChecked()
         self._width_spin.setEnabled(manual_res_enabled)
         self._height_spin.setEnabled(manual_res_enabled)
-        self._refresh_embed_mkv_enabled()
+        self._refresh_integration_enabled()
 
-    def _refresh_embed_mkv_enabled(self):
-        """MKV 統合チェックの enabled 状態を再評価する。
+    def _refresh_integration_enabled(self):
+        """MKV 統合 / 焼きこみチェックの enabled 状態を再評価する。
 
-        ASS 変換 ON かつ出力モードが「コンテナ結合」のときだけ操作可能。
-        音声のみ / remux のみのときは disable (動画統合の対象外)。
+        ASS 変換 ON かつ出力モードが動画を生成するモード（音声のみ /
+        remux のみ以外）のときだけ操作可能。disable 化したときに ON だった
+        場合はシグナルを止めて OFF に戻す（動画統合の対象外）。
         """
         usable = (
             self._convert_check.isChecked()
             and not self._output_audio_only
             and not self._output_remux_only
         )
-        self._embed_mkv_check.setEnabled(usable)
-        if not usable and self._embed_mkv_check.isChecked():
-            self._embed_mkv_check.blockSignals(True)
-            self._embed_mkv_check.setChecked(False)
-            self._embed_mkv_check.blockSignals(False)
+        for check in (self._embed_mkv_check, self._hardsub_check):
+            check.setEnabled(usable)
+            if not usable and check.isChecked():
+                check.blockSignals(True)
+                check.setChecked(False)
+                check.blockSignals(False)
 
 
 class _PanelSignals(QObject):

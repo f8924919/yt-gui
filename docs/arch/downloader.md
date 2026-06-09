@@ -148,6 +148,18 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 - 「音声のみ」モード (`is_audio=True`) では本処理をスキップ（動画統合の対象外）
 - 失敗（ffmpeg 欠如・入力ファイル欠如・サブプロセス非 0 終了）はいずれも非致命でログのみ
 
+### コメント ASS の動画への焼きこみ（ハードサブ）
+
+`nico_comments_opts.burn_in=True` かつ ASS 変換が成功した場合、`_burn_nico_comments_into_video(stem, final_ext, opts)` を呼び出す。MKV 統合（ソフトサブ）とは独立しており、両方有効なら両方の出力を生成する。実装上の要点:
+
+- ffmpeg を subprocess で実行し、`ass` フィルタで ASS を映像に焼き付ける。コマンドは純関数 `_build_hardsub_cmd(ffmpeg, video, ass_value, out)` が組み立てる: `-y -i {video} -vf ass={ass_value} -c:v libx264 -c:a aac -movflags +faststart {out}`
+- **映像を H.264 / 音声を AAC に再エンコード**する（焼きこみは原理的にコピーできないため）。コーデックは Phase 1 の再エンコードと統一。
+- 出力は常に `{stem}.hardsub.mp4`（同名衝突時は `(n)` サフィックス）。元動画・既存出力（`.with-comments.mkv` 等）は触らない。
+- **filtergraph のパスエスケープ**: `ass` フィルタの値に Windows パスの `:` / `\` をそのまま渡すと filtergraph パーサが誤解析する。これを避けるため、ffmpeg の `cwd` を動画のディレクトリに設定し、フィルタには ASS の**ベース名のみ**を渡す。さらに `_escape_ass_filter_value()` がベース名を単一引用符で囲み、内部の `\` と `'` をエスケープする（`ass='....ass'`）。これによりドライブレターのコロン・パス区切りの問題を構造的に回避する。
+- 「音声のみ」モード (`is_audio=True`) ではスキップ（動画が無い）
+- ログ（生成完了・スキップ・失敗）は i18n キー経由（`status_nico_hardsub_created` / `warn_nico_hardsub_skip_missing` / `warn_nico_hardsub_skip_no_ffmpeg` / `warn_nico_hardsub_failed`）
+- 失敗（ffmpeg 欠如・入力ファイル欠如・サブプロセス非 0 終了）はいずれも非致命でログのみ
+
 ### バイナリパス解決
 
 | バイナリ | パス |
