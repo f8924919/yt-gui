@@ -107,6 +107,7 @@ WebM は非対応のため自動スキップ。
 - **音声**: FFmpegExtractAudio → FFmpegMetadata → EmbedThumbnail
 - **映像 (字幕埋め込み無し)**: FFmpegMetadata → EmbedThumbnail
 - **映像 (字幕埋め込みあり)**: FFmpegMetadata → EmbedThumbnail → (json 専用字幕を含む場合 `_StripJsonOnlySubsBeforeEmbedPP`) → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
+- **映像 (再エンコード `recode_video=True`)**: FFmpegVideoConvertor → FFmpegMetadata → EmbedThumbnail（→ 字幕変換・埋め込み）。`FFmpegVideoConvertor` はメタデータ・サムネイル・字幕の埋め込みより前に走る必要があるため、postprocessors リストの**先頭に挿入**する
 
 SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直前に `ModifyChapters` が挿入される（`FFmpegExtractAudio` がある場合はその後段）。`SponsorBlock` PP は `after_filter` フェーズで動くためリスト末尾に追加され、上記の post_process 順には影響しない。詳細は [SponsorBlock](#sponsorblock) を参照。
 
@@ -115,6 +116,16 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 `_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` のいずれかがユーザー選択に含まれる場合は、convert/embed の前に `_StripJsonOnlySubsBeforeEmbedPP` を差し込んで `requested_subtitles` から該当 lang を取り除く。これにより、ライブチャット (YouTube) およびニコニコ動画コメント の JSON は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
 
 ニコニコ動画コメント (`comments` lang) は yt-dlp の `NiconicoIE._get_subtitles` が出力する v1/threads JSON。ライブチャットと同じ「json 専用・埋め込み不可」カテゴリとして同一の strip 機構で扱う。
+
+### 映像の再エンコード（H.264 MP4 / 互換性優先）
+
+出力形式ラジオで「H.264 MP4 に再変換（互換性優先）」を選ぶと `JobSpec.recode_video=True` となり、`_append_video_postprocessors` が再エンコード経路を構成する。
+
+- `FFmpegVideoConvertor`（PP キー `FFmpegVideoConvertor`、`--recode-video` 相当）を `preferedformat="mp4"` で postprocessors の**先頭に挿入**する。
+- `postprocessor_args` の `videoconvertor` キーに `-c:v libx264 -c:a aac` を渡し、**入力に関わらず H.264 / AAC を強制**する（`preferedformat="mp4"` だけでは ffmpeg デフォルト依存でコーデックが保証されないため）。PP キーの照合は `FFmpegVideoConvertorPP.pp_key()` = `VideoConvertor`（小文字化して `videoconvertor`）で行われ、出力ストリームへ適用される。
+- `merge_output_format` を **`mkv` に固定**する。`FFmpegVideoConvertor` は「入力 ext == 出力 ext」のとき変換をスキップするため、配信元が mp4 互換でマージ結果が `.mp4` になると再エンコードされない。中間コンテナを `mkv` にすることで `mkv → mp4` 変換を必ず走らせる。
+- 出力は常に `.mp4`。`JobSpec.video_container` は `build_job_spec` 側で `"mp4"` に固定されるため、サムネイル埋め込み条件（`_THUMBNAIL_EMBED_CONTAINERS` に `mp4` を含む）・`_resolve_unique_path` の `final_ext` 判定（`recode_video` 分岐で `.mp4`）と整合する。
+- 既に配信元が mp4（典型的に H.264）の単一プログレッシブ形式で再エンコードがスキップされる場合があるが、その場合も出力は互換性の高い MP4 のままで主旨を満たす。
 
 ### ニコニコ動画コメントの ASS 変換
 

@@ -577,16 +577,20 @@ class OriginalFormatPanel(QGroupBox):
         self._remux_group = QButtonGroup(self)
         self._radio_mp4 = QRadioButton(t("orig_output_mp4").format(container="MP4"))
         self._radio_remux = QRadioButton(t("orig_output_remux"))
+        self._radio_recode = QRadioButton(t("orig_output_recode"))
+        self._radio_recode.setToolTip(t("orig_output_recode_tooltip"))
         self._radio_audio = QRadioButton(
             t("orig_output_audio_only").format(label=self._audio_label)
         )
         self._radio_mp4.setChecked(True)
         self._remux_group.addButton(self._radio_mp4, 0)
         self._remux_group.addButton(self._radio_remux, 1)
-        self._remux_group.addButton(self._radio_audio, 2)
+        self._remux_group.addButton(self._radio_recode, 2)
+        self._remux_group.addButton(self._radio_audio, 3)
         self._remux_group.buttonToggled.connect(self._on_output_format_changed)
         out_row.addWidget(self._radio_mp4)
         out_row.addWidget(self._radio_remux)
+        out_row.addWidget(self._radio_recode)
         out_row.addWidget(self._radio_audio)
         out_row.addStretch()
         outer.addLayout(out_row)
@@ -694,6 +698,8 @@ class OriginalFormatPanel(QGroupBox):
             t("orig_output_mp4").format(container=video_container.upper())
         )
         self._radio_remux.setText(t("orig_output_remux"))
+        self._radio_recode.setText(t("orig_output_recode"))
+        self._radio_recode.setToolTip(t("orig_output_recode_tooltip"))
         self._radio_audio.setText(
             t("orig_output_audio_only").format(label=self._audio_label)
         )
@@ -732,6 +738,9 @@ class OriginalFormatPanel(QGroupBox):
 
     def get_audio_only(self) -> bool:
         return bool(self._radio_audio.isChecked())
+
+    def get_recode_video(self) -> bool:
+        return bool(self._radio_recode.isChecked())
 
     def get_embed_thumbnail(self) -> bool:
         return bool(self._embed_thumbnail_check.isChecked())
@@ -792,6 +801,7 @@ class OriginalFormatPanel(QGroupBox):
             subtitle_opts=self.get_subtitle_opts(),
             remux_only=self.get_remux_only(),
             audio_only=self.get_audio_only(),
+            recode_video=self.get_recode_video(),
             embed_thumbnail=self.get_embed_thumbnail(),
             embed_metadata=self.get_embed_metadata(),
             embed_chapters=self.get_embed_chapters(),
@@ -829,6 +839,7 @@ class OriginalFormatPanel(QGroupBox):
             "subtitle_opts": self.get_subtitle_opts(),
             "remux_only": self.get_remux_only(),
             "audio_only": self.get_audio_only(),
+            "recode_video": self.get_recode_video(),
             "embed_thumbnail": self.get_embed_thumbnail(),
             "embed_metadata": self.get_embed_metadata(),
             "embed_chapters": self.get_embed_chapters(),
@@ -852,6 +863,7 @@ class OriginalFormatPanel(QGroupBox):
         """チェックボックス・ラジオボタンを即時復元し、映像/音声/字幕はフォーマット取得後に復元する。"""
         audio_only = settings.get("audio_only", False)
         remux_only = settings.get("remux_only", False)
+        recode_video = settings.get("recode_video", False)
         if audio_only:
             self._radio_audio.setChecked(True)
             self._embed_thumbnail_check.setChecked(
@@ -859,6 +871,11 @@ class OriginalFormatPanel(QGroupBox):
             )
         elif remux_only:
             self._radio_remux.setChecked(True)
+        elif recode_video:
+            self._radio_recode.setChecked(True)
+            self._embed_thumbnail_check.setChecked(
+                settings.get("embed_thumbnail", False)
+            )
         else:
             self._radio_mp4.setChecked(True)
             self._embed_thumbnail_check.setChecked(
@@ -1075,9 +1092,12 @@ class OriginalFormatPanel(QGroupBox):
             return
         is_audio = button is self._radio_audio
         is_mp4 = button is self._radio_mp4
+        is_recode = button is self._radio_recode
 
-        self._embed_thumbnail_check.setEnabled(is_mp4 or is_audio)
-        if not (is_mp4 or is_audio):
+        # 再エンコードも出力は mp4 なのでサムネイル埋め込み可（remux のみ不可）
+        thumb_ok = is_mp4 or is_recode or is_audio
+        self._embed_thumbnail_check.setEnabled(thumb_ok)
+        if not thumb_ok:
             self._embed_thumbnail_check.setChecked(False)
 
         formats_available = bool(self._video_formats) or bool(self._audio_formats)

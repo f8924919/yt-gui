@@ -439,7 +439,12 @@ class App(QMainWindow):
 
     def _notify_container_promotion_if_needed(self, job: JobSpec) -> None:
         """build_job_spec で複数音声 → MKV 自動昇格が発生した場合に通知する。"""
-        if job.is_multi_audio and job.video_container != self._settings.video_container:
+        # 再エンコード時は常に mp4 固定で、MKV 昇格ではないため通知しない。
+        if (
+            job.is_multi_audio
+            and not job.recode_video
+            and job.video_container != self._settings.video_container
+        ):
             self._update_status(t("status_multi_audio_mkv_promoted"), 0)
 
     def _notify_audio_only_truncated_if_needed(

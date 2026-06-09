@@ -43,6 +43,7 @@ class PanelSnapshot:
     embed_chapters: bool
     has_multiple_audio: bool
     raw_settings: dict[str, Any] = field(default_factory=dict)
+    recode_video: bool = False
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class JobSpec:
     remux_only: bool
     orig_settings: dict | None
     is_multi_audio: bool
+    recode_video: bool = False
     # 区間ダウンロード (yt-dlp --download-sections 相当)。生の入力文字列を保持し、
     # 秒への変換は downloader 側で行う。形式非依存・アイテム単位。
     section_start: str | None = None
@@ -204,14 +206,17 @@ def _build_mp3_spec(settings: Settings, mp3_thumb_check: bool) -> JobSpec:
 def _build_original_spec(settings: Settings, panel: PanelSnapshot) -> JobSpec:
     audio_only = panel.audio_only
     remux_only = panel.remux_only
+    recode_video = panel.recode_video
 
     # 通常結合モードで複数音声選択 → コンテナを mkv に昇格
     is_multi_audio = panel.has_multiple_audio and not audio_only and not remux_only
-    video_container = (
-        "mkv"
-        if is_multi_audio and settings.video_container != "mkv"
-        else settings.video_container
-    )
+    if recode_video:
+        # 再エンコードは常に MP4 を出力する（複数音声の mkv 昇格より優先）
+        video_container = "mp4"
+    elif is_multi_audio and settings.video_container != "mkv":
+        video_container = "mkv"
+    else:
+        video_container = settings.video_container
 
     audio_codec = settings.audio_format if audio_only else "mp3"
     is_mp3 = audio_codec == "mp3"
@@ -231,4 +236,5 @@ def _build_original_spec(settings: Settings, panel: PanelSnapshot) -> JobSpec:
         remux_only=remux_only,
         orig_settings=panel.raw_settings,
         is_multi_audio=is_multi_audio,
+        recode_video=recode_video,
     )

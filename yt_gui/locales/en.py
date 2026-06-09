@@ -138,6 +138,11 @@ STRINGS: dict[str, str] = {
     "label_orig_output": "Output:",
     "orig_output_mp4": "Merge to {container}",
     "orig_output_remux": "Remux only (keep original container)",
+    "orig_output_recode": "Re-encode to H.264 MP4 (compatibility)",
+    "orig_output_recode_tooltip": (
+        "Re-encodes video to H.264 / audio to AAC to produce a highly compatible "
+        "MP4. This takes longer and reduces quality."
+    ),
     "orig_output_audio_only": "Audio only ({label})",
     "warn_skip_audio_only": "Cannot skip audio when 'Audio only' is selected.",
     "status_multi_audio_mkv_promoted": "ℹ️ Switched container to MKV for multiple audio tracks",

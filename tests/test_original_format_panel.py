@@ -15,6 +15,7 @@ from yt_gui.original_format_panel import (  # noqa: E402
     _AUTO_SENTINEL,
     _SKIP_SENTINEL,
     _AudioListWidget,
+    OriginalFormatPanel,
 )
 
 pytestmark = pytest.mark.qt
@@ -75,3 +76,50 @@ def test_enforce_exclusivity_drops_skip_when_audio_added(audio_list):
     audio_list.select_skip()
     audio_list.item(_ROW_AAC).setSelected(True)
     assert audio_list.get_selection() == (False, False, [_ROW_AAC])
+
+
+# ── 出力形式ラジオ: H.264 MP4 再変換（互換性優先） ──────────────────────────
+
+
+@pytest.fixture
+def panel(qtbot, tmp_path):
+    from yt_gui.downloader import Downloader
+
+    widget = OriginalFormatPanel(
+        downloader=Downloader(output_dir=str(tmp_path)),
+        get_url=lambda: "",
+        get_cookies=lambda: (None, None),
+        update_status=lambda msg, pct: None,
+    )
+    qtbot.addWidget(widget)
+    return widget
+
+
+def test_recode_radio_default_off(panel):
+    """既定は「結合」で、再変換は OFF。"""
+    assert panel.get_recode_video() is False
+    assert panel.get_remux_only() is False
+    assert panel.get_audio_only() is False
+
+
+def test_recode_radio_exclusive_and_thumbnail_enabled(panel):
+    """再変換を選ぶと他モードは OFF、サムネ埋め込みは有効（出力 mp4 のため）。"""
+    panel._radio_recode.setChecked(True)
+    assert panel.get_recode_video() is True
+    assert panel.get_remux_only() is False
+    assert panel.get_audio_only() is False
+    assert panel._embed_thumbnail_check.isEnabled() is True
+
+
+def test_recode_raw_settings_round_trip(panel):
+    """get_raw_settings ↔ restore_from_settings で再変換フラグが往復する。"""
+    panel._radio_recode.setChecked(True)
+    settings = panel.get_raw_settings()
+    assert settings["recode_video"] is True
+
+    panel._radio_mp4.setChecked(True)
+    assert panel.get_recode_video() is False
+
+    panel.restore_from_settings(settings)
+    assert panel.get_recode_video() is True
+    assert panel._radio_recode.isChecked() is True

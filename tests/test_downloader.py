@@ -26,6 +26,7 @@ def _job(
     video_container: str = "mp4",
     audio_only: bool = False,
     remux_only: bool = False,
+    recode_video: bool = False,
     embed_thumbnail: bool = False,
     embed_metadata: bool = True,
     embed_chapters: bool = True,
@@ -49,6 +50,7 @@ def _job(
         video_container=video_container,
         audio_only=audio_only,
         remux_only=remux_only,
+        recode_video=recode_video,
         orig_settings=orig_settings,
         is_multi_audio=is_multi_audio,
         section_start=section_start,
@@ -97,6 +99,67 @@ def test_remux_only_skips_merge_output_format(downloader, tmp_path) -> None:
     assert "merge_output_format" not in opts
     assert "writethumbnail" not in opts
     assert "EmbedThumbnail" not in _pp_keys(opts)
+
+
+def test_recode_video_forces_h264_aac_mp4(downloader, tmp_path) -> None:
+    """recode_video=True: FFmpegVideoConvertor を先頭に積み、H.264/AAC を明示し、
+    中間コンテナを mkv に固定して必ず mp4 へ再エンコードする。"""
+    opts = downloader._build_ydl_opts(
+        _job(format_spec="137+140", recode_video=True, video_container="mp4"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    # 中間コンテナを mkv に固定（convertor が ext 一致でスキップしないように）
+    assert opts["merge_output_format"] == "mkv"
+    # VideoConvertor は postprocessors の先頭
+    assert opts["postprocessors"][0]["key"] == "FFmpegVideoConvertor"
+    assert opts["postprocessors"][0]["preferedformat"] == "mp4"
+    # H.264 / AAC を明示強制（出力ストリームへ適用される videoconvertor キー）
+    assert opts["postprocessor_args"]["videoconvertor"] == [
+        "-c:v",
+        "libx264",
+        "-c:a",
+        "aac",
+    ]
+
+
+def test_recode_video_pp_order_before_metadata(downloader, tmp_path) -> None:
+    """VideoConvertor はメタデータ埋め込みより前に走る。"""
+    opts = downloader._build_ydl_opts(
+        _job(format_spec="137+140", recode_video=True, video_container="mp4"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert _pp_keys(opts) == ["FFmpegVideoConvertor", "FFmpegMetadata"]
+
+
+def test_recode_video_allows_thumbnail_embed(downloader, tmp_path) -> None:
+    """出力が mp4 なのでサムネ埋め込み可。順序は convertor→metadata→thumbnail。"""
+    opts = downloader._build_ydl_opts(
+        _job(
+            format_spec="137+140",
+            recode_video=True,
+            video_container="mp4",
+            embed_thumbnail=True,
+        ),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert opts["writethumbnail"] is True
+    assert _pp_keys(opts) == [
+        "FFmpegVideoConvertor",
+        "FFmpegMetadata",
+        "EmbedThumbnail",
+    ]
 
 
 def test_video_embed_thumbnail_supported_container(downloader, tmp_path) -> None:
@@ -211,6 +274,38 @@ def test_subtitle_embed_adds_convert_and_embed_pps(downloader, tmp_path) -> None
     # "best" は埋め込み不可なので "srt" にフォールバック
     assert convert_pp["format"] == "srt"
     # convert は embed の前に置く
+    assert pp_keys.index("FFmpegSubtitlesConvertor") < pp_keys.index(
+        "FFmpegEmbedSubtitle"
+    )
+
+
+def test_recode_video_with_subtitle_embed_order(downloader, tmp_path) -> None:
+    """再エンコード × 字幕埋め込み: VideoConvertor が先頭で、字幕の
+    convert → embed はその後段に並ぶ（spec original-format-panel.md の
+    「再エンコード時も字幕埋め込み可」を担保）。"""
+    opts = downloader._build_ydl_opts(
+        _job(
+            format_spec="137+140",
+            recode_video=True,
+            video_container="mp4",
+            subtitle_opts={
+                "writesubtitles": True,
+                "subtitleslangs": ["en"],
+                "subtitlesformat": "srt",
+                "embed": True,
+            },
+        ),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    pp_keys = _pp_keys(opts)
+    assert pp_keys[0] == "FFmpegVideoConvertor"
+    assert pp_keys.index("FFmpegVideoConvertor") < pp_keys.index(
+        "FFmpegSubtitlesConvertor"
+    )
     assert pp_keys.index("FFmpegSubtitlesConvertor") < pp_keys.index(
         "FFmpegEmbedSubtitle"
     )

@@ -138,6 +138,11 @@ STRINGS: dict[str, str] = {
     "label_orig_output": "出力形式:",
     "orig_output_mp4": "{container} に結合",
     "orig_output_remux": "remux のみ (元のコンテナを維持)",
+    "orig_output_recode": "H.264 MP4 に再変換 (互換性優先)",
+    "orig_output_recode_tooltip": (
+        "映像を H.264 / 音声を AAC に再エンコードし、互換性の高い MP4 を生成します。"
+        "処理に時間がかかり、画質が劣化します。"
+    ),
     "orig_output_audio_only": "音声のみ ({label})",
     "warn_skip_audio_only": "「音声のみ」選択時は音声を「ダウンロードしない」にできません。",
     "status_multi_audio_mkv_promoted": "ℹ️ 複数音声選択のためコンテナを MKV に切り替えました",

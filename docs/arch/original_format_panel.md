@@ -25,7 +25,7 @@
 | サムネイル埋め込みチェック | |
 | メタデータ埋め込みチェック | デフォルト ON |
 | チャプター埋め込みチェック | デフォルト ON |
-| 出力形式ラジオグループ | コンテナ結合 / remux のみ / 音声のみ の 3 択 |
+| 出力形式ラジオグループ | コンテナ結合 / remux のみ / H.264 MP4 再変換 / 音声のみ の 4 択 |
 | ニコニコ動画コメントグループ | `QGroupBox`（`comments` lang が字幕リストに含まれるときだけ可視化）。コメント ASS 変換チェック + 解像度/表示時間/不透明度/フォントサイズの SpinBox |
 
 複合フォーマット（★印）選択時は音声リストを `set_included_mode()` で「映像に含まれます」1 行表示に切り替え、`setEnabled(False)` で操作不可にする。
@@ -104,12 +104,13 @@
 | `get_subtitle_opts()` | `dict` | 字幕オプション |
 | `get_remux_only()` | `bool` | リマックスのみフラグ |
 | `get_audio_only()` | `bool` | 音声のみ出力フラグ |
+| `get_recode_video()` | `bool` | H.264 MP4 再変換（互換性優先）フラグ |
 | `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
 | `get_nico_comments_opts()` | `dict` | ニコニコ動画コメント → ASS 変換 / MKV 統合オプション（`convert_to_ass` / `embed_to_mkv` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す |
 | `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]`、ニコニコ動画コメント設定は `nico_comments: dict` を含む） |
-| `get_snapshot()` | `PanelSnapshot` | `build_job_spec` ([job_spec.md](job_spec.md)) に渡すための UI 非依存スナップショット。`get_format_spec` / `get_subtitle_opts` / 各 `get_embed_*` / `has_multiple_audio_selected` / `get_raw_settings` を 1 つの dataclass にまとめたもの |
+| `get_snapshot()` | `PanelSnapshot` | `build_job_spec` ([job_spec.md](job_spec.md)) に渡すための UI 非依存スナップショット。`get_format_spec` / `get_subtitle_opts` / 各 `get_embed_*` / `get_remux_only` / `get_audio_only` / `get_recode_video` / `has_multiple_audio_selected` / `get_raw_settings` を 1 つの dataclass にまとめたもの |
 | `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる。`nico_comments` 欠如時はデフォルト値を採用 |
 | `has_formats_loaded()` | `bool` | フォーマット取得済みかどうか |
 | `get_fetched_title()` | `str` | 取得済みタイトル |

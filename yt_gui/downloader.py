@@ -646,7 +646,9 @@ class Downloader:
             ydl_opts["postprocessors"].append({"key": "EmbedThumbnail"})
 
     def _append_video_postprocessors(self, ydl_opts: dict, job: JobSpec) -> None:
-        if not job.remux_only:
+        if job.recode_video:
+            self._append_recode_video_postprocessor(ydl_opts)
+        elif not job.remux_only:
             ydl_opts["merge_output_format"] = job.video_container
         if job.embed_metadata or job.embed_chapters:
             ydl_opts.setdefault("postprocessors", []).append(
@@ -663,6 +665,30 @@ class Downloader:
         ):
             ydl_opts["writethumbnail"] = True
             ydl_opts.setdefault("postprocessors", []).append({"key": "EmbedThumbnail"})
+
+    @staticmethod
+    def _append_recode_video_postprocessor(ydl_opts: dict) -> None:
+        """互換性優先: 映像を H.264 / 音声を AAC へ再エンコードして MP4 を出力する。
+
+        - `FFmpegVideoConvertor` を postprocessors の先頭に挿入する（メタデータ・
+          サムネイル・字幕の埋め込みより前に走らせる必要があるため）。
+        - `preferedformat="mp4"` だけでは ffmpeg デフォルト依存でコーデックが
+          保証されないため、`postprocessor_args` の `videoconvertor` キーで
+          `-c:v libx264 -c:a aac` を明示し H.264/AAC を強制する。
+        - `FFmpegVideoConvertor` は「入力 ext == 出力 ext」のとき変換をスキップ
+          する。配信元が mp4 互換でマージ結果が `.mp4` になると再エンコードされ
+          ないため、中間コンテナを `mkv` に固定して必ず `mkv → mp4` を走らせる。
+        """
+        ydl_opts["merge_output_format"] = "mkv"
+        ydl_opts.setdefault("postprocessors", []).insert(
+            0, {"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}
+        )
+        ydl_opts.setdefault("postprocessor_args", {})["videoconvertor"] = [
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+        ]
 
     @staticmethod
     def _append_subtitle_options(ydl_opts: dict, subtitle_opts: dict) -> None:
@@ -728,6 +754,9 @@ class Downloader:
         stem, raw_ext = os.path.splitext(raw_path)
         if job.is_audio_extraction:
             final_ext = f".{job.audio_codec}"
+        elif job.recode_video:
+            # 再エンコードは常に mp4 を出力する（FFmpegVideoConvertor）
+            final_ext = ".mp4"
         elif job.remux_only:
             final_ext = raw_ext
         elif "+" in job.format_spec:
