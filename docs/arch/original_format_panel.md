@@ -68,14 +68,15 @@
 
 ## 内部クラス: `_NicoCommentsGroup`
 
-ニコニコ動画コメント (ASS 変換 / MKV 統合) 設定を担う `QGroupBox` サブクラス。`OriginalFormatPanel._build_widgets` でインスタンス化される。
+ニコニコ動画コメント (ASS 変換 / MKV 統合 / ハードサブ焼きこみ) 設定を担う `QGroupBox` サブクラス。`OriginalFormatPanel._build_widgets` でインスタンス化される。
 
 責務:
 
-- コメント ASS 変換チェック / MKV 統合チェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・フォントサイズの各 SpinBox の保持
+- コメント ASS 変換チェック / MKV 統合チェック / ハードサブ焼きこみチェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・フォントサイズの各 SpinBox の保持
 - ASS 変換 ↔ MKV 統合の連動制御（OFF 時に MKV を解除 / MKV ON 時に ASS を強制 ON）
+- ASS 変換 ↔ ハードサブ焼きこみの連動制御（OFF 時に焼きこみを解除 / 焼きこみ ON 時に ASS を強制 ON）
 - 解像度自動追従 OFF 時のみ手動解像度 SpinBox を有効化
-- 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェックの有効/無効切替
+- 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェック・ハードサブ焼きこみチェックの有効/無効切替
 
 親パネルとの委譲経路:
 
