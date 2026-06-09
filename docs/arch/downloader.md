@@ -117,7 +117,7 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 
 ニコニコ動画コメント (`comments` lang) は yt-dlp の `NiconicoIE._get_subtitles` が出力する v1/threads JSON。ライブチャットと同じ「json 専用・埋め込み不可」カテゴリとして同一の strip 機構で扱う。
 
-### 映像の再エンコード（H.264 MP4 / 互換性優先）
+### 映像の再エンコード（H.264 MP4・互換性優先）
 
 出力形式ラジオで「H.264 MP4 に再変換（互換性優先）」を選ぶと `JobSpec.recode_video=True` となり、`_append_video_postprocessors` が再エンコード経路を構成する。
 

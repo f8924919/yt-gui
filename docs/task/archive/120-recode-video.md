@@ -1,8 +1,9 @@
 # 互換性優先（再エンコード）出力モード — Phase 1: 映像の H.264 MP4 再変換
 
 - 対応 Issue: [#120](https://github.com/f8924919/yt-gui/issues/120)
-- ブランチ: `feature/120-recode-video-h264`
-- ステータス: 進行中
+- ブランチ: `feature/120-recode-video-h264`（マージ済み・削除済み）
+- PR: [#121](https://github.com/f8924919/yt-gui/pull/121)（マージ済み）
+- ステータス: 完了（2026-06-09）。Phase 2（コメント焼きこみ）は #120 に残存
 
 ## 背景 / 目的
 
@@ -26,8 +27,8 @@
 
 ## 関連 docs
 
-- spec: [download-formats.md](../spec/features/download-formats.md) / [original-format-panel.md](../spec/screens/original-format-panel.md)
-- arch: [downloader.md](../arch/downloader.md#映像の再エンコードh264-mp4--互換性優先) / [job_spec.md](../arch/job_spec.md) / [original_format_panel.md](../arch/original_format_panel.md)
+- spec: [download-formats.md](../../spec/features/download-formats.md) / [original-format-panel.md](../../spec/screens/original-format-panel.md)
+- arch: [downloader.md](../../arch/downloader.md#映像の再エンコードh264-mp4互換性優先) / [job_spec.md](../../arch/job_spec.md) / [original_format_panel.md](../../arch/original_format_panel.md)
 
 ## 進捗メモ
 
