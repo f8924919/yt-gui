@@ -500,6 +500,11 @@ class Downloader:
                     effective_stem, final_ext, nico_comments_opts
                 )
 
+            if nico_comments_opts.get("burn_in") and not job.is_audio_extraction:
+                self._burn_nico_comments_into_video(
+                    effective_stem, final_ext, nico_comments_opts
+                )
+
     def _build_ydl_opts(
         self,
         job: JobSpec,
@@ -1060,3 +1065,110 @@ class Downloader:
             if self.log_callback:
                 err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
                 self.log_callback(t("warn_nico_mkv_failed").format(error=err))
+
+    @staticmethod
+    def _escape_ass_filter_value(name: str) -> str:
+        """ffmpeg の filtergraph に渡す `ass` フィルタの値（ASS のベース名）を
+        単一引用符で囲み、内部の `\\` と `'` をエスケープする。
+
+        filtergraph では `:` がオプション区切り、`\\` がエスケープ文字として
+        働くため、Windows パスをそのまま渡すと誤解析される。呼び出し側で
+        ffmpeg の `cwd` を動画ディレクトリに設定しベース名のみを渡すことで
+        ドライブレターのコロン・パス区切りを回避し、ここでは単一引用符内で
+        安全にする（単一引用符内なら `:` 等は字義通りに扱われる）。
+        """
+        escaped = name.replace("\\", "\\\\").replace("'", "\\'")
+        return f"'{escaped}'"
+
+    @staticmethod
+    def _build_hardsub_cmd(
+        ffmpeg_path: str, video_path: str, ass_value: str, out_path: str
+    ) -> list[str]:
+        """ASS を映像に焼き付ける ffmpeg コマンドを組み立てる純関数。
+
+        `ass` フィルタで焼きこむため映像は再エンコードされる。コーデックは
+        Phase 1 の再エンコードと統一し H.264 / AAC。`ass_value` は
+        `_escape_ass_filter_value()` でエスケープ済みの値を渡す。
+        """
+        return [
+            ffmpeg_path,
+            "-y",
+            "-i",
+            video_path,
+            "-vf",
+            f"ass={ass_value}",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            "-movflags",
+            "+faststart",
+            out_path,
+        ]
+
+    def _burn_nico_comments_into_video(
+        self, stem: str, final_ext: str, opts: dict
+    ) -> None:
+        """動画にコメント ASS を焼き付けた MP4 を別ファイルとして生成する。
+
+        元動画・既存出力は触らず、`{stem}.hardsub.mp4` を新規作成する。
+        ソフトサブ MKV 統合（`_embed_nico_comments_into_mkv`）と異なり、
+        焼きこみは原理的にコピー不可のため映像を H.264 / 音声を AAC に
+        再エンコードする。失敗・前提ファイル不在はいずれも非致命としてログのみ。
+        """
+        video_path = f"{stem}{final_ext}"
+        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+
+        if not os.path.exists(video_path):
+            if self.log_callback:
+                base = os.path.basename(video_path)
+                self.log_callback(
+                    t("warn_nico_hardsub_skip_missing").format(filename=base)
+                )
+            return
+        if not os.path.exists(ass_path):
+            if self.log_callback:
+                base = os.path.basename(ass_path)
+                self.log_callback(
+                    t("warn_nico_hardsub_skip_missing").format(filename=base)
+                )
+            return
+        if not os.path.exists(self._ffmpeg_path):
+            if self.log_callback:
+                self.log_callback(t("warn_nico_hardsub_skip_no_ffmpeg"))
+            return
+
+        out_path = f"{stem}.hardsub.mp4"
+        if os.path.exists(out_path):
+            n = 1
+            while os.path.exists(f"{stem}.hardsub ({n}).mp4"):
+                n += 1
+            out_path = f"{stem}.hardsub ({n}).mp4"
+
+        # filtergraph のパス問題を避けるため、cwd を動画ディレクトリに設定し
+        # ass フィルタには ASS のベース名のみ（エスケープ済み）を渡す。
+        work_dir = os.path.dirname(video_path)
+        ass_value = self._escape_ass_filter_value(os.path.basename(ass_path))
+        cmd = self._build_hardsub_cmd(
+            self._ffmpeg_path, video_path, ass_value, out_path
+        )
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=work_dir,
+            )
+            if self.log_callback:
+                self.log_callback(
+                    t("status_nico_hardsub_created").format(
+                        filename=os.path.basename(out_path)
+                    )
+                )
+        except subprocess.CalledProcessError as e:
+            if self.log_callback:
+                err = strip_ansi(e.stderr or e.stdout or str(e)).strip()
+                self.log_callback(t("warn_nico_hardsub_failed").format(error=err))

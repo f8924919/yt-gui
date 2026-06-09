@@ -130,6 +130,16 @@ STRINGS: dict[str, str] = {
     "warn_nico_mkv_failed": "⚠️ Failed to embed comments into MKV: {error}",
     "warn_nico_mkv_skip_missing": "⚠️ {filename} not found; skipping MKV integration",
     "warn_nico_mkv_skip_no_ffmpeg": "⚠️ ffmpeg not found; skipping MKV integration",
+    "nico_burn_in": "Burn comments into video (hardsub)",
+    "nico_burn_in_tooltip": (
+        "Generates an MP4 with comments burned into the video (for players "
+        "that cannot render ASS). Re-encodes video to H.264 / audio to AAC, "
+        "so it takes longer and reduces quality."
+    ),
+    "status_nico_hardsub_created": "Created MP4 with burned-in comments: {filename}",
+    "warn_nico_hardsub_failed": "⚠️ Failed to burn in comments: {error}",
+    "warn_nico_hardsub_skip_missing": "⚠️ {filename} not found; skipping burn-in",
+    "warn_nico_hardsub_skip_no_ffmpeg": "⚠️ ffmpeg not found; skipping burn-in",
     "orig_sub_embed": "Embed in MP4",
     "orig_embed_thumbnail": "Embed thumbnail",
     "orig_embed_metadata": "Embed metadata",

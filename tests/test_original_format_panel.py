@@ -123,3 +123,37 @@ def test_recode_raw_settings_round_trip(panel):
     panel.restore_from_settings(settings)
     assert panel.get_recode_video() is True
     assert panel._radio_recode.isChecked() is True
+
+
+# ── ニコニコ動画コメント焼きこみ（ハードサブ） (#120 Phase 2) ─────────────
+
+
+def test_nico_burn_in_default_off(panel):
+    assert panel._nico_group.get_opts()["burn_in"] is False
+
+
+def test_nico_burn_in_forces_convert_on(panel):
+    """焼きこみ ON は ASS 変換に依存するため変換を強制 ON にする。"""
+    panel._nico_group._hardsub_check.setChecked(True)
+    assert panel._nico_group._convert_check.isChecked() is True
+    assert panel._nico_group.get_opts()["burn_in"] is True
+
+
+def test_nico_convert_off_forces_burn_in_off(panel):
+    """ASS 変換を OFF にすると焼きこみも連動して OFF になる。"""
+    panel._nico_group._hardsub_check.setChecked(True)
+    panel._nico_group._convert_check.setChecked(False)
+    assert panel._nico_group._hardsub_check.isChecked() is False
+
+
+def test_nico_burn_in_round_trip(panel):
+    """get_opts ↔ restore_from で焼きこみフラグが往復する。"""
+    panel._nico_group._hardsub_check.setChecked(True)
+    opts = panel._nico_group.get_opts()
+    assert opts["burn_in"] is True
+
+    panel._nico_group._convert_check.setChecked(False)  # burn_in も OFF に
+    assert panel._nico_group.get_opts()["burn_in"] is False
+
+    panel._nico_group.restore_from({"nico_comments": opts})
+    assert panel._nico_group._hardsub_check.isChecked() is True

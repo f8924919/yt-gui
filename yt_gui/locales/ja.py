@@ -130,6 +130,18 @@ STRINGS: dict[str, str] = {
     "warn_nico_mkv_failed": "⚠️ MKV へのコメント統合に失敗しました: {error}",
     "warn_nico_mkv_skip_missing": "⚠️ {filename} が見つからないため MKV 統合をスキップ",
     "warn_nico_mkv_skip_no_ffmpeg": "⚠️ ffmpeg が見つからないため MKV 統合をスキップ",
+    "nico_burn_in": "コメントを焼きこむ (ハードサブ)",
+    "nico_burn_in_tooltip": (
+        "コメントを映像に焼き付けた MP4 を生成します（ASS 非対応環境向け）。"
+        "映像を H.264 / 音声を AAC に再エンコードするため処理に時間がかかり、"
+        "画質が劣化します。"
+    ),
+    "status_nico_hardsub_created": "コメント焼きこみ MP4 を生成しました: {filename}",
+    "warn_nico_hardsub_failed": "⚠️ コメントの焼きこみに失敗しました: {error}",
+    "warn_nico_hardsub_skip_missing": (
+        "⚠️ {filename} が見つからないため焼きこみをスキップ"
+    ),
+    "warn_nico_hardsub_skip_no_ffmpeg": "⚠️ ffmpeg が見つからないため焼きこみをスキップ",
     "orig_sub_embed": "MP4に埋め込む",
     "orig_embed_thumbnail": "サムネイルを埋め込む",
     "orig_embed_metadata": "メタデータを埋め込む",
