@@ -21,7 +21,8 @@
 | [81-download-sections.md](81-download-sections.md) | 区間ダウンロード（時間範囲の切り出し）を追加。安定性優先でフル取得→ローカル ffmpeg 切り出し方式。チャプター指定は #83、通信量節約版は #84 へ分離（Issue #81 / PR #82） | 2026-06-04 |
 | [76-ignore-archive-refetch.md](76-ignore-archive-refetch.md) | アイテム単位でダウンロードアーカイブを無視して再取得する手段を追加。右クリック「アーカイブを無視して再取得」、再記録せず既存記録は保持（Issue #76 / PR #91） | 2026-06-07 |
 | [108-parallel-downloads.md](108-parallel-downloads.md) | 並列ダウンロード（複数アイテム同時実行）＋キュー行単位の進捗表示。Downloader を N プール化・ステータス列に進捗 %・ステータスバーを全体進捗に変更（Issue #108 / PR #110） | 2026-06-08 |
-| [120-recode-video.md](120-recode-video.md) | 互換性優先の H.264 MP4 再エンコード出力を追加（`FFmpegVideoConvertor` で H.264/AAC 強制・中間 mkv 固定）。#120 Phase 1。Phase 2＝コメント焼きこみは未着手（Issue #120 / PR #121） | 2026-06-09 |
+| [120-recode-video.md](120-recode-video.md) | 互換性優先の H.264 MP4 再エンコード出力を追加（`FFmpegVideoConvertor` で H.264/AAC 強制・中間 mkv 固定）。#120 Phase 1（Issue #120 / PR #121） | 2026-06-09 |
+| [120-nico-hardsub.md](120-nico-hardsub.md) | ニコニコ動画コメントの焼きこみ（ハードサブ）出力を追加（`ass` フィルタで H.264/AAC MP4 を別生成・ソフトサブ MKV と併設）。#120 Phase 2＝#120 完結（Issue #120 / PR #123） | 2026-06-09 |
 
 ## バグ修正
 

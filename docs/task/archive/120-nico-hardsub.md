@@ -1,12 +1,13 @@
 # 互換性優先（再エンコード）出力モード — Phase 2: ニコニコ動画コメントの焼きこみ（ハードサブ）
 
-- 対応 Issue: [#120](https://github.com/f8924919/yt-gui/issues/120)
-- ブランチ: `feature/120-nico-hardsub`
-- ステータス: 進行中
+- 対応 Issue: [#120](https://github.com/f8924919/yt-gui/issues/120)（Phase 2 完了で #120 クローズ）
+- ブランチ: `feature/120-nico-hardsub`（マージ済み・削除済み）
+- PR: [#123](https://github.com/f8924919/yt-gui/pull/123)（マージ済み）
+- ステータス: 完了（2026-06-09）
 
 ## 背景 / 目的
 
-ニコニコ動画コメントの動画統合は現状ソフトサブ MKV（`-c copy`・無劣化）のみで、ASS をレンダリングできる環境が前提。SNS 投稿・スマホ標準プレーヤーなど ASS 非対応環境でもコメント付きで見られるよう、コメントを映像に焼き付けた（ハードサブ）動画を生成する。Phase 1（[120-recode-video](archive/120-recode-video.md)）と同じ「再エンコードを許容する」軸。
+ニコニコ動画コメントの動画統合は現状ソフトサブ MKV（`-c copy`・無劣化）のみで、ASS をレンダリングできる環境が前提。SNS 投稿・スマホ標準プレーヤーなど ASS 非対応環境でもコメント付きで見られるよう、コメントを映像に焼き付けた（ハードサブ）動画を生成する。Phase 1（[120-recode-video](120-recode-video.md)）と同じ「再エンコードを許容する」軸。
 
 ## 設計方針（確定事項・ユーザー確認済み）
 
@@ -26,10 +27,11 @@
 
 ## 関連 docs
 
-- spec: [original-format-panel.md](../spec/screens/original-format-panel.md)
-- arch: [downloader.md](../arch/downloader.md#コメント-ass-の動画への焼きこみハードサブ) / [original_format_panel.md](../arch/original_format_panel.md)
+- spec: [original-format-panel.md](../../spec/screens/original-format-panel.md)
+- arch: [downloader.md](../../arch/downloader.md#コメント-ass-の動画への焼きこみハードサブ) / [original_format_panel.md](../../arch/original_format_panel.md)
 
 ## 進捗メモ
 
-- docs 先行更新済み（spec / arch）。stale だった「フェーズ 2/3」記述も現状へ整合。
-- 次: テスト先行 → 実装 → green。
+- docs 先行 → テスト先行 → 実装 → green 完了。verify-gate（verify / docs-check / evaluator）通過。
+- stale だったニコ動コメント節の旧フェーズ記述も現状へ整合済み。
+- これにより Issue #120（Phase 1 + Phase 2）が完結。

@@ -3,7 +3,7 @@
 - 対応 Issue: [#120](https://github.com/f8924919/yt-gui/issues/120)
 - ブランチ: `feature/120-recode-video-h264`（マージ済み・削除済み）
 - PR: [#121](https://github.com/f8924919/yt-gui/pull/121)（マージ済み）
-- ステータス: 完了（2026-06-09）。Phase 2（コメント焼きこみ）は #120 に残存
+- ステータス: 完了（2026-06-09）。Phase 2（コメント焼きこみ）は PR #123 で完了 → [120-nico-hardsub.md](120-nico-hardsub.md)
 
 ## 背景 / 目的
 
@@ -36,6 +36,6 @@
 - テスト先行 → 実装 → green 完了。verify-gate（verify / docs-check / evaluator）通過。
 - 設計判断（ユーザー確認済み）: 再エンコード × 複数音声は**現状維持＝複数音声を保持**する。MP4 は複数音声トラックを保持でき、各トラックを AAC 再エンコードする。先頭のみへの制限はしない。
 
-## Phase 2（別 PR）
+## Phase 2（完了）
 
-ニコニコ動画コメントの焼きこみ（ハードサブ）は同 Issue #120 の Phase 2 として別途対応。
+ニコニコ動画コメントの焼きこみ（ハードサブ）は同 Issue #120 の Phase 2 として PR #123 で対応完了。詳細は [120-nico-hardsub.md](120-nico-hardsub.md) を参照。
