@@ -27,7 +27,7 @@
 ## 関連 docs
 
 - spec: [download-formats.md](../spec/features/download-formats.md) / [original-format-panel.md](../spec/screens/original-format-panel.md)
-- arch: [downloader.md](../arch/downloader.md#映像の再エンコードh264-mp4-互換性優先) / [job_spec.md](../arch/job_spec.md) / [original_format_panel.md](../arch/original_format_panel.md)
+- arch: [downloader.md](../arch/downloader.md#映像の再エンコードh264-mp4--互換性優先) / [job_spec.md](../arch/job_spec.md) / [original_format_panel.md](../arch/original_format_panel.md)
 
 ## 進捗メモ
 

@@ -279,6 +279,38 @@ def test_subtitle_embed_adds_convert_and_embed_pps(downloader, tmp_path) -> None
     )
 
 
+def test_recode_video_with_subtitle_embed_order(downloader, tmp_path) -> None:
+    """再エンコード × 字幕埋め込み: VideoConvertor が先頭で、字幕の
+    convert → embed はその後段に並ぶ（spec original-format-panel.md の
+    「再エンコード時も字幕埋め込み可」を担保）。"""
+    opts = downloader._build_ydl_opts(
+        _job(
+            format_spec="137+140",
+            recode_video=True,
+            video_container="mp4",
+            subtitle_opts={
+                "writesubtitles": True,
+                "subtitleslangs": ["en"],
+                "subtitlesformat": "srt",
+                "embed": True,
+            },
+        ),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    pp_keys = _pp_keys(opts)
+    assert pp_keys[0] == "FFmpegVideoConvertor"
+    assert pp_keys.index("FFmpegVideoConvertor") < pp_keys.index(
+        "FFmpegSubtitlesConvertor"
+    )
+    assert pp_keys.index("FFmpegSubtitlesConvertor") < pp_keys.index(
+        "FFmpegEmbedSubtitle"
+    )
+
+
 def test_subtitle_embed_preserves_explicit_format(downloader, tmp_path) -> None:
     opts = downloader._build_ydl_opts(
         _job(

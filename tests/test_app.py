@@ -18,7 +18,7 @@ pytest.importorskip("pytestqt")
 
 from yt_gui import i18n  # noqa: E402
 from yt_gui.app import App, _QueueTree  # noqa: E402
-from yt_gui.job_spec import build_job_spec  # noqa: E402
+from yt_gui.job_spec import PanelSnapshot, build_job_spec  # noqa: E402
 from yt_gui.queue_controller import _QueueItem  # noqa: E402
 from yt_gui.settings import Settings  # noqa: E402
 
@@ -261,3 +261,69 @@ def test_restore_section_clears_when_no_section(app):
     assert app._section_check.isChecked() is False
     assert app._section_start.text() == ""
     assert app._section_inputs.isHidden()
+
+
+# ── 複数音声 MKV 昇格通知 × 再エンコードの干渉 ─────────────────────────────
+
+
+def _recode_panel(*, has_multiple_audio: bool) -> PanelSnapshot:
+    return PanelSnapshot(
+        format_spec="137+140+141",
+        subtitle_opts=None,
+        remux_only=False,
+        audio_only=False,
+        recode_video=True,
+        embed_thumbnail=False,
+        embed_metadata=True,
+        embed_chapters=True,
+        has_multiple_audio=has_multiple_audio,
+        raw_settings={},
+    )
+
+
+def test_no_mkv_promotion_notice_for_recode_video(app):
+    """再エンコード時は video_container=mp4 固定で MKV 昇格ではないため、
+    複数音声でも昇格通知を出さない（誤通知の回帰防止）。"""
+    app._settings.video_container = "mkv"
+    notices: list[str] = []
+    app._update_status = lambda msg, pct=0: notices.append(msg)
+
+    # recode + 複数音声: is_multi_audio=True かつ video_container=mp4
+    job = build_job_spec(
+        "fmt_original",
+        Settings(video_container="mkv"),
+        panel=_recode_panel(has_multiple_audio=True),
+    )
+    assert job.is_multi_audio is True
+    assert job.recode_video is True
+    assert job.video_container == "mp4"
+
+    app._notify_container_promotion_if_needed(job)
+    assert notices == []
+
+
+def test_mkv_promotion_notice_still_fires_without_recode(app):
+    """通常の複数音声 MKV 昇格では従来どおり通知する（回帰なし確認）。"""
+    notices: list[str] = []
+    app._update_status = lambda msg, pct=0: notices.append(msg)
+
+    panel = PanelSnapshot(
+        format_spec="137+140+141",
+        subtitle_opts=None,
+        remux_only=False,
+        audio_only=False,
+        recode_video=False,
+        embed_thumbnail=False,
+        embed_metadata=True,
+        embed_chapters=True,
+        has_multiple_audio=True,
+        raw_settings={},
+    )
+    job = build_job_spec(
+        "fmt_original", Settings(video_container="mp4"), panel=panel
+    )
+    assert job.is_multi_audio is True
+    assert job.video_container == "mkv"
+
+    app._notify_container_promotion_if_needed(job)
+    assert len(notices) == 1
