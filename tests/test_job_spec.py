@@ -27,6 +27,7 @@ def _panel(
     subtitle_opts: dict | None = None,
     remux_only: bool = False,
     audio_only: bool = False,
+    recode_video: bool = False,
     embed_thumbnail: bool = True,
     embed_metadata: bool = True,
     embed_chapters: bool = True,
@@ -38,6 +39,7 @@ def _panel(
         subtitle_opts=subtitle_opts,
         remux_only=remux_only,
         audio_only=audio_only,
+        recode_video=recode_video,
         embed_thumbnail=embed_thumbnail,
         embed_metadata=embed_metadata,
         embed_chapters=embed_chapters,
@@ -162,6 +164,41 @@ def test_original_multi_audio_no_promotion_when_remux_only() -> None:
     assert job.video_container == "mp4"
     assert job.is_multi_audio is False
     assert job.remux_only is True
+
+
+def test_original_recode_video_forces_mp4() -> None:
+    """recode_video=True: コンテナ設定が mkv でも video_container は mp4 に固定。"""
+    panel = _panel(format_spec="137+140", recode_video=True)
+    job = build_job_spec(
+        "fmt_original", Settings(video_container="mkv"), panel=panel
+    )
+    assert job.recode_video is True
+    assert job.video_container == "mp4"
+    assert job.audio_only is False
+    assert job.remux_only is False
+    assert job.is_audio_extraction is False
+
+
+def test_original_recode_video_overrides_multi_audio_promotion() -> None:
+    """recode_video=True は複数音声による mkv 昇格より優先され mp4 を維持。"""
+    panel = _panel(
+        format_spec="137+140+141",
+        recode_video=True,
+        has_multiple_audio=True,
+    )
+    job = build_job_spec(
+        "fmt_original", Settings(video_container="mp4"), panel=panel
+    )
+    assert job.recode_video is True
+    assert job.video_container == "mp4"
+    assert job.is_multi_audio is True
+
+
+def test_original_default_recode_video_false() -> None:
+    """通常結合モードでは recode_video=False。"""
+    panel = _panel(format_spec="137+140")
+    job = build_job_spec("fmt_original", Settings(), panel=panel)
+    assert job.recode_video is False
 
 
 def test_original_audio_only_mp3() -> None:

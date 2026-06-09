@@ -29,6 +29,7 @@
 | `video_container` | `str` | コンテナ。複数音声時は `mkv` へ昇格済み |
 | `audio_only` | `bool` | 音声のみ出力 (fmt_mp3 または fmt_original + 音声のみ) |
 | `remux_only` | `bool` | コンテナのみ変換 (再エンコ無し) |
+| `recode_video` | `bool` | 映像を H.264 / 音声を AAC へ再エンコードして MP4 出力（互換性優先。既定 `False`）。`audio_only` / `remux_only` とは排他。`True` のとき `video_container` は `"mp4"` に固定される |
 | `orig_settings` | `dict \| None` | panel snapshot の raw dict (復元・nico_comments 取り出し用) |
 | `is_multi_audio` | `bool` | 複数音声ストリーム結合モード (downloader 側の `allow_multiple_audio_streams` 制御) |
 | `section_start` | `str \| None` | 区間ダウンロードの開始時刻（生の入力文字列。`HH:MM:SS` 等）。未指定なら `None` |
@@ -66,11 +67,13 @@ class PanelSnapshot:
     embed_chapters: bool
     has_multiple_audio: bool      # panel.has_multiple_audio_selected()
     raw_settings: dict            # panel.get_raw_settings() の dict (復元用)
+    recode_video: bool = False    # panel.get_recode_video()（H.264 MP4 再変換）
 ```
 
 ## 振る舞いの不変条件
 
 - **`fmt_original` で `panel.has_multiple_audio=True` かつ通常結合モード (audio_only / remux_only 共に False) のとき、`video_container` を `mkv` へ自動昇格する**。`is_multi_audio=True` も同時にセットされる。
+- **`fmt_original` で `panel.recode_video=True` のとき、`video_container` は `"mp4"` に固定する**（複数音声による mkv 昇格より優先。出力は常に MP4 のため）。`recode_video` は `audio_only` / `remux_only` と排他で、UI のラジオボタンが排他性を保証する。
 - **`mp3_bitrate` は mp3 抽出時 (`is_audio_extraction and audio_codec == "mp3"`) のみセット**。それ以外は `None`。
 - **`embed_thumbnail` は fmt_mp3 で `audio_codec != "mp3"` (= flac) のとき強制 False**。flac には埋め込めないため。
 - **コンテナ昇格・「音声のみ × 複数音声 → 先頭のみ採用」の通知はこの関数の責務外**。UI 側 (`App._notify_*`) が `JobSpec` を見て emit する。
