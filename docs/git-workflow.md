@@ -112,3 +112,15 @@ main ──┬──────────────────┬──→
 | [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・完了タスクの archive 移動（docs ブランチ＋PR） | step 9 |
 
 skill が呼ぶサブエージェントの**合否・設計判断は委譲しない**点は §5.1 / §5.2 と同じ。skill は正しい順序・条件での起動と結果集約に徹する。
+
+### 5.4 ルール層（path-scoped、`.claude/rules/`）
+
+特定の種類のファイルを編集する瞬間にだけ思い出すべき遵守事項は、`.claude/rules/` 配下に **path-scoped rule** として置く。Claude Code はマッチするファイルを読んだ時にそのルールをコンテキストへ自動注入する（`paths` frontmatter の glob で対象を指定）。CLAUDE.md（常時ロード）と違い、関係するファイルを触る時だけ載るため文脈を節約できる。
+
+- **薄いポインタに徹し、正本は再定義しない**: ルール本文に手順をコピーすると単一情報源が崩れる（§5.3 の skill と同じ drift 回避方針）。各 rule は対応する正本 docs を指し、編集時に外しやすい要点だけを再掲する。
+- **順序ゲートの置き換えではなく補完**: path-scoped は「マッチするファイルを *読んだ* 後」に発火するため、新規領域では発火が遅れることがある。`/start-task`（docs 先・テスト先の順序）や `/verify-gate`（PR 前検証）を代替しない。
+
+| rule | `paths` | 正本 | 効かせたい瞬間 |
+|---|---|---|---|
+| [`testing.md`](../.claude/rules/testing.md) | `tests/**`, `**/test_*.py` | [testing/policy.md](testing/policy.md) | テストを書く / 直す時（テストファースト・red 単独コミット禁止） |
+| [`docs-upkeep.md`](../.claude/rules/docs-upkeep.md) | `docs/*.md`, `docs/**/*.md` | [docs-guide.md](docs-guide.md) | spec / arch / task を編集する時（index 追記・相互リンク・archive 手順の漏れ防止） |
