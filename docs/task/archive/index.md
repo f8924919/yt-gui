@@ -82,3 +82,4 @@
 | [evaluator-agent.md](evaluator-agent.md) | evaluator サブエージェント新設（計画・生成・評価の3分離）。受け入れ条件・spec の充足を独立評価（Opus）、feature/bugfix/hotfix で必須（Issue #99 / PR #100） | 2026-06-07 |
 | [skill-layer.md](skill-layer.md) | Skills 層の新設。PR 前検証ゲート `/verify-gate` とマージ後処理 `/finish-task` を追加し git-workflow §5.3 に位置づけ。skill はルールを再定義せず正本を参照（Issue #102 / PR #103） | 2026-06-07 |
 | [start-task-skill.md](start-task-skill.md) | ワークフロー前半（§5 step 1-6）の入口 skill `/start-task` を新設。docs 先・テスト先の順序ゲートで実装先行を防止。判断ステップは確認ゲートに留め自動化しない（Issue #105 / PR #106） | 2026-06-07 |
+| [claude-rules-layer.md](claude-rules-layer.md) | `.claude/rules/` path-scoped ルール層を新設。テスト/docs 編集時に遵守事項を再注入（`testing.md` / `docs-upkeep.md`）。薄いポインタに徹し正本を参照、git-workflow §5.4 を新設（Issue #125 / PR #126） | 2026-06-11 |
