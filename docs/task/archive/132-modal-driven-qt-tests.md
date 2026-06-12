@@ -1,8 +1,10 @@
 # モーダル駆動(手段B)のQt UIテスト追加
 
 - Issue: [#132](https://github.com/f8924919/yt-gui/issues/132)
+- PR: [#133](https://github.com/f8924919/yt-gui/pull/133)（マージ済み）
 - ブランチ: `feature/132-modal-driven-qt-tests`
-- ステータス: 進行中
+- ステータス: 完了
+- 後続: coverage omit 解除は [#134](https://github.com/f8924919/yt-gui/issues/134) へ分離
 - 更新日: 2026-06-12
 
 ## 目的
@@ -30,9 +32,9 @@
 
 ## 対応 spec
 
-- [設定ダイアログ](../spec/screens/settings-dialog.md)（削除確認・保存検証・反映）
-- [オリジナル形式ダイアログ](../spec/screens/original-format-dialog.md)（追加フロー）
-- [ダウンロードキュー](../spec/features/queue.md)（追加）
+- [設定ダイアログ](../../spec/screens/settings-dialog.md)（削除確認・保存検証・反映）
+- [オリジナル形式ダイアログ](../../spec/screens/original-format-dialog.md)（追加フロー）
+- [ダウンロードキュー](../../spec/features/queue.md)（追加）
 
 ## docs 更新
 
