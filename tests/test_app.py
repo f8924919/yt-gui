@@ -398,3 +398,40 @@ def test_open_settings_retranslates_on_language_change(app, monkeypatch):
     app._open_settings()
 
     assert called
+
+
+# ── ログダイアログの起動・再表示（_open_log_dialog） ─────────────────────────
+#
+# 対応 spec: [ログダイアログ](../docs/spec/screens/log-dialog.md)。
+
+
+def test_open_log_dialog_creates_loads_and_shows(app):
+    """初回起動で `LogDialog` を生成し、既存ログを読み込んで表示する。"""
+    app._log_entries = ["[12:00:00] テストログ"]
+    assert app._log_dialog is None
+
+    app._open_log_dialog()
+
+    assert app._log_dialog is not None
+    assert app._log_dialog.isVisible()
+    assert "テストログ" in app._log_dialog._text.toPlainText()
+
+
+def test_open_log_dialog_reuses_instance_while_visible(app):
+    """表示中に再度開いても新規生成せず同一インスタンスを前面化する。"""
+    app._open_log_dialog()
+    first = app._log_dialog
+
+    app._open_log_dialog()
+
+    assert app._log_dialog is first
+
+
+def test_log_dialog_close_clears_reference(app):
+    """クローズコールバックで `_log_dialog` 参照が None に戻る。"""
+    app._open_log_dialog()
+    assert app._log_dialog is not None
+
+    app._on_log_dialog_close()
+
+    assert app._log_dialog is None

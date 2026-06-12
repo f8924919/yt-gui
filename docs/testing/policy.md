@@ -22,9 +22,8 @@
 | 純粋関数 | `yt_gui/output_template.py` | ◯ |
 | グローバル状態 | `yt_gui/i18n.py` | ◯ |
 | ファイル I/O | `yt_gui/settings.py` | ◯ |
-| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `settings_dialog.py`（タブレイアウト回帰・`_clear_archive`/`_save` の確認/検証分岐）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従・`_open_original_dialog` の追加フロー・`_open_settings` の設定反映ループなど。モーダル `exec()`/`question`/`QFileDialog` は手段B（§2.5）で能動駆動し、フル画面操作の E2E は対象外） | △ |
+| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `settings_dialog.py`（タブレイアウト回帰・`_clear_archive`/`_save` の確認/検証分岐・`_browse_*` のファイル選択反映・`_on_archive_toggled` の活性連動）・ `log_dialog.py`（`load`/`append` の表示往復）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従・`_open_original_dialog` の追加フロー・`_open_settings` の設定反映ループ・`_open_log_dialog` の起動/再表示など。モーダル `exec()`/`question`/`QFileDialog` は手段B（§2.5）で能動駆動し、フル画面操作の E2E は対象外） | △ |
 | スレッドヘルパ | `yt_gui/threading_utils.py`（コールバック順序） | △ |
-| Qt UI（ウィンドウ統合） | `yt_gui/log_dialog.py` | × |
 | 外部 I/O | `yt_gui/downloader.py`（yt-dlp、`omit` 解除済み・#95）・ `thumbnail_cache.py`（HTTP・未） | △ |
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
@@ -104,6 +103,7 @@ tests/
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）
 ├── test_original_format_dialog.py ← Qt（@pytest.mark.qt）
 ├── test_settings_dialog.py        ← Qt（@pytest.mark.qt）
+├── test_log_dialog.py             ← Qt（@pytest.mark.qt）
 └── test_app.py                    ← Qt（@pytest.mark.qt）
 ```
 
@@ -135,6 +135,7 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 - **数値閾値は初期は設けません**（計測のみ）
 - 数サイクル運用後、実績値からプロジェクト全体・モジュール別に最低ラインを設定します
 - 計測対象は `yt_gui` 全体ですが、UI ウィンドウ統合（`app.py` / `settings_dialog.py` / `original_format_panel.py` / `log_dialog.py`）・`thumbnail_cache.py`・`locales` は `omit` で除外し **ロジック層が対象** になります。`downloader.py` はロジック部分をテスト済みのため `omit` から外しています（#95）
+- **§1 で `△`（対象）に格上げ済みでも `omit` には残している**モジュールがあります（`app.py` / `settings_dialog.py` / `log_dialog.py`）。これは段階導入（§1 ノート）の方針で、テストは追加しつつ一括解除によるカバレッジ急落を避けるための意図的な据え置きです。`omit` 解除は後続タスク（#134）で扱います
 - カバレッジが急に下がった場合、テスト未追加の改修が無いかをレビューで確認します
 
 ---
