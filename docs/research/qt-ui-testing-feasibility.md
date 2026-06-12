@@ -153,7 +153,44 @@ GitHub Actions の `ubuntu-latest` (24.04) には今回必要なライブラリ�
 
 導入しない場合の根拠としては「Qt UI 層の振る舞いは手動 QA でカバーしており、自動化コスト > リグレッション発生コスト」のときに限る。本リポジトリは個人開発の Windows/macOS デスクトップアプリで、変更頻度が落ち着けばその判断もあり得る。
 
-## 8. 参考
+## 8. モーダル UI 挙動のテスト手段と xvfb の採否（2026-06-12 追記）
+
+§5.1 で触れた「モーダル `QMessageBox` が offscreen で無限ブロックする」問題を、**実 UI 挙動（ダイアログの開閉・ボタン押下・押下後の状態変化）まで検証したい**場合にどの手段があるか整理する。`xvfb` を使えば解決するか、という観点を含む。
+
+### 8.1 現行 UI に存在するモーダル系
+
+実装裏取り（2026-06-12 時点）:
+
+| 種別 | 箇所 | 駆動形態 |
+|---|---|---|
+| `QMessageBox.warning/critical/information/question` | `app.py` / `settings_dialog.py` / `original_format_panel.py` / `original_format_dialog.py` 多数 | 静的メソッド（ネストイベントループ） |
+| `QFileDialog.getSaveFileName / getExistingDirectory / getOpenFileName` | `settings_dialog.py:499,675,680` | 静的メソッド・既定でネイティブ |
+| `QDialog.exec()` | `app.py:785,1087`（設定・オリジナル形式ダイアログ） | モーダル `exec()` |
+| `QMenu.exec()` | `app.py:140`（キュー右クリック） | モーダル `exec()`。発火条件は `edit_format_requested` 等の**シグナルに切り出し済み**（§6） |
+| クリップボード | `app.py:143` | 非モーダル |
+
+D&D・システムトレイ・スクリーンショット用途は**コード上に存在しない**。
+
+### 8.2 核心: xvfb はモーダルのブロックを解決しない
+
+`exec()` / `getSaveFileName()` 等は「ユーザー操作を待つネストイベントループ」であり、**待つ相手がいないのは offscreen でも xvfb でも同じ**。ブロックは描画の問題ではなく論理（入力待ち）の問題なので、**xvfb に替えてもダイアログは自動では閉じない**。どの環境でも「プログラムから能動的に閉じる仕掛け」が別途要る。したがって論点は *offscreen vs xvfb* ではなく **モーダルをどう駆動するか** にある。
+
+### 8.3 手段の比較
+
+| 手段 | 概要 | テストできること | 追加コスト |
+|---|---|---|---|
+| **A: offscreen + 静的メソッド monkeypatch（現状）** | `QMessageBox.*` を no-op 化し戻り値固定、`QFileDialog.get*` も canned 値を返す（`conftest.py` の `_silence_qt_modal_dialogs` が前者を実施） | ダイアログ呼び出し**後の分岐ロジック**（Yes→削除実行、パス選択→設定反映 等） | なし・高速。**ダイアログ自体の描画/実クリックは不可** |
+| **B: offscreen + `QTimer` でモーダルを能動的に閉じる**（推奨ゾーン） | `exec()` の**前**に `QTimer.singleShot(0, ...)` で `QApplication.activeModalWidget()` を取得→ボタン click / `accept()`。`QFileDialog` は `DontUseNativeDialog` で Qt ウィジェット版にして `qtbot` で操作 | 「ダイアログが**実際に開くか**」「ボタン押下で**状態がどう変わるか**」まで **offscreen のまま**到達（`QMessageBox` / `QDialog` サブクラス / 非ネイティブ `QFileDialog`） | **xvfb 不要・OS 依存増なし**。要求の大半をここで満たせる |
+| **C: xvfb + xcb プラットフォーム** | `Xvfb :99` 起動・`DISPLAY` 付与・`QT_QPA_PLATFORM=xcb`（または `xvfb-run -a`） | **実描画が要る場合のみ**: スクリーンショット/ビジュアル回帰、ネイティブ `QFileDialog` そのもの、WM 依存挙動（フォーカス・`activateWindow()`・ジオメトリ・raise／要・軽量 WM） | **大**: `libxcb-*` 一式（icccm/image/keysyms/randr/render-util/shape/xinerama/xfixes・xkbcommon-x11 等）・起動が遅く flaky 化しやすい・CI に `xvfb-run`。**モーダル駆動は B と同じく別途必要** |
+| **D: xvfb 上でフル E2E** | アプリ全体を起動し通し操作 | — | [policy.md](../testing/policy.md) §2.4 が **`×`（導入しない）**。§6 の方針（状態機械・分岐に絞る）とも矛盾 |
+
+### 8.4 本リポジトリでの結論
+
+- 既存設計は**意図的に `exec()` を避ける方向**（コンテキストメニューはシグナル化済み）。追加で押さえたい UI 挙動（設定ダイアログ保存・`question` 分岐・ファイル選択後の状態反映）は **手段 B で offscreen のまま到達できる**ものがほとんど。
+- **xvfb を入れる正当な理由は「スクリーンショット/ビジュアル回帰」か「ネイティブダイアログそのものの検証」に限られる**。個人向けデスクトップアプリの現状では投資対効果は低い。
+- 推奨順序: **(1)** 手段 B を追加依存ゼロで導入 → **(2)** ビジュアル回帰が必要になった時点で初めて手段 C（xvfb）を検討。
+
+## 9. 参考
 
 - pytest-qt: <https://pytest-qt.readthedocs.io/>
 - Qt offscreen platform: <https://doc.qt.io/qt-6/qpa.html>
