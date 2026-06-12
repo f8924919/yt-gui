@@ -252,3 +252,105 @@ def test_save_persists_settings_when_valid(qtbot):
     saved = manager.save.call_args[0][0]
     assert saved.max_concurrent_downloads == 3
     assert dialog.result() == QDialog.DialogCode.Accepted
+
+
+# ── ファイル選択（_browse_* / 手段A: QFileDialog 静的メソッド固定） ────────────
+
+
+def test_browse_download_sets_field(qtbot, monkeypatch):
+    """フォルダ選択で得たパスをダウンロード先フィールドへ反映する。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *a, **kw: "/picked/dir"
+    )
+
+    dialog._browse_download()
+
+    assert dialog._download_edit.text() == "/picked/dir"
+
+
+def test_browse_download_keeps_field_on_cancel(qtbot, monkeypatch):
+    """選択をキャンセル（空文字）した場合はフィールドを変更しない。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    dialog._download_edit.setText("/orig")
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *a, **kw: "")
+
+    dialog._browse_download()
+
+    assert dialog._download_edit.text() == "/orig"
+
+
+def test_browse_cookies_sets_field(qtbot, monkeypatch):
+    """Cookies ファイル選択で得たパスを Cookies フィールドへ反映する。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", lambda *a, **kw: ("/picked/cookies.txt", "")
+    )
+
+    dialog._browse_cookies()
+
+    assert dialog._cookies_edit.text() == "/picked/cookies.txt"
+
+
+def test_browse_cookies_keeps_field_on_cancel(qtbot, monkeypatch):
+    """Cookies 選択をキャンセルした場合はフィールドを変更しない。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    dialog._cookies_edit.setText("/orig/cookies.txt")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **kw: ("", ""))
+
+    dialog._browse_cookies()
+
+    assert dialog._cookies_edit.text() == "/orig/cookies.txt"
+
+
+def test_browse_archive_sets_field(qtbot, monkeypatch):
+    """アーカイブ保存先選択で得たパスをアーカイブパスフィールドへ反映する。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", lambda *a, **kw: ("/picked/archive.txt", "")
+    )
+
+    dialog._browse_archive()
+
+    assert dialog._archive_path_edit.text() == "/picked/archive.txt"
+
+
+def test_browse_archive_keeps_field_on_cancel(qtbot, monkeypatch):
+    """アーカイブ保存先選択をキャンセルした場合はフィールドを変更しない。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = _make_dialog(qtbot, Settings())
+    dialog._archive_path_edit.setText("/orig/archive.txt")
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **kw: ("", ""))
+
+    dialog._browse_archive()
+
+    assert dialog._archive_path_edit.text() == "/orig/archive.txt"
+
+
+# ── アーカイブ有効化トグル（_on_archive_toggled） ─────────────────────────────
+
+
+def test_archive_toggle_enables_and_disables_controls(qtbot):
+    """アーカイブ有効化チェックに応じてパス入力・参照・クリアボタンが連動する。"""
+    dialog = _make_dialog(qtbot, Settings(download_archive_enabled=False))
+
+    dialog._archive_check.setChecked(True)
+    assert dialog._archive_path_edit.isEnabled()
+    assert dialog._archive_browse_btn.isEnabled()
+    assert dialog._archive_clear_btn.isEnabled()
+
+    dialog._archive_check.setChecked(False)
+    assert not dialog._archive_path_edit.isEnabled()
+    assert not dialog._archive_browse_btn.isEnabled()
+    assert not dialog._archive_clear_btn.isEnabled()
