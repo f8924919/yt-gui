@@ -1,8 +1,10 @@
 # 優先度中のQt UIテスト追加（ファイル選択・アーカイブトグル・ログダイアログ）
 
 - Issue: [#137](https://github.com/f8924919/yt-gui/issues/137)
+- PR: [#138](https://github.com/f8924919/yt-gui/pull/138)（マージ済み）
 - ブランチ: `feature/137-medium-qt-tests`
-- ステータス: 進行中
+- ステータス: 完了
+- 後続: coverage omit 解除は [#134](https://github.com/f8924919/yt-gui/issues/134) へ集約（log_dialog.py 追加）
 - 更新日: 2026-06-12
 
 ## 目的
@@ -28,9 +30,9 @@
 
 ## 対応 spec / arch
 
-- [設定ダイアログ](../spec/screens/settings-dialog.md) / [arch](../arch/settings_dialog.md)
-- [ログダイアログ](../spec/screens/log-dialog.md) / [arch](../arch/log_dialog.md)
-- [メインウィンドウ](../spec/screens/main-window.md) / [arch](../arch/app.md)
+- [設定ダイアログ](../../spec/screens/settings-dialog.md) / [arch](../../arch/settings_dialog.md)
+- [ログダイアログ](../../spec/screens/log-dialog.md) / [arch](../../arch/log_dialog.md)
+- [メインウィンドウ](../../spec/screens/main-window.md) / [arch](../../arch/app.md)
 
 ## docs 更新
 
