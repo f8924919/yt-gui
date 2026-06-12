@@ -74,6 +74,7 @@
 | [original-format-panel-tests.md](original-format-panel-tests.md) | Qt UI テスト: `_AudioListWidget` の AUTO/SKIP/音声 ID 排他ロジックのテスト追加（Issue #22 / PR #26） | 2026-05-30 |
 | [app-ui-logic-tests.md](app-ui-logic-tests.md) | Qt UI テスト: `_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従のテスト追加（モーダル QMenu.exec 回避のため `_edit_targets` を抽出）（Issue #23 / PR #27） | 2026-05-30 |
 | [132-modal-driven-qt-tests.md](132-modal-driven-qt-tests.md) | Qt UI テスト: モーダル経路を手段B（offscreen + `QTimer`/静的メソッド固定）で検証。設定ダイアログの `_clear_archive`/`_save` 確認・検証分岐、`_open_original_dialog` 追加フロー、`_open_settings` 反映ループ。omit 解除は #134 へ分離（Issue #132 / PR #133） | 2026-06-12 |
+| [137-medium-qt-tests.md](137-medium-qt-tests.md) | Qt UI テスト（優先度中・手段A）: 設定ダイアログの `_browse_*` ファイル選択反映・`_on_archive_toggled` 活性連動、`_open_log_dialog` 起動/再利用、`LogDialog.load`/`append`。`log_dialog.py` を ×→△ 格上げ（Issue #137 / PR #138） | 2026-06-12 |
 
 ## ドキュメント整備
 
