@@ -19,6 +19,6 @@
 
 ## 関連ファイル
 
-- [yt-gui.spec](../../yt-gui.spec)
-- [scripts/build_appimage.py](../../scripts/build_appimage.py)
-- [docs/build.md](../build.md)
+- [yt-gui.spec](../../../yt-gui.spec)
+- [scripts/build_appimage.py](../../../scripts/build_appimage.py)
+- [docs/build.md](../../build.md)

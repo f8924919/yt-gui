@@ -2,7 +2,7 @@
 
 [← タスク一覧](index.md) / [← 全体計画](refactor-overview.md)
 
-> 対応候補: [refactoring-analysis.md §A, §B, §C](../research/refactoring-analysis.md)
+> 対応候補: [refactoring-analysis.md §A, §B, §C](../../research/refactoring-analysis.md)
 > ブランチ: `refactor/job-spec`
 
 ## 背景

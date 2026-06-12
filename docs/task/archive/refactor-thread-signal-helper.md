@@ -2,7 +2,7 @@
 
 [← タスク一覧](index.md) / [← 全体計画](refactor-overview.md)
 
-> 対応候補: [refactoring-analysis.md §F](../research/refactoring-analysis.md)
+> 対応候補: [refactoring-analysis.md §F](../../research/refactoring-analysis.md)
 > ブランチ: `refactor/thread-signal-helper`
 
 ## 背景

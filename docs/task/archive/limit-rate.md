@@ -4,7 +4,7 @@
 
 ## 背景
 
-yt-dlp の `--limit-rate`（Python API の `ratelimit`、bytes/sec）が UI から到達できなかった。[機能ギャップ調査メモ](../research/yt-dlp-feature-gap.md) §4 の未対応項目。回線を専有しないよう帯域を絞りたいユーザー向け。
+yt-dlp の `--limit-rate`（Python API の `ratelimit`、bytes/sec）が UI から到達できなかった。[機能ギャップ調査メモ](../../research/yt-dlp-feature-gap.md) §4 の未対応項目。回線を専有しないよう帯域を絞りたいユーザー向け。
 
 ## 設計判断
 

@@ -6,7 +6,7 @@
 
 現状、1 ダウンロードあたり 1 音声トラックしか選択できない。YouTube の Multi-Audio 動画やニコニコの多重音声など、複数言語の音声が同一動画に同梱されているケースで「日本語＋英語の両方を含む 1 ファイルが欲しい」というニーズに応えられない。
 
-調査の詳細・代替案・課題は [docs/research/multi-audio-download.md](../research/multi-audio-download.md) を参照。本タスクは同調査のフェーズ 1（動画 + 複数音声を 1 MKV にマージ）のみを対象とする。
+調査の詳細・代替案・課題は [docs/research/multi-audio-download.md](../../research/multi-audio-download.md) を参照。本タスクは同調査のフェーズ 1（動画 + 複数音声を 1 MKV にマージ）のみを対象とする。
 音声のみモードでの複数ファイル出力（フェーズ 2 相当）は本タスクには含めず、`fmt_mp3` の簡易モードにも変更を入れない。
 
 ## 仕様
@@ -98,7 +98,7 @@
 
 ### テスト
 
-[docs/testing/policy.md](../testing/policy.md) のテスト対象スコープでは `original_format_panel.py` (Qt UI) と `downloader.py` (外部 I/O) はいずれも **対象外** と定められているため、本タスクではこれらに対する単体テストの追加は見送る。代わりに実機での動作確認で振る舞いを担保する。
+[docs/testing/policy.md](../../testing/policy.md) のテスト対象スコープでは `original_format_panel.py` (Qt UI) と `downloader.py` (外部 I/O) はいずれも **対象外** と定められているため、本タスクではこれらに対する単体テストの追加は見送る。代わりに実機での動作確認で振る舞いを担保する。
 
 実機での `--audio-multistreams` 動作確認は **YouTube** を主対象とし、ニコニコ動画・Twitch VOD は **動作確認程度** にとどめる（リサーチの §13 参照）。
 
