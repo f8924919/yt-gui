@@ -40,7 +40,7 @@
 
 ## 留意点 / ブロッカー
 
-- **`.github/workflows/` の push にはトークンの `workflow` スコープが必要**。`release.yml` 導入時（#5/#6）は、サンドボックスの egress プロキシが注入する固定トークンに `workflow` スコープが無く push が拒否された経緯がある（[archive/release-workflow.md](archive/release-workflow.md) の完了メモ参照）。現在は `gh auth status` 上 `workflow` スコープありを確認済みだが、実 push 時に拒否されたらホスト側 / Web UI 経由での push が必要。
+- **`.github/workflows/` の push にはトークンの `workflow` スコープが必要**。`release.yml` 導入時（#5/#6）は、サンドボックスの egress プロキシが注入する固定トークンに `workflow` スコープが無く push が拒否された経緯がある（[archive/release-workflow.md](release-workflow.md) の完了メモ参照）。現在は `gh auth status` 上 `workflow` スコープありを確認済みだが、実 push 時に拒否されたらホスト側 / Web UI 経由での push が必要。
 - 日本語コミットは `/c/` マウント FS の `O_TRUNC` 不具合・locale 問題があるため、`rm -f .git/COMMIT_EDITMSG` → `/tmp` のメッセージファイル → `LC_ALL=C.UTF-8 git commit -F` の手順で行う。
 
 ## 次アクション

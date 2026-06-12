@@ -50,5 +50,5 @@
 - ffmpeg: 取得元 `johnvansickle.com`（Linux）がサンドボックスのネットワークフィルタで **HTTP 403**。回避策として `apt-get install ffmpeg` で入れた `/usr/bin/ffmpeg`・`ffprobe` を `bin/ffmpeg/` に配置した（パイプライン検証目的のため実体は apt 版で代替）。
 - deno / appimagetool は GitHub から取得可能（`download_binaries.py` / `build_appimage.py` がそのまま成功）。
 - spec 内の `download_binaries.py` 呼び出しは `--yes` 非対応で GPL 同意プロンプトが EOF→N 扱いになるため、ffmpeg/deno/danmaku2ass は事前に配置しておく必要がある。
-- 入れた OS パッケージ（binutils / file / ffmpeg）はサンドボックス再起動で消える（[Qt UI テスト調査メモ](../research/qt-ui-testing-feasibility.md) §5.3 と同事情）。CI に乗せる場合はワークフローで明示インストールが要る。
+- 入れた OS パッケージ（binutils / file / ffmpeg）はサンドボックス再起動で消える（[Qt UI テスト調査メモ](../../research/qt-ui-testing-feasibility.md) §5.3 と同事情）。CI に乗せる場合はワークフローで明示インストールが要る。
 - 注: ディスプレイが無いため **GUI の目視確認は不可**。起動の可否（offscreen）までが限界。

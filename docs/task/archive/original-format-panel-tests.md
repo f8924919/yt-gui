@@ -2,7 +2,7 @@
 
 対応 Issue: #22
 
-親: Qt UI テスト導入 (3) [archive/qt-ui-test-harness.md](archive/qt-ui-test-harness.md)（#20 / PR #21）
+親: Qt UI テスト導入 (3) [archive/qt-ui-test-harness.md](qt-ui-test-harness.md)（#20 / PR #21）
 
 ## 背景
 

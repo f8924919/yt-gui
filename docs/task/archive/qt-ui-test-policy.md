@@ -1,6 +1,6 @@
 # Qt UI テスト導入 (2): テスト方針の格上げ・spec 整合
 
-関連: Qt UI テスト導入 (1) [archive/qt-ui-test-ci.md](archive/qt-ui-test-ci.md)（Issue #17 / PR #18 マージ済み）
+関連: Qt UI テスト導入 (1) [archive/qt-ui-test-ci.md](qt-ui-test-ci.md)（Issue #17 / PR #18 マージ済み）
 
 ドキュメントのみの変更のため、運用ルール §4 に従い Issue を伴わない `docs/` ブランチ（`docs/test-policy-qt-ui-scope`）で実施。
 
@@ -31,10 +31,10 @@ Qt UI テスト導入の前提として、`docs/testing/policy.md` が **「Qt U
 
 対象振る舞いは既存 spec でカバー済みのため、**spec の新規追記は不要**と判断。
 
-- 編集モードの状態遷移（`waiting` ↔ `editing`、適用/キャンセル、複数選択時のオリジナル形式グレーアウト）: [spec/features/queue.md](../spec/features/queue.md) 「編集モード」節。
-- トラック選択の排他（AUTO / SKIP / 音声 ID の相互解除）: [spec/screens/original-format-panel.md](../spec/screens/original-format-panel.md) 「排他ロジック」節。
-- `edit_mode_entered` / `edit_mode_exited` 等のシグナル名は実装詳細のため [arch/queue_controller.md](../arch/queue_controller.md) 側に対応（spec はステータス遷移という観測可能な振る舞いで対応づく）。
-- `threading_utils.run_in_thread`: 対応 spec なし → [arch/threading_utils.md](../arch/threading_utils.md) に対応（§2.1 の例外）。
+- 編集モードの状態遷移（`waiting` ↔ `editing`、適用/キャンセル、複数選択時のオリジナル形式グレーアウト）: [spec/features/queue.md](../../spec/features/queue.md) 「編集モード」節。
+- トラック選択の排他（AUTO / SKIP / 音声 ID の相互解除）: [spec/screens/original-format-panel.md](../../spec/screens/original-format-panel.md) 「排他ロジック」節。
+- `edit_mode_entered` / `edit_mode_exited` 等のシグナル名は実装詳細のため [arch/queue_controller.md](../../arch/queue_controller.md) 側に対応（spec はステータス遷移という観測可能な振る舞いで対応づく）。
+- `threading_utils.run_in_thread`: 対応 spec なし → [arch/threading_utils.md](../../arch/threading_utils.md) に対応（§2.1 の例外）。
 
 ## 対象ファイル
 

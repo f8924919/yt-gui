@@ -2,7 +2,7 @@
 
 [← タスク一覧](index.md) / [← 全体計画](refactor-overview.md)
 
-> 対応候補: [refactoring-analysis.md §K, §L](../research/refactoring-analysis.md)
+> 対応候補: [refactoring-analysis.md §K, §L](../../research/refactoring-analysis.md)
 > ブランチ: `refactor/misc-cleanup`
 
 ## 背景

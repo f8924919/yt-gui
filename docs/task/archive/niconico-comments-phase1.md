@@ -100,7 +100,7 @@ yt-dlp の標準テンプレートに従い `{title}.comments.json` 形式で保
 
 ## テスト
 
-[docs/testing/policy.md](../testing/policy.md) で `downloader.py` (外部 I/O) は単体テスト対象外のため、追加テストは行わない。実機での動作確認で担保する。
+[docs/testing/policy.md](../../testing/policy.md) で `downloader.py` (外部 I/O) は単体テスト対象外のため、追加テストは行わない。実機での動作確認で担保する。
 
 実機確認項目:
 

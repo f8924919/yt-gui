@@ -2,7 +2,7 @@
 
 [← タスク一覧](index.md) / [← 全体計画](refactor-overview.md)
 
-> 対応候補: [refactoring-analysis.md §D](../research/refactoring-analysis.md)
+> 対応候補: [refactoring-analysis.md §D](../../research/refactoring-analysis.md)
 > ブランチ: `refactor/app-split`
 > 前提: フェーズ 1 ([refactor-job-spec.md](refactor-job-spec.md)) 完了
 

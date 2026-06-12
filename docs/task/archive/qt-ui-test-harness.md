@@ -2,7 +2,7 @@
 
 対応 Issue: #20
 
-関連: (1) [archive/qt-ui-test-ci.md](archive/qt-ui-test-ci.md)（#17/#18）・(2) [archive/qt-ui-test-policy.md](archive/qt-ui-test-policy.md)（PR #19）
+関連: (1) [archive/qt-ui-test-ci.md](qt-ui-test-ci.md)（#17/#18）・(2) [archive/qt-ui-test-policy.md](qt-ui-test-policy.md)（PR #19）
 
 ## 背景
 

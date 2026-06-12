@@ -2,7 +2,7 @@
 
 [← タスク一覧](index.md)
 
-> 前提: [docs/research/refactoring-analysis.md](../research/refactoring-analysis.md) で洗い出した 12 候補 (A〜L) を、依存関係と投資効果でフェーズ分割した実行計画。
+> 前提: [docs/research/refactoring-analysis.md](../../research/refactoring-analysis.md) で洗い出した 12 候補 (A〜L) を、依存関係と投資効果でフェーズ分割した実行計画。
 
 ## 背景
 
@@ -43,7 +43,7 @@
 1. **フェーズは原則順番に進める**。フェーズ 1 (C のテスト) はそれ以降すべての安全網になるため最優先。
 2. **1 フェーズ = 1 PR**。 振る舞い変更が無いこと (`uv run pytest` 全通過) を必ず確認してからマージ。
 3. **ブランチ命名**: `refactor/{phase-slug}` (例: `refactor/job-spec`, `refactor/app-split`)。
-4. **docs 連動**: 各フェーズの完了時に対応する `docs/arch/*.md` を必ず更新する ([docs-guide.md §4](../docs-guide.md) に従う)。
+4. **docs 連動**: 各フェーズの完了時に対応する `docs/arch/*.md` を必ず更新する ([docs-guide.md §4](../../docs-guide.md) に従う)。
 5. **振る舞いは変えない**。仕様変更が必要だと感じた場合は本リファクタから切り離し、別タスクとして起票する。
 6. **フェーズ完了時の手順**:
    - 該当タスクファイルの「ステータス」を `完了 (YYYY-MM-DD)` に更新
@@ -52,9 +52,9 @@
 
 ## 関連ドキュメント
 
-- [docs/research/refactoring-analysis.md](../research/refactoring-analysis.md) — 調査メモ（採否未決の検討メモ）
-- [docs/arch/index.md](../arch/index.md) — モジュール構成
-- [docs/testing/policy.md](../testing/policy.md) — テスト方針
+- [docs/research/refactoring-analysis.md](../../research/refactoring-analysis.md) — 調査メモ（採否未決の検討メモ）
+- [docs/arch/index.md](../../arch/index.md) — モジュール構成
+- [docs/testing/policy.md](../../testing/policy.md) — テスト方針
 
 ## ステータス
 
