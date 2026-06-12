@@ -22,15 +22,15 @@
 | 純粋関数 | `yt_gui/output_template.py` | ◯ |
 | グローバル状態 | `yt_gui/i18n.py` | ◯ |
 | ファイル I/O | `yt_gui/settings.py` | ◯ |
-| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従など、モーダルを介さない UI ロジックに限定） | △ |
+| Qt UI（状態機械・ロジック） | `yt_gui/queue_controller.py`（編集モード状態機械）・ `original_format_panel.py`（トラック選択の排他/論理状態）・ `settings_dialog.py`（タブレイアウト回帰・`_clear_archive`/`_save` の確認/検証分岐）・ `app.py`（`_QueueTree._edit_targets` の編集対象判定・`_refresh_format_labels` の言語追従・`_open_original_dialog` の追加フロー・`_open_settings` の設定反映ループなど。モーダル `exec()`/`question`/`QFileDialog` は手段B（§2.5）で能動駆動し、フル画面操作の E2E は対象外） | △ |
 | スレッドヘルパ | `yt_gui/threading_utils.py`（コールバック順序） | △ |
-| Qt UI（ウィンドウ統合） | `yt_gui/settings_dialog.py` ・ `log_dialog.py` | × |
+| Qt UI（ウィンドウ統合） | `yt_gui/log_dialog.py` | × |
 | 外部 I/O | `yt_gui/downloader.py`（yt-dlp、`omit` 解除済み・#95）・ `thumbnail_cache.py`（HTTP・未） | △ |
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 
-Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイントは [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) を参照）。
+Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。モーダルダイアログ（`QMessageBox.question` / `QFileDialog` / `QDialog.exec()`）を経由する経路は **手段B**（§2.5・`QTimer.singleShot` で能動的に閉じる、または静的メソッドを固定値へ差し替える）で「開く→操作→状態反映」までを通しますが、フル画面操作の E2E は引き続き対象外です。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイント・手段A〜Dの整理は [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) §5・§8 を参照）。
 
 > **段階導入**: テストが存在しないモジュールは当面 `omit` に残し、テスト追加と同時に該当モジュールのみ `omit` から外します（一括解除でカバレッジが急落しないようにするため）。`downloader.py` はネットワーク・subprocess に依存しないロジック（フォーマット分類・パス解決・ログ整形等）を `YoutubeDL` スタブでテストし、`omit` から解除済み（#95）。実 DL・ffmpeg/danmaku2ass の subprocess 正常系は外部 I/O のため引き続きカバレッジ対象外（`△`）。`app.py` ほか Qt UI のウィンドウ統合系は `pytest-qt` ベースの UI ロジックテストに限定し、`omit` 解除は後続タスク。
 
@@ -77,7 +77,8 @@ Qt UI（状態機械・ロジック）行のテストを記述・実行する際
 
 - **ヘッドレス**: `QT_QPA_PLATFORM=offscreen` を前提とする（`conftest.py` で `os.environ.setdefault` 固定、CI は [`test.yml`](../../.github/workflows/test.yml) の env で設定済み）。
 - **マーカー分離と skip**: Qt UI テストは `@pytest.mark.qt`（選択用。`--strict-markers` のため `pyproject.toml` に登録）を付ける。Qt 非導入環境での skip はモジュール冒頭の `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` で行う（import 失敗より前にモジュール単位で skip され、ロジック層テストは従来どおり通る）。
-- **副作用の抑制**: `offscreen` ではモーダル `QMessageBox.warning/critical/information` が無限ブロックするため no-op 化する。`App` 構築時は `Downloader.missing_dependencies()`（PATH 実走査）が走るため、決定性確保のためモックする。
+- **副作用の抑制**: `offscreen` ではモーダル `QMessageBox.warning/critical/information/question` が無限ブロックするため no-op 化する（`conftest.py` の `_silence_qt_modal_dialogs` が `qt` マーカー付きテストへ autouse で適用）。`App` 構築時は `Downloader.missing_dependencies()`（PATH 実走査）が走るため、決定性確保のためモックする。
+- **モーダル経路の駆動（手段B）**: 分岐や状態反映を検証したい場合は、autouse の no-op を**テスト内で上書き**する。`QMessageBox.question` は `monkeypatch.setattr(..., lambda *a, **kw: QMessageBox.StandardButton.Yes)` で Yes/No を固定し、`QFileDialog.get*` は返却パスを固定値に差し替える。`QDialog.exec()` は `monkeypatch` で no-op 化（即 return）するか、`QTimer.singleShot(0, ...)` で `QApplication.activeModalWidget()` を取得して `accept()`/ボタン押下する。シグナル経由で検証できる箇所（`add_requested` 等）は `exec()` を介さず `_make_*` でダイアログを生成してシグナルを直接 emit する方を優先する。
 - **イベントループ / 後始末**: `qtbot.waitSignal` / `qtbot.waitUntil` で条件待ちする。`run_in_thread` は daemon スレッドで Qt シグナルをキュー発火するため、受信側 QObject がテスト終了時に破棄されないよう、シグナル受信を待ち切ってからテストを終える。
 - 要件の詳細・つまずきポイントは [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) を参照。
 
@@ -102,6 +103,7 @@ tests/
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）
 ├── test_original_format_dialog.py ← Qt（@pytest.mark.qt）
+├── test_settings_dialog.py        ← Qt（@pytest.mark.qt）
 └── test_app.py                    ← Qt（@pytest.mark.qt）
 ```
 

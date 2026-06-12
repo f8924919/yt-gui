@@ -319,11 +319,82 @@ def test_mkv_promotion_notice_still_fires_without_recode(app):
         has_multiple_audio=True,
         raw_settings={},
     )
-    job = build_job_spec(
-        "fmt_original", Settings(video_container="mp4"), panel=panel
-    )
+    job = build_job_spec("fmt_original", Settings(video_container="mp4"), panel=panel)
     assert job.is_multi_audio is True
     assert job.video_container == "mkv"
 
     app._notify_container_promotion_if_needed(job)
     assert len(notices) == 1
+
+
+# ── オリジナル形式 追加フロー通し（手段B: exec を介さずシグナル駆動） ──────────
+#
+# 対応 spec: [オリジナル形式ダイアログ](../docs/spec/screens/original-format-dialog.md)
+# ・[ダウンロードキュー](../docs/spec/features/queue.md)。
+
+
+def test_open_original_dialog_add_flow_enqueues_one(app, monkeypatch):
+    """追加モードでダイアログを開き、フォーマット取得済みで追加要求すると
+    キューに1件積まれ URL 入力がクリアされること。"""
+    from yt_gui.original_format_dialog import OriginalFormatDialog
+
+    # offscreen で exec がブロックしないよう no-op 化し、生成済みダイアログを取得する。
+    monkeypatch.setattr(OriginalFormatDialog, "exec", lambda self: None)
+    app.url_entry.setText("https://example.com/watch?v=abc")
+    _select_format(app, "fmt_original")
+
+    dialog = app._open_original_dialog()
+    assert dialog is not None
+
+    # ネットワークを使わずフォーマット取得済み・タイトル確定の状態を模す。
+    monkeypatch.setattr(dialog.panel, "has_formats_loaded", lambda: True)
+    monkeypatch.setattr(dialog.panel, "get_fetched_title", lambda: "動画タイトル")
+
+    before = len(app.queue._items)
+    dialog.add_requested.emit()
+
+    assert len(app.queue._items) == before + 1
+    assert app.url_entry.text() == ""
+
+
+# ── 設定反映ループ（手段B: SettingsDialog.exec を no-op 化） ──────────────────
+#
+# 対応 spec: [設定ダイアログ](../docs/spec/screens/settings-dialog.md)
+# #設定変更後のメインウィンドウへの反映。
+
+
+def test_open_settings_applies_saved_settings_to_downloader(app, monkeypatch):
+    """設定ダイアログを閉じた後、保存済み設定が downloader 各属性へ転写されること。"""
+    from yt_gui.settings_dialog import SettingsDialog
+
+    monkeypatch.setattr(SettingsDialog, "exec", lambda self: None)
+    desired = Settings(
+        language=app._settings.language,  # 言語は変えず反映のみ検証
+        video_resolution="1080",
+        mp3_bitrate="320",
+        concurrent_fragments=8,
+    )
+    app._settings_manager.save(desired)
+
+    app._open_settings()
+
+    assert app.downloader.video_resolution == "1080"
+    assert app.downloader.mp3_bitrate == "320"
+    assert app.downloader.concurrent_fragments == 8
+
+
+def test_open_settings_retranslates_on_language_change(app, monkeypatch):
+    """言語が変わった場合は `_retranslate_ui` を呼ぶこと。"""
+    from yt_gui.settings_dialog import SettingsDialog
+
+    monkeypatch.setattr(SettingsDialog, "exec", lambda self: None)
+    called: list[bool] = []
+    monkeypatch.setattr(app, "_retranslate_ui", lambda: called.append(True))
+
+    old_lang = app._settings.language
+    new_lang = "en" if old_lang != "en" else "ja"
+    app._settings_manager.save(Settings(language=new_lang))
+
+    app._open_settings()
+
+    assert called
