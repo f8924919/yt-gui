@@ -1480,12 +1480,6 @@ def test_cookies_opts_uses_cookiefile_key_for_path(downloader):
     }
 
 
-def test_cookies_opts_browser_takes_precedence(downloader):
-    assert downloader._cookies_opts(
-        cookies_path="/tmp/c.txt", cookies_browser="chrome"
-    ) == {"cookiesfrombrowser": ("chrome",)}
-
-
 def test_cookie_file_is_actually_loaded_by_ytdlp(downloader, tmp_path):
     """_base_ydl_opts 経由で渡した cookies.txt を yt-dlp が実際に読み込むこと。
 

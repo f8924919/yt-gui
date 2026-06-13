@@ -470,7 +470,9 @@ def test_on_extension_enqueue_threads_cookies(app, monkeypatch):
     """受信 cookies が一時ファイル化され、item_cookies_path として流れる。"""
     captured = {}
 
-    def _fake_start(url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None):
+    def _fake_start(
+        url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
+    ):
         captured.update(
             url=url,
             cookies_path=cookies_path,
@@ -492,7 +494,9 @@ def test_on_extension_enqueue_threads_cookies(app, monkeypatch):
 def test_on_extension_enqueue_without_cookies(app, monkeypatch):
     captured = {}
 
-    def _fake_start(url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None):
+    def _fake_start(
+        url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
+    ):
         captured.update(cookies_path=cookies_path, item_cookies_path=item_cookies_path)
 
     monkeypatch.setattr(app, "_start_add_thread", _fake_start)
@@ -562,7 +566,8 @@ def test_on_extension_enqueue_logs_cookie_count(app, monkeypatch):
     monkeypatch.setattr(app, "_start_add_thread", lambda *a, **k: None)
 
     netscape = (
-        "# Netscape HTTP Cookie File\n.nicovideo.jp\tTRUE\t/\tTRUE\t0\tuser_session\tx\n"
+        "# Netscape HTTP Cookie File\n"
+        ".nicovideo.jp\tTRUE\t/\tTRUE\t0\tuser_session\tx\n"
     )
     app._on_extension_enqueue("https://www.nicovideo.jp/watch/sm1", netscape, None)
     assert any("1" in m and ("Cookie" in m or "cookie" in m) for m in logs)

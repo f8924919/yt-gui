@@ -8,8 +8,6 @@ import socket
 import urllib.error
 import urllib.request
 
-import pytest
-
 from yt_gui.extension_server import ExtensionServer, handle_request
 
 TOKEN = "test-token-abc"

@@ -334,7 +334,9 @@ def test_each_waiting_item_processed_exactly_once(qtbot):
     items = []
     for i in range(6):
         job = build_job_spec("fmt_best_mp4", Settings())
-        items.append(ctrl.enqueue_single(f"https://example.com/{i}", f"V{i}", "MP4", job))
+        items.append(
+            ctrl.enqueue_single(f"https://example.com/{i}", f"V{i}", "MP4", job)
+        )
 
     assert ctrl.start(lambda: (None, None)) is True
     qtbot.waitUntil(lambda: not ctrl.is_running, timeout=3000)

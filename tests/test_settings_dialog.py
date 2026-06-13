@@ -369,7 +369,9 @@ def test_extension_enable_autogenerates_token(qtbot):
 
 
 def test_extension_regenerate_changes_token(qtbot):
-    dialog = _make_dialog(qtbot, Settings(extension_enabled=True, extension_token="old"))
+    dialog = _make_dialog(
+        qtbot, Settings(extension_enabled=True, extension_token="old")
+    )
     dialog._regenerate_extension_token()
     assert dialog._extension_token_edit.text() != "old"
     assert dialog._extension_token_edit.text() != ""

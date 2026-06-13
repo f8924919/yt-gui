@@ -118,7 +118,8 @@ def test_max_concurrent_downloads_roundtrips(manager: SettingsManager) -> None:
 def test_max_concurrent_downloads_defaults_from_old_json(
     manager: SettingsManager, tmp_path: Path
 ) -> None:
-    """max_concurrent_downloads 無しの古い settings.json でも既定 1 で読み込めること。"""
+    """max_concurrent_downloads 無しの古い settings.json でも
+    既定 1 で読み込めること。"""
     config_file = tmp_path / "yt-gui" / "settings.json"
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps({"language": "en"}), encoding="utf-8")

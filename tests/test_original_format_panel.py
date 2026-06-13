@@ -14,8 +14,8 @@ from PySide6.QtWidgets import QAbstractItemView  # noqa: E402
 from yt_gui.original_format_panel import (  # noqa: E402
     _AUTO_SENTINEL,
     _SKIP_SENTINEL,
-    _AudioListWidget,
     OriginalFormatPanel,
+    _AudioListWidget,
 )
 
 pytestmark = pytest.mark.qt
