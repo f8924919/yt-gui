@@ -8,9 +8,21 @@
 
 | ファイル | 役割 |
 |---|---|
-| `manifest.json` | Manifest V3 定義（権限・background・options） |
+| `manifest.json` | Manifest V3 定義（権限・background・options・icons・default_locale） |
 | `background.js` | service worker。URL/Cookie 取得 → 受信サーバーへ POST |
-| `options.html` / `options.js` | トークン・ポートの設定画面 |
+| `options.html` / `options.js` | トークン・ポートの設定画面（表示はブラウザ言語に追従） |
+| `_locales/{en,ja}/messages.json` | オプション画面の多言語メッセージ |
+| `icons/icon-{16,32,48,128}.png` | 拡張アイコン（アプリ本体と同一。`assets/icon.png` 由来） |
+
+## 多言語・アイコン・バージョン
+
+- **多言語**: オプション画面の文言は Chrome 標準の `_locales/` + `chrome.i18n` でブラウザの UI 言語（日本語 / 英語）に自動追従します。未対応言語は英語（`default_locale`）にフォールバックします。`manifest.json` の `name` / `description` は英語固定です。
+- **アイコン**: アプリ本体と同一アイコンを使用します。生成は `scripts/build_extension_icons.py`（`assets/icon.png` から 16/32/48/128 px を生成）。
+- **バージョン**: `manifest.json` の `version` はアプリ本体（`pyproject.toml`）と同期します。リリース時に CI が `scripts/sync_extension_version.py` で揃えます。
+
+## 配布物（リリース zip）
+
+リリースでは拡張一式を `yt-gui-extension-{version}.zip` として GitHub Release に添付します。手元では `extension/` フォルダをそのまま unpacked 読み込みできます。
 
 ## インストール（unpacked）
 

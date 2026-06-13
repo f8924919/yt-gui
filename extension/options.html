@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ja">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>yt-gui Connector 設定</title>
+    <title data-i18n="optionsTitle">yt-gui Connector Settings</title>
     <style>
       body {
         font-family: sans-serif;
@@ -44,22 +44,22 @@
     </style>
   </head>
   <body>
-    <h1>yt-gui Connector 設定</h1>
+    <h1 data-i18n="optionsTitle">yt-gui Connector Settings</h1>
 
-    <label for="token">トークン</label>
-    <input type="text" id="token" placeholder="yt-gui の設定画面で発行したトークン" />
+    <label for="token" data-i18n="tokenLabel">Token</label>
+    <input type="text" id="token" data-i18n-placeholder="tokenPlaceholder" />
 
-    <label for="port">受信ポート</label>
+    <label for="port" data-i18n="portLabel">Receiving port</label>
     <input type="number" id="port" min="1" max="65535" value="8718" />
 
-    <button id="save">保存</button>
+    <button id="save" data-i18n="saveButton">Save</button>
     <div id="status"></div>
 
-    <p class="note">
-      yt-gui の「設定 → ブラウザ連携」でサーバーを有効化し、表示されるトークンを
-      上の欄に貼り付けてください。ポートは yt-gui 側と同じ値にします（既定 8718）。
-      ポートが使用中で yt-gui がフォールバックした場合に備え、拡張は 8718〜8720 を
-      自動的に試します。
+    <p class="note" data-i18n="note">
+      Enable the server under "Settings → Browser integration" in yt-gui and
+      paste the token shown there into the field above. Use the same port as
+      yt-gui (default 8718). In case yt-gui falls back when the port is busy,
+      the extension automatically tries 8718–8720.
     </p>
 
     <script src="options.js"></script>

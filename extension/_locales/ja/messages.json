@@ -1,0 +1,29 @@
+{
+  "optionsTitle": {
+    "message": "yt-gui Connector 設定"
+  },
+  "tokenLabel": {
+    "message": "トークン"
+  },
+  "tokenPlaceholder": {
+    "message": "yt-gui の設定画面で発行したトークン"
+  },
+  "portLabel": {
+    "message": "受信ポート"
+  },
+  "saveButton": {
+    "message": "保存"
+  },
+  "savedStatus": {
+    "message": "保存しました。"
+  },
+  "note": {
+    "message": "yt-gui の「設定 → ブラウザ連携」でサーバーを有効化し、表示されるトークンを上の欄に貼り付けてください。ポートは yt-gui 側と同じ値にします（既定 8718）。ポートが使用中で yt-gui がフォールバックした場合に備え、拡張は 8718〜8720 を自動的に試します。"
+  },
+  "menuTitle": {
+    "message": "yt-gui に送る"
+  },
+  "actionTitle": {
+    "message": "yt-gui に送る"
+  }
+}

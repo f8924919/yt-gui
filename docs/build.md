@@ -129,6 +129,12 @@ python scripts/download_binaries.py --update
 | `macos-15-intel` | x86_64 | `yt-gui-{version}-macos-x86_64.zip`（`dist/yt-gui.app` を `ditto` で圧縮） |
 | `ubuntu-22.04` | x64 | `yt-gui-{version}-x86_64.AppImage`（spec が生成） |
 
+OS 非依存の成果物として、ブラウザ拡張の zip を Linux ランナーで併せて生成する。
+
+| 成果物 | 内容 |
+|---|---|
+| `yt-gui-extension-{version}.zip` | `extension/` 一式（`manifest.json` / `background.js` / `options.*` / `_locales/` / `icons/`）。zip 化の直前に `scripts/sync_extension_version.py` で `manifest.json` の version を `pyproject.toml` に同期する |
+
 - macOS は arm64 / x86_64 の 2 アーキを別ランナーでビルドする。`PyInstaller` は `target_arch=None`（ランナーのネイティブ arch）でビルドし、deno・ffmpeg・ffprobe はダウンロード時に `platform.machine()` で arch を解決するため、ランナーごとに対応 arch のバイナリが同梱される。zip 名は matrix の `macos_arch` で出し分ける。
   - Intel ランナーは `macos-13` 退役後の標準 Intel イメージ `macos-15-intel` を使用する。
   - ffmpeg/ffprobe は arm64 = osxexperts.net（Apple Silicon ネイティブ）、x86_64 = evermeet.cx をそれぞれ取得する（`bin/pins.json` の `ffmpeg-mac.<arch>`）。両 arch ともネイティブで動作し、arm64 成果物の Rosetta 依存は解消済み。
@@ -206,7 +212,7 @@ public 化（`gh repo edit f8924919/yt-gui --visibility public`）後、public �
 - PySide6 向けに設定済み。`pyinstaller-hooks-contrib` が PySide6 プラグイン・データを自動検出するため追加設定は最小限。
 - macOS 向けビルドでは `BUNDLE` ブロックで `.app` バンドルを自動生成する。
 - Linux 向けビルドでは `scripts/build_appimage.py` を後処理として自動呼び出しし、`.AppImage` を生成する。
-- アイコンは `assets/icon.png` から PNG → ICO（Windows）/ ICNS（macOS）への自動変換に対応。
+- アイコンは `assets/icon.png` から PNG → ICO（Windows）/ ICNS（macOS）への自動変換に対応。ブラウザ拡張用アイコン（`extension/icons/`、16/32/48/128 px）も同じ `assets/icon.png` から `scripts/build_extension_icons.py` で生成する（生成物はコミット）。
 - ビルド時に `pyproject.toml` からバージョンを読み取り（`tomllib`）、`CFBundleShortVersionString` に注入する。`copy_metadata('yt-gui')` でパッケージメタデータも同梱する（バージョン管理セクション参照）。
 
 ## Linux AppImage の生成
