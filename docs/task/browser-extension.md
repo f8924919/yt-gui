@@ -44,10 +44,14 @@
 5. **拡張機能（完了）**: `extension/` に Manifest V3 一式（`manifest.json` / `background.js` / `options.html` / `options.js` / `README.md`）。ツールバー/右クリックで URL 取得・`chrome.cookies` → Netscape 整形・トークン付き POST・ポート追従（8718→8720）・バッジ結果表示。JS のため pytest 対象外（手動検証）。
 6. arch ドキュメント更新（完了: app/queue_controller/extension_server/settings/settings_dialog の arch、各 spec）。
 
+## 手動 E2E 検証
+
+- 2026-06-13: 実ブラウザ（Chrome ログイン済み）＋アプリでニコニコ動画の DL に成功。
+- この過程で pre-existing バグを発見・修正: `_cookies_opts` が cookie ファイルを誤キー `cookies` で渡しており yt-dlp に無視されていた → `cookiefile` に修正（cookies.txt 指定が初めて実際に有効化）。
+
 ## 残作業
 
-- 手動 E2E 検証（実ブラウザ + アプリでの送受信）。
-- PR 化（#140、フェーズPR方針は別途ユーザー判断待ち）。
+- PR #141 のレビュー/マージ。マージ後は `/finish-task`（archive 移動）。
 
 ## 検証メモ
 
