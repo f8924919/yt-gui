@@ -542,3 +542,37 @@ def test_sync_extension_server_skips_without_token(app, monkeypatch):
     app._settings.extension_token = ""
     app._sync_extension_server()
     assert app._extension_server is None
+
+
+def test_count_cookies_ignores_comments_and_blanks(app):
+    netscape = (
+        "# Netscape HTTP Cookie File\n"
+        "\n"
+        ".nicovideo.jp\tTRUE\t/\tTRUE\t0\tuser_session\tabc\n"
+        ".nicovideo.jp\tTRUE\t/\tTRUE\t0\tlang\tja\n"
+    )
+    assert app._count_cookies(netscape) == 2
+    assert app._count_cookies(None) == 0
+    assert app._count_cookies("# only comment\n") == 0
+
+
+def test_on_extension_enqueue_logs_cookie_count(app, monkeypatch):
+    logs = []
+    monkeypatch.setattr(app, "_log", lambda m: logs.append(m))
+    monkeypatch.setattr(app, "_start_add_thread", lambda *a, **k: None)
+
+    netscape = (
+        "# Netscape HTTP Cookie File\n.nicovideo.jp\tTRUE\t/\tTRUE\t0\tuser_session\tx\n"
+    )
+    app._on_extension_enqueue("https://www.nicovideo.jp/watch/sm1", netscape, None)
+    assert any("1" in m and ("Cookie" in m or "cookie" in m) for m in logs)
+
+
+def test_on_extension_enqueue_logs_no_cookies(app, monkeypatch):
+    logs = []
+    monkeypatch.setattr(app, "_log", lambda m: logs.append(m))
+    monkeypatch.setattr(app, "_start_add_thread", lambda *a, **k: None)
+
+    app._on_extension_enqueue("https://www.nicovideo.jp/watch/sm1", None, None)
+    # Cookie なしのログが出る（i18n 文言の一部で判定）
+    assert any("Cookie" in m or "cookie" in m for m in logs)

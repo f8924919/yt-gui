@@ -251,6 +251,8 @@ STRINGS: dict[str, str] = {
     "log_extension_bind_failed": "⚠️ ブラウザ連携サーバーのポート確保に失敗しました",
     "log_extension_no_token": "⚠️ ブラウザ連携トークンが未設定のためサーバーを起動しませんでした",
     "log_extension_received": "📥 ブラウザ連携で受信: {url}",
+    "log_extension_cookies": "🍪 Cookie を受信: {count} 件",
+    "log_extension_no_cookies": "🍪 Cookie なしで受信（ブラウザのログイン状態・プロファイル・権限を確認してください）",
     # queue tooltip
     "tooltip_title": "タイトル",
     "tooltip_url": "URL",

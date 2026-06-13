@@ -249,6 +249,8 @@ STRINGS: dict[str, str] = {
     "log_extension_bind_failed": "⚠️ Failed to bind a port for the browser integration server",
     "log_extension_no_token": "⚠️ Browser integration token is not set; server not started",
     "log_extension_received": "📥 Received via browser integration: {url}",
+    "log_extension_cookies": "🍪 Received {count} cookie(s)",
+    "log_extension_no_cookies": "🍪 Received with no cookies (check browser login state / profile / permissions)",
     # queue tooltip
     "tooltip_title": "Title",
     "tooltip_url": "URL",

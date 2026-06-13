@@ -1172,8 +1172,26 @@ class App(QMainWindow):
         format_id, format_label = self._extension_default_format()
         job = build_job_spec(format_id, self._settings)
         self._log(t("log_extension_received").format(url=url))
+        # 診断: 受信した Cookie の件数だけをログに出す（値は記録しない）。
+        # 0 件なら capture 側（未ログイン・プロファイル違い・権限）を疑う。
+        count = self._count_cookies(cookies)
+        if count:
+            self._log(t("log_extension_cookies").format(count=count))
+        else:
+            self._log(t("log_extension_no_cookies"))
         self._start_add_thread(
             url, cookies_path, None, job, format_label, item_cookies_path=cookies_path
+        )
+
+    @staticmethod
+    def _count_cookies(cookies: str | None) -> int:
+        """Netscape 形式文字列の Cookie 件数（コメント/空行を除く行数）を返す。"""
+        if not cookies:
+            return 0
+        return sum(
+            1
+            for line in cookies.splitlines()
+            if line.strip() and not line.strip().startswith("#")
         )
 
     def _extension_default_format(self) -> tuple[str, str]:
