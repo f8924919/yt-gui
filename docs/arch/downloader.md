@@ -175,6 +175,8 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 `cookies_path`（ファイルパス）と `cookies_browser`（ブラウザ名）の両方に対応。両方指定時はブラウザ優先。
 
+`_cookies_opts` が yt-dlp opt へ変換する。**ファイルパスは `cookiefile` キー**（`cookies` ではない。誤キーだと yt-dlp が黙って無視しファイルを読み込まない。#140 で発覚）、ブラウザは `cookiesfrombrowser` キー。
+
 ### プロキシ
 
 `self.proxy_url` が空でない場合、`_base_ydl_opts()` で `opts["proxy"] = self.proxy_url` を付与する。`fetch_title_or_entries` / `fetch_formats` / `download_video`（メタデータ抽出・実ダウンロード）の全 `YoutubeDL` 呼び出しが `_base_ydl_opts()` を経由するため、1 箇所の代入で全経路に反映される。

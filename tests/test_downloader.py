@@ -1129,7 +1129,7 @@ def test_cookies_opts_browser_takes_precedence() -> None:
 
 
 def test_cookies_opts_file_only() -> None:
-    assert Downloader._cookies_opts("c.txt", None) == {"cookies": "c.txt"}
+    assert Downloader._cookies_opts("c.txt", None) == {"cookiefile": "c.txt"}
 
 
 def test_cookies_opts_none() -> None:
@@ -1146,7 +1146,7 @@ def test_base_ydl_opts_includes_proxy_logger_and_cookies(tmp_path) -> None:
     opts = dl._base_ydl_opts(cookies_path="c.txt")
     assert opts["proxy"] == "http://p:8080"
     assert "logger" in opts
-    assert opts["cookies"] == "c.txt"
+    assert opts["cookiefile"] == "c.txt"
     assert "ejs:github" in opts["remote_components"]
 
 
@@ -1468,3 +1468,39 @@ def test_cut_section_skips_when_ffmpeg_missing(
     )
     assert called["run"] is False
     assert len(logs) == 1
+
+
+# ── Cookies オプション（#140 で発覚した cookiefile キー回帰） ──────────────────
+
+
+def test_cookies_opts_uses_cookiefile_key_for_path(downloader):
+    """cookies.txt パスは yt-dlp の正しいキー `cookiefile` で渡すこと。"""
+    assert downloader._cookies_opts(cookies_path="/tmp/c.txt") == {
+        "cookiefile": "/tmp/c.txt"
+    }
+
+
+def test_cookies_opts_browser_takes_precedence(downloader):
+    assert downloader._cookies_opts(
+        cookies_path="/tmp/c.txt", cookies_browser="chrome"
+    ) == {"cookiesfrombrowser": ("chrome",)}
+
+
+def test_cookie_file_is_actually_loaded_by_ytdlp(downloader, tmp_path):
+    """_base_ydl_opts 経由で渡した cookies.txt を yt-dlp が実際に読み込むこと。
+
+    オプションキーが誤っている（例: `cookies`）と yt-dlp は黙って無視し
+    cookiejar が空になる。これを回帰として固定する。
+    """
+    from yt_dlp import YoutubeDL
+
+    cf = tmp_path / "c.txt"
+    cf.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".nicovideo.jp\tTRUE\t/\tTRUE\t4102444800\tuser_session\tval123\n",
+        encoding="utf-8",
+    )
+    opts = downloader._base_ydl_opts(cookies_path=str(cf))
+    ydl = YoutubeDL({**opts, "quiet": True})
+    names = [c.name for c in ydl.cookiejar]
+    assert "user_session" in names
