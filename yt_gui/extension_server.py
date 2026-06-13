@@ -67,6 +67,7 @@ def handle_request(
 
     try:
         data = json.loads(body.decode("utf-8"))
+    # PEP 758 (Python 3.14): 括弧なしで複数例外を捕捉する記法。両例外を捕捉する。
     except ValueError, UnicodeDecodeError:
         return 400, {"ok": False, "error": "invalid_json"}
     if not isinstance(data, dict):
