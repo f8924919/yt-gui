@@ -1,0 +1,29 @@
+{
+  "optionsTitle": {
+    "message": "yt-gui Connector Settings"
+  },
+  "tokenLabel": {
+    "message": "Token"
+  },
+  "tokenPlaceholder": {
+    "message": "Token issued in the yt-gui settings screen"
+  },
+  "portLabel": {
+    "message": "Receiving port"
+  },
+  "saveButton": {
+    "message": "Save"
+  },
+  "savedStatus": {
+    "message": "Saved."
+  },
+  "note": {
+    "message": "Enable the server under \"Settings → Browser integration\" in yt-gui and paste the token shown there into the field above. Use the same port as yt-gui (default 8718). In case yt-gui falls back when the port is busy, the extension automatically tries 8718–8720."
+  },
+  "menuTitle": {
+    "message": "Send to yt-gui"
+  },
+  "actionTitle": {
+    "message": "Send to yt-gui"
+  }
+}

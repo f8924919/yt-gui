@@ -100,6 +100,7 @@ tests/
 ├── test_download_binaries.py
 ├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
 ├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
+├── test_extension.py              ← scripts/sync_extension_version.py・extension/ 整合性
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）

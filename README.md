@@ -12,7 +12,8 @@ YouTube などの動画を GUI 操作でダウンロードできるデスクト�
 - **メタデータ / チャプター / サムネイル埋め込み** — 出力ファイルにそのまま含める
 - **OUTPUT TEMPLATE** — yt-dlp のテンプレート構文で保存ファイル名・フォルダ構成をカスタマイズ（単独動画 / プレイリスト別）
 - **Cookies 対応** — Cookies ファイル指定またはブラウザからの自動抽出
-- **多言語 UI** — 日本語 / English を即時切替
+- **ブラウザ拡張連携** — Chromium 系拡張から、開いている動画の URL と Cookie をワンクリックでキューへ送信（アイテム単位 Cookie・ローカル受信サーバー）
+- **多言語 UI** — 日本語 / English を即時切替（ブラウザ拡張のオプション画面もブラウザ言語に追従）
 - **動作ログ** — yt-dlp の処理メッセージ・進捗・エラーをタイムスタンプ付きで確認可能
 
 ## 動作環境
@@ -66,6 +67,16 @@ uv run pyinstaller yt-gui.spec
 | Linux | `~/.config/yt-gui/settings.json` |
 
 Cookies ファイルはビルド成果物には**含まれません**。必要な場合はアプリ起動後に設定画面（ファイル > 設定...）からパスを指定してください。
+
+## ブラウザ拡張（yt-gui Connector）
+
+開いている動画ページの URL と Cookie を、ワンクリックで yt-gui のダウンロードキューへ送る Chromium 系（Chrome / Edge / Brave など）向け拡張機能です。cookies.txt の手動エクスポートなしに、ログインが必要なサイトの動画も取得できます。
+
+- 設定画面（ファイル > 設定 > ブラウザ連携）でローカル受信サーバーを有効化（既定は無効）し、表示トークンを拡張のオプションに貼り付けて使います。
+- 拡張のオプション画面はブラウザの言語に追従（日本語 / 英語）し、アイコン・バージョンはアプリ本体と同一です。
+- リリースには拡張一式の `yt-gui-extension-{version}.zip` を同梱しています。手元では `extension/` を unpacked 読み込みできます。
+
+導入手順・仕様は [extension/README.md](extension/README.md) / [docs/spec/features/browser-extension.md](docs/spec/features/browser-extension.md) を参照してください。
 
 ## 詳細ドキュメント
 

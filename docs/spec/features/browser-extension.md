@@ -94,10 +94,35 @@
 | 設定 | オプション画面でトークンとポートを設定 |
 | 結果表示 | ツールバーアイコンのバッジ（`OK` / `403` / `OFF` / `KEY` / `ERR`）で送信結果を通知 |
 | ポート追従 | 設定ポート → +1 → +2 を順に試し、接続失敗時のみ次へ（アプリのフォールバックに追従）。HTTP 応答が返ったら停止 |
+| 多言語 | オプション画面の表示はブラウザの UI 言語に追従（日本語 / 英語）。未対応言語は英語へフォールバック |
+| アイコン | アプリ本体と同一（`assets/icon.png` 由来）。ツールバー・拡張一覧に表示 |
+| バージョン | `manifest.json` の `version` はアプリ本体（`pyproject.toml`）と同期 |
 
 > Manifest V3 の Service Worker は常駐しないため、送信時に都度 `fetch` する設計とし、常時接続は張りません。
 
-実体は [`extension/`](../../../extension/README.md) に配置（unpacked 読み込み）。
+実体は [`extension/`](../../../extension/README.md) に配置。開発時は unpacked（開発者モード）で読み込み、リリース時は zip 成果物（後述）を配布します。
+
+### 多言語（オプション画面）
+
+- Chrome 標準の国際化機構（`_locales/<lang>/messages.json` + `chrome.i18n.getMessage()`）を用い、**ブラウザの UI 言語に自動追従**する。対応は日本語（`ja`）/ 英語（`en`）。
+- `manifest.json` に `default_locale: "en"` を設定し、未対応言語は英語へフォールバックする。
+- `manifest.json` の `name` / `description` は**英語固定**（ストア表記の一貫性のため `__MSG_*__` による多言語化は行わない）。多言語化の対象はオプション画面の文言に限る。
+
+### アイコン
+
+- アプリ本体と同一のアイコン（`assets/icon.png`）から生成した 16 / 32 / 48 / 128 px の PNG を `extension/icons/` に配置し、`manifest.json` の `icons` と `action.default_icon` に設定する。
+- 生成は [`scripts/build_extension_icons.py`](../../../scripts/build_extension_icons.py)（Pillow）で行い、生成物はコミットする（unpacked 読み込み・zip 配布のいずれでも同梱が必要なため）。
+
+### バージョン同期
+
+- 拡張のバージョンはアプリ本体と一致させる。**単一ソースは `pyproject.toml` の `[project] version`**（[version-single-source](../../task/archive/version-single-source.md) と同方針）。
+- [`scripts/sync_extension_version.py`](../../../scripts/sync_extension_version.py) が `pyproject.toml` の version を読み、`extension/manifest.json` の `version` を書き換える（冪等）。
+- リリース時に CI（`release.yml`）が zip 化の前にこのスクリプトを実行し、配布物の version を一致させる。**実行時に動的同期はしない**（リリース時固定）。
+
+### リリース zip
+
+- リリース時、CI が拡張一式（`manifest.json` / `background.js` / `options.*` / `_locales/` / `icons/`）を `yt-gui-extension-{version}.zip` に固め、GitHub Release のアセットとして添付する。
+- zip の version はバージョン同期後の値で、アプリ本体と一致する。詳細は [docs/build.md](../../build.md) を参照。
 
 ---
 

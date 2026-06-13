@@ -80,6 +80,13 @@ jobs:
         if: runner.os == 'macOS'
         run: ditto -c -k --keepParent dist/yt-gui.app "yt-gui-${{ needs.version-gate.outputs.version }}-macos-${{ matrix.macos_arch }}.zip"
       # Linux は dist/yt-gui-{version}-x86_64.AppImage がそのまま成果物
+      # ブラウザ拡張は OS 非依存のため Linux ランナーで一度だけ zip 化する。
+      # version を pyproject に同期してから固め、配布物をアプリ本体と一致させる。
+      - name: Package browser extension
+        if: runner.os == 'Linux'
+        run: |
+          uv run python scripts/sync_extension_version.py
+          (cd extension && zip -r "../yt-gui-extension-${{ needs.version-gate.outputs.version }}.zip" . -x '*.DS_Store')
       - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.os }}

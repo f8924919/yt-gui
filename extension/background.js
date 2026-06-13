@@ -13,7 +13,7 @@ const MENU_ID = "yt-gui-send";
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: MENU_ID,
-    title: "yt-gui に送る",
+    title: chrome.i18n.getMessage("menuTitle"),
     contexts: ["page", "link", "video"],
   });
 });
