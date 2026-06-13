@@ -166,6 +166,19 @@ def test_enqueue_single_cookies_path_defaults_none(controller):
     assert item.cookies_path is None
 
 
+def test_enqueue_playlist_applies_cookies_to_all_entries(controller):
+    """プレイリスト一括追加で全エントリに同一 cookies_path が付くこと。"""
+    job = build_job_spec("fmt_best_mp4", Settings())
+    entries = [
+        {"url": "https://example.com/1", "title": "A"},
+        {"url": "https://example.com/2", "title": "B"},
+    ]
+    items = controller.enqueue_playlist(
+        entries, "PL", "MP4", job, cookies_path="/tmp/pl.txt"
+    )
+    assert [i.cookies_path for i in items] == ["/tmp/pl.txt", "/tmp/pl.txt"]
+
+
 def test_worker_prefers_item_cookies_over_global(controller, qtbot, tmp_path):
     """アイテム固有 cookies_path がグローバル設定より優先されること。"""
     cookie_file = tmp_path / "item_cookies.txt"

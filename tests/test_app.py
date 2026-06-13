@@ -435,3 +435,110 @@ def test_log_dialog_close_clears_reference(app):
     app._on_log_dialog_close()
 
     assert app._log_dialog is None
+
+
+# ── ブラウザ拡張連携 ────────────────────────────────────────────────────────
+# 対応 spec: docs/spec/features/browser-extension.md
+
+
+def test_extension_default_format_uses_current_selection(app):
+    """拡張追加の形式はメイン画面の現在選択を使う。"""
+    _select_format(app, "fmt_mp3")
+    format_id, label = app._extension_default_format()
+    assert format_id == "fmt_mp3"
+    assert label == app.format_combo.currentText()
+
+
+def test_extension_default_format_falls_back_from_original(app):
+    """オリジナル形式選択時は最高画質 MP4 へフォールバック。"""
+    _select_format(app, "fmt_original")
+    format_id, _label = app._extension_default_format()
+    assert format_id == "fmt_best_mp4"
+
+
+def test_write_extension_cookies_creates_file(app):
+    path = app._write_extension_cookies("# Netscape HTTP Cookie File\nX\n")
+    assert path is not None
+    import os
+
+    assert os.path.isfile(path)
+    with open(path, encoding="utf-8") as f:
+        assert "Netscape" in f.read()
+
+
+def test_on_extension_enqueue_threads_cookies(app, monkeypatch):
+    """受信 cookies が一時ファイル化され、item_cookies_path として流れる。"""
+    captured = {}
+
+    def _fake_start(url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None):
+        captured.update(
+            url=url,
+            cookies_path=cookies_path,
+            item_cookies_path=item_cookies_path,
+        )
+
+    monkeypatch.setattr(app, "_start_add_thread", _fake_start)
+    app._on_extension_enqueue("https://example.com/v", "COOKIEDATA", None)
+
+    import os
+
+    assert captured["url"] == "https://example.com/v"
+    assert captured["item_cookies_path"] is not None
+    # fetch にも同じ cookies ファイルを使う
+    assert captured["cookies_path"] == captured["item_cookies_path"]
+    assert os.path.isfile(captured["item_cookies_path"])
+
+
+def test_on_extension_enqueue_without_cookies(app, monkeypatch):
+    captured = {}
+
+    def _fake_start(url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None):
+        captured.update(cookies_path=cookies_path, item_cookies_path=item_cookies_path)
+
+    monkeypatch.setattr(app, "_start_add_thread", _fake_start)
+    app._on_extension_enqueue("https://example.com/v", None, None)
+
+    assert captured["cookies_path"] is None
+    assert captured["item_cookies_path"] is None
+
+
+def test_sync_extension_server_starts_and_stops(app, monkeypatch):
+    """有効化（トークン有）で起動、無効化で停止すること。"""
+    started = {"n": 0}
+    stopped = {"n": 0}
+
+    class _FakeServer:
+        def __init__(self, *a, **k):
+            pass
+
+        def start(self):
+            started["n"] += 1
+            return 8718
+
+        def stop(self):
+            stopped["n"] += 1
+
+    monkeypatch.setattr("yt_gui.app.ExtensionServer", _FakeServer)
+
+    app._settings.extension_enabled = True
+    app._settings.extension_token = "tok"
+    app._sync_extension_server()
+    assert app._extension_server is not None
+    assert started["n"] == 1
+
+    app._settings.extension_enabled = False
+    app._sync_extension_server()
+    assert app._extension_server is None
+    assert stopped["n"] == 1
+
+
+def test_sync_extension_server_skips_without_token(app, monkeypatch):
+    """トークン未設定なら起動しない。"""
+    monkeypatch.setattr(
+        "yt_gui.app.ExtensionServer",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not construct")),
+    )
+    app._settings.extension_enabled = True
+    app._settings.extension_token = ""
+    app._sync_extension_server()
+    assert app._extension_server is None

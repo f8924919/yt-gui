@@ -175,6 +175,8 @@ class QueueController(QObject):
         playlist_title: str,
         format_label: str,
         job: JobSpec,
+        *,
+        cookies_path: str | None = None,
     ) -> list[_QueueItem]:
         batch: list[tuple[int, _QueueItem]] = []
         for idx, entry in enumerate(entries, start=1):
@@ -187,6 +189,7 @@ class QueueController(QObject):
                 playlist_title=playlist_title,
                 playlist_index=idx,
                 thumbnail_url=entry.get("thumbnail_url"),
+                cookies_path=cookies_path,
             )
             batch.append((self._item_counter, item))
 

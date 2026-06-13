@@ -2,7 +2,7 @@
 
 [← 目次](../index.md)
 
-> 関連実装: [yt_gui/queue_controller.py](../../arch/queue_controller.md)（アイテム単位 Cookies）。ローカル受信サーバー・拡張機能は未実装（実装時に arch リンクを張る）。
+> 関連実装: [extension_server.py](../../arch/extension_server.md)（受信サーバー）・[app.py — ブラウザ拡張連携](../../arch/app.md#ブラウザ拡張連携)（配線）・[queue_controller.py](../../arch/queue_controller.md)（アイテム単位 Cookies）。拡張機能（JS）は未実装。
 > 関連仕様: [ダウンロードキュー](queue.md) ・ [ダウンロード動作 — Cookies](download-behavior.md#cookies) ・ [設定管理](../settings.md)
 
 ## 概要
@@ -111,9 +111,13 @@
 
 ## 一時 Cookies ファイルのライフサイクル
 
-- 保存先: アプリ専用の一時ディレクトリ。権限はユーザーのみ（POSIX 0600）。
-- 削除: アイテムが `done` / `error` になった時、アイテム削除時、およびアプリ終了時にまとめて掃除する。
+- 保存先: アプリ専用の一時ディレクトリ（`tempfile.TemporaryDirectory`）。各ファイルの権限はユーザーのみ（POSIX 0600）。
+- 削除: **アプリ終了時に一時ディレクトリごと一括削除**する（MVP）。アイテム完了/削除時の即時削除は将来の最適化とする。
 - 削除失敗は非致命（ログのみ）。
+
+## プレイリスト URL の扱い
+
+拡張から単一動画 URL を送った場合、そのアイテムに Cookies を紐付ける。拡張からプレイリスト URL を送った場合は、取得した全エントリに同一の Cookies を適用する（[キュー追加フロー](queue.md#キューへの追加フロー)に従い展開）。
 
 ---
 

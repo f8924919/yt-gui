@@ -39,7 +39,7 @@
 2. **アイテム単位 Cookies（完了）**: `_QueueItem.cookies_path` 追加・`enqueue_single(cookies_path=...)`・worker のフォールバック解決（アイテム固有 > グローバル、欠落時は警告して cookies なし続行）・テスト 5 件・arch 更新。
 3. ローカル受信サーバー:
    - **3a（完了）**: settings フィールド（`extension_enabled` / `extension_port` / `extension_token`）・`generate_extension_token()`・定数・`extension_server.py`（`handle_request` 純関数 + `ExtensionServer` ライフサイクル、`127.0.0.1` 限定・トークン/Origin 認証・ポートフォールバック）・テスト 15 件・arch/spec docs。
-   - **3b（未）**: app.py の配線（起動/停止・enqueue をメインスレッドへ委譲・一時 cookies.txt 生成と掃除）。
+   - **3b（完了）**: app.py の配線。`_AppSignals.extension_enqueue` でサーバースレッド→メインスレッド委譲。`_sync_extension_server` / `_start`/`_stop` / `_on_extension_enqueue` / `_extension_default_format`（現在のコンボ選択、original→best_mp4）/ `_write_extension_cookies`（TemporaryDirectory・0600）/ `closeEvent` 掃除。`_start_add_thread`・`_on_fetch_for_add_done` に `item_cookies_path` を通し、`enqueue_single`/`enqueue_playlist` の cookies_path へ。i18n キー追加。app テスト 7 件・queue テスト 1 件追加。
 4. 設定 UI: ブラウザ連携の有効化・トークン・ポート。
 5. 拡張機能（unpacked）: URL/cookies 取得・送信・オプション画面。
 6. arch ドキュメント更新。

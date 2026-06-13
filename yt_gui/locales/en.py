@@ -236,6 +236,12 @@ STRINGS: dict[str, str] = {
     "log_playlist_archived_skipped": "⏭ Excluded {count} already-archived video(s)",
     "info_playlist_all_archived": "All videos in this playlist have already been downloaded (archived).",
     "log_queue_done": "✅ Queue complete",
+    # browser extension integration
+    "log_extension_started": "🔌 Browser integration server started (port {port})",
+    "log_extension_stopped": "🔌 Browser integration server stopped",
+    "log_extension_bind_failed": "⚠️ Failed to bind a port for the browser integration server",
+    "log_extension_no_token": "⚠️ Browser integration token is not set; server not started",
+    "log_extension_received": "📥 Received via browser integration: {url}",
     # queue tooltip
     "tooltip_title": "Title",
     "tooltip_url": "URL",

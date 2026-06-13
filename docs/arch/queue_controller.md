@@ -30,7 +30,7 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 | メソッド | 説明 |
 |---|---|
 | `enqueue_single(url, title, format_label, job, *, thumbnail_url=None, cookies_path=None) -> _QueueItem` | 単発追加 (`tree_item` を生成して `queue_tree.addTopLevelItem`、`item_added` シグナル emit)。`cookies_path` はアイテム固有 Cookies（拡張連携） |
-| `enqueue_playlist(entries, playlist_title, format_label, job) -> list[_QueueItem]` | プレイリスト一括追加 |
+| `enqueue_playlist(entries, playlist_title, format_label, job, *, cookies_path=None) -> list[_QueueItem]` | プレイリスト一括追加。`cookies_path` を渡すと全エントリへ同一値を付与（拡張連携） |
 | `find_item_for(tree_item) -> _QueueItem \| None` | `QTreeWidgetItem` から対応する `_QueueItem` を検索 |
 | `remove_selected() -> None` | `queue_tree.selectedItems()` のうち `downloading` / `editing` 以外を削除 |
 | `has_waiting() -> bool` | 待機中アイテムがあるか |

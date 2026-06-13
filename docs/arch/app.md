@@ -29,6 +29,7 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 | `status_update` | `str, float` | ステータスバー更新（テキスト・進捗） |
 | `log_message` | `str` | ログ追記 |
 | `show_error` | `str, str` | エラーダイアログ表示（title, message） |
+| `extension_enqueue` | `str, object, object` | ブラウザ拡張連携。サーバースレッドからの enqueue（url, cookies, format）をメインスレッドへ委譲 |
 
 URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` / `on_failed` / `on_finished` コールバックでメインスレッドの UI 操作を完結させる。`on_failed` 内で `_update_status` / `_log` / `QMessageBox.critical` を直接呼び、`on_finished` で「追加」ボタンを再有効化する。
 
@@ -80,9 +81,28 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 - `add_requested` ハンドラで `build_job_spec()` を呼び出して `JobSpec` を組み立てる。`fmt_original` のときはダイアログ内包パネルの `get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。オリジナル形式以外はメインの「追加」ボタン（`_add_url`）から従来どおり組み立てる。
 - 取得済み（`has_formats_loaded()`）なら `enqueue_single(...)` に即委譲。未取得なら URL 取得スレッドへ渡す（単独動画のみ。オリジナル形式はプレイリスト非対応で、`_on_fetch_for_add_done` がプレイリスト判明時に `warn_playlist_original_fmt` で中止する）。
-- `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str}`。単発は `self.queue.enqueue_single(...)`、プレイリストは `self.queue.enqueue_playlist(...)` に委譲。
+- `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str, "item_cookies_path": str | None}`。単発は `self.queue.enqueue_single(..., cookies_path=item_cookies_path)`、プレイリストは `self.queue.enqueue_playlist(..., cookies_path=item_cookies_path)` に委譲。`item_cookies_path` は拡張連携で受信した一時 cookies のパス（手動追加では `None`）。
 - `_on_queue_item_added(item)` スロット: `QueueController.item_added` シグナルを受けて `self._thumbnail_cache.request(item.thumbnail_url)` を起動する。
 - `_notify_container_promotion_if_needed(job)`: 複数音声で MKV 昇格が起きた場合のステータス通知。`build_job_spec` は UI 通知を行わないため UI 側で発火する。
+
+## ブラウザ拡張連携
+
+> 関連仕様: [ブラウザ拡張連携](../spec/features/browser-extension.md)。サーバー本体は [extension_server.md](extension_server.md)。
+
+`App` は [`ExtensionServer`](extension_server.md) を所有し、設定に応じて起動/停止する。
+
+| メソッド / スロット | 説明 |
+|---|---|
+| `_sync_extension_server()` | `settings.extension_enabled` を見て起動/停止を整合させる。`__init__` 末尾・`_open_settings` 後に呼ぶ。ポート変更は再起動が必要だが MVP では次回有効化時に反映 |
+| `_start_extension_server()` | トークンが空なら起動しない（`log_extension_no_token`）。`ExtensionServer.start()` で `127.0.0.1` にバインド、失敗時は `log_extension_bind_failed` |
+| `_stop_extension_server()` | サーバーを停止して参照を破棄 |
+| `_emit_extension_enqueue(url, cookies, fmt)` | **サーバースレッド**から呼ばれ、`extension_enqueue` シグナルでメインスレッドへ委譲（Qt ウィジェットを直接触らない） |
+| `_on_extension_enqueue(url, cookies, fmt)` | **メインスレッド**。cookies を一時ファイル化し、`_extension_default_format()` の形式で `_start_add_thread(..., item_cookies_path=...)` を起動。`fmt` は MVP では無視 |
+| `_extension_default_format()` | メイン画面のコンボ現在選択を使う。`fmt_original`（ダイアログ必須）のときは `fmt_best_mp4` へフォールバック |
+| `_write_extension_cookies(cookies)` | `tempfile.TemporaryDirectory` 配下に 0600 で cookies.txt を書き、パスを返す（失敗時 `None`） |
+| `closeEvent(event)` | サーバー停止と一時 cookies ディレクトリの掃除 |
+
+一時 cookies ディレクトリはアプリ終了時（`closeEvent`）に一括削除する。
 
 ## 編集モード経路
 

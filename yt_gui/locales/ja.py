@@ -238,6 +238,12 @@ STRINGS: dict[str, str] = {
     "log_playlist_archived_skipped": "⏭ アーカイブ済み {count} 件を除外しました",
     "info_playlist_all_archived": "このプレイリストの動画はすべてダウンロード済み（アーカイブ済み）でした。",
     "log_queue_done": "✅ キュー完了",
+    # browser extension integration
+    "log_extension_started": "🔌 ブラウザ連携サーバーを起動しました（ポート {port}）",
+    "log_extension_stopped": "🔌 ブラウザ連携サーバーを停止しました",
+    "log_extension_bind_failed": "⚠️ ブラウザ連携サーバーのポート確保に失敗しました",
+    "log_extension_no_token": "⚠️ ブラウザ連携トークンが未設定のためサーバーを起動しませんでした",
+    "log_extension_received": "📥 ブラウザ連携で受信: {url}",
     # queue tooltip
     "tooltip_title": "タイトル",
     "tooltip_url": "URL",
