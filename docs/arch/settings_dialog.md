@@ -80,6 +80,19 @@ SponsorBlock の処理方法・対象カテゴリを設定するタブ（`_build
 | ポート | `QLineEdit` + `QIntValidator(1, 65535)` | 空欄可 |
 | ユーザー名 / パスワード | `QLineEdit` | パスワードは `EchoMode.Password` |
 
+### 「ブラウザ連携」タブ
+
+ブラウザ拡張連携のローカル受信サーバー設定（`_build_extension_tab`、関連: [extension_server.md](extension_server.md) / [browser-extension spec](../spec/features/browser-extension.md)）。
+
+| 項目 | ウィジェット | 説明 |
+|------|------------|------|
+| ブラウザ拡張連携を有効にする | `QCheckBox` | OFF のとき他項目をグレーアウト（`_on_extension_toggled`） |
+| 受信ポート | `QSpinBox(1, 65535)` | `extension_port`（既定 `EXTENSION_SERVER_DEFAULT_PORT`） |
+| トークン | `QLineEdit`（read-only） | `extension_token`。`コピー`（`_copy_extension_token`）/ `再生成`（`_regenerate_extension_token`） |
+
+- `_on_extension_toggled` は有効化時にトークンが空なら `generate_extension_token()` で自動生成する。
+- `_save` でも有効かつトークン空なら生成してから保存する。
+
 ## 保存フロー
 
 1. 「ファイル名」タブのテンプレートを `validate_template()` で検証。エラー時は警告ダイアログを表示し、該当タブに切り替えてダイアログを閉じない

@@ -16,7 +16,7 @@
 | ドキュメント | モジュール | 関連仕様 |
 |---|---|---|
 | [entry.md](entry.md) | `__main__.py` / `__init__.py` — エントリーポイント・リソースパス解決 | — |
-| [app.md](app.md) | `app.py` — メインウィンドウ・ウィジェット組み立て・シグナル配線 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) |
+| [app.md](app.md) | `app.py` — メインウィンドウ・ウィジェット組み立て・シグナル配線 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) / [ブラウザ拡張連携](../spec/features/browser-extension.md) |
 | [queue_controller.md](queue_controller.md) | `queue_controller.py` — キュー所有・ワーカースレッド・編集モード状態機械 | [ダウンロードキュー](../spec/features/queue.md) |
 | [thumbnail_cache.md](thumbnail_cache.md) | `thumbnail_cache.py` — 動画サムネイル画像の非同期取得・キャッシュ | — |
 | [threading_utils.md](threading_utils.md) | `threading_utils.py` — バックグラウンドスレッド + Qt シグナル転送の共通ヘルパ | — |
@@ -26,6 +26,7 @@
 | [settings_dialog.md](settings_dialog.md) | `settings_dialog.py` — 設定ダイアログ | [設定ダイアログ](../spec/screens/settings-dialog.md) |
 | [log_dialog.md](log_dialog.md) | `log_dialog.py` — ログ表示ダイアログ | [ログダイアログ](../spec/screens/log-dialog.md) |
 | [settings.md](settings.md) | `settings.py` — 設定の読み書き | [設定管理](../spec/settings.md) |
+| [extension_server.md](extension_server.md) | `extension_server.py` — ブラウザ拡張連携のローカル受信サーバー | [ブラウザ拡張連携](../spec/features/browser-extension.md) |
 | [formats.md](formats.md) | `formats.py` — フォーマット定数・仕様生成関数 | [ダウンロード形式](../spec/features/download-formats.md) |
 | [job_spec.md](job_spec.md) | `job_spec.py` — `JobSpec` DTO と `build_job_spec` (`format_id` 派生ラダー集約) | [ダウンロード形式](../spec/features/download-formats.md) / [ダウンロード動作](../spec/features/download-behavior.md) |
 | [output_template.md](output_template.md) | `output_template.py` — OUTPUT TEMPLATE 定数・検証/プレビュー補助 | [設定管理](../spec/settings.md) |

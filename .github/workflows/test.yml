@@ -46,7 +46,7 @@ jobs:
       - run: uv sync
 
       - name: Lint (ruff check)
-        run: uv run ruff check yt_gui/
+        run: uv run ruff check .
 
       - name: Format check (ruff format)
         run: uv run ruff format --check yt_gui/

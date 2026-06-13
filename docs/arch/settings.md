@@ -29,6 +29,17 @@
 | `proxy_password` | `str` | `""` | プロキシ認証のパスワード（任意、平文保存） |
 | `download_archive_enabled` | `bool` | `False` | ダウンロードアーカイブの有効化トグル |
 | `download_archive_path` | `str` | `""` | アーカイブ記録ファイルのパス（空 = 設定ディレクトリの `download_archive.txt`） |
+| `extension_enabled` | `bool` | `False` | ブラウザ拡張連携のローカル受信サーバー有効化トグル |
+| `extension_port` | `int` | `8718` | 受信ポート（`EXTENSION_SERVER_DEFAULT_PORT`） |
+| `extension_token` | `str` | `""` | 拡張と共有する認証トークン（`generate_extension_token()` で生成、有効化時に発行） |
+
+## 定数: `EXTENSION_SERVER_DEFAULT_PORT` / `EXTENSION_SERVER_PORT_FALLBACKS`
+
+ブラウザ拡張連携のローカル受信サーバーの既定ポート `8718` とフォールバック `(8719, 8720)`。`ExtensionServer.start()` がこの順でバインドを試す（[extension_server.md](extension_server.md)）。
+
+## 関数: `generate_extension_token() -> str`
+
+`secrets.token_urlsafe(32)` で URL セーフな共有トークンを生成する。設定ダイアログでブラウザ連携を有効化したときに発行する。
 
 ## 定数: `PROXY_SCHEMES`
 

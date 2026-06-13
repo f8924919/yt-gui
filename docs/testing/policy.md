@@ -26,6 +26,7 @@
 | スレッドヘルパ | `yt_gui/threading_utils.py`（コールバック順序） | △ |
 | 外部 I/O | `yt_gui/downloader.py`（yt-dlp、`omit` 解除済み・#95）・ `thumbnail_cache.py`（HTTP・未） | △ |
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
+| 純粋関数 | `yt_gui/extension_server.py`（`handle_request` / `ExtensionServer` ライフサイクル） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 
@@ -98,6 +99,7 @@ tests/
 ├── test_downloader.py
 ├── test_download_binaries.py
 ├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
+├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）

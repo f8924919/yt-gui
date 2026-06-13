@@ -76,6 +76,13 @@ STRINGS: dict[str, str] = {
     "label_proxy_username": "Username:",
     "label_proxy_password": "Password:",
     "proxy_help": "Specify a proxy used for yt-dlp traffic.\nExample: http://user:pass@host:port or socks5h://host:port\nThe password is stored in plain text in the settings file.",
+    "tab_extension": "Browser",
+    "label_extension_enabled": "Enable browser extension integration",
+    "label_extension_port": "Listen port:",
+    "label_extension_token": "Token:",
+    "btn_extension_copy_token": "Copy",
+    "btn_extension_regen_token": "Regenerate",
+    "extension_help": "Receive the current video's URL and cookies from the browser extension and add them to the queue.\nThe server listens on 127.0.0.1 (this PC only). Paste the token into the extension's settings.\nIf the port is busy, the next candidates (8719 then 8720) are tried automatically. Restart the app to apply a port change.",
     "warn_proxy_no_host": "Please enter the proxy host.",
     "warn_proxy_bad_port": "The proxy port must be an integer between 1 and 65535.",
     # original format detail panel
@@ -236,6 +243,14 @@ STRINGS: dict[str, str] = {
     "log_playlist_archived_skipped": "⏭ Excluded {count} already-archived video(s)",
     "info_playlist_all_archived": "All videos in this playlist have already been downloaded (archived).",
     "log_queue_done": "✅ Queue complete",
+    # browser extension integration
+    "log_extension_started": "🔌 Browser integration server started (port {port})",
+    "log_extension_stopped": "🔌 Browser integration server stopped",
+    "log_extension_bind_failed": "⚠️ Failed to bind a port for the browser integration server",
+    "log_extension_no_token": "⚠️ Browser integration token is not set; server not started",
+    "log_extension_received": "📥 Received via browser integration: {url}",
+    "log_extension_cookies": "🍪 Received {count} cookie(s)",
+    "log_extension_no_cookies": "🍪 Received with no cookies (check browser login state / profile / permissions)",
     # queue tooltip
     "tooltip_title": "Title",
     "tooltip_url": "URL",

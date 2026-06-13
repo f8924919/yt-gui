@@ -10,7 +10,7 @@
 
 | 名前 | 役割 |
 |---|---|
-| `_QueueItem` (`@dataclass`) | 1 キュー項目。`url` / `title` / `format_label` / `job: JobSpec` / `playlist_*` / `thumbnail_url` / `status` / `progress: float` / `tree_item` を保持 |
+| `_QueueItem` (`@dataclass`) | 1 キュー項目。`url` / `title` / `format_label` / `job: JobSpec` / `playlist_*` / `thumbnail_url` / `cookies_path: str \| None` / `status` / `progress: float` / `tree_item` を保持 |
 | `QueueController(QObject)` | キューの所有とライフサイクル管理 |
 
 `_QueueItem.format_id` は `job.format_id` のエイリアスプロパティ。
@@ -29,8 +29,8 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 | メソッド | 説明 |
 |---|---|
-| `enqueue_single(url, title, format_label, job, *, thumbnail_url=None) -> _QueueItem` | 単発追加 (`tree_item` を生成して `queue_tree.addTopLevelItem`、`item_added` シグナル emit) |
-| `enqueue_playlist(entries, playlist_title, format_label, job) -> list[_QueueItem]` | プレイリスト一括追加 |
+| `enqueue_single(url, title, format_label, job, *, thumbnail_url=None, cookies_path=None) -> _QueueItem` | 単発追加 (`tree_item` を生成して `queue_tree.addTopLevelItem`、`item_added` シグナル emit)。`cookies_path` はアイテム固有 Cookies（拡張連携） |
+| `enqueue_playlist(entries, playlist_title, format_label, job, *, cookies_path=None) -> list[_QueueItem]` | プレイリスト一括追加。`cookies_path` を渡すと全エントリへ同一値を付与（拡張連携） |
 | `find_item_for(tree_item) -> _QueueItem \| None` | `QTreeWidgetItem` から対応する `_QueueItem` を検索 |
 | `remove_selected() -> None` | `queue_tree.selectedItems()` のうち `downloading` / `editing` 以外を削除 |
 | `has_waiting() -> bool` | 待機中アイテムがあるか |
@@ -39,7 +39,7 @@ UI ウィジェット (URL 入力欄・フォーマットコンボ・ボタン�
 
 | メソッド | 説明 |
 |---|---|
-| `start(cookies_resolver) -> bool` | `get_concurrency()` を `[1, MAX_CONCURRENT_DOWNLOADS_MAX]` にクランプした数だけワーカースレッドを起動する。`cookies_resolver: () -> (cookies_path, cookies_browser)` を毎イテレーション呼ぶことで生きた設定変更を反映する。起動できないとき (待機項目無し / 実行中) は `False` |
+| `start(cookies_resolver) -> bool` | `get_concurrency()` を `[1, MAX_CONCURRENT_DOWNLOADS_MAX]` にクランプした数だけワーカースレッドを起動する。`cookies_resolver: () -> (cookies_path, cookies_browser)` を毎イテレーション呼ぶことで生きた設定変更を反映する。ただし**アイテム固有 `cookies_path` があればそちらを優先**し（`cookies_browser` は `None`）、無いときだけ `cookies_resolver()` にフォールバックする。起動できないとき (待機項目無し / 実行中) は `False` |
 | `pause() -> None` | `_paused=True` をセットし、走行中の **全ワーカーの `Downloader`**（`_active_downloaders`、dedupe）に `request_cancel()` で中断を要求する。進行中アイテムは `DownloadCancelled` で中断され `waiting` に戻り、各ワーカーは次のイテレーション境界で停止する |
 | `is_running` (property) | 走行中ワーカーが 1 つ以上あるか（`_active_workers > 0`） |
 
@@ -128,4 +128,4 @@ waiting → editing → waiting (apply or cancel)
 
 - ワーカースレッドは **`_queue_tree` を直接操作しない**。表示更新は `item_refresh` シグナル経由でメインスレッドへ。
 - `enqueue_*` / `remove_selected` / `enter_edit_mode` / `apply_edit` / `cancel_edit` はメインスレッドから呼ぶ前提 (UI 操作を含む)。
-- `cookies_resolver` は毎イテレーションで呼ばれるため、生きた設定変更が反映される (queue 走行中に設定変更しても次アイテムから新値)。
+- `cookies_resolver` は毎イテレーションで呼ばれるため、生きた設定変更が反映される (queue 走行中に設定変更しても次アイテムから新値)。アイテム固有 `cookies_path` を持つアイテムは resolver を呼ばずにそちらを使う（アイテム固有 > グローバル。[browser-extension](../spec/features/browser-extension.md)）。

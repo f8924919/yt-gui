@@ -18,7 +18,7 @@ uv run python -m yt_gui        # アプリ起動（開発時）
 PR を出す前に、ローカルで以下がすべて通ることを確認してください（CI でも `Test` ワークフローが同じ内容を実行します）。
 
 ```bash
-uv run ruff check yt_gui/            # Lint
+uv run ruff check .                  # Lint（リポジトリ全体）
 uv run ruff format --check yt_gui/   # フォーマット
 uv run mypy yt_gui/                  # 型チェック
 uv run pytest                        # テスト

@@ -354,3 +354,43 @@ def test_archive_toggle_enables_and_disables_controls(qtbot):
     assert not dialog._archive_path_edit.isEnabled()
     assert not dialog._archive_browse_btn.isEnabled()
     assert not dialog._archive_clear_btn.isEnabled()
+
+
+# ── ブラウザ拡張連携タブ ────────────────────────────────────────────────────
+# 対応 spec: docs/spec/features/browser-extension.md
+
+
+def test_extension_enable_autogenerates_token(qtbot):
+    """有効化時にトークンが空なら自動生成される。"""
+    dialog = _make_dialog(qtbot, Settings())
+    assert dialog._extension_token_edit.text() == ""
+    dialog._extension_check.setChecked(True)
+    assert dialog._extension_token_edit.text() != ""
+
+
+def test_extension_regenerate_changes_token(qtbot):
+    dialog = _make_dialog(
+        qtbot, Settings(extension_enabled=True, extension_token="old")
+    )
+    dialog._regenerate_extension_token()
+    assert dialog._extension_token_edit.text() != "old"
+    assert dialog._extension_token_edit.text() != ""
+
+
+def test_extension_inputs_disabled_when_off(qtbot):
+    dialog = _make_dialog(qtbot, Settings(extension_enabled=False))
+    assert dialog._extension_port_spin.isEnabled() is False
+    assert dialog._extension_token_edit.isEnabled() is False
+
+
+def test_save_persists_extension_settings(qtbot):
+    dialog, manager = _make_dialog_with_manager(qtbot, Settings())
+    dialog._extension_check.setChecked(True)
+    dialog._extension_port_spin.setValue(8719)
+
+    dialog._save()
+
+    saved = manager.save.call_args[0][0]
+    assert saved.extension_enabled is True
+    assert saved.extension_port == 8719
+    assert saved.extension_token != ""  # 有効時はトークンが入る

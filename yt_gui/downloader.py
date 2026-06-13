@@ -200,7 +200,9 @@ class Downloader:
         if cookies_browser:
             return {"cookiesfrombrowser": (cookies_browser,)}
         if cookies_path:
-            return {"cookies": cookies_path}
+            # yt-dlp の cookie ファイル指定オプションは `cookiefile`。
+            # 誤って `cookies` を渡すと黙って無視され、ファイルが読み込まれない。
+            return {"cookiefile": cookies_path}
         return {}
 
     def _base_ydl_opts(self, cookies_path=None, cookies_browser=None) -> dict:

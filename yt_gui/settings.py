@@ -1,10 +1,16 @@
 import json
 import os
+import secrets
 import sys
 from dataclasses import asdict, dataclass, field
 from urllib.parse import quote
 
 PROXY_SCHEMES: tuple[str, ...] = ("http", "https", "socks4", "socks5", "socks5h")
+
+# ブラウザ拡張連携のローカル受信サーバー（127.0.0.1）。既定ポートが使用中の
+# ときは順にフォールバックを試す（docs/spec/features/browser-extension.md）。
+EXTENSION_SERVER_DEFAULT_PORT = 8718
+EXTENSION_SERVER_PORT_FALLBACKS: tuple[int, ...] = (8719, 8720)
 
 # 並列フラグメント DL 数の指定可能範囲（UI のスピンボックスにも適用）
 CONCURRENT_FRAGMENTS_MIN = 1
@@ -65,6 +71,15 @@ class Settings:
     proxy_password: str = ""
     download_archive_enabled: bool = False  # 既 DL 動画を記録して再 DL をスキップ
     download_archive_path: str = ""  # 空 = 設定ディレクトリの download_archive.txt
+    # ブラウザ拡張連携（ローカル受信サーバー）。既定は無効＝オプトイン。
+    extension_enabled: bool = False
+    extension_port: int = EXTENSION_SERVER_DEFAULT_PORT
+    extension_token: str = ""  # 有効化時に生成（空 = 未生成）
+
+
+def generate_extension_token() -> str:
+    """ブラウザ拡張連携の共有トークンを生成する（URL セーフな乱数）。"""
+    return secrets.token_urlsafe(32)
 
 
 def build_proxy_url(settings: Settings) -> str:

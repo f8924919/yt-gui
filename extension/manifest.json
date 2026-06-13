@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "yt-gui Connector",
+  "version": "0.1.0",
+  "description": "開いている動画の URL と Cookie を yt-gui のダウンロードキューへ送ります。",
+  "permissions": ["cookies", "contextMenus", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "yt-gui に送る"
+  },
+  "options_page": "options.html"
+}

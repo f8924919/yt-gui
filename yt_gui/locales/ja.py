@@ -77,6 +77,13 @@ STRINGS: dict[str, str] = {
     "label_proxy_password": "パスワード:",
     "proxy_help": "yt-dlp の通信に使うプロキシを指定します。\n例: http://user:pass@host:port、socks5h://host:port\nパスワードは設定ファイルに平文で保存されます。",
     "warn_proxy_no_host": "プロキシのホストを入力してください。",
+    "tab_extension": "ブラウザ連携",
+    "label_extension_enabled": "ブラウザ拡張連携を有効にする",
+    "label_extension_port": "受信ポート:",
+    "label_extension_token": "トークン:",
+    "btn_extension_copy_token": "コピー",
+    "btn_extension_regen_token": "再生成",
+    "extension_help": "ブラウザ拡張から、開いている動画の URL と Cookie を受け取ってキューに追加します。\n受信は 127.0.0.1（このPCのみ）で待ち受けます。トークンを拡張の設定に貼り付けてください。\nポートが使用中の場合は自動的に次の候補（8719→8720）を試します。設定変更後はアプリ再起動でポートが反映されます。",
     "warn_proxy_bad_port": "プロキシのポートは 1〜65535 の整数で入力してください。",
     # original format detail panel
     "label_original_detail": "オリジナル形式の詳細設定",
@@ -238,6 +245,14 @@ STRINGS: dict[str, str] = {
     "log_playlist_archived_skipped": "⏭ アーカイブ済み {count} 件を除外しました",
     "info_playlist_all_archived": "このプレイリストの動画はすべてダウンロード済み（アーカイブ済み）でした。",
     "log_queue_done": "✅ キュー完了",
+    # browser extension integration
+    "log_extension_started": "🔌 ブラウザ連携サーバーを起動しました（ポート {port}）",
+    "log_extension_stopped": "🔌 ブラウザ連携サーバーを停止しました",
+    "log_extension_bind_failed": "⚠️ ブラウザ連携サーバーのポート確保に失敗しました",
+    "log_extension_no_token": "⚠️ ブラウザ連携トークンが未設定のためサーバーを起動しませんでした",
+    "log_extension_received": "📥 ブラウザ連携で受信: {url}",
+    "log_extension_cookies": "🍪 Cookie を受信: {count} 件",
+    "log_extension_no_cookies": "🍪 Cookie なしで受信（ブラウザのログイン状態・プロファイル・権限を確認してください）",
     # queue tooltip
     "tooltip_title": "タイトル",
     "tooltip_url": "URL",

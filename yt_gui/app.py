@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
 
 from . import get_resource_base, get_version, i18n
 from .downloader import Downloader
+from .extension_server import ExtensionServer
 from .formats import FORMAT_KEYS
 from .i18n import t
 from .job_spec import JobSpec, build_job_spec
@@ -38,6 +40,7 @@ from .log_dialog import LogDialog
 from .original_format_dialog import OriginalFormatDialog
 from .queue_controller import QueueController, _QueueItem
 from .settings import (
+    EXTENSION_SERVER_PORT_FALLBACKS,
     SettingsManager,
     build_proxy_url,
     build_rate_limit,
@@ -68,6 +71,9 @@ class _AppSignals(QObject):
     status_update = Signal(str, float)
     log_message = Signal(str)
     show_error = Signal(str, str)
+    # ブラウザ拡張連携: サーバースレッドからの enqueue をメインスレッドへ委譲する。
+    # (url, cookies: str | None, format: str | None)
+    extension_enqueue = Signal(str, object, object)
 
 
 class _QueueTree(QTreeWidget):
@@ -267,6 +273,12 @@ class App(QMainWindow):
             get_concurrency=lambda: self._settings.max_concurrent_downloads,
         )
         self._wire_queue_signals()
+
+        # ブラウザ拡張連携のローカル受信サーバー（既定は無効）。
+        self._extension_server: ExtensionServer | None = None
+        self._ext_cookies_dir: tempfile.TemporaryDirectory | None = None
+        self._signals.extension_enqueue.connect(self._on_extension_enqueue)
+        self._sync_extension_server()
 
         QTimer.singleShot(0, self._check_dependencies)
 
@@ -853,6 +865,8 @@ class App(QMainWindow):
         cookies_browser: str | None,
         job: JobSpec,
         format_label: str,
+        *,
+        item_cookies_path: str | None = None,
     ):
         self.add_button.setEnabled(False)
         self.add_button.setText(t("btn_adding"))
@@ -862,7 +876,12 @@ class App(QMainWindow):
             result = self.downloader.fetch_title_or_entries(
                 url, cookies_path, cookies_browser
             )
-            return {"result": result, "job": job, "format_label": format_label}
+            return {
+                "result": result,
+                "job": job,
+                "format_label": format_label,
+                "item_cookies_path": item_cookies_path,
+            }
 
         def _on_failed(exc: Exception) -> None:
             err_msg = strip_ansi(str(exc))
@@ -890,6 +909,7 @@ class App(QMainWindow):
         result = payload["result"]
         job: JobSpec = payload["job"]
         format_label: str = payload["format_label"]
+        item_cookies_path: str | None = payload.get("item_cookies_path")
         format_id = job.format_id
 
         if result["type"] == "single":
@@ -899,6 +919,7 @@ class App(QMainWindow):
                 format_label,
                 job,
                 thumbnail_url=result.get("thumbnail_url"),
+                cookies_path=item_cookies_path,
             )
             self.url_entry.clear()
             self._signals.status_update.emit(t("status_title_added"), 0)
@@ -936,7 +957,11 @@ class App(QMainWindow):
 
             playlist_title = result.get("title", "")
             added = self.queue.enqueue_playlist(
-                entries, playlist_title, format_label, job
+                entries,
+                playlist_title,
+                format_label,
+                job,
+                cookies_path=item_cookies_path,
             )
 
             self.url_entry.clear()
@@ -1081,6 +1106,120 @@ class App(QMainWindow):
 
     # ── settings ──────────────────────────────────────────────────────────────
 
+    # ── ブラウザ拡張連携 ────────────────────────────────────────────────────
+
+    def _sync_extension_server(self) -> None:
+        """設定に応じてローカル受信サーバーを起動/停止する。
+
+        ポート変更は再起動が必要だが、MVP では起動時／有効化時にのみ反映する。
+        """
+        want = self._settings.extension_enabled
+        running = self._extension_server is not None
+        if want and not running:
+            self._start_extension_server()
+        elif not want and running:
+            self._stop_extension_server()
+
+    def _start_extension_server(self) -> None:
+        token = self._settings.extension_token
+        if not token:
+            self._log(t("log_extension_no_token"))
+            return
+        server = ExtensionServer(
+            token,
+            self._emit_extension_enqueue,
+            port=self._settings.extension_port,
+            fallback_ports=EXTENSION_SERVER_PORT_FALLBACKS,
+        )
+        port = server.start()
+        if port is None:
+            self._log(t("log_extension_bind_failed"))
+            return
+        self._extension_server = server
+        self._log(t("log_extension_started").format(port=port))
+
+    def _stop_extension_server(self) -> None:
+        if self._extension_server is not None:
+            self._extension_server.stop()
+            self._extension_server = None
+            self._log(t("log_extension_stopped"))
+
+    def _emit_extension_enqueue(
+        self, url: str, cookies: str | None, fmt: str | None
+    ) -> None:
+        """サーバースレッドから呼ばれる。Qt シグナルでメインスレッドへ委譲する。"""
+        self._signals.extension_enqueue.emit(url, cookies, fmt)
+
+    def closeEvent(self, event):  # noqa: N802
+        """終了時にサーバーを停止し、一時 cookies ディレクトリを掃除する。"""
+        self._stop_extension_server()
+        if self._ext_cookies_dir is not None:
+            try:
+                self._ext_cookies_dir.cleanup()
+            except OSError:
+                pass
+            self._ext_cookies_dir = None
+        super().closeEvent(event)
+
+    def _on_extension_enqueue(
+        self, url: str, cookies: str | None, fmt: str | None
+    ) -> None:
+        """メインスレッド。受信した URL（+ cookies）をキュー追加フローへ流す。
+
+        `fmt` は MVP では無視し、メイン画面で選択中の形式を使う。
+        """
+        cookies_path = self._write_extension_cookies(cookies) if cookies else None
+        format_id, format_label = self._extension_default_format()
+        job = build_job_spec(format_id, self._settings)
+        self._log(t("log_extension_received").format(url=url))
+        # 診断: 受信した Cookie の件数だけをログに出す（値は記録しない）。
+        # 0 件なら capture 側（未ログイン・プロファイル違い・権限）を疑う。
+        count = self._count_cookies(cookies)
+        if count:
+            self._log(t("log_extension_cookies").format(count=count))
+        else:
+            self._log(t("log_extension_no_cookies"))
+        self._start_add_thread(
+            url, cookies_path, None, job, format_label, item_cookies_path=cookies_path
+        )
+
+    @staticmethod
+    def _count_cookies(cookies: str | None) -> int:
+        """Netscape 形式文字列の Cookie 件数（コメント/空行を除く行数）を返す。"""
+        if not cookies:
+            return 0
+        return sum(
+            1
+            for line in cookies.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+
+    def _extension_default_format(self) -> tuple[str, str]:
+        """拡張追加に使う形式。現在のコンボ選択を使い、オリジナル形式
+        （ダイアログ必須でヘッドレス不可）のときは最高画質 MP4 へフォールバック。"""
+        idx = self.format_combo.currentIndex()
+        format_id = FORMAT_KEYS[idx] if 0 <= idx < len(FORMAT_KEYS) else FORMAT_KEYS[0]
+        if format_id == _ORIGINAL_KEY:
+            format_id = FORMAT_KEYS[0]
+        label = self._format_display[FORMAT_KEYS.index(format_id)]
+        return format_id, label
+
+    def _write_extension_cookies(self, cookies: str) -> str | None:
+        """受信クッキーを一時 cookies.txt に書いてパスを返す。失敗時は None。"""
+        try:
+            if self._ext_cookies_dir is None:
+                self._ext_cookies_dir = tempfile.TemporaryDirectory(
+                    prefix="yt-gui-cookies-"
+                )
+            fd, path = tempfile.mkstemp(suffix=".txt", dir=self._ext_cookies_dir.name)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(cookies)
+            os.chmod(path, 0o600)
+            return path
+        except OSError as e:
+            self._log(f"⚠️ {strip_ansi(str(e))}")
+            return None
+
     def _open_settings(self):
         old_lang = self._settings.language
         dialog = SettingsDialog(self, self._settings_manager)
@@ -1101,6 +1240,8 @@ class App(QMainWindow):
         self.downloader.download_archive_path = resolve_download_archive_path(
             self._settings
         )
+
+        self._sync_extension_server()
 
         if self._settings.language != old_lang:
             i18n.set_language(self._settings.language)

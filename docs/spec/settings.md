@@ -40,6 +40,9 @@
 | `proxy_password` | str | `""` | プロキシタブ — パスワード（任意、平文保存） |
 | `download_archive_enabled` | bool | `False` | ダウンロードタブ — ダウンロードアーカイブ有効化 |
 | `download_archive_path` | str | `""` | ダウンロードタブ — アーカイブ記録ファイル（空欄時は設定ディレクトリの `download_archive.txt`） |
+| `extension_enabled` | bool | `False` | ブラウザ連携 — ローカル受信サーバーの有効化（[ブラウザ拡張連携](features/browser-extension.md)） |
+| `extension_port` | int | `8718` | ブラウザ連携 — 受信ポート（使用中時は `8719` → `8720` にフォールバック） |
+| `extension_token` | str | `""` | ブラウザ連携 — 拡張と共有する認証トークン（有効化時に生成） |
 
 ### プロキシ URL の組み立て
 
