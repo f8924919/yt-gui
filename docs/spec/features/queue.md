@@ -30,6 +30,7 @@ yt-gui はダウンロードキューを持ち、URL と形式を複数登録し
 | `remux_only` | bool | remux のみフラグ |
 | `playlist_folder` | str \| None | プレイリスト用サブフォルダ名 |
 | `thumbnail_url` | str \| None | サムネイル画像の URL |
+| `cookies_path` | str \| None | アイテム固有の cookies.txt パス（ブラウザ拡張連携で付与）。`None` ならグローバル設定の Cookies を使用 |
 | `status` | str | `waiting` / `downloading` / `done` / `error` / `editing` / `skipped` |
 | `progress` | float | ダウンロード進捗（0〜100）。`downloading` 中に進捗フックで更新され、行のステータス列に表示される |
 | `tree_item` | QTreeWidgetItem \| None | 対応するツリーウィジェットの行 |
@@ -86,6 +87,7 @@ yt-gui はダウンロードキューを持ち、URL と形式を複数登録し
 - **取り出しの排他**: `waiting` の取り出しとステータス遷移は `_lock` 下で行うため、同じアイテムが複数ワーカーに二重処理されることはありません。
 - **ワーカーごとに独立した Downloader**: 進捗コールバック・中断フラグがアイテム間で混線しないよう、各ワーカーは専用の `Downloader` インスタンスを使います（[arch/queue_controller.md](../../arch/queue_controller.md) / [arch/downloader.md](../../arch/downloader.md)）。
 - 実行中でも新しいアイテムをキューに追加できます。ただし `waiting` が尽きて終了したワーカーは再起動しないため、走行中に追加した分は残存ワーカー数で処理されます（「同時に最大 N」の best-effort）。全ワーカーが終了済みなら「ダウンロード開始」で再走行できます。
+- **Cookies の解決**: ワーカーはアイテム固有の `cookies_path` があればそれを優先し、無ければグローバル設定（`cookies_path` / `cookies_browser`）にフォールバックします（[ブラウザ拡張連携](browser-extension.md) / [ダウンロード動作 — Cookies](download-behavior.md#cookies)）。
 
 ### 行単位の進捗表示
 

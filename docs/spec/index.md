@@ -30,6 +30,7 @@
 | [ダウンロードキュー](features/queue.md) | キュー追加・実行・一時停止・削除・編集モード・ツールチップ |
 | [ダウンロード形式](features/download-formats.md) | 形式定義・yt-dlp フォーマット文字列生成ロジック |
 | [ダウンロード動作](features/download-behavior.md) | ファイル名重複回避・プレイリスト・サムネイル埋め込み・字幕・区間ダウンロード・Cookies |
+| [ブラウザ拡張連携](features/browser-extension.md) | ローカル受信サーバー・拡張機能・アイテム単位 Cookies |
 
 ---
 
