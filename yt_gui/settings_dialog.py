@@ -4,6 +4,7 @@ import sys
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -38,6 +39,7 @@ from .output_template import (
 from .settings import (
     CONCURRENT_FRAGMENTS_MAX,
     CONCURRENT_FRAGMENTS_MIN,
+    EXTENSION_SERVER_DEFAULT_PORT,
     MAX_CONCURRENT_DOWNLOADS_MAX,
     MAX_CONCURRENT_DOWNLOADS_MIN,
     PROXY_SCHEMES,
@@ -47,6 +49,7 @@ from .settings import (
     SettingsManager,
     count_download_archive_entries,
     default_download_archive_path,
+    generate_extension_token,
 )
 
 _BROWSERS = [
@@ -112,6 +115,10 @@ class SettingsDialog(QDialog):
         proxy_widget = QWidget()
         self._build_proxy_tab(proxy_widget)
         self._proxy_tab_index = self._tabs.addTab(proxy_widget, t("tab_proxy"))
+
+        extension_widget = QWidget()
+        self._build_extension_tab(extension_widget)
+        self._tabs.addTab(extension_widget, t("tab_extension"))
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -646,6 +653,71 @@ class SettingsDialog(QDialog):
         for widget in self._proxy_inputs:
             widget.setEnabled(enabled)
 
+    def _build_extension_tab(self, parent: QWidget):
+        layout = QGridLayout(parent)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        layout.setColumnStretch(1, 1)
+
+        self._extension_check = QCheckBox(t("label_extension_enabled"))
+        self._extension_check.setChecked(self._settings.extension_enabled)
+        layout.addWidget(self._extension_check, 0, 0, 1, 3)
+
+        layout.addWidget(
+            QLabel(t("label_extension_port")), 1, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._extension_port_spin = QSpinBox()
+        self._extension_port_spin.setRange(1, 65535)
+        self._extension_port_spin.setValue(
+            self._settings.extension_port or EXTENSION_SERVER_DEFAULT_PORT
+        )
+        layout.addWidget(
+            self._extension_port_spin, 1, 1, Qt.AlignmentFlag.AlignLeft
+        )
+
+        layout.addWidget(
+            QLabel(t("label_extension_token")), 2, 0, Qt.AlignmentFlag.AlignRight
+        )
+        self._extension_token_edit = QLineEdit(self._settings.extension_token)
+        self._extension_token_edit.setReadOnly(True)
+        layout.addWidget(self._extension_token_edit, 2, 1)
+        token_btns = QHBoxLayout()
+        self._extension_copy_btn = QPushButton(t("btn_extension_copy_token"))
+        self._extension_copy_btn.clicked.connect(self._copy_extension_token)
+        self._extension_regen_btn = QPushButton(t("btn_extension_regen_token"))
+        self._extension_regen_btn.clicked.connect(self._regenerate_extension_token)
+        token_btns.addWidget(self._extension_copy_btn)
+        token_btns.addWidget(self._extension_regen_btn)
+        layout.addLayout(token_btns, 2, 2)
+
+        help_label = QLabel(t("extension_help"))
+        help_label.setStyleSheet("color: gray;")
+        help_label.setWordWrap(True)
+        layout.addWidget(help_label, 3, 0, 1, 3)
+        layout.setRowStretch(4, 1)
+
+        self._extension_inputs = (
+            self._extension_port_spin,
+            self._extension_token_edit,
+            self._extension_copy_btn,
+            self._extension_regen_btn,
+        )
+        self._extension_check.toggled.connect(self._on_extension_toggled)
+        self._on_extension_toggled(self._extension_check.isChecked())
+
+    def _on_extension_toggled(self, enabled: bool):
+        for widget in self._extension_inputs:
+            widget.setEnabled(enabled)
+        # 有効化時にトークンが無ければ自動生成する。
+        if enabled and not self._extension_token_edit.text():
+            self._extension_token_edit.setText(generate_extension_token())
+
+    def _regenerate_extension_token(self):
+        self._extension_token_edit.setText(generate_extension_token())
+
+    def _copy_extension_token(self):
+        QApplication.clipboard().setText(self._extension_token_edit.text())
+
     def _build_insert_menu(self, target_edit: QLineEdit) -> QMenu:
         menu = QMenu(self)
         for placeholder, key in TEMPLATE_FIELDS:
@@ -778,6 +850,13 @@ class SettingsDialog(QDialog):
         self._settings.proxy_port = self._proxy_port_edit.text().strip()
         self._settings.proxy_username = self._proxy_username_edit.text()
         self._settings.proxy_password = self._proxy_password_edit.text()
+
+        self._settings.extension_enabled = self._extension_check.isChecked()
+        self._settings.extension_port = self._extension_port_spin.value()
+        token = self._extension_token_edit.text()
+        if self._settings.extension_enabled and not token:
+            token = generate_extension_token()
+        self._settings.extension_token = token
 
         self._manager.save(self._settings)
 

@@ -77,6 +77,13 @@ STRINGS: dict[str, str] = {
     "label_proxy_password": "パスワード:",
     "proxy_help": "yt-dlp の通信に使うプロキシを指定します。\n例: http://user:pass@host:port、socks5h://host:port\nパスワードは設定ファイルに平文で保存されます。",
     "warn_proxy_no_host": "プロキシのホストを入力してください。",
+    "tab_extension": "ブラウザ連携",
+    "label_extension_enabled": "ブラウザ拡張連携を有効にする",
+    "label_extension_port": "受信ポート:",
+    "label_extension_token": "トークン:",
+    "btn_extension_copy_token": "コピー",
+    "btn_extension_regen_token": "再生成",
+    "extension_help": "ブラウザ拡張から、開いている動画の URL と Cookie を受け取ってキューに追加します。\n受信は 127.0.0.1（このPCのみ）で待ち受けます。トークンを拡張の設定に貼り付けてください。\nポートが使用中の場合は自動的に次の候補（8719→8720）を試します。設定変更後はアプリ再起動でポートが反映されます。",
     "warn_proxy_bad_port": "プロキシのポートは 1〜65535 の整数で入力してください。",
     # original format detail panel
     "label_original_detail": "オリジナル形式の詳細設定",

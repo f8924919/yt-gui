@@ -76,6 +76,13 @@ STRINGS: dict[str, str] = {
     "label_proxy_username": "Username:",
     "label_proxy_password": "Password:",
     "proxy_help": "Specify a proxy used for yt-dlp traffic.\nExample: http://user:pass@host:port or socks5h://host:port\nThe password is stored in plain text in the settings file.",
+    "tab_extension": "Browser",
+    "label_extension_enabled": "Enable browser extension integration",
+    "label_extension_port": "Listen port:",
+    "label_extension_token": "Token:",
+    "btn_extension_copy_token": "Copy",
+    "btn_extension_regen_token": "Regenerate",
+    "extension_help": "Receive the current video's URL and cookies from the browser extension and add them to the queue.\nThe server listens on 127.0.0.1 (this PC only). Paste the token into the extension's settings.\nIf the port is busy, the next candidates (8719 then 8720) are tried automatically. Restart the app to apply a port change.",
     "warn_proxy_no_host": "Please enter the proxy host.",
     "warn_proxy_bad_port": "The proxy port must be an integer between 1 and 65535.",
     # original format detail panel
