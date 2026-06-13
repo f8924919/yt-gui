@@ -671,9 +671,7 @@ class SettingsDialog(QDialog):
         self._extension_port_spin.setValue(
             self._settings.extension_port or EXTENSION_SERVER_DEFAULT_PORT
         )
-        layout.addWidget(
-            self._extension_port_spin, 1, 1, Qt.AlignmentFlag.AlignLeft
-        )
+        layout.addWidget(self._extension_port_spin, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addWidget(
             QLabel(t("label_extension_token")), 2, 0, Qt.AlignmentFlag.AlignRight
