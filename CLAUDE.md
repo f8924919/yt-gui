@@ -62,11 +62,11 @@ source .venv/bin/activate # Linux/Mac
 ## Lint / Format / 型チェック
 
 ```bash
-# Lint（問題の検出）
-uv run ruff check yt_gui/
+# Lint（問題の検出。CI も同じくリポジトリ全体を対象）
+uv run ruff check .
 
 # Lint + 自動修正
-uv run ruff check --fix yt_gui/
+uv run ruff check --fix .
 
 # フォーマット（差分確認のみ）
 uv run ruff format --check yt_gui/

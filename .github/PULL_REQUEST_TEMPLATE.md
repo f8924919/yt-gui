@@ -14,7 +14,7 @@ Closes #
 
 <!-- ローカルで実施した確認。CI でも Test ワークフローが lint/format/型/テストを実行します。 -->
 
-- [ ] `uv run ruff check yt_gui/`
+- [ ] `uv run ruff check .`
 - [ ] `uv run ruff format --check yt_gui/`
 - [ ] `uv run mypy yt_gui/`
 - [ ] `uv run pytest`
