@@ -2,7 +2,7 @@
 
 [← 目次](../index.md)
 
-> 関連実装: [extension_server.py](../../arch/extension_server.md)（受信サーバー）・[app.py — ブラウザ拡張連携](../../arch/app.md#ブラウザ拡張連携)（配線）・[queue_controller.py](../../arch/queue_controller.md)（アイテム単位 Cookies）。拡張機能（JS）は未実装。
+> 関連実装: [extension_server.py](../../arch/extension_server.md)（受信サーバー）・[app.py — ブラウザ拡張連携](../../arch/app.md#ブラウザ拡張連携)（配線）・[queue_controller.py](../../arch/queue_controller.md)（アイテム単位 Cookies）・拡張機能本体は [`extension/`](../../../extension/README.md)。
 > 関連仕様: [ダウンロードキュー](queue.md) ・ [ダウンロード動作 — Cookies](download-behavior.md#cookies) ・ [設定管理](../settings.md)
 
 ## 概要
@@ -92,8 +92,12 @@
 | 整形 | Netscape cookies.txt 形式へ変換して送信 |
 | 権限 | `cookies`、対象ドメインの `host_permissions`、`http://127.0.0.1/*` への接続 |
 | 設定 | オプション画面でトークンとポートを設定 |
+| 結果表示 | ツールバーアイコンのバッジ（`OK` / `403` / `OFF` / `KEY` / `ERR`）で送信結果を通知 |
+| ポート追従 | 設定ポート → +1 → +2 を順に試し、接続失敗時のみ次へ（アプリのフォールバックに追従）。HTTP 応答が返ったら停止 |
 
 > Manifest V3 の Service Worker は常駐しないため、送信時に都度 `fetch` する設計とし、常時接続は張りません。
+
+実体は [`extension/`](../../../extension/README.md) に配置（unpacked 読み込み）。
 
 ---
 

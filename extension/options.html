@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>yt-gui Connector 設定</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 16px;
+        max-width: 480px;
+        font-size: 14px;
+      }
+      h1 {
+        font-size: 16px;
+      }
+      label {
+        display: block;
+        margin-top: 12px;
+        font-weight: bold;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px;
+        margin-top: 4px;
+      }
+      input[type="number"] {
+        width: 120px;
+      }
+      button {
+        margin-top: 16px;
+        padding: 6px 16px;
+      }
+      .note {
+        color: #666;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      #status {
+        margin-top: 12px;
+        color: #2e7d32;
+        min-height: 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>yt-gui Connector 設定</h1>
+
+    <label for="token">トークン</label>
+    <input type="text" id="token" placeholder="yt-gui の設定画面で発行したトークン" />
+
+    <label for="port">受信ポート</label>
+    <input type="number" id="port" min="1" max="65535" value="8718" />
+
+    <button id="save">保存</button>
+    <div id="status"></div>
+
+    <p class="note">
+      yt-gui の「設定 → ブラウザ連携」でサーバーを有効化し、表示されるトークンを
+      上の欄に貼り付けてください。ポートは yt-gui 側と同じ値にします（既定 8718）。
+      ポートが使用中で yt-gui がフォールバックした場合に備え、拡張は 8718〜8720 を
+      自動的に試します。
+    </p>
+
+    <script src="options.js"></script>
+  </body>
+</html>
