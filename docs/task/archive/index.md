@@ -23,6 +23,7 @@
 | [108-parallel-downloads.md](108-parallel-downloads.md) | 並列ダウンロード（複数アイテム同時実行）＋キュー行単位の進捗表示。Downloader を N プール化・ステータス列に進捗 %・ステータスバーを全体進捗に変更（Issue #108 / PR #110） | 2026-06-08 |
 | [120-recode-video.md](120-recode-video.md) | 互換性優先の H.264 MP4 再エンコード出力を追加（`FFmpegVideoConvertor` で H.264/AAC 強制・中間 mkv 固定）。#120 Phase 1（Issue #120 / PR #121） | 2026-06-09 |
 | [120-nico-hardsub.md](120-nico-hardsub.md) | ニコニコ動画コメントの焼きこみ（ハードサブ）出力を追加（`ass` フィルタで H.264/AAC MP4 を別生成・ソフトサブ MKV と併設）。#120 Phase 2＝#120 完結（Issue #120 / PR #123） | 2026-06-09 |
+| [browser-extension.md](browser-extension.md) | ブラウザ拡張から URL + Cookie をワンクリックでキュー追加（ローカル受信サーバー・アイテム単位 Cookie・設定タブ・MV3 拡張）。途中で `cookiefile` キー誤りの pre-existing バグも修正、CI lint を `ruff check .` に拡張（Issue #140 / PR #141） | 2026-06-13 |
 
 ## バグ修正
 

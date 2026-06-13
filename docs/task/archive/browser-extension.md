@@ -4,7 +4,7 @@
 
 - Issue: [#140](https://github.com/f8924919/yt-gui/issues/140)
 - ブランチ: `feature/140-browser-extension`
-- 関連 spec: [browser-extension.md](../spec/features/browser-extension.md) / [download-behavior.md#cookies](../spec/features/download-behavior.md#cookies) / [queue.md](../spec/features/queue.md)
+- 関連 spec: [browser-extension.md](../../spec/features/browser-extension.md) / [download-behavior.md#cookies](../../spec/features/download-behavior.md#cookies) / [queue.md](../../spec/features/queue.md)
 
 ## 背景
 
