@@ -36,7 +36,7 @@
 ## 進め方（フェーズ）
 
 1. **docs 先行（完了）**: spec ファイル化・index/関連 spec 追記。
-2. アイテム単位 Cookies: `_QueueItem.cookies_path` + worker のフォールバック解決 + テスト。
+2. **アイテム単位 Cookies（完了）**: `_QueueItem.cookies_path` 追加・`enqueue_single(cookies_path=...)`・worker のフォールバック解決（アイテム固有 > グローバル、欠落時は警告して cookies なし続行）・テスト 5 件・arch 更新。
 3. ローカル受信サーバー: `127.0.0.1` 限定・トークン/Origin 認証・`POST /enqueue`・一時ファイル管理 + テスト。
 4. 設定 UI: ブラウザ連携の有効化・トークン・ポート。
 5. 拡張機能（unpacked）: URL/cookies 取得・送信・オプション画面。

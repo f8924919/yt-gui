@@ -147,6 +147,101 @@ def test_worker_archived_item_marked_skipped(controller, qtbot):
     assert item.status == "skipped"
 
 
+# ── アイテム単位 Cookies ──────────────────────────────────────────────────
+# 対応 spec: docs/spec/features/browser-extension.md / queue.md
+
+
+def test_enqueue_single_stores_item_cookies_path(controller):
+    """enqueue_single の cookies_path がアイテムに保存されること。"""
+    job = build_job_spec("fmt_best_mp4", Settings())
+    item = controller.enqueue_single(
+        "https://example.com/v", "動画", "MP4", job, cookies_path="/tmp/c.txt"
+    )
+    assert item.cookies_path == "/tmp/c.txt"
+
+
+def test_enqueue_single_cookies_path_defaults_none(controller):
+    """cookies_path 未指定時は None（従来挙動）。"""
+    item = _enqueue(controller)
+    assert item.cookies_path is None
+
+
+def test_worker_prefers_item_cookies_over_global(controller, qtbot, tmp_path):
+    """アイテム固有 cookies_path がグローバル設定より優先されること。"""
+    cookie_file = tmp_path / "item_cookies.txt"
+    cookie_file.write_text("# Netscape HTTP Cookie File\n")
+    job = build_job_spec("fmt_best_mp4", Settings())
+    controller.enqueue_single(
+        "https://example.com/v", "動画", "MP4", job, cookies_path=str(cookie_file)
+    )
+
+    captured: dict = {}
+
+    def _dv(url, job, cookies_path, **kwargs):
+        captured["cookies_path"] = cookies_path
+        captured["cookies_browser"] = kwargs.get("cookies_browser")
+        controller._paused = True
+        return None
+
+    controller._downloader.download_video.side_effect = _dv
+
+    # グローバルはブラウザ取得。アイテム固有（ファイル）が勝つこと。
+    assert controller.start(lambda: (None, "chrome")) is True
+    qtbot.waitUntil(lambda: not controller.is_running, timeout=2000)
+    assert captured["cookies_path"] == str(cookie_file)
+    assert captured["cookies_browser"] is None
+
+
+def test_worker_falls_back_to_global_when_item_has_no_cookies(controller, qtbot):
+    """アイテムに cookies_path が無ければグローバル設定にフォールバック。"""
+    _enqueue(controller)
+    captured: dict = {}
+
+    def _dv(url, job, cookies_path, **kwargs):
+        captured["cookies_path"] = cookies_path
+        captured["cookies_browser"] = kwargs.get("cookies_browser")
+        controller._paused = True
+        return None
+
+    controller._downloader.download_video.side_effect = _dv
+
+    assert controller.start(lambda: (None, "chrome")) is True
+    qtbot.waitUntil(lambda: not controller.is_running, timeout=2000)
+    assert captured["cookies_path"] is None
+    assert captured["cookies_browser"] == "chrome"
+
+
+def test_worker_warns_and_drops_missing_item_cookies(controller, qtbot):
+    """アイテム固有 cookies のファイルが無ければ警告し、cookies なしで続行
+    （グローバルにはフォールバックしない）。"""
+    job = build_job_spec("fmt_best_mp4", Settings())
+    controller.enqueue_single(
+        "https://example.com/v",
+        "動画",
+        "MP4",
+        job,
+        cookies_path="/nonexistent/item_cookies.txt",
+    )
+
+    captured: dict = {}
+
+    def _dv(url, job, cookies_path, **kwargs):
+        captured["cookies_path"] = cookies_path
+        captured["cookies_browser"] = kwargs.get("cookies_browser")
+        controller._paused = True
+        return None
+
+    controller._downloader.download_video.side_effect = _dv
+
+    with qtbot.waitSignal(controller.show_warning, timeout=2000):
+        # グローバルは browser 指定でも、欠落アイテム cookies はそちらへ
+        # フォールバックしないこと。
+        assert controller.start(lambda: (None, "chrome")) is True
+    qtbot.waitUntil(lambda: not controller.is_running, timeout=2000)
+    assert captured["cookies_path"] is None
+    assert captured["cookies_browser"] is None
+
+
 # ── 並列ダウンロード（同時実行）・進捗表示 ──────────────────────────────────
 
 

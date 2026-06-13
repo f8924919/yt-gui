@@ -43,6 +43,10 @@ class _QueueItem:
     playlist_title: str | None = None
     playlist_index: int | None = None
     thumbnail_url: str | None = None
+    # アイテム固有の cookies.txt パス（ブラウザ拡張連携で付与）。None なら
+    # グローバル設定の Cookies を使用する。詳細は
+    # docs/spec/features/browser-extension.md。
+    cookies_path: str | None = None
     status: str = "waiting"
     progress: float = 0.0  # ダウンロード進捗（0〜100）。行のステータス列に表示
     tree_item: QTreeWidgetItem | None = None
@@ -146,6 +150,7 @@ class QueueController(QObject):
         job: JobSpec,
         *,
         thumbnail_url: str | None = None,
+        cookies_path: str | None = None,
     ) -> _QueueItem:
         self._item_counter += 1
         item = _QueueItem(
@@ -154,6 +159,7 @@ class QueueController(QObject):
             format_label=format_label,
             job=job,
             thumbnail_url=thumbnail_url,
+            cookies_path=cookies_path,
         )
         with self._lock:
             self._items.append(item)
@@ -360,7 +366,14 @@ class QueueController(QObject):
 
             downloader.status_callback = make_cb(item)
 
-            cookies_path, cookies_browser = cookies_resolver()
+            # アイテム固有 cookies（拡張連携）を最優先。無ければグローバル設定に
+            # フォールバックする（docs/spec/features/queue.md「Cookies の解決」）。
+            cookies_path: str | None
+            cookies_browser: str | None
+            if item.cookies_path:
+                cookies_path, cookies_browser = item.cookies_path, None
+            else:
+                cookies_path, cookies_browser = cookies_resolver()
             if cookies_path and not os.path.isfile(cookies_path):
                 self.show_warning.emit(
                     t("warn_title"),

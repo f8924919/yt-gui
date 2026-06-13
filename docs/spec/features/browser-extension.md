@@ -2,7 +2,7 @@
 
 [← 目次](../index.md)
 
-> 関連実装: （未実装。実装時に arch リンクを張る）
+> 関連実装: [yt_gui/queue_controller.py](../../arch/queue_controller.md)（アイテム単位 Cookies）。ローカル受信サーバー・拡張機能は未実装（実装時に arch リンクを張る）。
 > 関連仕様: [ダウンロードキュー](queue.md) ・ [ダウンロード動作 — Cookies](download-behavior.md#cookies) ・ [設定管理](../settings.md)
 
 ## 概要
