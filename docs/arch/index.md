@@ -26,6 +26,7 @@
 | [settings_dialog.md](settings_dialog.md) | `settings_dialog.py` — 設定ダイアログ | [設定ダイアログ](../spec/screens/settings-dialog.md) |
 | [log_dialog.md](log_dialog.md) | `log_dialog.py` — ログ表示ダイアログ | [ログダイアログ](../spec/screens/log-dialog.md) |
 | [settings.md](settings.md) | `settings.py` — 設定の読み書き | [設定管理](../spec/settings.md) |
+| [extension_server.md](extension_server.md) | `extension_server.py` — ブラウザ拡張連携のローカル受信サーバー | [ブラウザ拡張連携](../spec/features/browser-extension.md) |
 | [formats.md](formats.md) | `formats.py` — フォーマット定数・仕様生成関数 | [ダウンロード形式](../spec/features/download-formats.md) |
 | [job_spec.md](job_spec.md) | `job_spec.py` — `JobSpec` DTO と `build_job_spec` (`format_id` 派生ラダー集約) | [ダウンロード形式](../spec/features/download-formats.md) / [ダウンロード動作](../spec/features/download-behavior.md) |
 | [output_template.md](output_template.md) | `output_template.py` — OUTPUT TEMPLATE 定数・検証/プレビュー補助 | [設定管理](../spec/settings.md) |
