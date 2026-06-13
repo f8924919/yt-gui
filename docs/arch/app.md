@@ -1,6 +1,6 @@
 # yt_gui/app.py
 
-> 関連仕様: [メインウィンドウ](../spec/screens/main-window.md) ・ [ダウンロードキュー](../spec/features/queue.md)
+> 関連仕様: [メインウィンドウ](../spec/screens/main-window.md) ・ [ダウンロードキュー](../spec/features/queue.md) ・ [ブラウザ拡張連携](../spec/features/browser-extension.md)
 
 ## クラス: `App(QMainWindow)`
 

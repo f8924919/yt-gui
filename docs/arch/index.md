@@ -16,7 +16,7 @@
 | ドキュメント | モジュール | 関連仕様 |
 |---|---|---|
 | [entry.md](entry.md) | `__main__.py` / `__init__.py` — エントリーポイント・リソースパス解決 | — |
-| [app.md](app.md) | `app.py` — メインウィンドウ・ウィジェット組み立て・シグナル配線 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) |
+| [app.md](app.md) | `app.py` — メインウィンドウ・ウィジェット組み立て・シグナル配線 | [メインウィンドウ](../spec/screens/main-window.md) / [ダウンロードキュー](../spec/features/queue.md) / [ブラウザ拡張連携](../spec/features/browser-extension.md) |
 | [queue_controller.md](queue_controller.md) | `queue_controller.py` — キュー所有・ワーカースレッド・編集モード状態機械 | [ダウンロードキュー](../spec/features/queue.md) |
 | [thumbnail_cache.md](thumbnail_cache.md) | `thumbnail_cache.py` — 動画サムネイル画像の非同期取得・キャッシュ | — |
 | [threading_utils.md](threading_utils.md) | `threading_utils.py` — バックグラウンドスレッド + Qt シグナル転送の共通ヘルパ | — |

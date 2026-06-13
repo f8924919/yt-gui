@@ -16,7 +16,7 @@
 | ファイル | 内容 |
 |---|---|
 | [メインウィンドウ](screens/main-window.md) | URL入力・形式選択・キュー表示・ステータスバー・メニューバー |
-| [設定ダイアログ](screens/settings-dialog.md) | 一般タブ・画質音質タブ・ファイル名タブ・ダウンロードタブ・プロキシタブ |
+| [設定ダイアログ](screens/settings-dialog.md) | 一般タブ・画質音質タブ・ファイル名タブ・ダウンロードタブ・プロキシタブ・ブラウザ連携タブ |
 | [オリジナル形式ダイアログ](screens/original-format-dialog.md) | オリジナル形式パネルを内包するモーダルダイアログ・起動/追加/編集フロー |
 | [オリジナル形式パネル](screens/original-format-panel.md) | 映像/音声/字幕トラック選択・出力形式・メタデータ設定 |
 | [ログダイアログ](screens/log-dialog.md) | 動作ログ表示・クリア |
