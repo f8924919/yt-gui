@@ -57,6 +57,6 @@
 - [x] Issue 起票（#149）・ブランチ作成・investigate
 - [x] docs 先行更新
 - [x] テスト先行（test_formats / test_extension_server / test_extension）
-- [x] 実装 → green（347 passed・ruff・mypy・format OK）
-- [ ] verify-gate
+- [x] 実装 → green（351 passed・ruff・mypy・format OK）
+- [x] verify-gate（verify green / docs-check PASS / evaluator PASS）
 - [ ] PR
