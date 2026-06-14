@@ -44,6 +44,9 @@
   "kindAudio": {
     "message": "音声のみ"
   },
+  "kindOriginal": {
+    "message": "オリジナル形式（アプリで選択）"
+  },
   "resolutionLabel": {
     "message": "解像度の上限"
   },

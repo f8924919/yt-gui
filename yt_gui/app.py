@@ -2,6 +2,7 @@ import dataclasses
 import os
 import sys
 import tempfile
+from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
@@ -34,7 +35,11 @@ from PySide6.QtWidgets import (
 from . import get_resource_base, get_version, i18n
 from .downloader import Downloader
 from .extension_server import ExtensionServer
-from .formats import FORMAT_KEYS, resolve_extension_format
+from .formats import (
+    FORMAT_KEYS,
+    OriginalIntent,
+    resolve_extension_format,
+)
 from .i18n import t
 from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
@@ -279,6 +284,9 @@ class App(QMainWindow):
         # ブラウザ拡張連携のローカル受信サーバー（既定は無効）。
         self._extension_server: ExtensionServer | None = None
         self._ext_cookies_dir: tempfile.TemporaryDirectory | None = None
+        # 拡張から kind=original を受けたときのダイアログ起動待ち行列（直列化）。
+        self._pending_original_requests: deque[tuple[str, str | None]] = deque()
+        self._original_dialog_active = False
         self._signals.extension_enqueue.connect(self._on_extension_enqueue)
         self._sync_extension_server()
 
@@ -799,23 +807,113 @@ class App(QMainWindow):
         return dialog
 
     def _make_original_dialog(
-        self, mode: str, restore_settings: dict | None
+        self,
+        mode: str,
+        restore_settings: dict | None,
+        *,
+        get_url: Callable[[], str] | None = None,
+        get_cookies: Callable[[], tuple[str | None, str | None]] | None = None,
+        add_handler: Callable[[OriginalFormatDialog], None] | None = None,
     ) -> OriginalFormatDialog:
+        """オリジナル形式ダイアログを生成する。
+
+        既定では URL/Cookies はメイン画面（URL 入力欄・グローバル設定）を参照する。
+        拡張起点（kind=original）では `get_url` / `get_cookies` / `add_handler` を
+        注入し、拡張由来 URL とアイテム単位 Cookies を使う。
+        """
         dialog = OriginalFormatDialog(
             self,
             downloader=self.downloader,
-            get_url=lambda: self.url_entry.text().strip(),
-            get_cookies=self._resolve_cookies,
+            get_url=get_url or (lambda: self.url_entry.text().strip()),
+            get_cookies=get_cookies or self._resolve_cookies,
             update_status=lambda text, pct: self._signals.status_update.emit(text, pct),
             video_container=self._settings.video_container,
             audio_label=self._build_audio_label(),
             mode=mode,
             restore_settings=restore_settings,
         )
-        dialog.add_requested.connect(lambda: self._on_dialog_add_requested(dialog))
+        if add_handler is not None:
+            dialog.add_requested.connect(lambda: add_handler(dialog))
+        else:
+            dialog.add_requested.connect(lambda: self._on_dialog_add_requested(dialog))
         dialog.edit_applied.connect(lambda: self._on_dialog_edit_applied(dialog))
         dialog.edit_cancelled.connect(self._cancel_edit)
         return dialog
+
+    # ── 拡張からのオリジナル形式（アプリ側ダイアログ起動・Issue #151） ──────────
+
+    def _enqueue_original_dialog_request(
+        self, url: str, item_cookies_path: str | None
+    ) -> None:
+        """拡張から kind=original を受けたとき、ダイアログ起動を待ち行列へ積む。
+
+        受信スロット内で直接 `exec()` を呼ぶとイベントループがネストするため、
+        `QTimer.singleShot(0, ...)` でスロットを抜けてからディスパッチする。
+        """
+        self._pending_original_requests.append((url, item_cookies_path))
+        QTimer.singleShot(0, self._dispatch_next_original_dialog)
+
+    def _dispatch_next_original_dialog(self) -> None:
+        """待ち行列から 1 件取り出し、オリジナル形式ダイアログを直列に表示する。
+
+        多重モーダルを開かないよう `_original_dialog_active` で再入を防ぐ。
+        ダイアログが閉じたら次の 1 件を処理する。
+        """
+        if self._original_dialog_active or not self._pending_original_requests:
+            return
+        url, item_cookies_path = self._pending_original_requests.popleft()
+        self._original_dialog_active = True
+        try:
+            self._bring_window_to_front()
+            dialog = self._make_original_dialog(
+                "add",
+                None,
+                get_url=lambda: url,
+                get_cookies=lambda: (item_cookies_path, None),
+                add_handler=lambda d: self._on_extension_dialog_add(
+                    d, url, item_cookies_path
+                ),
+            )
+            dialog.exec()
+        finally:
+            self._original_dialog_active = False
+        # exec 中に積まれた次の要求を処理する。
+        self._dispatch_next_original_dialog()
+
+    def _bring_window_to_front(self) -> None:
+        """最小化中なら復元し、メインウィンドウを前面化する。"""
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _on_extension_dialog_add(
+        self, dialog: OriginalFormatDialog, url: str, item_cookies_path: str | None
+    ) -> None:
+        """拡張起点のオリジナル形式ダイアログで確定したときのキュー追加。
+
+        メイン画面の URL 入力欄は使わず、拡張由来 URL とアイテム単位 Cookies を
+        用いる。プローブ・確定後 DL の双方へ Cookies を適用する。
+        """
+        panel = dialog.panel
+        job, format_label = self._build_original_job(dialog)
+        if panel.has_formats_loaded():
+            self.queue.enqueue_single(
+                url,
+                panel.get_fetched_title(),
+                format_label,
+                job,
+                cookies_path=item_cookies_path,
+            )
+        else:
+            self._start_add_thread(
+                url,
+                item_cookies_path,
+                None,
+                job,
+                format_label,
+                item_cookies_path=item_cookies_path,
+            )
 
     def _build_original_job(self, dialog: OriginalFormatDialog) -> tuple[JobSpec, str]:
         """ダイアログ内包パネルから `JobSpec` と表示用ラベルを組み立て、
@@ -1179,6 +1277,18 @@ class App(QMainWindow):
             default_audio_format=self._settings.audio_format,
             default_mp3_bitrate=self._settings.mp3_bitrate,
         )
+        self._log(t("log_extension_received").format(url=url))
+        # 診断: 受信した Cookie の件数だけをログに出す（値は記録しない）。
+        # 0 件なら capture 側（未ログイン・プロファイル違い・権限）を疑う。
+        count = self._count_cookies(cookies)
+        if count:
+            self._log(t("log_extension_cookies").format(count=count))
+        else:
+            self._log(t("log_extension_no_cookies"))
+        if isinstance(resolved, OriginalIntent):
+            # オリジナル形式は形式を確定せず、アプリ側ダイアログで詰める。
+            self._enqueue_original_dialog_request(url, cookies_path)
+            return
         if resolved is None:
             format_id, format_label = self._extension_default_format()
             job = build_job_spec(format_id, self._settings)
@@ -1194,14 +1304,6 @@ class App(QMainWindow):
                 FORMAT_KEYS.index(format_id)
             ]
             job = build_job_spec(format_id, eff_settings)
-        self._log(t("log_extension_received").format(url=url))
-        # 診断: 受信した Cookie の件数だけをログに出す（値は記録しない）。
-        # 0 件なら capture 側（未ログイン・プロファイル違い・権限）を疑う。
-        count = self._count_cookies(cookies)
-        if count:
-            self._log(t("log_extension_cookies").format(count=count))
-        else:
-            self._log(t("log_extension_no_cookies"))
         self._start_add_thread(
             url, cookies_path, None, job, format_label, item_cookies_path=cookies_path
         )
