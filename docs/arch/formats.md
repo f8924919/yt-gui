@@ -1,6 +1,6 @@
 # yt_gui/formats.py
 
-> 関連仕様: [ダウンロード形式](../spec/features/download-formats.md)
+> 関連仕様: [ダウンロード形式](../spec/features/download-formats.md) / [ブラウザ拡張連携](../spec/features/browser-extension.md)
 
 フォーマット仕様の定数と、yt-dlp フォーマット文字列を生成するユーティリティ。
 
