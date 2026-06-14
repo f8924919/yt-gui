@@ -184,7 +184,9 @@ def _post(port, body, token=TOKEN, origin=EXT_ORIGIN):
 def test_server_binds_and_handles_post():
     captured: list = []
     server = ExtensionServer(
-        TOKEN, lambda *a: captured.append(a), port=0  # 0 = OS 任意ポート
+        TOKEN,
+        lambda *a: captured.append(a),
+        port=0,  # 0 = OS 任意ポート
     )
     port = server.start()
     try:

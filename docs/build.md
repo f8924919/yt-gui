@@ -133,7 +133,7 @@ OS 非依存の成果物として、ブラウザ拡張の zip を Linux ラン�
 
 | 成果物 | 内容 |
 |---|---|
-| `yt-gui-extension-{version}.zip` | `extension/` 一式（`manifest.json` / `background.js` / `options.*` / `_locales/` / `icons/`）。zip 化の直前に `scripts/sync_extension_version.py` で `manifest.json` の version を `pyproject.toml` に同期する |
+| `yt-gui-extension-{version}.zip` | `extension/` 一式（`manifest.json` / `background.js` / `popup.*` / `format_choice.js` / `options.*` / `_locales/` / `icons/`）。zip 化の直前に `scripts/sync_extension_version.py` で `manifest.json` の version を `pyproject.toml` に同期する |
 
 - macOS は arm64 / x86_64 の 2 アーキを別ランナーでビルドする。`PyInstaller` は `target_arch=None`（ランナーのネイティブ arch）でビルドし、deno・ffmpeg・ffprobe はダウンロード時に `platform.machine()` で arch を解決するため、ランナーごとに対応 arch のバイナリが同梱される。zip 名は matrix の `macos_arch` で出し分ける。
   - Intel ランナーは `macos-13` 退役後の標準 Intel イメージ `macos-15-intel` を使用する。

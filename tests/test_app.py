@@ -506,6 +506,84 @@ def test_on_extension_enqueue_without_cookies(app, monkeypatch):
     assert captured["item_cookies_path"] is None
 
 
+def _capture_enqueue_job(app, monkeypatch):
+    """`_start_add_thread` をフックして (job, label) を捕捉するヘルパ。"""
+    captured = {}
+
+    def _fake_start(
+        url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
+    ):
+        captured.update(job=job, label=label)
+
+    monkeypatch.setattr(app, "_start_add_thread", _fake_start)
+    return captured
+
+
+def test_on_extension_enqueue_audio_flac_overrides_per_item(app, monkeypatch):
+    """拡張から audio/flac を指定するとアイテムにのみ反映し、グローバル設定は不変。"""
+    app._settings.audio_format = "mp3"  # グローバルは mp3 のまま
+    captured = _capture_enqueue_job(app, monkeypatch)
+
+    app._on_extension_enqueue(
+        "https://example.com/v", None, {"kind": "audio", "audio_format": "flac"}
+    )
+
+    job = captured["job"]
+    assert job.format_id == "fmt_mp3"
+    assert job.audio_codec == "flac"
+    assert job.audio_only is True
+    # グローバル設定は変更されない（アイテム単位の上書き）
+    assert app._settings.audio_format == "mp3"
+
+
+def test_on_extension_enqueue_audio_mp3_bitrate_override(app, monkeypatch):
+    app._settings.audio_format = "mp3"
+    app._settings.mp3_bitrate = "192"
+    captured = _capture_enqueue_job(app, monkeypatch)
+
+    app._on_extension_enqueue(
+        "https://example.com/v",
+        None,
+        {"kind": "audio", "audio_format": "mp3", "mp3_bitrate": "320"},
+    )
+
+    job = captured["job"]
+    assert job.format_id == "fmt_mp3"
+    assert job.mp3_bitrate == "320"
+    assert app._settings.mp3_bitrate == "192"  # グローバル不変
+
+
+def test_on_extension_enqueue_resolution_override_keeps_container(app, monkeypatch):
+    app._settings.video_resolution = "720"
+    app._settings.video_container = "mkv"  # コンテナはアプリ設定に従う
+    captured = _capture_enqueue_job(app, monkeypatch)
+
+    app._on_extension_enqueue(
+        "https://example.com/v", None, {"kind": "resolution", "resolution": "1080"}
+    )
+
+    job = captured["job"]
+    assert job.format_id == "fmt_720p"
+    assert "1080" in job.format_spec  # 指定解像度が反映
+    assert job.video_container == "mkv"  # 拡張はコンテナを送らない
+    # ラベルも実効 settings 基準（解像度 1080）で生成される
+    assert "1080" in captured["label"]
+    assert app._settings.video_resolution == "720"  # グローバル不変
+
+
+def test_on_extension_enqueue_app_default_uses_combo_selection(app, monkeypatch):
+    """app_default / 不正 format は従来どおりメイン画面の選択形式を使う。"""
+    captured = _capture_enqueue_job(app, monkeypatch)
+
+    app._on_extension_enqueue("https://example.com/v", None, {"kind": "app_default"})
+    default_job = captured["job"]
+
+    # 形式未指定（None）と同じ挙動になる
+    captured2 = _capture_enqueue_job(app, monkeypatch)
+    app._on_extension_enqueue("https://example.com/v", None, None)
+    assert captured2["job"].format_id == default_job.format_id
+
+
 def test_sync_extension_server_starts_and_stops(app, monkeypatch):
     """有効化（トークン有）で起動、無効化で停止すること。"""
     started = {"n": 0}

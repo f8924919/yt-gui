@@ -163,7 +163,7 @@
 
 ### リリース zip
 
-- リリース時、CI が拡張一式（`manifest.json` / `background.js` / `options.*` / `_locales/` / `icons/`）を `yt-gui-extension-{version}.zip` に固め、GitHub Release のアセットとして添付する。
+- リリース時、CI が拡張一式（`manifest.json` / `background.js` / `popup.*` / `format_choice.js` / `options.*` / `_locales/` / `icons/`）を `yt-gui-extension-{version}.zip` に固め、GitHub Release のアセットとして添付する。
 - zip の version はバージョン同期後の値で、アプリ本体と一致する。詳細は [docs/build.md](../../build.md) を参照。
 
 ---
