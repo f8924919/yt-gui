@@ -25,6 +25,16 @@
 
 解像度上限つきのフォーマット文字列を返す。
 
+### `resolve_extension_format(fmt, *, default_resolution, default_audio_format, default_mp3_bitrate) -> ResolvedExtensionFormat | None`
+
+ブラウザ拡張から受け取った[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)（`dict | None`）を、許可値へクランプ済みの形式情報に正規化する **Qt 非依存の pure function**。`app.py` の `_on_extension_enqueue` から呼ぶ。
+
+- 返り値 `ResolvedExtensionFormat`（`@dataclass(frozen=True)`）: `format_id`（`fmt_best_mp4` / `fmt_720p` / `fmt_mp3`）と実効 `resolution` / `audio_format` / `mp3_bitrate`。呼び出し側はこれを `dataclasses.replace(settings, ...)` に流して `build_job_spec` に渡す。
+- **`None` を返す = アプリ既定形式を使う**（`kind == "app_default"` / `fmt` が `None` / dict でない / `kind` が未知）。
+- クランプ: `resolution` は `VIDEO_RESOLUTIONS`、`audio_format` は `AUDIO_FORMATS`、`mp3_bitrate` は `MP3_BITRATES` に含まれない・欠落なら対応する `default_*` へフォールバック。
+- container は受け取らない（拡張はコンテナを指定しない。実コンテナはアプリ設定に従う）。
+- `fmt_original` は拡張からは指定できない（`kind` に存在しない）。
+
 ## コンテナ別フォーマット文字列の方針
 
 | コンテナ | フォーマット制約 |

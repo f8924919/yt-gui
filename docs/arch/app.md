@@ -97,8 +97,8 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 | `_start_extension_server()` | トークンが空なら起動しない（`log_extension_no_token`）。`ExtensionServer.start()` で `127.0.0.1` にバインド、失敗時は `log_extension_bind_failed` |
 | `_stop_extension_server()` | サーバーを停止して参照を破棄 |
 | `_emit_extension_enqueue(url, cookies, fmt)` | **サーバースレッド**から呼ばれ、`extension_enqueue` シグナルでメインスレッドへ委譲（Qt ウィジェットを直接触らない） |
-| `_on_extension_enqueue(url, cookies, fmt)` | **メインスレッド**。cookies を一時ファイル化し、`_extension_default_format()` の形式で `_start_add_thread(..., item_cookies_path=...)` を起動。`fmt` は MVP では無視 |
-| `_extension_default_format()` | メイン画面のコンボ現在選択を使う。`fmt_original`（ダイアログ必須）のときは `fmt_best_mp4` へフォールバック |
+| `_on_extension_enqueue(url, cookies, fmt)` | **メインスレッド**。cookies を一時ファイル化し、`fmt`（[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)・`dict\|None`）を [`resolve_extension_format`](formats.md) でクランプ。結果が `None`（`app_default`/欠落/未知）なら `_extension_default_format()`、それ以外は実効 `Settings`（`dataclasses.replace` で `resolution`/`audio_format`/`mp3_bitrate` を上書き）で `build_job_spec` を呼び、`_start_add_thread(..., item_cookies_path=...)` を起動 |
+| `_extension_default_format()` | `app_default`（拡張が形式を指定しない）時のフォールバック。メイン画面のコンボ現在選択を使う。`fmt_original`（ダイアログ必須）のときは `fmt_best_mp4` へフォールバック |
 | `_write_extension_cookies(cookies)` | `tempfile.TemporaryDirectory` 配下に 0600 で cookies.txt を書き、パスを返す（失敗時 `None`） |
 | `closeEvent(event)` | サーバー停止と一時 cookies ディレクトリの掃除 |
 

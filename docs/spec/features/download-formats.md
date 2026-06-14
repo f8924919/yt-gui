@@ -93,3 +93,17 @@
 | `flac` | `FLAC (音声のみ)` |
 
 MP3 サムネイル埋め込みチェックボックスは、音声形式が `mp3` のときのみ表示されます（FLAC では非表示）。
+
+---
+
+## アイテム単位の形式上書き（ブラウザ拡張連携）
+
+通常、解像度・コンテナ・音声形式・MP3 ビットレートはアプリのグローバル設定から決まります。ただし[ブラウザ拡張連携](browser-extension.md#形式指定オブジェクトformat)から形式を指定して追加した場合は、**そのキューアイテムにのみ**以下を上書き適用します（グローバル設定は変更しない）。
+
+| 拡張の `kind` | アイテムに反映する形式 | 上書きするパラメータ |
+|---|---|---|
+| `best` | `fmt_best_mp4` | なし（コンテナはアプリ設定） |
+| `resolution` | `fmt_720p` | `resolution` |
+| `audio` | `fmt_mp3` | `audio_format`(mp3/flac) ・ `mp3_bitrate` |
+
+`audio_format` は従来グローバル設定のみでしたが、拡張からの `kind: audio` 指定時に限りアイテム単位の上書きを許容します。値は許可値（[設定値の選択肢](#設定値の選択肢)）へクランプし、コンテナは拡張から指定できません。実装は [`resolve_extension_format`](../../arch/formats.md) と [`build_job_spec`](../../arch/job_spec.md)（実効 `Settings` を `dataclasses.replace` で生成）が担います。

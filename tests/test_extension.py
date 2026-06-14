@@ -81,6 +81,20 @@ def test_manifest_is_valid_mv3():
     assert m["description"].isascii()
 
 
+def test_manifest_declares_popup():
+    """action に default_popup を宣言し、popup ファイルが存在する。"""
+    m = _read_json(os.path.join(_EXT, "manifest.json"))
+    popup = m["action"]["default_popup"]
+    assert os.path.isfile(os.path.join(_EXT, popup)), popup
+    assert os.path.isfile(os.path.join(_EXT, "popup.js"))
+
+
+def test_manifest_declares_context_menus_permission():
+    """右クリックメニュー（即送信）用に contextMenus 権限を宣言する。"""
+    m = _read_json(os.path.join(_EXT, "manifest.json"))
+    assert "contextMenus" in m["permissions"]
+
+
 def test_manifest_declares_icons_for_all_sizes():
     m = _read_json(os.path.join(_EXT, "manifest.json"))
     for sizes_block in (m["icons"], m["action"]["default_icon"]):

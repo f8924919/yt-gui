@@ -1,11 +1,14 @@
 // yt-gui Connector — service worker
 //
 // 動作:
-//   1. ツールバーボタン / 右クリックメニューで現在タブの URL を取得
-//   2. chrome.cookies で当該ドメインの Cookie を取得し Netscape 形式へ整形
-//   3. ローカル受信サーバー (127.0.0.1) の /enqueue へ POST（トークン認証）
+//   1. ツールバーボタンはポップアップ（popup.html）で形式を選んで送信
+//   2. 右クリックメニューは記憶済み形式でワンクリック送信
+//   3. chrome.cookies で当該ドメインの Cookie を取得し Netscape 形式へ整形
+//   4. ローカル受信サーバー (127.0.0.1) の /enqueue へ POST（トークン認証）
 //
 // 仕様: ../docs/spec/features/browser-extension.md
+
+importScripts("format_choice.js");
 
 const DEFAULT_PORT = 8718;
 const MENU_ID = "yt-gui-send";
@@ -18,15 +21,21 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.action.onClicked.addListener((tab) => {
-  const url = tab && tab.url;
-  if (url) sendToYtGui(url);
+// ツールバーボタンは default_popup を持つため onClicked は発火しない。
+// 送信トリガはポップアップ（popup.js）からのメッセージで受ける。
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg && msg.type === "send" && msg.url) {
+    sendToYtGui(msg.url, msg.format || null);
+  }
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+// 右クリックメニューは記憶済みの形式で即送信する。
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
   const url = info.linkUrl || (tab && tab.url);
-  if (url) sendToYtGui(url);
+  if (!url) return;
+  const choice = await self.ytGuiFormat.loadFormatChoice();
+  sendToYtGui(url, self.ytGuiFormat.buildFormatPayload(choice));
 });
 
 // chrome.storage から設定（トークン・ポート）を読む。
@@ -56,7 +65,7 @@ function toNetscape(cookies) {
   return lines.join("\n") + "\n";
 }
 
-async function sendToYtGui(url) {
+async function sendToYtGui(url, format = null) {
   const { token, port } = await getConfig();
   if (!token) {
     flashBadge("KEY", "#c62828"); // トークン未設定
@@ -72,7 +81,10 @@ async function sendToYtGui(url) {
     console.warn("cookie 取得失敗", e);
   }
 
-  const body = JSON.stringify({ url, cookies: cookieStr });
+  // format は app_default / 未指定なら省略（アプリ既定形式を使う）。
+  const payload = { url, cookies: cookieStr };
+  if (format) payload.format = format;
+  const body = JSON.stringify(payload);
   // 設定ポート → +1 → +2 の順に試す（アプリ側のフォールバックに追従）。
   // 接続失敗のときだけ次のポートへ。HTTP 応答（403 等）が返ったら止める。
   for (const p of [port, port + 1, port + 2]) {

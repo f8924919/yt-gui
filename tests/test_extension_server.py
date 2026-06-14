@@ -59,11 +59,32 @@ def test_cookies_omitted_passes_none():
     assert captured[0][1] is None
 
 
-def test_format_passed_through():
+def test_format_dict_passed_through():
+    """format オブジェクト（dict）はそのまま on_enqueue に渡す（中身検証は app 側）。"""
+    fmt = {"kind": "audio", "audio_format": "flac"}
+    body = json.dumps({"url": "https://example.com/v", "format": fmt}).encode()
+    headers = {"Origin": EXT_ORIGIN, "X-YtGui-Token": TOKEN}
+    status, _data, captured = _call("POST", "/enqueue", headers, body)
+    assert status == 200
+    assert captured[0][2] == fmt
+
+
+def test_format_omitted_passes_none():
+    body = json.dumps({"url": "https://example.com/v"}).encode()
+    headers = {"Origin": EXT_ORIGIN, "X-YtGui-Token": TOKEN}
+    status, _data, captured = _call("POST", "/enqueue", headers, body)
+    assert status == 200
+    assert captured[0][2] is None
+
+
+def test_non_dict_format_returns_400():
+    """format が dict 以外（文字列等）は 400 invalid_format。"""
     body = json.dumps({"url": "https://example.com/v", "format": "fmt_mp3"}).encode()
     headers = {"Origin": EXT_ORIGIN, "X-YtGui-Token": TOKEN}
-    _status, _data, captured = _call("POST", "/enqueue", headers, body)
-    assert captured[0][2] == "fmt_mp3"
+    status, data, captured = _call("POST", "/enqueue", headers, body)
+    assert status == 400
+    assert data["error"] == "invalid_format"
+    assert captured == []
 
 
 def test_missing_origin_with_token_allowed():

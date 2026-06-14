@@ -20,9 +20,10 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Protocol
 
-# enqueue コールバック: (url, cookies, format) を受け取る。受理した時点で
-# 即時に戻り、実際のタイトル取得・キュー行確定はアプリ側が非同期に行う。
-EnqueueCallback = Callable[[str, str | None, str | None], None]
+# enqueue コールバック: (url, cookies, format) を受け取る。format は形式指定
+# オブジェクト（dict）または None。受理した時点で即時に戻り、実際のタイトル取得・
+# キュー行確定・format のクランプはアプリ側が非同期に行う。
+EnqueueCallback = Callable[[str, str | None, "dict[str, Any] | None"], None]
 
 
 class _HeaderLike(Protocol):
@@ -81,9 +82,11 @@ def handle_request(
     if cookies is not None and not isinstance(cookies, str):
         return 400, {"ok": False, "error": "invalid_cookies"}
 
+    # format は形式指定オブジェクト（dict）。欠落は許容し、中身の検証・クランプは
+    # 呼び出し側（app.py）に委ねる。dict 以外（文字列・配列等）は 400。
     fmt = data.get("format")
-    if not isinstance(fmt, str):
-        fmt = None
+    if fmt is not None and not isinstance(fmt, dict):
+        return 400, {"ok": False, "error": "invalid_format"}
 
     on_enqueue(url.strip(), cookies, fmt)
     return 200, {"ok": True}

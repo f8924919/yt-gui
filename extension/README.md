@@ -8,8 +8,9 @@
 
 | ファイル | 役割 |
 |---|---|
-| `manifest.json` | Manifest V3 定義（権限・background・options・icons・default_locale） |
-| `background.js` | service worker。URL/Cookie 取得 → 受信サーバーへ POST |
+| `manifest.json` | Manifest V3 定義（権限・background・options・popup・icons・default_locale） |
+| `background.js` | service worker。URL/Cookie 取得 → 受信サーバーへ POST。右クリックメニュー（記憶済み形式で即送信）も担う |
+| `popup.html` / `popup.js` | ツールバーボタンのポップアップ。形式（最高画質/解像度指定/音声のみ/アプリ既定）を選んで送信。選択は `chrome.storage` に記憶 |
 | `options.html` / `options.js` | トークン・ポートの設定画面（表示はブラウザ言語に追従） |
 | `_locales/{en,ja}/messages.json` | オプション画面の多言語メッセージ |
 | `icons/icon-{16,32,48,128}.png` | 拡張アイコン（アプリ本体と同一。`assets/icon.png` 由来） |
@@ -33,7 +34,10 @@
 
 ## 使い方
 
-- 動画ページでツールバーのアイコンをクリック、またはページを右クリックして「yt-gui に送る」。
+- **形式を選んで送る**: 動画ページでツールバーのアイコンをクリックするとポップアップが開きます。形式（`最高画質` / `解像度指定` / `音声のみ` / `アプリの既定を使う`）を選び、「yt-gui に送る」を押します。選んだ形式は次回以降の既定として記憶されます。
+  - コンテナ（mp4/mkv/webm）は拡張では選べません。実際の出力コンテナは yt-gui アプリ側の設定に従います。
+  - オリジナル形式（トラック個別選択）は拡張では選べません。
+- **記憶済み形式でワンクリック送信**: ページを右クリックして「yt-gui に送る」を選ぶと、ポップアップを開かずに前回選択した形式で即送信します。
 - 結果はアイコンのバッジで通知されます。
 
 | バッジ | 意味 |
