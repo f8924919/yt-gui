@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title data-i18n="popupTitle">Send to yt-gui</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 14px;
+        width: 240px;
+        font-size: 13px;
+      }
+      label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+      }
+      select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px;
+        margin-top: 4px;
+      }
+      button {
+        margin-top: 14px;
+        padding: 7px 14px;
+        width: 100%;
+        font-weight: bold;
+      }
+      .note {
+        color: #666;
+        margin-top: 10px;
+        line-height: 1.4;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="kind" data-i18n="formatLabel">Format</label>
+    <select id="kind">
+      <option value="app_default" data-i18n="kindAppDefault">Use app default</option>
+      <option value="best" data-i18n="kindBest">Best quality</option>
+      <option value="resolution" data-i18n="kindResolution">Resolution</option>
+      <option value="audio" data-i18n="kindAudio">Audio only</option>
+    </select>
+
+    <div id="row-resolution" class="hidden">
+      <label for="resolution" data-i18n="resolutionLabel">Max resolution</label>
+      <select id="resolution"></select>
+    </div>
+
+    <div id="row-audio-format" class="hidden">
+      <label for="audio_format" data-i18n="audioFormatLabel">Audio format</label>
+      <select id="audio_format"></select>
+    </div>
+
+    <div id="row-bitrate" class="hidden">
+      <label for="mp3_bitrate" data-i18n="bitrateLabel">MP3 bitrate (kbps)</label>
+      <select id="mp3_bitrate"></select>
+    </div>
+
+    <button id="send" data-i18n="popupSend">Send to yt-gui</button>
+
+    <p class="note" data-i18n="popupNote">
+      The output container follows the yt-gui app settings.
+    </p>
+
+    <script src="format_choice.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

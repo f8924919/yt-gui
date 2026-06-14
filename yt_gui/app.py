@@ -1,3 +1,4 @@
+import dataclasses
 import os
 import sys
 import tempfile
@@ -33,7 +34,7 @@ from PySide6.QtWidgets import (
 from . import get_resource_base, get_version, i18n
 from .downloader import Downloader
 from .extension_server import ExtensionServer
-from .formats import FORMAT_KEYS
+from .formats import FORMAT_KEYS, resolve_extension_format
 from .i18n import t
 from .job_spec import JobSpec, build_job_spec
 from .log_dialog import LogDialog
@@ -41,6 +42,7 @@ from .original_format_dialog import OriginalFormatDialog
 from .queue_controller import QueueController, _QueueItem
 from .settings import (
     EXTENSION_SERVER_PORT_FALLBACKS,
+    Settings,
     SettingsManager,
     build_proxy_url,
     build_rate_limit,
@@ -420,8 +422,9 @@ class App(QMainWindow):
             path = None
         return path, None
 
-    def _build_format_display(self) -> list[str]:
-        container = self._settings.video_container.upper()
+    def _build_format_display(self, settings: Settings | None = None) -> list[str]:
+        settings = settings if settings is not None else self._settings
+        container = settings.video_container.upper()
         result = []
         for k in FORMAT_KEYS:
             if k == "fmt_best_mp4":
@@ -429,17 +432,15 @@ class App(QMainWindow):
             elif k == "fmt_720p":
                 result.append(
                     t("fmt_720p").format(
-                        resolution=self._settings.video_resolution,
+                        resolution=settings.video_resolution,
                         container=container,
                     )
                 )
             elif k == "fmt_mp3":
-                if self._settings.audio_format == "flac":
+                if settings.audio_format == "flac":
                     result.append(t("fmt_flac"))
                 else:
-                    result.append(
-                        t("fmt_mp3").format(bitrate=self._settings.mp3_bitrate)
-                    )
+                    result.append(t("fmt_mp3").format(bitrate=settings.mp3_bitrate))
             else:
                 result.append(t(k))
         return result
@@ -1145,7 +1146,7 @@ class App(QMainWindow):
             self._log(t("log_extension_stopped"))
 
     def _emit_extension_enqueue(
-        self, url: str, cookies: str | None, fmt: str | None
+        self, url: str, cookies: str | None, fmt: dict | None
     ) -> None:
         """サーバースレッドから呼ばれる。Qt シグナルでメインスレッドへ委譲する。"""
         self._signals.extension_enqueue.emit(url, cookies, fmt)
@@ -1162,15 +1163,37 @@ class App(QMainWindow):
         super().closeEvent(event)
 
     def _on_extension_enqueue(
-        self, url: str, cookies: str | None, fmt: str | None
+        self, url: str, cookies: str | None, fmt: dict | None
     ) -> None:
-        """メインスレッド。受信した URL（+ cookies）をキュー追加フローへ流す。
+        """メインスレッド。受信した URL（+ cookies + 形式）をキュー追加フローへ流す。
 
-        `fmt` は MVP では無視し、メイン画面で選択中の形式を使う。
+        `fmt`（形式指定オブジェクト）を `resolve_extension_format` でクランプする。
+        結果が `None`（app_default / 欠落 / 未知）ならメイン画面の選択形式を使い、
+        それ以外は実効 `Settings`（解像度 / 音声形式 / ビットレートを上書き）で
+        JobSpec を組む。container は拡張から指定されずアプリ設定に従う。
         """
         cookies_path = self._write_extension_cookies(cookies) if cookies else None
-        format_id, format_label = self._extension_default_format()
-        job = build_job_spec(format_id, self._settings)
+        resolved = resolve_extension_format(
+            fmt,
+            default_resolution=self._settings.video_resolution,
+            default_audio_format=self._settings.audio_format,
+            default_mp3_bitrate=self._settings.mp3_bitrate,
+        )
+        if resolved is None:
+            format_id, format_label = self._extension_default_format()
+            job = build_job_spec(format_id, self._settings)
+        else:
+            eff_settings = dataclasses.replace(
+                self._settings,
+                video_resolution=resolved.resolution,
+                audio_format=resolved.audio_format,
+                mp3_bitrate=resolved.mp3_bitrate,
+            )
+            format_id = resolved.format_id
+            format_label = self._build_format_display(eff_settings)[
+                FORMAT_KEYS.index(format_id)
+            ]
+            job = build_job_spec(format_id, eff_settings)
         self._log(t("log_extension_received").format(url=url))
         # 診断: 受信した Cookie の件数だけをログに出す（値は記録しない）。
         # 0 件なら capture 側（未ログイン・プロファイル違い・権限）を疑う。

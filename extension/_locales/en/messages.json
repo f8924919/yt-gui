@@ -25,5 +25,38 @@
   },
   "actionTitle": {
     "message": "Send to yt-gui"
+  },
+  "popupTitle": {
+    "message": "Send to yt-gui"
+  },
+  "formatLabel": {
+    "message": "Format"
+  },
+  "kindAppDefault": {
+    "message": "Use app default"
+  },
+  "kindBest": {
+    "message": "Best quality"
+  },
+  "kindResolution": {
+    "message": "Resolution"
+  },
+  "kindAudio": {
+    "message": "Audio only"
+  },
+  "resolutionLabel": {
+    "message": "Max resolution"
+  },
+  "audioFormatLabel": {
+    "message": "Audio format"
+  },
+  "bitrateLabel": {
+    "message": "MP3 bitrate (kbps)"
+  },
+  "popupSend": {
+    "message": "Send to yt-gui"
+  },
+  "popupNote": {
+    "message": "The output container (MP4/MKV/WebM) follows the yt-gui app settings."
   }
 }

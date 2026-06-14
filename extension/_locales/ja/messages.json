@@ -25,5 +25,38 @@
   },
   "actionTitle": {
     "message": "yt-gui に送る"
+  },
+  "popupTitle": {
+    "message": "yt-gui に送る"
+  },
+  "formatLabel": {
+    "message": "形式"
+  },
+  "kindAppDefault": {
+    "message": "アプリの既定を使う"
+  },
+  "kindBest": {
+    "message": "最高画質"
+  },
+  "kindResolution": {
+    "message": "解像度指定"
+  },
+  "kindAudio": {
+    "message": "音声のみ"
+  },
+  "resolutionLabel": {
+    "message": "解像度の上限"
+  },
+  "audioFormatLabel": {
+    "message": "音声形式"
+  },
+  "bitrateLabel": {
+    "message": "MP3 ビットレート (kbps)"
+  },
+  "popupSend": {
+    "message": "yt-gui に送る"
+  },
+  "popupNote": {
+    "message": "出力コンテナ（MP4/MKV/WebM）は yt-gui アプリ側の設定に従います。"
   }
 }
