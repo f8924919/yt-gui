@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [151-extension-original-format-dialog](151-extension-original-format-dialog.md) | 進行中 | 拡張から `kind:"original"` を送るとアプリ側で `OriginalFormatDialog` を開く導線 | 2026-06-14 |
+| （現在、進行中・未着手のタスクはありません） | — | — | — |
 
 ## 完了タスク
 
