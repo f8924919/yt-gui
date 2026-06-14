@@ -25,6 +25,7 @@
 | [120-nico-hardsub.md](120-nico-hardsub.md) | ニコニコ動画コメントの焼きこみ（ハードサブ）出力を追加（`ass` フィルタで H.264/AAC MP4 を別生成・ソフトサブ MKV と併設）。#120 Phase 2＝#120 完結（Issue #120 / PR #123） | 2026-06-09 |
 | [browser-extension.md](browser-extension.md) | ブラウザ拡張から URL + Cookie をワンクリックでキュー追加（ローカル受信サーバー・アイテム単位 Cookie・設定タブ・MV3 拡張）。途中で `cookiefile` キー誤りの pre-existing バグも修正、CI lint を `ruff check .` に拡張（Issue #140 / PR #141） | 2026-06-13 |
 | [143-extension-enhancements.md](143-extension-enhancements.md) | ブラウザ拡張の改善: オプション画面の多言語化（`_locales` + `chrome.i18n` でブラウザ言語追従）・manifest 英語化・バージョン同期（`sync_extension_version.py`）・アイコン統一（`build_extension_icons.py`）・リリース zip 生成。README も現状反映（Issue #143 / PR #144） | 2026-06-13 |
+| [149-extension-format-selection.md](149-extension-format-selection.md) | ブラウザ拡張のポップアップで形式選択（最高画質/解像度/音声/アプリ既定）に対応。案A＝拡張はコンテナ非依存で意味のみ送り形式解決はアプリ側に一任、`resolve_extension_format` でクランプ。オリジナル形式は #151 へ分離（Issue #149 / PR #150） | 2026-06-14 |
 
 ## バグ修正
 
