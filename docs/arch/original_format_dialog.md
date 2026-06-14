@@ -71,6 +71,15 @@
 | `_apply_edit` のオリジナル分岐 | `edit_applied` ハンドラへ移動 |
 | `_on_edit_mode_entered` のパネル復元 + `trigger_fetch` | 編集モードのダイアログ生成（`restore_settings` 渡し）に移動 |
 
+## 拡張起点の起動（`kind: "original"`）
+
+ブラウザ拡張から `kind: "original"` を受けたときも、本ダイアログを**追加モード**で起動する（仕様: [browser-extension.md — オリジナル形式（アプリ側ダイアログ起動）](../spec/features/browser-extension.md#オリジナル形式アプリ側ダイアログ起動)）。GUI からの「詳細設定...」起動との違いは DI の差し替えのみで、ダイアログ実装自体は変更しない。
+
+- `get_url`: メイン画面 URL 欄の参照ではなく、拡張由来 URL を返す `lambda: url` を注入する。
+- `get_cookies`: 拡張の一時 cookies（アイテム単位）を返す callable を注入し、トラックプローブ・確定後ダウンロード双方へ適用する。
+- 起動・直列化（複数 URL 連続送信時の多重モーダル防止）・ウィンドウ前面化は `App` 側（[`_dispatch_next_original_dialog`](app.md#オリジナル形式ダイアログ起動kind-original)）が担う。
+- `add_requested` で従来どおりキューへ追加。キャンセル（`reject`）時はキューに追加しない。
+
 ## テスト方針
 
 モーダル `QDialog.exec` はヘッドレス検証しにくいため、検証ロジックはダイアログの純粋ヘルパ（または引き続きパネル側の公開 API）に寄せ、`exec` を回さずに「ボタン押下相当 → シグナル emit / 警告判定」を検証できる構造にする。既存のパネル単体テストは再ペアレント後も流用する。

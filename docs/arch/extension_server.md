@@ -27,7 +27,7 @@
 | 妥当 | 200 | — (`{"ok": true}`、`on_enqueue(url, cookies, format)` を呼ぶ) |
 
 - `Origin` ヘッダ自体が無い場合（curl 等）はトークンのみで判定する。
-- `format` は[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)（dict）。欠落（`None`）は許容してそのまま渡す。dict 以外（文字列・配列・数値等）は `400`（`invalid_format`）。`on_enqueue(url, cookies, format)` の `format` 引数の型は `dict | None`。**中身の検証・許可値クランプ・既定フォールバックは呼び出し側（`app.py`）が行う**（サーバー層は構造の型のみ検証し、未知 `kind` や余分フィールドはそのまま透過する）。
+- `format` は[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)（dict）。欠落（`None`）は許容してそのまま渡す。dict 以外（文字列・配列・数値等）は `400`（`invalid_format`）。`on_enqueue(url, cookies, format)` の `format` 引数の型は `dict | None`。**中身の検証・許可値クランプ・既定フォールバックは呼び出し側（`app.py`）が行う**（サーバー層は構造の型のみ検証し、`kind: "original"`・未知 `kind`・余分フィールドはそのまま透過する。`original` 受信時のダイアログ起動も `app.py` 側の責務）。
 - ヘッダ参照は `_HeaderLike` Protocol（`get` のみ要求）越しに行い、`dict` と `http.client.HTTPMessage`（大文字小文字無視）の両対応とする。
 
 ### `ExtensionServer(token, on_enqueue, *, port, fallback_ports=())`

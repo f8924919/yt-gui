@@ -584,6 +584,139 @@ def test_on_extension_enqueue_app_default_uses_combo_selection(app, monkeypatch)
     assert captured2["job"].format_id == default_job.format_id
 
 
+# ── 拡張からのオリジナル形式（アプリ側ダイアログ起動・Issue #151） ────────────
+# 対応 spec: docs/spec/features/browser-extension.md
+#           （#オリジナル形式アプリ側ダイアログ起動）
+
+
+def test_on_extension_enqueue_original_queues_dialog_request(app, monkeypatch):
+    """kind=original は _start_add_thread せず pending キューへ積む。"""
+    started = []
+    monkeypatch.setattr(app, "_start_add_thread", lambda *a, **k: started.append(a))
+    # 実ダイアログは開かず、pending への積み込みのみ検証する。
+    monkeypatch.setattr(app, "_dispatch_next_original_dialog", lambda: None)
+
+    app._on_extension_enqueue(
+        "https://example.com/v", "COOKIEDATA", {"kind": "original"}
+    )
+
+    assert started == []  # 即時のキュー追加スレッドは起動しない
+    assert len(app._pending_original_requests) == 1
+    url, item_cookies_path = app._pending_original_requests[0]
+    assert url == "https://example.com/v"
+    # 受信 cookies が一時ファイル化され item_cookies_path として保持される
+    import os
+
+    assert item_cookies_path is not None
+    assert os.path.isfile(item_cookies_path)
+
+
+def test_dispatch_original_dialog_injects_url_cookies_and_fronts(app, monkeypatch):
+    """ダイアログに拡張由来 URL と item Cookies が注入され、前面化される。"""
+    captured = {}
+
+    class _StubDialog:
+        def exec(self):
+            captured["exec_active"] = app._original_dialog_active
+
+    def _fake_make(mode, restore, *, get_url=None, get_cookies=None, add_handler=None):
+        captured.update(
+            mode=mode,
+            get_url=get_url,
+            get_cookies=get_cookies,
+            add_handler=add_handler,
+        )
+        return _StubDialog()
+
+    monkeypatch.setattr(app, "_make_original_dialog", _fake_make)
+    front = []
+    monkeypatch.setattr(app, "raise_", lambda: front.append("raise"))
+    monkeypatch.setattr(app, "activateWindow", lambda: front.append("activate"))
+
+    app._pending_original_requests.append(
+        ("https://example.com/v", "/tmp/ext_cookie.txt")
+    )
+    app._dispatch_next_original_dialog()
+
+    assert captured["mode"] == "add"
+    assert captured["get_url"]() == "https://example.com/v"
+    # トラックプローブ・確定後 DL 双方へ item Cookies を適用する経路
+    assert captured["get_cookies"]() == ("/tmp/ext_cookie.txt", None)
+    assert front == ["raise", "activate"]  # 前面化された
+    assert captured["exec_active"] is True  # exec 中は active フラグが立つ
+    assert app._original_dialog_active is False  # 完了後に解除
+    assert len(app._pending_original_requests) == 0  # 捌けた
+
+
+def test_extension_original_add_enqueues_with_item_cookies(app, monkeypatch):
+    """ダイアログ確定でキューに1件追加され、item Cookies がアイテムに紐付く。"""
+    from yt_gui.original_format_dialog import OriginalFormatDialog
+
+    opened = []
+    monkeypatch.setattr(OriginalFormatDialog, "exec", lambda self: opened.append(self))
+
+    app._pending_original_requests.append(
+        ("https://example.com/v", "/tmp/ext_cookie.txt")
+    )
+    app._dispatch_next_original_dialog()
+    dialog = opened[0]
+
+    # ネットワークを使わずフォーマット取得済み・タイトル確定の状態を模す。
+    monkeypatch.setattr(dialog.panel, "has_formats_loaded", lambda: True)
+    monkeypatch.setattr(dialog.panel, "get_fetched_title", lambda: "動画タイトル")
+
+    before = len(app.queue._items)
+    dialog.add_requested.emit()
+
+    assert len(app.queue._items) == before + 1
+    item = app.queue._items[-1]
+    assert item.url == "https://example.com/v"
+    assert item.cookies_path == "/tmp/ext_cookie.txt"
+
+
+def test_extension_original_cancel_does_not_enqueue(app, monkeypatch):
+    """ダイアログをキャンセル（add_requested を発火しない）するとキューに積まれない。"""
+    from yt_gui.original_format_dialog import OriginalFormatDialog
+
+    opened = []
+    monkeypatch.setattr(OriginalFormatDialog, "exec", lambda self: opened.append(self))
+
+    before = len(app.queue._items)
+    app._pending_original_requests.append(("https://example.com/v", None))
+    app._dispatch_next_original_dialog()
+
+    # 確定操作をしない＝キャンセル相当。キューは増えない。
+    assert len(app.queue._items) == before
+
+
+def test_extension_original_serializes_multiple_requests(app, monkeypatch):
+    """複数 original を連続送信しても多重モーダルを開かず、順に直列処理される。
+
+    直列化の検証にダイアログ内部は不要なため、`_make_original_dialog` を
+    スタブ化して exec 中の再入ガードと待ち行列の捌け方だけを確認する。
+    """
+    opened = []
+
+    class _StubDialog:
+        def exec(self):
+            # exec 中（active）に別の original が来ても多重起動しないこと。
+            if not opened:
+                app._pending_original_requests.append(("u2", None))
+            app._dispatch_next_original_dialog()  # active ガードで何もしないはず
+            opened.append(app._original_dialog_active)
+
+    monkeypatch.setattr(app, "_make_original_dialog", lambda *a, **k: _StubDialog())
+
+    app._pending_original_requests.append(("u1", None))
+    app._dispatch_next_original_dialog()
+
+    # u1 の exec 中に積まれた u2 も、exec 完了後に1件ずつ処理される。
+    assert len(opened) == 2
+    assert all(active is True for active in opened)  # 各 exec 中は active
+    assert app._original_dialog_active is False  # 最終的に解除
+    assert len(app._pending_original_requests) == 0  # 全部捌けた
+
+
 def test_sync_extension_server_starts_and_stops(app, monkeypatch):
     """有効化（トークン有）で起動、無効化で停止すること。"""
     started = {"n": 0}

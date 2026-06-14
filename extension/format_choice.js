@@ -36,6 +36,7 @@ async function saveFormatChoice(choice) {
 // container は送らない（アプリ設定に従う）。
 function buildFormatPayload(choice) {
   if (!choice || !choice.kind || choice.kind === "app_default") return null;
+  if (choice.kind === "original") return { kind: "original" };
   if (choice.kind === "best") return { kind: "best" };
   if (choice.kind === "resolution") {
     return { kind: "resolution", resolution: choice.resolution };

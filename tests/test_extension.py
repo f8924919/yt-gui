@@ -115,6 +115,24 @@ def test_locales_en_ja_have_identical_keys():
         assert "message" in block
 
 
+# --- オリジナル形式の選択肢（Issue #151） ---------------------------------
+
+
+def test_popup_offers_original_kind_option():
+    """popup.html の形式セレクタに original（アプリで選択）の選択肢がある。"""
+    with open(os.path.join(_EXT, "popup.html"), encoding="utf-8") as fh:
+        html = fh.read()
+    assert 'value="original"' in html
+
+
+def test_locales_define_original_kind_label():
+    """en / ja 双方に kindOriginal ラベルが定義されている。"""
+    for lang in ("en", "ja"):
+        msgs = _read_json(os.path.join(_EXT, "_locales", lang, "messages.json"))
+        assert "kindOriginal" in msgs
+        assert msgs["kindOriginal"]["message"].strip()
+
+
 # --- アイコン実サイズ ------------------------------------------------------
 
 

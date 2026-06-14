@@ -62,17 +62,39 @@ class ResolvedExtensionFormat:
     mp3_bitrate: str
 
 
+@dataclass(frozen=True)
+class OriginalIntent:
+    """拡張から ``kind == "original"`` を受けたことを表すセンチネル。
+
+    形式は確定させず「アプリ側でオリジナル形式ダイアログを開く必要がある」
+    ことだけを表す。パラメータは持たない（トラック選択はアプリ側ダイアログが担う）。
+    インスタンスは ``ORIGINAL_INTENT`` singleton を使う。
+
+    対応仕様:
+    docs/spec/features/browser-extension.md#オリジナル形式アプリ側ダイアログ起動
+    """
+
+
+ORIGINAL_INTENT = OriginalIntent()
+
+
 def resolve_extension_format(
     fmt: object,
     *,
     default_resolution: str,
     default_audio_format: str,
     default_mp3_bitrate: str,
-) -> ResolvedExtensionFormat | None:
+) -> ResolvedExtensionFormat | OriginalIntent | None:
     """拡張の形式指定オブジェクトを正規化する pure function（Qt 非依存）。
 
-    返り値が ``None`` のときはアプリ既定形式を使うことを意味する
-    （``kind == "app_default"`` / ``fmt`` が dict でない / ``kind`` が未知）。
+    返り値は 3 状態:
+
+    - ``ResolvedExtensionFormat`` … ``best`` / ``resolution`` / ``audio``。
+    - ``ORIGINAL_INTENT`` … ``kind == "original"``。アプリ側でオリジナル形式
+      ダイアログを開く必要があることだけを表す（パラメータは持たない）。
+    - ``None`` … アプリ既定形式を使う（``kind == "app_default"`` /
+      ``fmt`` が dict でない / ``kind`` が未知）。
+
     ``resolution`` / ``audio_format`` / ``mp3_bitrate`` は許可値
     （``VIDEO_RESOLUTIONS`` / ``AUDIO_FORMATS`` / ``MP3_BITRATES``）へクランプし、
     欠落・未知値は対応する ``default_*`` へフォールバックする。
@@ -83,6 +105,8 @@ def resolve_extension_format(
         return None
 
     kind = fmt.get("kind")
+    if kind == "original":
+        return ORIGINAL_INTENT
     if kind == "best":
         return ResolvedExtensionFormat(
             format_id="fmt_best_mp4",

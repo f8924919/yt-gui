@@ -97,12 +97,26 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 | `_start_extension_server()` | トークンが空なら起動しない（`log_extension_no_token`）。`ExtensionServer.start()` で `127.0.0.1` にバインド、失敗時は `log_extension_bind_failed` |
 | `_stop_extension_server()` | サーバーを停止して参照を破棄 |
 | `_emit_extension_enqueue(url, cookies, fmt)` | **サーバースレッド**から呼ばれ、`extension_enqueue` シグナルでメインスレッドへ委譲（Qt ウィジェットを直接触らない） |
-| `_on_extension_enqueue(url, cookies, fmt)` | **メインスレッド**。cookies を一時ファイル化し、`fmt`（[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)・`dict\|None`）を [`resolve_extension_format`](formats.md) でクランプ。結果が `None`（`app_default`/欠落/未知）なら `_extension_default_format()`、それ以外は実効 `Settings`（`dataclasses.replace` で `resolution`/`audio_format`/`mp3_bitrate` を上書き）で `build_job_spec` を呼び、`_start_add_thread(..., item_cookies_path=...)` を起動 |
+| `_on_extension_enqueue(url, cookies, fmt)` | **メインスレッド**。cookies を一時ファイル化し、`fmt`（[形式指定オブジェクト](../spec/features/browser-extension.md#形式指定オブジェクトformat)・`dict\|None`）を [`resolve_extension_format`](formats.md) でクランプ。結果が `OriginalIntent`（`kind: "original"`）なら `_enqueue_original_dialog_request(url, item_cookies_path)` でダイアログ起動キューへ。`None`（`app_default`/欠落/未知）なら `_extension_default_format()`、それ以外は実効 `Settings`（`dataclasses.replace` で `resolution`/`audio_format`/`mp3_bitrate` を上書き）で `build_job_spec` を呼び、`_start_add_thread(..., item_cookies_path=...)` を起動 |
 | `_extension_default_format()` | `app_default`（拡張が形式を指定しない）時のフォールバック。メイン画面のコンボ現在選択を使う。`fmt_original`（ダイアログ必須）のときは `fmt_best_mp4` へフォールバック |
+| `_enqueue_original_dialog_request(url, item_cookies_path)` | `kind: "original"` 受信時。`(url, item_cookies_path)` を内部 pending キューへ積み、`QTimer.singleShot(0, ...)` でディスパッチを起動（スロット内で `exec()` を呼ばずイベントループのネストを避ける） |
+| `_dispatch_next_original_dialog()` | pending キューから 1 件取り出し、`_bring_window_to_front()` してから `get_url=lambda: url` / `get_cookies` に拡張 cookies を注入し `add_handler=_on_extension_dialog_add` を渡した [`OriginalFormatDialog`](original_format_dialog.md) を `exec()`。`_original_dialog_active` で再入防止し、閉じたら次の 1 件を処理（直列・多重モーダル防止） |
+| `_bring_window_to_front()` | 最小化中なら `showNormal()` で復元し、`raise_()` + `activateWindow()` で前面化 |
+| `_on_extension_dialog_add(dialog, url, item_cookies_path)` | 拡張起点ダイアログの確定ハンドラ。メイン画面 URL 欄を使わず拡張由来 `url`・`item_cookies_path` でキュー追加（取得済みは `enqueue_single(..., cookies_path=...)`、未取得は `_start_add_thread(..., item_cookies_path=...)`）。キャンセル時は何もしない |
 | `_write_extension_cookies(cookies)` | `tempfile.TemporaryDirectory` 配下に 0600 で cookies.txt を書き、パスを返す（失敗時 `None`） |
 | `closeEvent(event)` | サーバー停止と一時 cookies ディレクトリの掃除 |
 
 一時 cookies ディレクトリはアプリ終了時（`closeEvent`）に一括削除する。
+
+### オリジナル形式ダイアログ起動（`kind: "original"`）
+
+拡張から `kind: "original"` を受けると、形式を即確定せずアプリ側で [`OriginalFormatDialog`](original_format_dialog.md) を開いてトラックを対話選択する（仕様: [browser-extension.md — オリジナル形式（アプリ側ダイアログ起動）](../spec/features/browser-extension.md#オリジナル形式アプリ側ダイアログ起動)）。
+
+- **直列化**: `original` 意図は内部 pending キュー（`deque` 等）へ積み、`_dispatch_next_original_dialog()` が 1 件ずつ `exec()` で表示する。表示中フラグで多重起動を防ぎ、ダイアログが閉じたら次を処理する。複数 URL を連続送信しても同時に複数モーダルは開かない。
+- **イベントループのネスト回避**: 受信スロット（`_on_extension_enqueue`）内で直接 `exec()` を呼ばず、`QTimer.singleShot(0, _dispatch_next_original_dialog)` でスロットを抜けてから起動する。
+- **URL / Cookies の注入**: 拡張由来 URL はメイン画面の URL 入力欄を介さないため、ダイアログには `get_url=lambda: url` と、拡張の一時 cookies を返す `get_cookies` を注入する。これによりトラックプローブ・確定後ダウンロード双方にアイテム単位 Cookies が適用される。
+- **確定 / キャンセル**: 確定（`add_requested`）でキューへ追加（`item_cookies_path` 適用）。キャンセルはキューに追加しない。
+- 一時 cookies ファイルはダイアログ処理中も生存させ、削除は従来どおりアプリ終了時にまとめて行う。
 
 ## 編集モード経路
 

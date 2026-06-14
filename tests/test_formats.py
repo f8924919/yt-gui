@@ -10,8 +10,10 @@ from yt_gui.formats import (
     FORMAT_KEYS,
     FORMAT_SPECS,
     MP3_BITRATES,
+    ORIGINAL_INTENT,
     VIDEO_CONTAINERS,
     VIDEO_RESOLUTIONS,
+    OriginalIntent,
     ResolvedExtensionFormat,
     build_720p_spec,
     build_best_spec,
@@ -139,9 +141,7 @@ def test_resolve_audio_uses_given_format_and_bitrate() -> None:
 
 
 def test_resolve_audio_flac() -> None:
-    r = resolve_extension_format(
-        {"kind": "audio", "audio_format": "flac"}, **_DEFAULTS
-    )
+    r = resolve_extension_format({"kind": "audio", "audio_format": "flac"}, **_DEFAULTS)
     assert r is not None
     assert r.format_id == "fmt_mp3"
     assert r.audio_format == "flac"
@@ -162,7 +162,6 @@ def test_resolve_audio_clamps_unknown_format_and_bitrate() -> None:
         None,
         {},  # kind 欠落
         {"kind": "app_default"},
-        {"kind": "original"},  # 拡張からは指定不可
         {"kind": "unknown"},
         "fmt_mp3",  # dict 以外
         ["best"],
@@ -171,3 +170,21 @@ def test_resolve_audio_clamps_unknown_format_and_bitrate() -> None:
 )
 def test_resolve_returns_none_for_app_default_or_invalid(fmt: object) -> None:
     assert resolve_extension_format(fmt, **_DEFAULTS) is None
+
+
+def test_resolve_original_returns_original_intent() -> None:
+    """kind=original はアプリ側ダイアログ起動を表す OriginalIntent を返す。"""
+    r = resolve_extension_format({"kind": "original"}, **_DEFAULTS)
+    assert isinstance(r, OriginalIntent)
+    assert r is ORIGINAL_INTENT
+
+
+def test_original_intent_is_distinct_from_none_and_resolved() -> None:
+    """OriginalIntent は None（既定）とも ResolvedExtensionFormat とも区別される。"""
+    assert ORIGINAL_INTENT is not None
+    assert not isinstance(ORIGINAL_INTENT, ResolvedExtensionFormat)
+    # 余分なパラメータが付いても original の意味は変わらない（パラメータを持たない）
+    r = resolve_extension_format(
+        {"kind": "original", "resolution": "1080"}, **_DEFAULTS
+    )
+    assert r is ORIGINAL_INTENT
