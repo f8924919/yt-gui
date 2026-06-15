@@ -50,6 +50,18 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 `_build_download_worker() -> Downloader` は、現在の設定から `status_callback=None` / `log_callback=self._on_downloader_log` の `Downloader` を生成する（`__init__` の生成ブロックと同じ設定を共通化）。`QueueController` は各ワーカーごとにこのファクトリで**専用インスタンス**を得て使う（進捗コールバック・中断フラグの混線を避けるため。[queue_controller.md](queue_controller.md)）。primary の `self.downloader` はキュー実行には使わず、`_open_settings` でのミューテートは従来どおり維持する（メタデータ系操作・パネル参照のため）。
 
+### メニューバー構成（`_create_menu`）
+
+`ファイル`（`menu_file`）メニューに以下の `QAction` を持つ。
+
+| アクション | ラベル | 接続先 | 備考 |
+|---|---|---|---|
+| `_act_settings` | `menu_settings`（`設定...` / `Settings...`） | `_open_settings` | ショートカット `Ctrl+,`。`menuRole = PreferencesRole` を明示 |
+| `_act_log` | `menu_log`（`ログ表示` / `Show Log`） | `_open_log_dialog` | |
+| `_act_quit` | `menu_quit`（`終了` / `Quit`） | `self.close` | **非 macOS のみ**生成・追加（macOS は Qt がアプリメニューに自動提供するため） |
+
+**macOS のメニューロール**: macOS では Qt が `QAction` の `menuRole` に応じて項目をアプリケーションメニュー（アプリ名のメニュー）へ自動移動する。既定の `TextHeuristicRole` はアクションのテキストを**英語キーワード**で判定するため、英語ラベル `Settings...` は移動されるが日本語ラベル `設定...` は移動されず、言語で置き場所がずれる。これを防ぐため `_act_settings` には `QAction.MenuRole.PreferencesRole` を明示し、UI 言語によらず常にアプリメニュー配下に表示する。Windows / Linux ではメニューマージが行われないため表示に影響しない。
+
 ## 内部クラス: `_QueueTree(QTreeWidget)`
 
 キュー表示。依存は **コンストラクタ DI** で受け取り、外部からの属性書き込みは行わない:
