@@ -28,6 +28,7 @@
 | [149-extension-format-selection.md](149-extension-format-selection.md) | ブラウザ拡張のポップアップで形式選択（最高画質/解像度/音声/アプリ既定）に対応。案A＝拡張はコンテナ非依存で意味のみ送り形式解決はアプリ側に一任、`resolve_extension_format` でクランプ。オリジナル形式は #151 へ分離（Issue #149 / PR #150） | 2026-06-14 |
 | [151-extension-original-format-dialog.md](151-extension-original-format-dialog.md) | 拡張から `kind:"original"` を送るとアプリ側で `OriginalFormatDialog` を開く導線。`resolve_extension_format` を 3 状態化（`OriginalIntent` センチネル）、pending キュー＋`QTimer.singleShot` で直列起動（多重モーダル防止）・ウィンドウ前面化・アイテム単位 Cookies 引き回し・キャンセル時は非追加（Issue #151 / PR #153） | 2026-06-14 |
 | [157-settings-sidebar-nav.md](157-settings-sidebar-nav.md) | 設定ダイアログを上部横並びタブから左サイドバー型（`QListWidget`＋`QStackedWidget` のラッパー `_SidebarNav`）へ刷新し、macOS でタブが窮屈に潰れる問題を解消。固定サイズを 700×520 に拡大・`QTabWidget` 互換 API でページ切替を維持（Issue #157 / PR #158） | 2026-06-15 |
+| [164-extension-chrome-ui.md](164-extension-chrome-ui.md) | ブラウザ拡張の popup/options を Material 3（現行 Chrome 風）デザインへ刷新。アクセント `#0b57d0`・ピル型ボタン・`prefers-color-scheme` でダーク追従、色/角丸/余白を CSS カスタムプロパティに集約。既存 JS 参照の id/`.hidden`/`data-i18n` は非破壊（Issue #164 / PR #165） | 2026-06-15 |
 
 ## バグ修正
 
