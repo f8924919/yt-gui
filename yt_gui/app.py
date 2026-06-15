@@ -482,6 +482,12 @@ class App(QMainWindow):
 
         self._act_settings = QAction(t("menu_settings"), self)
         self._act_settings.setShortcut("Ctrl+,")
+        # macOS では menuRole に応じて項目がアプリメニューへ自動移動する。既定の
+        # TextHeuristicRole はテキストを英語キーワードで判定するため、英語
+        # `Settings...` は移動するが日本語 `設定...` は File に残り、言語で置き場所
+        # がずれる。PreferencesRole を明示して言語によらずアプリメニューに統一する
+        # （#160）。
+        self._act_settings.setMenuRole(QAction.MenuRole.PreferencesRole)
         self._act_settings.triggered.connect(self._open_settings)
         self._file_menu.addAction(self._act_settings)
 

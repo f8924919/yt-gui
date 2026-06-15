@@ -97,6 +97,15 @@ def test_refresh_format_labels_follows_language(app):
     assert en_texts != ja_texts
 
 
+def test_settings_action_has_preferences_menu_role(app):
+    """設定アクションは PreferencesRole を明示し、macOS で言語によらずアプリ
+    メニュー配下に表示されるようにする（#160。既定の TextHeuristicRole だと
+    英語 `Settings...` のみアプリメニューへ移動し日本語 `設定...` が File に残る）。"""
+    from PySide6.QtGui import QAction
+
+    assert app._act_settings.menuRole() == QAction.MenuRole.PreferencesRole
+
+
 def _select_format(app, key: str) -> None:
     from yt_gui.formats import FORMAT_KEYS
 
