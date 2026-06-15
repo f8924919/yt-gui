@@ -56,9 +56,7 @@ def _grid_cells(layout: QGridLayout) -> list[tuple[int, int]]:
 
 
 def _download_tab_grid(dialog: SettingsDialog) -> QGridLayout:
-    from PySide6.QtWidgets import QTabWidget
-
-    tabs = dialog.findChild(QTabWidget)
+    tabs = dialog._tabs
     assert tabs is not None
     for i in range(tabs.count()):
         page = tabs.widget(i)
@@ -394,3 +392,83 @@ def test_save_persists_extension_settings(qtbot):
     assert saved.extension_enabled is True
     assert saved.extension_port == 8719
     assert saved.extension_token != ""  # 有効時はトークンが入る
+
+
+# ── サイドバー型ナビゲーション（#157） ──────────────────────────────
+
+
+def test_settings_uses_sidebar_navigation_not_tabwidget(qtbot):
+    """設定画面は上部横並びタブ（QTabWidget）ではなくサイドバー型で構成する。"""
+    from PySide6.QtWidgets import QListWidget, QStackedWidget, QTabWidget
+
+    dialog = _make_dialog(qtbot, Settings())
+
+    # macOS でタブが窮屈になる根因の QTabWidget は使わない
+    assert dialog.findChild(QTabWidget) is None
+    # 左ナビ（QListWidget）＋ 右ページ（QStackedWidget）で構成する
+    assert dialog.findChild(QListWidget) is not None
+    assert dialog.findChild(QStackedWidget) is not None
+
+
+def test_sidebar_has_seven_pages_with_locale_labels(qtbot):
+    """7 ページが定義順に並び、ナビ項目ラベルがロケール文言と一致する。"""
+    from PySide6.QtWidgets import QListWidget, QStackedWidget
+
+    from yt_gui.i18n import t
+
+    dialog = _make_dialog(qtbot, Settings())
+
+    expected_labels = [
+        t("tab_general"),
+        t("tab_quality"),
+        t("tab_output_template"),
+        t("tab_download"),
+        t("tab_sponsorblock"),
+        t("tab_proxy"),
+        t("tab_extension"),
+    ]
+
+    nav = dialog.findChild(QListWidget)
+    stack = dialog.findChild(QStackedWidget)
+    assert dialog._tabs.count() == 7
+    assert nav.count() == 7
+    assert stack.count() == 7
+    assert [nav.item(i).text() for i in range(nav.count())] == expected_labels
+
+
+def test_sidebar_selection_switches_page(qtbot):
+    """ナビ項目の選択で右ページが対応するインデックスへ切り替わる。"""
+    from PySide6.QtWidgets import QListWidget, QStackedWidget
+
+    dialog = _make_dialog(qtbot, Settings())
+    nav = dialog.findChild(QListWidget)
+    stack = dialog.findChild(QStackedWidget)
+
+    nav.setCurrentRow(dialog._proxy_tab_index)
+
+    assert stack.currentIndex() == dialog._proxy_tab_index
+    assert dialog._tabs.currentIndex() == dialog._proxy_tab_index
+
+
+def test_set_current_index_syncs_nav_and_page(qtbot):
+    """`_tabs.setCurrentIndex` がナビ選択行と表示ページの両方を同期する。"""
+    from PySide6.QtWidgets import QListWidget, QStackedWidget
+
+    dialog = _make_dialog(qtbot, Settings())
+    nav = dialog.findChild(QListWidget)
+    stack = dialog.findChild(QStackedWidget)
+
+    dialog._tabs.setCurrentIndex(dialog._template_tab_index)
+
+    assert nav.currentRow() == dialog._template_tab_index
+    assert stack.currentIndex() == dialog._template_tab_index
+
+
+def test_dialog_widened_for_sidebar(qtbot):
+    """サイドバー分だけ横幅を広げた固定サイズ（700×520）にする。"""
+    dialog = _make_dialog(qtbot, Settings())
+
+    assert dialog.minimumWidth() == 700
+    assert dialog.maximumWidth() == 700
+    assert dialog.minimumHeight() == 520
+    assert dialog.maximumHeight() == 520

@@ -4,9 +4,27 @@
 
 ## クラス: `SettingsDialog(QDialog)`
 
-モーダルの設定ダイアログ。`setFixedSize(520, 520)`。
+モーダルの設定ダイアログ。`setFixedSize(700, 520)`。
 
-## タブ構成（`QTabWidget`）
+## ナビゲーション構成（サイドバー）
+
+上部横並びの `QTabWidget` ではなく、左サイドバー（`QListWidget`）＋ 右ページ（`QStackedWidget`）のサイドバー型ナビゲーションを採用する。macOS のネイティブスタイルがタブ溢れ時にスクロール矢印を出さずタブを圧縮・省略表示してしまい、見出しが窮屈に潰れる問題を避けるため（横幅にナビ項目数が依存しない構造にする）。
+
+実装はラッパーウィジェット `_SidebarNav(QWidget)` にまとめる。`QListWidget` の選択行と `QStackedWidget` のページを 1 対 1 で同期し、既存コード・テストが前提とする整数インデックス API（`addTab(widget, label)` / `currentIndex()` / `setCurrentIndex(i)` / `widget(i)` / `count()`）を公開する。これによりページの追加順＝インデックスが保たれ、`_template_tab_index` / `_proxy_tab_index` や保存時のページ切替（後述）は従来どおり整数インデックスで扱える。`self._tabs` がこのラッパーを保持する。
+
+サイドバー項目（＝ページ）は追加順に以下の 7 つ。
+
+| インデックス | 項目（ロケールキー） | ビルド関数 |
+|---|---|---|
+| 0 | 一般（`tab_general`） | `_build_general_tab` |
+| 1 | 画質・音質（`tab_quality`） | `_build_quality_tab` |
+| 2 | ファイル名（`tab_output_template`、`_template_tab_index`） | `_build_output_template_tab` |
+| 3 | ダウンロード（`tab_download`） | `_build_download_tab` |
+| 4 | SponsorBlock（`tab_sponsorblock`） | `_build_sponsorblock_tab` |
+| 5 | プロキシ（`tab_proxy`、`_proxy_tab_index`） | `_build_proxy_tab` |
+| 6 | ブラウザ連携（`tab_extension`） | `_build_extension_tab` |
+
+以降の各ページ（見出しの「○○タブ」）はサイドバー項目に対応する `QStackedWidget` のページを指す。
 
 ### 「一般」タブ
 
@@ -95,7 +113,7 @@ SponsorBlock の処理方法・対象カテゴリを設定するタブ（`_build
 
 ## 保存フロー
 
-1. 「ファイル名」タブのテンプレートを `validate_template()` で検証。エラー時は警告ダイアログを表示し、該当タブに切り替えてダイアログを閉じない
+1. 「ファイル名」ページのテンプレートを `validate_template()` で検証。エラー時は警告ダイアログを表示し、`self._tabs.setCurrentIndex()` で該当ページ（ファイル名 / プロキシ）に切り替えてダイアログを閉じない
 2. 各ウィジェットの値を `Settings` に書き込む
 3. `SettingsManager.save()` を呼ぶ
 4. `self.accept()` でダイアログを閉じる

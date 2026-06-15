@@ -15,12 +15,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMenu,
     QMessageBox,
     QPushButton,
     QRadioButton,
     QSpinBox,
-    QTabWidget,
+    QStackedWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -69,12 +70,58 @@ _BROWSER_DISPLAY = [label for label, _ in _BROWSERS]
 _BROWSER_INTERNAL = [name for _, name in _BROWSERS]
 
 
+class _SidebarNav(QWidget):
+    """左サイドバー（`QListWidget`）＋右ページ（`QStackedWidget`）のナビゲーション。
+
+    macOS のネイティブスタイルがタブ溢れ時にスクロール矢印を出さずタブを圧縮・
+    省略表示し、見出しが窮屈に潰れる問題を避けるため、上部横並びの `QTabWidget`
+    を置き換える。`QTabWidget` 互換の整数インデックス API を公開し、既存コード・
+    テストの「ページ追加順＝インデックス」前提をそのまま温存する。
+    """
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._nav = QListWidget()
+        self._nav.setFixedWidth(150)
+        self._stack = QStackedWidget()
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self._nav)
+        layout.addWidget(self._stack, 1)
+
+        # ナビ選択行と表示ページを 1 対 1 で同期する。
+        self._nav.currentRowChanged.connect(self._stack.setCurrentIndex)
+
+    def addTab(self, widget: QWidget, label: str) -> int:
+        """ページを末尾に追加し、そのインデックスを返す（`QTabWidget.addTab` 互換）。"""
+        index = self._stack.addWidget(widget)
+        self._nav.addItem(label)
+        if self._nav.currentRow() < 0:
+            self._nav.setCurrentRow(0)
+        return index
+
+    def setCurrentIndex(self, index: int) -> None:
+        """ナビ選択行と表示ページの両方を `index` に切り替える。"""
+        self._nav.setCurrentRow(index)
+
+    def currentIndex(self) -> int:
+        return self._stack.currentIndex()
+
+    def widget(self, index: int) -> QWidget | None:
+        return self._stack.widget(index)
+
+    def count(self) -> int:
+        return self._stack.count()
+
+
 class SettingsDialog(QDialog):
     def __init__(self, parent, manager: SettingsManager):
         super().__init__(parent)
         self.setWindowTitle(t("settings_title"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setFixedSize(520, 520)
+        self.setFixedSize(700, 520)
 
         self._manager = manager
         self._settings = manager.load()
@@ -87,7 +134,7 @@ class SettingsDialog(QDialog):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(8)
 
-        self._tabs = QTabWidget()
+        self._tabs = _SidebarNav()
         root.addWidget(self._tabs)
 
         general_widget = QWidget()
