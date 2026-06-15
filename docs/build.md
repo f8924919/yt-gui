@@ -215,6 +215,12 @@ public 化（`gh repo edit f8924919/yt-gui --visibility public`）後、public �
 - アイコンは `assets/icon.png` から PNG → ICO（Windows）/ ICNS（macOS）への自動変換に対応。ブラウザ拡張用アイコン（`extension/icons/`、16/32/48/128 px）も同じ `assets/icon.png` から `scripts/build_extension_icons.py` で生成する（生成物はコミット）。
 - ビルド時に `pyproject.toml` からバージョンを読み取り（`tomllib`）、`CFBundleShortVersionString` に注入する。`copy_metadata('yt-gui')` でパッケージメタデータも同梱する（バージョン管理セクション参照）。
 
+### macOS のメニューバー名（アプリケーションメニュー）
+
+macOS のメニューバー左端のアプリケーションメニュー名は、`.app` バンドルの `Info.plist` の `CFBundleName` から決まる。`BUNDLE(name='yt-gui.app', …)` により PyInstaller が `CFBundleName="yt-gui"` を設定するため、**配布する `.app` を起動した場合はメニュー名が `yt-gui` になる**。
+
+一方、開発時に `uv run python -m yt_gui` のように**ソースから直接起動した場合はバンドルを介さない**ため、macOS は起動プロセス名（インタプリタ名）をメニュー名として表示し、`python3` 等になる。これは開発時のみの表示で配布物には影響しない。`QApplication.setApplicationName("yt-gui")`（`yt_gui/__main__.py`）は Qt 内部のアプリ名であって macOS のメニューバー表示には反映されない（macOS 固有の仕様）。ソース起動時にも `yt-gui` と表示するにはランタイムで `Info.plist` を書き換える必要があり（`pyobjc` 依存等）、コスト対効果が見合わないため対応しない。
+
 ## Linux AppImage の生成
 
 Linux 上で `uv run pyinstaller yt-gui.spec` を実行すると、`COLLECT` 完了後に `scripts/build_appimage.py` が自動実行され `dist/yt-gui-{version}-{arch}.AppImage` を生成する。
