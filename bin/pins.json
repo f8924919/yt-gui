@@ -1,22 +1,22 @@
 {
   "_comment": "同梱バイナリのピン留め台帳。各バイナリのバージョン・取得 URL・sha256 を固定し、scripts/download_binaries.py が取得後に sha256 を検証する（不一致なら中断）。更新方針・信頼の確立は docs/research/binary-supply-chain.md / docs/build.md を参照。sha256 が null の項目は未確定で、ビルド時に検証エラーとなる。",
   "deno": {
-    "version": "v2.8.2",
-    "base_url": "https://github.com/denoland/deno/releases/download/v2.8.2",
+    "version": "v2.8.3",
+    "base_url": "https://github.com/denoland/deno/releases/download/v2.8.3",
     "comment": "上流の <asset>.zip.sha256sum（authoritative）と照合済み。",
     "assets": {
-      "deno-x86_64-pc-windows-msvc.zip": "6fe073b11cabeba2f2726d8a3d1592b198aec5f23dab3473d0dc8d5ec7aee1c9",
-      "deno-aarch64-apple-darwin.zip": "02e5eb795c9f763772dfd081429cead9029e0a4a6aaff6d4e5f3ed6d2e94d361",
-      "deno-x86_64-apple-darwin.zip": "77cf27f835f1921e49434449675c57432c6314d54edc725e2474cc825546e206",
-      "deno-x86_64-unknown-linux-gnu.zip": "184da7a5267ab649bc08821b3bc3ce6805d8e6985fb82707cb8d5e9fd6535362",
-      "deno-aarch64-unknown-linux-gnu.zip": "48647189aee6454ed9b9852fa700a77f92b39465c04c625901d165bc8e937afc"
+      "deno-x86_64-pc-windows-msvc.zip": "7fdd1f42e6b0855421ecf27bb406e2492ade1087c85e30ebf0deab6280ea743c",
+      "deno-aarch64-apple-darwin.zip": "88b350be928fdba0e5d8142ff7c101a17133426371e3cf5ed0e0f74e62476f6c",
+      "deno-x86_64-apple-darwin.zip": "4254ec12123cfcf88b87703d7acf092a1ea024bdf9be8dd3cd9d4474761cb74e",
+      "deno-x86_64-unknown-linux-gnu.zip": "30455b845ffa6082209c3590269c910ad3b7efdf28c9879afd4006c47ae54197",
+      "deno-aarch64-unknown-linux-gnu.zip": "d4589cc1ffcbf1995c92a0127d932aaf832ac70cfdcc6d5b7bf38043cf303575"
     }
   },
   "ffmpeg-win": {
-    "version": "n8.1.1-11-ge4c7fbf6c0",
+    "version": "n8.1.1-118-g1034b144ff",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-07-13-55/ffmpeg-n8.1.1-11-ge4c7fbf6c0-win64-gpl-8.1.zip",
-    "sha256": "e9cacb08869180b0b24dc9c89afea7d84cd4703a0c4ae3b7725a443f943e9754"
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-14-13-33/ffmpeg-n8.1.1-118-g1034b144ff-win64-gpl-8.1.zip",
+    "sha256": "27de249c51e9f369623dddd0743e1918ec174dcf85c3594225f5732966ecb95e"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
