@@ -4,63 +4,175 @@
     <meta charset="utf-8" />
     <title data-i18n="optionsTitle">yt-gui Connector Settings</title>
     <style>
+      /* Chrome 風（Material 3 / GM3）デザイン。popup.html とトークンを揃える。
+         仕様: ../docs/spec/features/browser-extension.md#ui-デザインポップアップオプション画面 */
+      :root {
+        --bg: #ffffff;
+        --surface-2: #f0f4f9;
+        --text: #1f1f1f;
+        --text-secondary: #444746;
+        --outline: #c4c7c5;
+        --outline-subtle: #e1e3e1;
+        --primary: #0b57d0;
+        --primary-hover: #0b50bd;
+        --primary-press: #0a47a8;
+        --on-primary: #ffffff;
+        --focus-ring: rgba(11, 87, 208, 0.3);
+        --field-bg: #ffffff;
+        --success: #1e8e3e;
+        --radius-field: 8px;
+        --radius-card: 16px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1f20;
+          --surface-2: #28292a;
+          --text: #e3e3e3;
+          --text-secondary: #c4c7c5;
+          --outline: #5e5e5e;
+          --outline-subtle: #3c4043;
+          --primary: #a8c7fa;
+          --primary-hover: #b6d0fb;
+          --primary-press: #c2d7fc;
+          --on-primary: #062e6f;
+          --focus-ring: rgba(168, 199, 250, 0.35);
+          --field-bg: #28292a;
+          --success: #81c995;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: sans-serif;
-        margin: 16px;
-        max-width: 480px;
+        font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 32px 20px;
         font-size: 14px;
+        color: var(--text);
+        background: var(--bg);
       }
+
+      .card {
+        max-width: 520px;
+        margin: 0 auto;
+        background: var(--bg);
+        border: 1px solid var(--outline-subtle);
+        border-radius: var(--radius-card);
+        padding: 24px 28px 28px;
+      }
+
       h1 {
-        font-size: 16px;
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 4px;
+        letter-spacing: 0.2px;
       }
+
       label {
         display: block;
-        margin-top: 12px;
-        font-weight: bold;
+        margin-top: 18px;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: var(--text-secondary);
       }
+
       input {
         width: 100%;
-        box-sizing: border-box;
-        padding: 6px;
-        margin-top: 4px;
+        font: inherit;
+        color: var(--text);
+        background: var(--field-bg);
+        border: 1px solid var(--outline);
+        border-radius: var(--radius-field);
+        padding: 10px 12px;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      input::placeholder {
+        color: var(--text-secondary);
+        opacity: 0.7;
+      }
+      input:hover {
+        border-color: var(--text-secondary);
+      }
+      input:focus-visible {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--focus-ring);
       }
       input[type="number"] {
-        width: 120px;
+        width: 140px;
       }
+
       button {
-        margin-top: 16px;
-        padding: 6px 16px;
+        margin-top: 22px;
+        padding: 10px 24px;
+        font: inherit;
+        font-weight: 500;
+        color: var(--on-primary);
+        background: var(--primary);
+        border: none;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition:
+          background-color 0.15s ease,
+          box-shadow 0.15s ease;
       }
-      .note {
-        color: #666;
-        margin-top: 8px;
-        line-height: 1.5;
+      button:hover {
+        background: var(--primary-hover);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
       }
+      button:active {
+        background: var(--primary-press);
+        box-shadow: none;
+      }
+      button:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--focus-ring);
+      }
+
       #status {
-        margin-top: 12px;
-        color: #2e7d32;
+        margin-top: 14px;
+        color: var(--success);
+        font-weight: 500;
         min-height: 1em;
+      }
+
+      .note {
+        color: var(--text-secondary);
+        margin-top: 20px;
+        padding-top: 18px;
+        border-top: 1px solid var(--outline-subtle);
+        line-height: 1.6;
+        font-size: 13px;
       }
     </style>
   </head>
   <body>
-    <h1 data-i18n="optionsTitle">yt-gui Connector Settings</h1>
+    <div class="card">
+      <h1 data-i18n="optionsTitle">yt-gui Connector Settings</h1>
 
-    <label for="token" data-i18n="tokenLabel">Token</label>
-    <input type="text" id="token" data-i18n-placeholder="tokenPlaceholder" />
+      <label for="token" data-i18n="tokenLabel">Token</label>
+      <input type="text" id="token" data-i18n-placeholder="tokenPlaceholder" />
 
-    <label for="port" data-i18n="portLabel">Receiving port</label>
-    <input type="number" id="port" min="1" max="65535" value="8718" />
+      <label for="port" data-i18n="portLabel">Receiving port</label>
+      <input type="number" id="port" min="1" max="65535" value="8718" />
 
-    <button id="save" data-i18n="saveButton">Save</button>
-    <div id="status"></div>
+      <div>
+        <button id="save" data-i18n="saveButton">Save</button>
+      </div>
+      <div id="status"></div>
 
-    <p class="note" data-i18n="note">
-      Enable the server under "Settings → Browser integration" in yt-gui and
-      paste the token shown there into the field above. Use the same port as
-      yt-gui (default 8718). In case yt-gui falls back when the port is busy,
-      the extension automatically tries 8718–8720.
-    </p>
+      <p class="note" data-i18n="note">
+        Enable the server under "Settings → Browser integration" in yt-gui and
+        paste the token shown there into the field above. Use the same port as
+        yt-gui (default 8718). In case yt-gui falls back when the port is busy,
+        the extension automatically tries 8718–8720.
+      </p>
+    </div>
 
     <script src="options.js"></script>
   </body>
