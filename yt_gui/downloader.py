@@ -23,9 +23,7 @@ _DANMAKU_LANG = "danmaku"
 _COMMENT_DANMAKU_LANGS = frozenset({_COMMENTS_LANG, _DANMAKU_LANG})
 # コンテナ埋め込み不可・サイドカー保存専用の字幕 lang（live_chat は保存のみ）。
 # 実体は JSON（live_chat / comments）と XML（danmaku）が混在する。
-_SIDECAR_ONLY_SUB_LANGS = frozenset(
-    {_LIVE_CHAT_LANG, _COMMENTS_LANG, _DANMAKU_LANG}
-)
+_SIDECAR_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG, _DANMAKU_LANG})
 # コメント/弾幕 lang → (サイドカー拡張子, danmaku2ass 入力フォーマット)。
 _COMMENT_SOURCE_FORMAT = {
     _COMMENTS_LANG: ("json", "NiconicoYtdlpJson2"),
