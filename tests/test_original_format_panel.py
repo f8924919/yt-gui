@@ -157,3 +157,24 @@ def test_nico_burn_in_round_trip(panel):
 
     panel._nico_group.restore_from({"nico_comments": opts})
     assert panel._nico_group._hardsub_check.isChecked() is True
+
+
+# ── コメント・弾幕グループの表示条件（#168 ビリビリ弾幕一般化） ───────────────
+
+
+def test_comment_group_visible_for_niconico_comments(panel):
+    """`comments` lang（ニコニコ）が含まれるとグループ表示条件を満たす。"""
+    panel._subtitle_formats = [("comments – ニコニコ動画コメント", "comments", False)]
+    assert panel._has_nico_comments_lang() is True
+
+
+def test_comment_group_visible_for_bilibili_danmaku(panel):
+    """`danmaku` lang（ビリビリ弾幕）が含まれるとグループ表示条件を満たす。"""
+    panel._subtitle_formats = [("danmaku – ビリビリ弾幕", "danmaku", False)]
+    assert panel._has_nico_comments_lang() is True
+
+
+def test_comment_group_hidden_for_normal_subtitles(panel):
+    """通常字幕のみのときはグループを表示しない。"""
+    panel._subtitle_formats = [("en – English", "en", False)]
+    assert panel._has_nico_comments_lang() is False

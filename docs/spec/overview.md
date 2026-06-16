@@ -39,7 +39,7 @@ yt-gui は PySide6 製のデスクトップ動画ダウンローダーです。�
 - **多言語対応**: 日本語 / English を切り替え可能。言語変更は即座に反映（再起動不要）
 - **ログ表示**: セッション中の動作ログをダイアログで確認可能
 - **依存ツールチェック**: 起動時に ffmpeg・ffprobe・deno の存在を確認
-- **ニコニコ動画コメント統合**: ニコニコ動画 URL で `comments` 字幕を選択するとコメント JSON が保存され、オプションで ASS 字幕への変換・MKV ソフトサブ統合まで対応（[ダウンロード動作](features/download-behavior.md) / [オリジナル形式パネル](screens/original-format-panel.md) 参照）
+- **コメント・弾幕統合**: ニコニコ動画 URL の `comments` 字幕（JSON）またはビリビリ動画 URL の `danmaku` 字幕（Bilibili XML）を選択するとコメント/弾幕がサイドカー保存され、オプションで ASS 字幕への変換・MKV ソフトサブ統合・ハードサブ焼きこみまで対応（[ダウンロード動作](features/download-behavior.md) / [オリジナル形式パネル](screens/original-format-panel.md) 参照）
 
 ---
 
@@ -60,7 +60,7 @@ yt-gui は PySide6 製のデスクトップ動画ダウンローダーです。�
 | `deno` / `deno.exe` | yt-dlp の JavaScript ランタイム |
 | `ffmpeg/ffmpeg` / `ffmpeg.exe` | 動画結合・音声変換 |
 | `ffmpeg/ffprobe` / `ffprobe.exe` | 動画メタデータ取得 |
-| `danmaku2ass` / `danmaku2ass.exe` | ニコニコ動画コメント JSON → ASS 字幕変換（PyInstaller でビルドした単独実行ファイル） |
+| `danmaku2ass` / `danmaku2ass.exe` | コメント/弾幕（ニコニコ JSON / ビリビリ XML）→ ASS 字幕変換（PyInstaller でビルドした単独実行ファイル） |
 | `assets/icon.png` | アプリアイコン |
 
 `bin/` 以下のバイナリは `scripts/download_binaries.py` で取得します（`uv run pyinstaller yt-gui.spec` 実行時に自動呼び出し）。

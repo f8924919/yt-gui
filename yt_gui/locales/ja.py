@@ -120,8 +120,9 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(自動生成)",
     "orig_sub_live_chat_name": "ライブチャット (埋め込み不可・サイドカー保存)",
     "orig_sub_nico_comments_name": "ニコニコ動画コメント (埋め込み不可・サイドカー保存)",
-    # niconico comments → ASS 変換 (オリジナル形式パネル)
-    "nico_group_title": "ニコニコ動画コメント",
+    "orig_sub_bilibili_danmaku_name": "ビリビリ弾幕 (埋め込み不可・サイドカー保存)",
+    # コメント/弾幕 → ASS 変換 (オリジナル形式パネル)
+    "nico_group_title": "コメント・弾幕",
     "nico_convert_ass": "コメントを ASS 字幕に変換",
     "nico_resolution": "画面解像度:",
     "nico_duration": "表示時間 (秒):",
@@ -129,7 +130,7 @@ STRINGS: dict[str, str] = {
     "nico_font_size": "フォントサイズ:",
     "warn_danmaku2ass_missing": "⚠️ danmaku2ass が見つかりません。ASS 変換をスキップしました。",
     "warn_danmaku2ass_failed": "⚠️ コメントの ASS 変換に失敗しました: {error}",
-    "warn_nico_ass_skip_no_json": "⚠️ {filename} が見つからないため ASS 変換をスキップ",
+    "warn_nico_ass_skip_no_source": "⚠️ {filename} が見つからないため ASS 変換をスキップ",
     "status_danmaku2ass_created": "[danmaku2ass] {filename} を生成しました",
     "nico_embed_mkv": "コメントを MKV に統合",
     "nico_auto_resolution": "動画の解像度を自動使用",

@@ -29,6 +29,9 @@ from .utils import strip_ansi
 
 _SUBTITLE_FORMATS = ("srt", "vtt", "best")
 _COMMENTS_LANG = "comments"
+_DANMAKU_LANG = "danmaku"
+# ニコニコ comments・ビリビリ danmaku の双方をコメント・弾幕グループの対象とする。
+_COMMENT_DANMAKU_LANGS = (_COMMENTS_LANG, _DANMAKU_LANG)
 
 # コンボ・リストの「自動」「ダウンロードしない」項目を翻訳済み文字列ではなく
 # `userData` のセンチネルで識別するための定数。
@@ -794,16 +797,20 @@ class OriginalFormatPanel(QGroupBox):
         return str(data)
 
     def _has_nico_comments_lang(self) -> bool:
-        """字幕フォーマットに `comments` lang が含まれるか。"""
-        return any(lang == _COMMENTS_LANG for _, lang, _ in self._subtitle_formats)
+        """字幕フォーマットにコメント/弾幕 lang（`comments` または `danmaku`）が
+        含まれるか。"""
+        return any(
+            lang in _COMMENT_DANMAKU_LANGS for _, lang, _ in self._subtitle_formats
+        )
 
     def _on_request_select_comments(self):
         """`_NicoCommentsGroup` から ASS 変換 ON 通知を受けたとき、
-        字幕リストの `comments` lang を自動選択する。"""
+        字幕リストのコメント/弾幕 lang（`comments` または `danmaku`）を
+        自動選択する。"""
         if not self._subtitle_formats:
             return
         for i, (_, lang, _) in enumerate(self._subtitle_formats):
-            if lang != _COMMENTS_LANG:
+            if lang not in _COMMENT_DANMAKU_LANGS:
                 continue
             item = self._subtitle_list.item(i)
             if item is not None and not item.isSelected():

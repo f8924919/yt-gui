@@ -120,8 +120,9 @@ STRINGS: dict[str, str] = {
     "orig_sub_auto_marker": "(auto-generated)",
     "orig_sub_live_chat_name": "Live chat (not embeddable, saved as sidecar)",
     "orig_sub_nico_comments_name": "Niconico comments (not embeddable, saved as sidecar)",
-    # niconico comments → ASS conversion (original-format panel)
-    "nico_group_title": "Niconico Comments",
+    "orig_sub_bilibili_danmaku_name": "Bilibili danmaku (not embeddable, saved as sidecar)",
+    # comments / danmaku → ASS conversion (original-format panel)
+    "nico_group_title": "Comments / Danmaku",
     "nico_convert_ass": "Convert comments to ASS subtitle",
     "nico_resolution": "Resolution:",
     "nico_duration": "Display duration (sec):",
@@ -129,7 +130,7 @@ STRINGS: dict[str, str] = {
     "nico_font_size": "Font size:",
     "warn_danmaku2ass_missing": "⚠️ danmaku2ass not found. Skipping ASS conversion.",
     "warn_danmaku2ass_failed": "⚠️ Failed to convert comments to ASS: {error}",
-    "warn_nico_ass_skip_no_json": "⚠️ {filename} not found; skipping ASS conversion",
+    "warn_nico_ass_skip_no_source": "⚠️ {filename} not found; skipping ASS conversion",
     "status_danmaku2ass_created": "[danmaku2ass] Generated {filename}",
     "nico_embed_mkv": "Embed comments into MKV",
     "nico_auto_resolution": "Use video resolution automatically",

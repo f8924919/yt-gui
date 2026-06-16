@@ -751,6 +751,7 @@ def test_cleanup_partial_files_removes_subtitle_sidecars(downloader, tmp_path) -
         tmp_path / "動画.en.json3",
         tmp_path / "動画.live_chat.json",  # YouTube ライブチャット
         tmp_path / "動画.comments.json",  # ニコニコ動画コメント
+        tmp_path / "動画.danmaku.xml",  # ビリビリ弾幕
     ]
     keep = [
         tmp_path / "動画.mp4",  # 完成済み最終ファイル
@@ -1034,21 +1035,25 @@ def test_fetch_formats_subtitle_classification(downloader, monkeypatch) -> None:
             "en": [{"ext": "vtt"}],
             "live_chat": [{"ext": "json"}],
             "comments": [{"ext": "json"}],
+            "danmaku": [{"ext": "xml"}],  # ビリビリ弾幕（xml 専用・埋め込み不可）
         },
         "automatic_captions": {
             "en": [{"ext": "vtt"}],  # 主言語 → 残す（auto=True）
             "fr": [{"ext": "vtt"}],  # 非主言語かつ手動に無い → 除外
-            "live_chat": [{"ext": "json"}],  # json 専用 → auto からは除外
+            "live_chat": [{"ext": "json"}],  # サイドカー専用 → auto からは除外
         },
     }
     _patch_stub_ydl(monkeypatch, info)
 
     result = downloader.fetch_formats("u")
     langs = [(lang, auto) for (_lbl, lang, auto) in result["subtitles"]]
+    labels = {lang: lbl for (lbl, lang, _a) in result["subtitles"]}
 
     assert ("en", False) in langs  # 手動字幕
-    assert ("live_chat", False) in langs  # json 専用（手動扱い）
-    assert ("comments", False) in langs  # json 専用（手動扱い）
+    assert ("live_chat", False) in langs  # サイドカー専用（手動扱い）
+    assert ("comments", False) in langs  # サイドカー専用（手動扱い）
+    assert ("danmaku", False) in langs  # ビリビリ弾幕（手動扱い）
+    assert "[xml]" in labels["danmaku"]  # 弾幕は xml サイドカーとして提示
     assert ("en", True) in langs  # 自動字幕（主言語）
     assert all(lang != "fr" for (lang, _a) in langs)  # 非主言語は除外
     # live_chat は自動字幕としては重複追加されない（手動扱いの 1 件のみ）
@@ -1224,9 +1229,82 @@ def test_convert_nico_comments_skips_when_json_missing(
         "yt_gui.downloader.subprocess.run",
         lambda *a, **k: called.__setitem__("run", True),
     )
-    downloader._convert_nico_comments_to_ass(str(tmp_path / "stem"), {})
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "stem"), "comments", {})
     assert called["run"] is False
     assert len(logs) == 1  # 警告ログのみ
+
+
+def test_convert_danmaku_skips_when_xml_missing(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ビリビリ弾幕は入力 `.danmaku.xml` 不在ならスキップ（非致命ログのみ）。"""
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    called = {"run": False}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda *a, **k: called.__setitem__("run", True),
+    )
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "stem"), "danmaku", {})
+    assert called["run"] is False
+    assert len(logs) == 1
+
+
+def test_convert_danmaku_uses_bilibili_format_and_xml_input(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ビリビリ弾幕は `{stem}.danmaku.xml` を入力に `-f Bilibili` で変換し
+    `{stem}.danmaku.ass` を出力する。"""
+    (tmp_path / "動画.danmaku.xml").write_text("<i></i>")
+    fake_bin = tmp_path / "danmaku2ass"
+    fake_bin.write_text("")
+    downloader._danmaku2ass_path = str(fake_bin)
+    downloader.log_callback = lambda m: None
+
+    captured: dict = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+
+        class _R:
+            pass
+
+        return _R()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "動画"), "danmaku", {})
+
+    cmd = captured["cmd"]
+    f_idx = cmd.index("-f")
+    assert cmd[f_idx + 1] == "Bilibili"
+    o_idx = cmd.index("-o")
+    assert cmd[o_idx + 1].endswith("動画.danmaku.ass")
+    assert cmd[-1].endswith("動画.danmaku.xml")  # 入力は xml サイドカー
+
+
+def test_convert_comments_uses_niconico_format_and_json_input(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ニコニコは従来どおり `{stem}.comments.json` を入力に
+    `-f NiconicoYtdlpJson2` で変換する（一般化後も退行しない）。"""
+    (tmp_path / "動画.comments.json").write_text("[]")
+    fake_bin = tmp_path / "danmaku2ass"
+    fake_bin.write_text("")
+    downloader._danmaku2ass_path = str(fake_bin)
+    downloader.log_callback = lambda m: None
+
+    captured: dict = {}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda cmd, **k: captured.__setitem__("cmd", cmd) or type("R", (), {})(),
+    )
+
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "動画"), "comments", {})
+
+    cmd = captured["cmd"]
+    assert cmd[cmd.index("-f") + 1] == "NiconicoYtdlpJson2"
+    assert cmd[-1].endswith("動画.comments.json")
 
 
 def test_cut_section_skips_when_infile_missing(
@@ -1257,9 +1335,37 @@ def test_embed_nico_comments_skips_when_video_missing(
         "yt_gui.downloader.subprocess.run",
         lambda *a, **k: called.__setitem__("run", True),
     )
-    downloader._embed_nico_comments_into_mkv(str(tmp_path / "nope"), ".mp4", {})
+    downloader._embed_nico_comments_into_mkv(
+        str(tmp_path / "nope"), ".mp4", "comments", {}
+    )
     assert called["run"] is False
     assert len(logs) == 1
+
+
+def test_embed_danmaku_uses_danmaku_ass_input(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """ビリビリ弾幕の MKV 統合は `{stem}.danmaku.ass` を字幕入力に使う。"""
+    (tmp_path / "動画.mp4").write_text("v")
+    (tmp_path / "動画.danmaku.ass").write_text("a")
+    fake_ffmpeg = tmp_path / "ffmpeg"
+    fake_ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(fake_ffmpeg)
+    downloader.log_callback = lambda m: None
+
+    captured: dict = {}
+    monkeypatch.setattr(
+        "yt_gui.downloader.subprocess.run",
+        lambda cmd, **k: captured.__setitem__("cmd", cmd) or type("R", (), {})(),
+    )
+
+    downloader._embed_nico_comments_into_mkv(
+        str(tmp_path / "動画"), ".mp4", "danmaku", {}
+    )
+
+    cmd = captured["cmd"]
+    assert any(str(a).endswith("動画.danmaku.ass") for a in cmd)
+    assert cmd[-1].endswith("動画.with-comments.mkv")
 
 
 # ── ハードサブ焼きこみ (#120 Phase 2) ──────────────────────────────────────
@@ -1308,7 +1414,9 @@ def test_burn_nico_comments_skips_when_video_missing(
         "yt_gui.downloader.subprocess.run",
         lambda *a, **k: called.__setitem__("run", True),
     )
-    downloader._burn_nico_comments_into_video(str(tmp_path / "nope"), ".mp4", {})
+    downloader._burn_nico_comments_into_video(
+        str(tmp_path / "nope"), ".mp4", "comments", {}
+    )
     assert called["run"] is False
     assert len(logs) == 1
 
@@ -1324,7 +1432,9 @@ def test_burn_nico_comments_skips_when_ass_missing(
         "yt_gui.downloader.subprocess.run",
         lambda *a, **k: called.__setitem__("run", True),
     )
-    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    downloader._burn_nico_comments_into_video(
+        str(tmp_path / "v"), ".mp4", "comments", {}
+    )
     assert called["run"] is False
     assert len(logs) == 1
 
@@ -1352,7 +1462,9 @@ def test_burn_nico_comments_invokes_ffmpeg_with_cwd_and_basename(
 
     monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
 
-    downloader._burn_nico_comments_into_video(str(tmp_path / "動画"), ".mp4", {})
+    downloader._burn_nico_comments_into_video(
+        str(tmp_path / "動画"), ".mp4", "comments", {}
+    )
 
     # filtergraph のパス問題回避: cwd を動画ディレクトリにしてベース名のみ渡す
     assert captured["cwd"] == str(tmp_path)
@@ -1375,7 +1487,9 @@ def test_burn_nico_comments_skips_when_no_ffmpeg(
         "yt_gui.downloader.subprocess.run",
         lambda *a, **k: called.__setitem__("run", True),
     )
-    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    downloader._burn_nico_comments_into_video(
+        str(tmp_path / "v"), ".mp4", "comments", {}
+    )
     assert called["run"] is False
     assert len(logs) == 1
 
@@ -1398,26 +1512,35 @@ def test_burn_nico_comments_ffmpeg_failure_is_non_fatal(
     monkeypatch.setattr("yt_gui.downloader.subprocess.run", _raise)
 
     # 例外が伝播しないこと
-    downloader._burn_nico_comments_into_video(str(tmp_path / "v"), ".mp4", {})
+    downloader._burn_nico_comments_into_video(
+        str(tmp_path / "v"), ".mp4", "comments", {}
+    )
     assert any("boom" in m for m in logs)
 
 
 # ── 追加: 純ロジックの未カバー分 ────────────────────────────────────────────
 
 
-def test_strip_json_only_subs_pp_removes_json_langs() -> None:
-    from yt_gui.downloader import _StripJsonOnlySubsBeforeEmbedPP
+def test_strip_sidecar_only_subs_pp_removes_sidecar_langs() -> None:
+    from yt_gui.downloader import _StripSidecarOnlySubsBeforeEmbedPP
 
-    pp = _StripJsonOnlySubsBeforeEmbedPP()
-    info = {"requested_subtitles": {"en": {}, "live_chat": {}, "comments": {}}}
+    pp = _StripSidecarOnlySubsBeforeEmbedPP()
+    info = {
+        "requested_subtitles": {
+            "en": {},
+            "live_chat": {},
+            "comments": {},
+            "danmaku": {},  # ビリビリ弾幕も埋め込み対象から除外
+        }
+    }
     _ret, out = pp.run(info)
     assert set(out["requested_subtitles"]) == {"en"}
 
 
-def test_strip_json_only_subs_pp_noop_without_json_langs() -> None:
-    from yt_gui.downloader import _StripJsonOnlySubsBeforeEmbedPP
+def test_strip_sidecar_only_subs_pp_noop_without_sidecar_langs() -> None:
+    from yt_gui.downloader import _StripSidecarOnlySubsBeforeEmbedPP
 
-    pp = _StripJsonOnlySubsBeforeEmbedPP()
+    pp = _StripSidecarOnlySubsBeforeEmbedPP()
     info = {"requested_subtitles": {"en": {}, "ja": {}}}
     _ret, out = pp.run(info)
     assert set(out["requested_subtitles"]) == {"en", "ja"}

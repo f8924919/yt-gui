@@ -45,7 +45,7 @@
 
 ## レイアウト追従
 
-内包パネルの `size_hint_changed` シグナル（ニコニコ動画コメントグループの出現等で発火）を受けて `adjustSize()` を呼び、ダイアログをパネルの新しい sizeHint に再フィットさせる。旧インライン埋め込み時の `App._resync_splitter_to_top_hint` による `QSplitter` 高さ再計算・ウィンドウ `resize` は不要になった。
+内包パネルの `size_hint_changed` シグナル（コメント・弾幕グループの出現等で発火）を受けて `adjustSize()` を呼び、ダイアログをパネルの新しい sizeHint に再フィットさせる。旧インライン埋め込み時の `App._resync_splitter_to_top_hint` による `QSplitter` 高さ再計算・ウィンドウ `resize` は不要になった。
 
 ## 起動時の処理
 
