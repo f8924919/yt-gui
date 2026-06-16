@@ -518,7 +518,7 @@ class Downloader:
 
         nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
-        # 単一動画ではニコニコ・ビリビリのどちらか一方しか出現しないため対象は最大 1 件。
+        # 単一動画では一方の lang しか出ないため対象は最大 1 件
         comment_lang = next(
             (lang for lang in sub_langs if lang in _COMMENT_DANMAKU_LANGS), None
         )
@@ -1034,7 +1034,7 @@ class Downloader:
     def _embed_nico_comments_into_mkv(
         self, stem: str, final_ext: str, lang: str, opts: dict
     ) -> None:
-        """動画 + コメント/弾幕 ASS をソフトサブで結合した MKV を別ファイルとして生成する。
+        """動画とコメント/弾幕 ASS をソフトサブで結合した MKV を生成する。
 
         元動画は触らず、`{stem}.with-comments.mkv` を新規作成する。
         ffmpeg は再エンコードなしの stream copy (`-c copy -c:s ass`)。
