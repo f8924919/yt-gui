@@ -169,9 +169,7 @@ def test_original_multi_audio_no_promotion_when_remux_only() -> None:
 def test_original_recode_video_forces_mp4() -> None:
     """recode_video=True: コンテナ設定が mkv でも video_container は mp4 に固定。"""
     panel = _panel(format_spec="137+140", recode_video=True)
-    job = build_job_spec(
-        "fmt_original", Settings(video_container="mkv"), panel=panel
-    )
+    job = build_job_spec("fmt_original", Settings(video_container="mkv"), panel=panel)
     assert job.recode_video is True
     assert job.video_container == "mp4"
     assert job.audio_only is False
@@ -186,9 +184,7 @@ def test_original_recode_video_overrides_multi_audio_promotion() -> None:
         recode_video=True,
         has_multiple_audio=True,
     )
-    job = build_job_spec(
-        "fmt_original", Settings(video_container="mp4"), panel=panel
-    )
+    job = build_job_spec("fmt_original", Settings(video_container="mp4"), panel=panel)
     assert job.recode_video is True
     assert job.video_container == "mp4"
     assert job.is_multi_audio is True

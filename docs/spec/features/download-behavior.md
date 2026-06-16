@@ -94,21 +94,22 @@ yt-dlp の `outtmpl` に `%(title)s.%(ext)s` を指定します。拡張子は�
 
 YouTube Live など `json3` 形式しか配信されない動画では、`FFmpegEmbedSubtitle` 単体だと `JSON subtitles cannot be embedded` のエラーで埋め込みに失敗します。これを避けるため、埋め込み有効時は `FFmpegSubtitlesConvertor` を埋め込み前に挟み、ユーザーが選んだフォーマット（`srt` / `vtt`）または `srt`（`best` 選択時のフォールバック）へ変換してから埋め込みます。
 
-### JSON 専用字幕の扱い（`live_chat` / `comments`）
+### サイドカー専用字幕の扱い（`live_chat` / `comments` / `danmaku`）
 
-一部の抽出器は標準的な字幕フォーマットではない JSON のみを字幕として公開します。
+一部の抽出器は標準的な字幕フォーマットではないコメント・弾幕ログを字幕トラックとして公開します。これらは `FFmpegSubtitlesConvertor` / `FFmpegEmbedSubtitle` で変換も埋め込みもできないため、字幕リストには表示しつつ、埋め込みパスからは除外してサイドカーファイルだけが残るようにしています。
 
-| lang | 由来 | ラベル |
-|---|---|---|
-| `live_chat` | YouTube Live のチャットログ（`info["subtitles"]` / `info["automatic_captions"]` 双方に出現） | `live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]` |
-| `comments` | ニコニコ動画コメント（`NiconicoIE._get_subtitles` が v1/threads JSON として出力） | `comments – ニコニコ動画コメント (埋め込み不可・サイドカー保存) [json]` |
+| lang | 由来 | 形式 | ラベル |
+|---|---|---|---|
+| `live_chat` | YouTube Live のチャットログ（`info["subtitles"]` / `info["automatic_captions"]` 双方に出現） | json | `live_chat – ライブチャット (埋め込み不可・サイドカー保存) [json]` |
+| `comments` | ニコニコ動画コメント（`NiconicoIE._get_subtitles` が v1/threads JSON として出力） | json | `comments – ニコニコ動画コメント (埋め込み不可・サイドカー保存) [json]` |
+| `danmaku` | ビリビリ動画の弾幕（`BiliBiliIE._get_subtitles` が `comment.bilibili.com/{cid}.xml` から取得する Bilibili XML） | xml | `danmaku – ビリビリ弾幕 (埋め込み不可・サイドカー保存) [xml]` |
 
-これらは `FFmpegSubtitlesConvertor` / `FFmpegEmbedSubtitle` で変換も埋め込みもできないため、字幕リストには表示しつつ、埋め込みパスからは除外して JSON ファイルだけがサイドカーとして残るようにしています。
+`comments` / `danmaku` は[コメント・弾幕グループ](../screens/original-format-panel.md#コメント弾幕グループ)で ASS 変換・動画統合の対象になります（`live_chat` はサイドカー保存のみ）。
 
 実装:
 
-- 自動字幕ループでは `_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` をスキップ（手動扱いの 1 エントリだけが UI に出る）
-- 「MP4 に埋め込む」が ON でかつ `subtitleslangs` にいずれかの json 専用 lang が含まれるとき、`_StripJsonOnlySubsBeforeEmbedPP` を `FFmpegSubtitlesConvertor` の前に差し込み、`requested_subtitles` から該当 lang を取り除く（ファイルはダウンロード済みなのでディスクには残る）
+- 自動字幕ループでは `_SIDECAR_ONLY_SUB_LANGS = {"live_chat", "comments", "danmaku"}` をスキップ（手動扱いの 1 エントリだけが UI に出る）
+- 「MP4 に埋め込む」が ON でかつ `subtitleslangs` にいずれかのサイドカー専用 lang が含まれるとき、`_StripSidecarOnlySubsBeforeEmbedPP` を `FFmpegSubtitlesConvertor` の前に差し込み、`requested_subtitles` から該当 lang を取り除く（ファイルはダウンロード済みなのでディスクには残る）
 - 埋め込み OFF のときは convert/embed PP 自体が走らないため、フィルタも不要
 
 ---

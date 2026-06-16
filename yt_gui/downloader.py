@@ -18,7 +18,25 @@ from .utils import strip_ansi
 
 _LIVE_CHAT_LANG = "live_chat"
 _COMMENTS_LANG = "comments"
-_JSON_ONLY_SUB_LANGS = frozenset({_LIVE_CHAT_LANG, _COMMENTS_LANG})
+_DANMAKU_LANG = "danmaku"
+# danmaku2ass で ASS 化できるコメント/弾幕 lang（ニコニコ JSON / ビリビリ XML）。
+_COMMENT_DANMAKU_LANGS = frozenset({_COMMENTS_LANG, _DANMAKU_LANG})
+# コンテナ埋め込み不可・サイドカー保存専用の字幕 lang（live_chat は保存のみ）。
+# 実体は JSON（live_chat / comments）と XML（danmaku）が混在する。
+_SIDECAR_ONLY_SUB_LANGS = frozenset(
+    {_LIVE_CHAT_LANG, _COMMENTS_LANG, _DANMAKU_LANG}
+)
+# コメント/弾幕 lang → (サイドカー拡張子, danmaku2ass 入力フォーマット)。
+_COMMENT_SOURCE_FORMAT = {
+    _COMMENTS_LANG: ("json", "NiconicoYtdlpJson2"),
+    _DANMAKU_LANG: ("xml", "Bilibili"),
+}
+# 中断時に掃除するサイドカー専用字幕の `.{lang}.{ext}` サフィックス。
+_SIDECAR_SUB_SUFFIXES = (
+    f".{_LIVE_CHAT_LANG}.json",
+    f".{_COMMENTS_LANG}.json",
+    f".{_DANMAKU_LANG}.xml",
+)
 
 # SponsorBlock でチャプター化される区間のタイトル（yt-dlp CLI の既定値と同じ）
 _SPONSORBLOCK_CHAPTER_TITLE = "[SponsorBlock]: %(category_names)l"
@@ -70,16 +88,16 @@ class _YtdlpLogger:
         self._cb(f"❌ {strip_ansi(msg)}")
 
 
-class _StripJsonOnlySubsBeforeEmbedPP(PostProcessor):
-    """json 専用字幕 (live_chat / ニコニコ動画 comments) は ffmpeg では
-    変換も埋め込みもできないため、後段の FFmpegSubtitlesConvertor /
-    FFmpegEmbedSubtitle が処理対象として見ないよう `requested_subtitles`
-    から外す。json ファイルは既にダウンロード済みなので、サイドカーとして
-    そのまま残る。"""
+class _StripSidecarOnlySubsBeforeEmbedPP(PostProcessor):
+    """サイドカー専用字幕 (live_chat / ニコニコ動画 comments / ビリビリ
+    danmaku) は ffmpeg では変換も埋め込みもできないため、後段の
+    FFmpegSubtitlesConvertor / FFmpegEmbedSubtitle が処理対象として見ないよう
+    `requested_subtitles` から外す。サイドカーファイル (json / xml) は既に
+    ダウンロード済みなので、そのまま残る。"""
 
     def run(self, info):
         subs = info.get("requested_subtitles") or {}
-        filtered = {k: v for k, v in subs.items() if k not in _JSON_ONLY_SUB_LANGS}
+        filtered = {k: v for k, v in subs.items() if k not in _SIDECAR_ONLY_SUB_LANGS}
         if len(filtered) != len(subs):
             info["requested_subtitles"] = filtered
         return [], info
@@ -384,6 +402,16 @@ class Downloader:
                     )
                 )
                 continue
+            if lang == _DANMAKU_LANG:
+                # ビリビリ弾幕 (xml 専用、埋め込み不可) は専用ラベルで提示
+                subtitle_list.append(
+                    (
+                        f"{lang} – {t('orig_sub_bilibili_danmaku_name')} [xml]",
+                        lang,
+                        False,
+                    )
+                )
+                continue
             exts = (
                 ", ".join(
                     dict.fromkeys(
@@ -396,7 +424,7 @@ class Downloader:
             subtitle_list.append((f"{lang} – {name} [{exts}]", lang, False))
 
         for lang, formats in sorted(auto_captions_raw.items()):
-            if not formats or lang in _JSON_ONLY_SUB_LANGS:
+            if not formats or lang in _SIDECAR_ONLY_SUB_LANGS:
                 continue
             # Limit auto captions to primary language family when known
             if primary_lang:
@@ -490,21 +518,27 @@ class Downloader:
 
         nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
+        # 単一動画ではニコニコ・ビリビリのどちらか一方しか出現しないため対象は最大 1 件。
+        comment_lang = next(
+            (lang for lang in sub_langs if lang in _COMMENT_DANMAKU_LANGS), None
+        )
         if (
             nico_comments_opts
             and nico_comments_opts.get("convert_to_ass")
-            and _COMMENTS_LANG in sub_langs
+            and comment_lang
         ):
-            self._convert_nico_comments_to_ass(effective_stem, nico_comments_opts)
+            self._convert_nico_comments_to_ass(
+                effective_stem, comment_lang, nico_comments_opts
+            )
 
             if nico_comments_opts.get("embed_to_mkv") and not job.is_audio_extraction:
                 self._embed_nico_comments_into_mkv(
-                    effective_stem, final_ext, nico_comments_opts
+                    effective_stem, final_ext, comment_lang, nico_comments_opts
                 )
 
             if nico_comments_opts.get("burn_in") and not job.is_audio_extraction:
                 self._burn_nico_comments_into_video(
-                    effective_stem, final_ext, nico_comments_opts
+                    effective_stem, final_ext, comment_lang, nico_comments_opts
                 )
 
     def _build_ydl_opts(
@@ -791,19 +825,19 @@ class Downloader:
     ) -> None:
         """ydl を起動してダウンロードを実行する。
 
-        json 専用字幕 (live_chat / ニコニコ動画 comments) が埋め込み対象に
-        含まれるときは convert/embed が json を触らないように strip PP を
-        先頭に挿入する。
+        サイドカー専用字幕 (live_chat / ニコニコ動画 comments / ビリビリ
+        danmaku) が埋め込み対象に含まれるときは convert/embed がサイドカーを
+        触らないように strip PP を先頭に挿入する。
         """
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
-        needs_strip_json_only_subs = bool(
+        needs_strip_sidecar_only_subs = bool(
             job.subtitle_opts and job.subtitle_opts.get("embed", False)
-        ) and any(lang in _JSON_ONLY_SUB_LANGS for lang in sub_langs)
+        ) and any(lang in _SIDECAR_ONLY_SUB_LANGS for lang in sub_langs)
 
         with YoutubeDL(ydl_opts) as ydl:
-            if needs_strip_json_only_subs:
+            if needs_strip_sidecar_only_subs:
                 ydl.add_post_processor(
-                    _StripJsonOnlySubsBeforeEmbedPP(), when="post_process"
+                    _StripSidecarOnlySubsBeforeEmbedPP(), when="post_process"
                 )
                 # yt-dlp 内部 API 依存: `add_post_processor` は常に末尾追加で
                 # ある一方、convert/embed の前で strip を走らせる必要がある。
@@ -837,7 +871,8 @@ class Downloader:
         - 一時ファイル: `.part` / `.ytdl` で終わる・`.part-Frag*` を含む・
           `.fNNN.`（マージ前の中間フォーマットファイル）形式
         - 字幕サイドカー: `.{lang}.{ext}`（ext は `_SUBTITLE_CLEANUP_EXTS`）・
-          `.live_chat.json` / `.comments.json`（json 専用字幕）
+          `.live_chat.json` / `.comments.json` / `.danmaku.xml`
+          （サイドカー専用字幕）
 
         非対象（残す）: 最終ファイル・`.info.json`・サムネイル画像。
         """
@@ -848,25 +883,28 @@ class Downloader:
             return True
         if re.search(r"\.f\d+\.", name):
             return True
-        if name.endswith(f".{_LIVE_CHAT_LANG}.json") or name.endswith(
-            f".{_COMMENTS_LANG}.json"
-        ):
+        if name.endswith(_SIDECAR_SUB_SUFFIXES):
             return True
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
         return ext in _SUBTITLE_CLEANUP_EXTS
 
-    def _convert_nico_comments_to_ass(self, stem: str, opts: dict) -> None:
-        """ニコニコ動画コメント JSON を danmaku2ass で ASS に変換する。
+    def _convert_nico_comments_to_ass(self, stem: str, lang: str, opts: dict) -> None:
+        """コメント/弾幕サイドカーを danmaku2ass で ASS に変換する。
 
+        `lang` に応じて入力サイドカー（ニコニコ `comments`→json /
+        ビリビリ `danmaku`→xml）と danmaku2ass 入力フォーマットを切り替える。
         失敗・バイナリ欠如はいずれも非致命としてログのみ。
         """
-        json_path = f"{stem}.{_COMMENTS_LANG}.json"
-        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+        src_ext, src_format = _COMMENT_SOURCE_FORMAT[lang]
+        src_path = f"{stem}.{lang}.{src_ext}"
+        ass_path = f"{stem}.{lang}.ass"
 
-        if not os.path.exists(json_path):
+        if not os.path.exists(src_path):
             if self.log_callback:
-                base = os.path.basename(json_path)
-                self.log_callback(t("warn_nico_ass_skip_no_json").format(filename=base))
+                base = os.path.basename(src_path)
+                self.log_callback(
+                    t("warn_nico_ass_skip_no_source").format(filename=base)
+                )
             return
         if not os.path.exists(self._danmaku2ass_path):
             if self.log_callback:
@@ -880,14 +918,14 @@ class Downloader:
             "-s",
             f"{opts.get('resolution_w', 1920)}x{opts.get('resolution_h', 1080)}",
             "-f",
-            "NiconicoYtdlpJson2",
+            src_format,
             "-dm",
             str(opts.get("duration_sec", 8.0)),
             "-fs",
             str(opts.get("font_size", 32)),
             "-a",
             str(opts.get("opacity", 0.8)),
-            json_path,
+            src_path,
         ]
         try:
             subprocess.run(
@@ -994,16 +1032,16 @@ class Downloader:
                 self.log_callback(t("warn_section_failed").format(error=detail))
 
     def _embed_nico_comments_into_mkv(
-        self, stem: str, final_ext: str, opts: dict
+        self, stem: str, final_ext: str, lang: str, opts: dict
     ) -> None:
-        """動画 + コメント ASS をソフトサブで結合した MKV を別ファイルとして生成する。
+        """動画 + コメント/弾幕 ASS をソフトサブで結合した MKV を別ファイルとして生成する。
 
         元動画は触らず、`{stem}.with-comments.mkv` を新規作成する。
         ffmpeg は再エンコードなしの stream copy (`-c copy -c:s ass`)。
         失敗・前提ファイル不在はいずれも非致命としてログのみ。
         """
         video_path = f"{stem}{final_ext}"
-        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+        ass_path = f"{stem}.{lang}.ass"
 
         if not os.path.exists(video_path):
             if self.log_callback:
@@ -1109,9 +1147,9 @@ class Downloader:
         ]
 
     def _burn_nico_comments_into_video(
-        self, stem: str, final_ext: str, opts: dict
+        self, stem: str, final_ext: str, lang: str, opts: dict
     ) -> None:
-        """動画にコメント ASS を焼き付けた MP4 を別ファイルとして生成する。
+        """動画にコメント/弾幕 ASS を焼き付けた MP4 を別ファイルとして生成する。
 
         元動画・既存出力は触らず、`{stem}.hardsub.mp4` を新規作成する。
         ソフトサブ MKV 統合（`_embed_nico_comments_into_mkv`）と異なり、
@@ -1119,7 +1157,7 @@ class Downloader:
         再エンコードする。失敗・前提ファイル不在はいずれも非致命としてログのみ。
         """
         video_path = f"{stem}{final_ext}"
-        ass_path = f"{stem}.{_COMMENTS_LANG}.ass"
+        ass_path = f"{stem}.{lang}.ass"
 
         if not os.path.exists(video_path):
             if self.log_callback:

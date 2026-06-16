@@ -60,7 +60,7 @@ URL 種別を判別して返す。
 |---|---|
 | `_build_ydl_opts(job, *, out_dir, is_playlist, cookies_path, cookies_browser)` | `JobSpec` から `ydl_opts` dict を組み立てる純粋関数。`_append_audio_postprocessors` / `_append_video_postprocessors` / `_append_subtitle_options` の 3 サブヘルパに分岐 |
 | `_resolve_unique_path(ydl_opts, url, job, *, extra_info)` | 同名ファイル衝突を避けるため `(stem, final_ext)` を予測し、必要なら `outtmpl` を ` (N)` 付きに上書きする |
-| `_run_download(ydl_opts, url, job, *, extra_info)` | `YoutubeDL` 起動とダウンロード実行。json 専用字幕の strip PP 順序操作もここに集約 |
+| `_run_download(ydl_opts, url, job, *, extra_info)` | `YoutubeDL` 起動とダウンロード実行。サイドカー専用字幕の strip PP 順序操作もここに集約 |
 
 `_build_ydl_opts` は副作用がないため [`tests/test_downloader.py`](../testing/index.md) で表ベースの単体テストを行う。
 
@@ -106,16 +106,21 @@ WebM は非対応のため自動スキップ。
 
 - **音声**: FFmpegExtractAudio → FFmpegMetadata → EmbedThumbnail
 - **映像 (字幕埋め込み無し)**: FFmpegMetadata → EmbedThumbnail
-- **映像 (字幕埋め込みあり)**: FFmpegMetadata → EmbedThumbnail → (json 専用字幕を含む場合 `_StripJsonOnlySubsBeforeEmbedPP`) → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
+- **映像 (字幕埋め込みあり)**: FFmpegMetadata → EmbedThumbnail → (サイドカー専用字幕を含む場合 `_StripSidecarOnlySubsBeforeEmbedPP`) → FFmpegSubtitlesConvertor → FFmpegEmbedSubtitle
 - **映像 (再エンコード `recode_video=True`)**: FFmpegVideoConvertor → FFmpegMetadata → EmbedThumbnail（→ 字幕変換・埋め込み）。`FFmpegVideoConvertor` はメタデータ・サムネイル・字幕の埋め込みより前に走る必要があるため、postprocessors リストの**先頭に挿入**する
 
 SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直前に `ModifyChapters` が挿入される（`FFmpegExtractAudio` がある場合はその後段）。`SponsorBlock` PP は `after_filter` フェーズで動くためリスト末尾に追加され、上記の post_process 順には影響しない。詳細は [SponsorBlock](#sponsorblock) を参照。
 
 字幕埋め込み時は `FFmpegSubtitlesConvertor` を先に挟む。これは `json3` しか配信されない動画で `FFmpegEmbedSubtitle` が `JSON subtitles cannot be embedded` で失敗するのを避けるため。変換先はユーザーが選んだフォーマット（`srt` / `vtt`）。`best` 選択時は `srt` をデフォルトに採用する。
 
-`_JSON_ONLY_SUB_LANGS = {"live_chat", "comments"}` のいずれかがユーザー選択に含まれる場合は、convert/embed の前に `_StripJsonOnlySubsBeforeEmbedPP` を差し込んで `requested_subtitles` から該当 lang を取り除く。これにより、ライブチャット (YouTube) およびニコニコ動画コメント の JSON は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
+`_SIDECAR_ONLY_SUB_LANGS = {"live_chat", "comments", "danmaku"}` のいずれかがユーザー選択に含まれる場合は、convert/embed の前に `_StripSidecarOnlySubsBeforeEmbedPP` を差し込んで `requested_subtitles` から該当 lang を取り除く。これにより、ライブチャット (YouTube)・ニコニコ動画コメント・ビリビリ弾幕は通常の writesubtitles でディスクに保存された後、変換・埋め込み対象からは除外され、ffmpeg のエラーや警告が出ない。挿入は `add_post_processor()` 後に `_pps['post_process']` の先頭へ移動して実現している（yt-dlp に公開された prepend API が無いため）。
 
-ニコニコ動画コメント (`comments` lang) は yt-dlp の `NiconicoIE._get_subtitles` が出力する v1/threads JSON。ライブチャットと同じ「json 専用・埋め込み不可」カテゴリとして同一の strip 機構で扱う。
+コメント/弾幕 lang の由来と形式:
+
+- `comments`（ニコニコ）は `NiconicoIE._get_subtitles` が出力する v1/threads JSON（`.comments.json`）。
+- `danmaku`（ビリビリ）は `BiliBiliIE._get_subtitles` が `comment.bilibili.com/{cid}.xml` から取得する Bilibili XML（`.danmaku.xml`）。
+
+いずれもライブチャットと同じ「コンテナ埋め込み不可・サイドカー保存」カテゴリとして同一の strip 機構で扱う（`live_chat` はサイドカー保存のみ、`comments` / `danmaku` は加えて danmaku2ass で ASS 化できる）。
 
 ### 映像の再エンコード（H.264 MP4・互換性優先）
 
@@ -127,30 +132,34 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 - 出力は常に `.mp4`。`JobSpec.video_container` は `build_job_spec` 側で `"mp4"` に固定されるため、サムネイル埋め込み条件（`_THUMBNAIL_EMBED_CONTAINERS` に `mp4` を含む）・`_resolve_unique_path` の `final_ext` 判定（`recode_video` 分岐で `.mp4`）と整合する。
 - 既に配信元が mp4（典型的に H.264）の単一プログレッシブ形式で再エンコードがスキップされる場合があるが、その場合も出力は互換性の高い MP4 のままで主旨を満たす。
 
-### ニコニコ動画コメントの ASS 変換
+### コメント/弾幕の ASS 変換
 
-`nico_comments_opts.convert_to_ass=True` かつ `subtitle_opts.subtitleslangs` に `comments` が含まれる場合、`extract_info(download=True)` 完了後に `_convert_nico_comments_to_ass(stem, opts)` を呼び出す。実装上の要点:
+`nico_comments_opts.convert_to_ass=True` かつ `subtitle_opts.subtitleslangs` にコメント/弾幕 lang（`comments` または `danmaku`）が含まれる場合、`extract_info(download=True)` 完了後に処理対象 lang を渡して `_convert_nico_comments_to_ass(stem, lang, opts)` を呼び出す（メソッド名は歴史的経緯で `nico` を維持）。実装上の要点:
 
-- yt-dlp が保存する `{stem}.comments.json` をベースに `{stem}.comments.ass` を生成する（`stem` は同名衝突回避の `(n)` サフィックスを含む実効ステム）
-- subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f NiconicoYtdlpJson2 -dm {sec} -fs {size} -a {opacity} {json}` を実行
-- `-f NiconicoYtdlpJson2` は yt-dlp の `v1/threads` JSON 用パーサ（フェーズ 0 で検証済み）
-- 失敗（バイナリ欠如・JSON 不在・サブプロセス非 0 終了）はいずれも `log_callback` に警告を流すのみで例外を投げない
+- 処理対象 lang は `_SIDECAR_ONLY_SUB_LANGS` のうち danmaku2ass で変換可能なもの（`_COMMENT_DANMAKU_LANGS = {"comments", "danmaku"}`）のうち `subtitleslangs` に含まれるものを採用する。単一動画ではニコニコ・ビリビリのどちらか一方しか出現しないため対象は最大 1 件。
+- lang → (拡張子, danmaku2ass 入力フォーマット) のマップで入出力を組み立てる。
+  - `comments` → 入力 `{stem}.comments.json` / `-f NiconicoYtdlpJson2`（yt-dlp の `v1/threads` JSON 用パーサ）
+  - `danmaku` → 入力 `{stem}.danmaku.xml` / `-f Bilibili`（`comment.bilibili.com/{cid}.xml` の Bilibili XML 用パーサ）
+- 出力は `{stem}.{lang}.ass`（`stem` は同名衝突回避の `(n)` サフィックスを含む実効ステム）
+- subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f {format} -dm {sec} -fs {size} -a {opacity} {input}` を実行
+- 失敗（バイナリ欠如・入力ファイル不在・サブプロセス非 0 終了）はいずれも `log_callback` に警告を流すのみで例外を投げない
 
-### コメント ASS と動画の MKV 統合
+### コメント/弾幕 ASS と動画の MKV 統合
 
-`nico_comments_opts.embed_to_mkv=True` かつ ASS 変換が成功した場合、`_embed_nico_comments_into_mkv(stem, final_ext, opts)` を呼び出す。実装上の要点:
+`nico_comments_opts.embed_to_mkv=True` かつ ASS 変換が成功した場合、処理対象 lang を渡して `_embed_nico_comments_into_mkv(stem, final_ext, lang, opts)` を呼び出す。実装上の要点:
 
+- 入力 ASS は `{stem}.{lang}.ass`
 - ffmpeg を subprocess で実行: `-i {video} -i {ass} -map 0 -map 1 -c copy -c:s ass -metadata:s:s:0 title={t("nico_group_title")} -metadata:s:s:0 language=jpn {out}`
 - 字幕トラック名は UI 言語に追従させるため `t("nico_group_title")` を用いる（`language=jpn` はコメント本文の言語コードなので固定）
-- 処理中のログ出力（生成完了・スキップ・失敗）はすべて i18n キー経由（`status_danmaku2ass_created` / `warn_nico_ass_skip_no_json` / `warn_nico_mkv_skip_missing` / `warn_nico_mkv_skip_no_ffmpeg` / `warn_nico_mkv_failed` 等）
+- 処理中のログ出力（生成完了・スキップ・失敗）はすべて i18n キー経由（`status_danmaku2ass_created` / `warn_nico_ass_skip_no_source` / `warn_nico_mkv_skip_missing` / `warn_nico_mkv_skip_no_ffmpeg` / `warn_nico_mkv_failed` 等）
 - 再エンコードなし (stream copy) のため処理は高速
 - 元動画は触らず、別ファイル `{stem}.with-comments.mkv` を生成（同名衝突時は `(n)` サフィックス）
 - 「音声のみ」モード (`is_audio=True`) では本処理をスキップ（動画統合の対象外）
 - 失敗（ffmpeg 欠如・入力ファイル欠如・サブプロセス非 0 終了）はいずれも非致命でログのみ
 
-### コメント ASS の動画への焼きこみ（ハードサブ）
+### コメント/弾幕 ASS の動画への焼きこみ（ハードサブ）
 
-`nico_comments_opts.burn_in=True` かつ ASS 変換が成功した場合、`_burn_nico_comments_into_video(stem, final_ext, opts)` を呼び出す。MKV 統合（ソフトサブ）とは独立しており、両方有効なら両方の出力を生成する。実装上の要点:
+`nico_comments_opts.burn_in=True` かつ ASS 変換が成功した場合、処理対象 lang を渡して `_burn_nico_comments_into_video(stem, final_ext, lang, opts)` を呼び出す。MKV 統合（ソフトサブ）とは独立しており、両方有効なら両方の出力を生成する。実装上の要点:
 
 - ffmpeg を subprocess で実行し、`ass` フィルタで ASS を映像に焼き付ける。コマンドは純関数 `_build_hardsub_cmd(ffmpeg, video, ass_value, out)` が組み立てる: `-y -i {video} -vf ass={ass_value} -c:v libx264 -c:a aac -movflags +faststart {out}`
 - **映像を H.264 / 音声を AAC に再エンコード**する（焼きこみは原理的にコピーできないため）。コーデックは Phase 1 の再エンコードと統一。
@@ -254,7 +263,7 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 `effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + "*")` を走査し、`_is_cleanup_target` が真のファイルだけを削除する。
 
 - 一時ファイル: `.part` / `.ytdl` で終わるファイル、`.part-Frag*` を含むファイル、`.fNNN.` 形式の中間フォーマットファイル。
-- 字幕サイドカー: 拡張子が `_SUBTITLE_CLEANUP_EXTS`（`srt` / `vtt` / `ttml` / `ass` / `ssa` / `lrc` / `srv1` / `srv2` / `srv3` / `json3`）のファイル、および `.live_chat.json` / `.comments.json`（json 専用字幕）。中断後に再ダウンロードすると先頭からやり直すため、書き出し済みの字幕を残さない。
+- 字幕サイドカー: 拡張子が `_SUBTITLE_CLEANUP_EXTS`（`srt` / `vtt` / `ttml` / `ass` / `ssa` / `lrc` / `srv1` / `srv2` / `srv3` / `json3`）のファイル、および `.live_chat.json` / `.comments.json` / `.danmaku.xml`（サイドカー専用字幕）。中断後に再ダウンロードすると先頭からやり直すため、書き出し済みの字幕を残さない。
 - 完成済みの最終ファイル・メタデータ（`.info.json`）・サムネイル画像は対象外（残す）。
 - 削除失敗（`OSError`）は非致命でログのみ。
 
