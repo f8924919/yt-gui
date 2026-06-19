@@ -24,7 +24,7 @@ jobs:
       # そのまま乗るよう先行して設定しておく。
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
         with:
