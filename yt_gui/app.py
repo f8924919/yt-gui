@@ -926,7 +926,11 @@ class App(QMainWindow):
         昇格/トランケートのステータス通知を発火する。検証はダイアログ側で
         実施済みの前提。"""
         panel = dialog.panel
-        format_label = self.format_combo.currentText()
+        # ラベルはメイン画面のコンボ選択に依存させず、常にオリジナル形式の
+        # 表示ラベルに固定する。アプリ内フローはコンボが fmt_original のため
+        # 同値だが、拡張フローはコンボを操作しないため、固定しないと既定の
+        # fmt_best_mp4（「最高画質」）の表示に化ける（#175）。
+        format_label = self._format_display[FORMAT_KEYS.index(_ORIGINAL_KEY)]
         audio_only = panel.get_audio_only()
         snapshot = panel.get_snapshot()
         section_start, section_end, section_force = self._read_section()
