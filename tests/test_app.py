@@ -683,6 +683,35 @@ def test_extension_original_add_enqueues_with_item_cookies(app, monkeypatch):
     assert item.cookies_path == "/tmp/ext_cookie.txt"
 
 
+def test_extension_original_uses_original_label_not_combo(app, monkeypatch):
+    """拡張オリジナルフローのキュー表示は、メイン画面コンボの選択（既定の
+    最高画質）に引きずられず「オリジナルの形式」になる（#175）。"""
+    from yt_gui.formats import FORMAT_KEYS
+    from yt_gui.original_format_dialog import OriginalFormatDialog
+
+    # 拡張フローはコンボを操作しない。既定の最高画質 MP4 を選択した状態を再現。
+    _select_format(app, "fmt_best_mp4")
+
+    opened = []
+    monkeypatch.setattr(OriginalFormatDialog, "exec", lambda self: opened.append(self))
+
+    app._pending_original_requests.append(("https://example.com/v", None))
+    app._dispatch_next_original_dialog()
+    dialog = opened[0]
+
+    monkeypatch.setattr(dialog.panel, "has_formats_loaded", lambda: True)
+    monkeypatch.setattr(dialog.panel, "get_fetched_title", lambda: "動画タイトル")
+    monkeypatch.setattr(dialog.panel, "get_audio_only", lambda: False)
+
+    dialog.add_requested.emit()
+
+    item = app.queue._items[-1]
+    assert item.format_label == i18n.t("fmt_original")
+    # 最高画質のラベルに化けていないこと（バグの再発防止）。
+    best_label = app._format_display[FORMAT_KEYS.index("fmt_best_mp4")]
+    assert item.format_label != best_label
+
+
 def test_extension_original_cancel_does_not_enqueue(app, monkeypatch):
     """ダイアログをキャンセル（add_requested を発火しない）するとキューに積まれない。"""
     from yt_gui.original_format_dialog import OriginalFormatDialog

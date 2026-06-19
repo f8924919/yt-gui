@@ -92,6 +92,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 ## キュー追加経路
 
 - `add_requested` ハンドラで `build_job_spec()` を呼び出して `JobSpec` を組み立てる。`fmt_original` のときはダイアログ内包パネルの `get_snapshot()` で UI 非依存の `PanelSnapshot` を作って渡す。オリジナル形式以外はメインの「追加」ボタン（`_add_url`）から従来どおり組み立てる。
+- `_build_original_job(dialog)` はオリジナル形式専用（常に `build_job_spec(fmt_original, ...)`）。表示ラベルは**メイン画面の形式コンボ（`format_combo.currentText()`）に依存させず**、`_format_display[FORMAT_KEYS.index(fmt_original)]`（＝「オリジナルの形式」）に固定する。アプリ内フロー（追加・編集）はコンボが `fmt_original` にセット済みのため同値だが、拡張フロー（`_on_extension_dialog_add`）はコンボを操作しないため、固定しないと既定 `fmt_best_mp4`（「最高画質」）の表示になってしまう。音声のみ確定時は `→ MP3/FLAC` を後置する。
 - 取得済み（`has_formats_loaded()`）なら `enqueue_single(...)` に即委譲。未取得なら URL 取得スレッドへ渡す（単独動画のみ。オリジナル形式はプレイリスト非対応で、`_on_fetch_for_add_done` がプレイリスト判明時に `warn_playlist_original_fmt` で中止する）。
 - `_on_fetch_for_add_done(payload)` の payload 構造は `{"result": ..., "job": JobSpec, "format_label": str, "item_cookies_path": str | None}`。単発は `self.queue.enqueue_single(..., cookies_path=item_cookies_path)`、プレイリストは `self.queue.enqueue_playlist(..., cookies_path=item_cookies_path)` に委譲。`item_cookies_path` は拡張連携で受信した一時 cookies のパス（手動追加では `None`）。
 - `_on_queue_item_added(item)` スロット: `QueueController.item_added` シグナルを受けて `self._thumbnail_cache.request(item.thumbnail_url)` を起動する。
