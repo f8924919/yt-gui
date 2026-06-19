@@ -37,6 +37,7 @@
 |---|---|---|
 | [fix-original-format-no-codec.md](fix-original-format-no-codec.md) | codec 情報を返さない抽出器（xvideos 等）でオリジナル形式が「プレイリスト」誤判定される不具合の修正 | 2026-05-17 |
 | [160-settings-menu-role.md](160-settings-menu-role.md) | macOS で設定メニュー項目の置き場所が言語で異なる不具合（`menuRole` 未指定＝英語テキスト依存マージ）を、`_act_settings` に `PreferencesRole` を明示して言語非依存にアプリメニュー配下へ統一（Issue #160 / PR #161） | 2026-06-15 |
+| [175-extension-original-label.md](175-extension-original-label.md) | 拡張から `kind:"original"` 送信時にキュー表示が「最高画質」に化けるバグを修正。`_build_original_job` のラベル基点をコンボの `currentText()` から `_format_display[FORMAT_KEYS.index(fmt_original)]` 固定へ（拡張フローはコンボ非操作のため既定 fmt_best_mp4 に化けていた偶発結合を解消）（Issue #175 / PR #176） | 2026-06-19 |
 
 ## ニコニコ動画コメント取得
 
