@@ -1,7 +1,7 @@
 # yt-dlp 本体の更新機能: 実装方式の決定
 
 - 関連 Issue: [#119](https://github.com/f8924919/yt-gui/issues/119)
-- ステータス: 進行中（方式決定＋docs 作成）
+- ステータス: 完了（方式決定＋docs 作成）
 - ブランチ: `feature/119-yt-dlp-update-design`
 
 ## ゴール（本タスク）
