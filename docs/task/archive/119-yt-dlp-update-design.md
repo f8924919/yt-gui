@@ -29,8 +29,8 @@ spec/arch を起こす」まで。実体の実装は方式確定後に別 Issue 
 
 ## 成果物
 
-- spec: [docs/spec/features/yt-dlp-update.md](../spec/features/yt-dlp-update.md)
-- arch: [docs/arch/yt_dlp_update.md](../arch/yt_dlp_update.md)
+- spec: [docs/spec/features/yt-dlp-update.md](../../spec/features/yt-dlp-update.md)
+- arch: [docs/arch/yt_dlp_update.md](../../arch/yt_dlp_update.md)
 - index 追記: spec/index.md・arch/index.md
 - #119 へ決定をコメント記録、Phase A / Phase B の実装 Issue を起票
 

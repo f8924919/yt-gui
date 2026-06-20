@@ -31,6 +31,7 @@
 | [164-extension-chrome-ui.md](164-extension-chrome-ui.md) | ブラウザ拡張の popup/options を Material 3（現行 Chrome 風）デザインへ刷新。アクセント `#0b57d0`・ピル型ボタン・`prefers-color-scheme` でダーク追従、色/角丸/余白を CSS カスタムプロパティに集約。既存 JS 参照の id/`.hidden`/`data-i18n` は非破壊（Issue #164 / PR #165） | 2026-06-15 |
 | [168-bilibili-danmaku-comments.md](168-bilibili-danmaku-comments.md) | ニコニコ動画コメント機能を一般化し、ビリビリ動画の弾幕（yt-dlp `danmaku` lang / Bilibili XML）も ASS 変換・MKV ソフトサブ統合・ハードサブ焼き込みに対応。サイドカー専用字幕を `_SIDECAR_ONLY_SUB_LANGS` に汎用化、lang→形式マップで `-f Bilibili` に分岐、UI グループも `comments`/`danmaku` 双方で表示（Issue #168 / PR #169） | 2026-06-16 |
 | [119-yt-dlp-update-design.md](119-yt-dlp-update-design.md) | yt-dlp 本体更新の実装方式を決定（A→B 段階導入：更新チェック＋通知→side-load 実体更新、C は不採用）。採用方式の spec/arch を新規作成し、実装は Phase A=#178 / Phase B=#179 へ分離（Issue #119 / PR #180） | 2026-06-20 |
+| [178-ytdlp-update-phase-a.md](178-ytdlp-update-phase-a.md) | yt-dlp 更新 Phase A: ヘルプメニューに「バージョン情報 / 更新を確認」を追加。yt-gui/yt-dlp 版を併記し、PyPI JSON API 照会で最新版と比較・通知（古い場合は GitHub releases 導線）。照会は純関数 `yt_dlp_update.py`（HTTP 差し替え可）＋ `run_in_thread` でバックグラウンド実行（Issue #178 / PR #182） | 2026-06-20 |
 
 ## バグ修正
 
