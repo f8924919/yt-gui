@@ -1,7 +1,7 @@
 # yt-dlp 更新 Phase A: バージョン表示＋更新チェック＋通知
 
 - 関連 Issue: [#178](https://github.com/f8924919/yt-gui/issues/178)（親: [#119](https://github.com/f8924919/yt-gui/issues/119)）
-- ステータス: 進行中
+- ステータス: 完了（PR [#182](https://github.com/f8924919/yt-gui/pull/182) マージ済み）
 - ブランチ: `feature/178-ytdlp-update-phase-a`
 
 ## ゴール
@@ -33,8 +33,8 @@
 
 ## 成果物
 
-- spec: [docs/spec/features/yt-dlp-update.md](../spec/features/yt-dlp-update.md)（Phase A 節を確定）
-- arch: [docs/arch/yt_dlp_update.md](../arch/yt_dlp_update.md)（Phase A 節・影響範囲表を確定）
+- spec: [docs/spec/features/yt-dlp-update.md](../../spec/features/yt-dlp-update.md)（Phase A 節を確定）
+- arch: [docs/arch/yt_dlp_update.md](../../arch/yt_dlp_update.md)（Phase A 節・影響範囲表を確定）
 - code: `yt_gui/yt_dlp_update.py`（新規）・`yt_gui/__init__.py`・`yt_gui/app.py`・`yt_gui/locales/{ja,en}.py`
 - test: `tests/test_yt_dlp_update.py`（純関数のオフライン単体テスト）
 
