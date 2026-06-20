@@ -16,11 +16,17 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
+from PySide6.QtGui import QAction  # noqa: E402
+from PySide6.QtWidgets import QMessageBox  # noqa: E402
+
+from yt_gui import app as app_module  # noqa: E402
 from yt_gui import i18n  # noqa: E402
 from yt_gui.app import App, _QueueTree  # noqa: E402
+from yt_gui.i18n import t  # noqa: E402
 from yt_gui.job_spec import PanelSnapshot, build_job_spec  # noqa: E402
 from yt_gui.queue_controller import _QueueItem  # noqa: E402
 from yt_gui.settings import Settings  # noqa: E402
+from yt_gui.yt_dlp_update import UpdateCheckResult, UpdateStatus  # noqa: E402
 
 pytestmark = pytest.mark.qt
 
@@ -830,3 +836,73 @@ def test_on_extension_enqueue_logs_no_cookies(app, monkeypatch):
     app._on_extension_enqueue("https://www.nicovideo.jp/watch/sm1", None, None)
     # Cookie なしのログが出る（i18n 文言の一部で判定）
     assert any("Cookie" in m or "cookie" in m for m in logs)
+
+
+# ── ヘルプメニュー / yt-dlp 更新チェック（#178） ──────────────────────────────
+
+
+def test_help_menu_has_about_action(app):
+    """ヘルプメニュー＋「バージョン情報 / 更新を確認」が AboutRole で追加される。"""
+    assert app._help_menu is not None
+    assert app._act_about.text() == t("menu_about")
+    assert app._act_about.menuRole() == QAction.MenuRole.AboutRole
+
+
+def test_check_update_up_to_date_runs_in_background_and_notifies(
+    app, qtbot, monkeypatch
+):
+    """照会はバックグラウンド実行され、結果は Slot 経由で通知される（最新時）。"""
+    result = UpdateCheckResult(
+        current="2026.06.09", latest="2026.06.09", status=UpdateStatus.UP_TO_DATE
+    )
+    monkeypatch.setattr(app_module, "check_for_update", lambda current: result)
+    seen = {}
+    monkeypatch.setattr(
+        QMessageBox,
+        "information",
+        lambda *a, **k: seen.setdefault("msg", a[2]),
+    )
+
+    app._check_yt_dlp_update()
+    qtbot.waitUntil(lambda: "msg" in seen, timeout=2000)
+    assert seen["msg"] == t("update_up_to_date")
+
+
+def test_check_update_available_shows_latest_version(app, qtbot, monkeypatch):
+    """より新しい版があるときは最新版を含む通知を表示する。"""
+    result = UpdateCheckResult(
+        current="2026.05.01",
+        latest="2026.06.09",
+        status=UpdateStatus.UPDATE_AVAILABLE,
+    )
+    monkeypatch.setattr(app_module, "check_for_update", lambda current: result)
+    captured = {}
+
+    # UPDATE_AVAILABLE 分岐はインスタンス `QMessageBox.exec()` を使うため、
+    # offscreen でハングしないよう no-op 化し、表示テキストだけ確認する。
+    def fake_exec(self):
+        captured["text"] = self.text()
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", fake_exec, raising=False)
+
+    app._check_yt_dlp_update()
+    qtbot.waitUntil(lambda: "text" in captured, timeout=2000)
+    assert result.latest in captured["text"]
+
+
+def test_check_update_failure_notifies_and_does_not_crash(app, qtbot, monkeypatch):
+    """照会失敗時は警告で穏当に通知し、アプリは継続する。"""
+
+    def boom(current):
+        raise OSError("offline")
+
+    monkeypatch.setattr(app_module, "check_for_update", boom)
+    seen = {}
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: seen.setdefault("msg", a[2])
+    )
+
+    app._check_yt_dlp_update()
+    qtbot.waitUntil(lambda: "msg" in seen, timeout=2000)
+    assert "offline" in seen["msg"]

@@ -27,6 +27,7 @@
 | 外部 I/O | `yt_gui/downloader.py`（yt-dlp、`omit` 解除済み・#95）・ `thumbnail_cache.py`（HTTP・未） | △ |
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | 純粋関数 | `yt_gui/extension_server.py`（`handle_request` / `ExtensionServer` ライフサイクル） | ◯ |
+| 純粋関数 | `yt_gui/yt_dlp_update.py`（`parse_latest_version` / `compare_versions` / `check_for_update`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 

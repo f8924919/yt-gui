@@ -19,22 +19,28 @@ yt-dlp は `downloader.py` で **Python API として密結合**している
 になり、更新機能のためだけに払うコストに見合わない。Python API を維持したまま
 `sys.path` 差し込みで実体を差し替える side-load（B）を本格策とする。
 
-## Phase A: バージョン照会と通知
+## Phase A: バージョン照会と通知（実装 [#178](https://github.com/f8924919/yt-gui/issues/178)）
+
+照会・比較ロジックは新規モジュール **`yt_gui/yt_dlp_update.py`** に UI 非依存の
+純関数として切り出す。UI（メニュー・ダイアログ）は `app.py` 側に置き、純関数を
+バックグラウンドスレッドから呼ぶ。
 
 | 要素 | 接続点・責務 |
 |---|---|
-| yt-dlp 現バージョン | `yt_dlp.version.__version__` を参照（新規ヘルパで取得） |
+| yt-dlp 現バージョン | `yt_gui.get_yt_dlp_version()`（`__init__.py` の `get_version()` 近傍に追加。`yt_dlp.version.__version__` を返し、取得不可なら `"unknown"`） |
 | アプリ現バージョン | 既存 `yt_gui.get_version()`（[entry.md](entry.md)） |
-| 最新版照会 | PyPI JSON API（`pypi.org/pypi/yt-dlp/json` の `info.version`）を stdlib `urllib` で取得 |
-| 比較・通知 | 同梱版と最新版を比較し UI へ結果を返す |
-| UI 接続 | `app.py` にヘルプメニュー＋バージョン情報/更新確認を追加（既存メニューは「ファイル」のみ。`_window_title` がバージョン表示の前例） |
+| 最新版照会 | `yt_dlp_update.check_for_update()` が PyPI JSON API（`pypi.org/pypi/yt-dlp/json` の `info.version`）を stdlib `urllib` で取得。HTTP は `fetch` 引数で差し替え可能 |
+| レスポンス解析 | `yt_dlp_update.parse_latest_version()`（純関数。`info.version` を取り出す） |
+| 比較 | `yt_dlp_update.compare_versions()`（純関数。`packaging.version` で比較し `UpdateStatus` を返す） |
+| UI 接続 | `app.py` の `_create_menu` にヘルプメニュー＋「バージョン情報 / 更新を確認」（1 項目）を追加。`QMessageBox` でバージョン併記・照会結果を表示し、古い場合は `QDesktopServices.openUrl` で yt-dlp GitHub releases を開く。`_window_title` がバージョン表示の前例 |
 
 - ネットワーク照会は**バックグラウンドスレッド**で行い、結果は Qt の
   `Signal`/`Slot` でメインスレッドへ戻す（[app.md](app.md) のスレッド間通信
-  パターン。ワーカーは [threading_utils.md](threading_utils.md) を流用しうる）。
-- 照会は明示操作起点。失敗時は穏当に通知しアプリ動作は継続。
+  パターン。`thumbnail_cache.py` と同様に [threading_utils.md](threading_utils.md)
+  の `run_in_thread` を流用する）。
+- 照会は明示操作起点。失敗時は `on_failed` 経由で穏当に通知しアプリ動作は継続。
 - 照会・比較ロジックは UI 非依存の純関数として切り出し、テスト容易性を確保する
-  （HTTP 部分は差し替え可能にしてオフラインでも単体テストできる形にする）。
+  （HTTP 部分は `fetch` 引数で差し替え可能にしてオフラインでも単体テストできる）。
 
 ## Phase B: side-load ブートストラップ
 
@@ -72,8 +78,9 @@ yt-dlp は `downloader.py` で **Python API として密結合**している
 
 | ファイル | 影響 |
 |---|---|
-| `yt_gui/__init__.py` | yt-dlp バージョン取得ヘルパを追加（`get_version()` 近傍） |
+| `yt_gui/__init__.py` | yt-dlp バージョン取得ヘルパ `get_yt_dlp_version()` を追加（`get_version()` 近傍） |
+| `yt_gui/yt_dlp_update.py` | **新規（Phase A）**。最新版照会・解析・比較の純関数（`check_for_update` / `parse_latest_version` / `compare_versions` / `UpdateStatus`） |
 | `yt_gui/app.py` | ヘルプメニュー・バージョン情報/更新確認 UI を追加 |
 | `yt_gui/__main__.py` | Phase B の起動時 `sys.path` ブートストラップ |
 | `yt_gui/downloader.py` | import 経路は不変（side-load 版が `sys.path` 経由で解決される） |
-| 新規モジュール | バージョン照会・side-load を担う新モジュール（実装 Issue で確定） |
+| 新規モジュール | Phase B の side-load を担う新モジュール（実装 Issue で確定） |
