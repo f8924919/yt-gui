@@ -33,7 +33,7 @@
 | [i18n.md](i18n.md) | `i18n.py` — 多言語対応 | [多言語対応](../spec/i18n.md) |
 | [locales.md](locales.md) | `locales/` — 言語別文字列辞書 | [多言語対応](../spec/i18n.md) |
 | [utils.md](utils.md) | `utils.py` — 共通ユーティリティ | — |
-| [yt_dlp_update.md](yt_dlp_update.md) | yt-dlp バージョン照会・更新チェック（Phase A）／ side-load 実体更新（Phase B）の設計 | [yt-dlp 本体の更新](../spec/features/yt-dlp-update.md) |
+| [yt_dlp_update.md](yt_dlp_update.md) | `yt_dlp_update.py` — yt-dlp バージョン照会・更新チェック（Phase A）／ side-load 実体更新（Phase B）の設計 | [yt-dlp 本体の更新](../spec/features/yt-dlp-update.md) |
 
 ---
 

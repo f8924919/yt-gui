@@ -7,8 +7,8 @@ from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import get_resource_base, get_version, i18n
+from . import get_resource_base, get_version, get_yt_dlp_version, i18n
 from .downloader import Downloader
 from .extension_server import ExtensionServer
 from .formats import (
@@ -57,6 +57,12 @@ from .settings_dialog import SettingsDialog
 from .threading_utils import run_in_thread
 from .thumbnail_cache import ThumbnailCache
 from .utils import parse_time_to_seconds, strip_ansi
+from .yt_dlp_update import (
+    RELEASES_URL,
+    UpdateCheckResult,
+    UpdateStatus,
+    check_for_update,
+)
 
 _ORIGINAL_KEY = "fmt_original"
 _MP3_KEY = "fmt_mp3"
@@ -389,6 +395,8 @@ class App(QMainWindow):
         self._act_log.setText(t("menu_log"))
         if self._act_quit is not None:
             self._act_quit.setText(t("menu_quit"))
+        self._help_menu.setTitle(t("menu_help"))
+        self._act_about.setText(t("menu_about"))
 
         self._lbl_url.setText(t("label_url"))
         self._lbl_format.setText(t("label_format"))
@@ -501,6 +509,64 @@ class App(QMainWindow):
             self._act_quit = QAction(t("menu_quit"), self)
             self._act_quit.triggered.connect(self.close)
             self._file_menu.addAction(self._act_quit)
+
+        self._help_menu = menubar.addMenu(t("menu_help"))
+        self._act_about = QAction(t("menu_about"), self)
+        # macOS では AboutRole によりアプリメニュー（「yt-gui について」）へ自動移動
+        # する。設定の PreferencesRole と同じくプラットフォーム慣習に合わせる。
+        self._act_about.setMenuRole(QAction.MenuRole.AboutRole)
+        self._act_about.triggered.connect(self._show_about_dialog)
+        self._help_menu.addAction(self._act_about)
+
+    def _show_about_dialog(self) -> None:
+        """バージョン情報を表示し、「更新を確認」で yt-dlp の更新照会を起動する。"""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(t("menu_about"))
+        box.setText(
+            t("about_body").format(
+                app_version=get_version(),
+                ytdlp_version=get_yt_dlp_version(),
+            )
+        )
+        check_btn = box.addButton(
+            t("btn_check_update"), QMessageBox.ButtonRole.ActionRole
+        )
+        box.addButton(QMessageBox.StandardButton.Close)
+        box.exec()
+        if box.clickedButton() is check_btn:
+            self._check_yt_dlp_update()
+
+    def _check_yt_dlp_update(self) -> None:
+        """PyPI 照会をバックグラウンドで実行し、結果を Signal/Slot 経由で受け取る。"""
+        current = get_yt_dlp_version()
+        run_in_thread(
+            lambda: check_for_update(current),
+            on_done=self._on_update_check_done,
+            on_failed=self._on_update_check_failed,
+            parent=self,
+        )
+
+    def _on_update_check_done(self, result: UpdateCheckResult) -> None:
+        if result.status is UpdateStatus.UPDATE_AVAILABLE:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle(t("menu_about"))
+            box.setText(t("update_available").format(latest=result.latest))
+            open_btn = box.addButton(
+                t("btn_open_releases"), QMessageBox.ButtonRole.ActionRole
+            )
+            box.addButton(QMessageBox.StandardButton.Close)
+            box.exec()
+            if box.clickedButton() is open_btn:
+                QDesktopServices.openUrl(QUrl(RELEASES_URL))
+        else:
+            QMessageBox.information(self, t("menu_about"), t("update_up_to_date"))
+
+    def _on_update_check_failed(self, exc: Exception) -> None:
+        QMessageBox.warning(
+            self, t("err_title"), t("update_check_failed").format(error=exc)
+        )
 
     # ── widgets ───────────────────────────────────────────────────────────────
 
