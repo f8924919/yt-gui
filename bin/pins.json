@@ -13,25 +13,25 @@
     }
   },
   "ffmpeg-win": {
-    "version": "n8.1.1-118-g1034b144ff",
+    "version": "n8.1.2",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-14-13-33/ffmpeg-n8.1.1-118-g1034b144ff-win64-gpl-8.1.zip",
-    "sha256": "27de249c51e9f369623dddd0743e1918ec174dcf85c3594225f5732966ecb95e"
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-21-13-34/ffmpeg-n8.1.2-win64-gpl-8.1.zip",
+    "sha256": "23e7d43a4bacb404bc3df95223b74f2c777276229a995ee98660e036ded8b90a"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
     "x86_64": {
-      "version": "8.1.1",
+      "version": "8.1.2",
       "source": "evermeet.cx",
       "verify": "zip",
       "comment": "evermeet.cx の versioned zip。GPG .sig が evermeet 鍵 70202E8ED17B372A6D04467B4E7BEC998E920EE1 で署名され、zip サイズも info API の公開値と一致することを確認のうえ登録（完全な鍵検証はキーサーバ到達環境で実施推奨）。sha256 は zip のハッシュ。",
       "ffmpeg": {
-        "url": "https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip",
-        "sha256": "4610988e2f54c243c50da73a09e4e2c36d9bb77546f9aa6c84cb328dcb1a98c1"
+        "url": "https://evermeet.cx/ffmpeg/ffmpeg-8.1.2.zip",
+        "sha256": "e91df72a1ee7c26606f90dd2dd4dcccc6a75140ff9ea6fdd50faae828b82ba69"
       },
       "ffprobe": {
-        "url": "https://evermeet.cx/ffmpeg/ffprobe-8.1.1.zip",
-        "sha256": "aeade29dee3c3844e9bcc974f4ae4b29cc4f87994177d77003a8589fa531009e"
+        "url": "https://evermeet.cx/ffmpeg/ffprobe-8.1.2.zip",
+        "sha256": "399b93f0b9862f69767afa343e90c2f48d7e7958cadbb6deb76a012d0e3b7ce3"
       }
     },
     "arm64": {
