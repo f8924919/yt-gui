@@ -97,3 +97,4 @@
 | [skill-layer.md](skill-layer.md) | Skills 層の新設。PR 前検証ゲート `/verify-gate` とマージ後処理 `/finish-task` を追加し git-workflow §5.3 に位置づけ。skill はルールを再定義せず正本を参照（Issue #102 / PR #103） | 2026-06-07 |
 | [start-task-skill.md](start-task-skill.md) | ワークフロー前半（§5 step 1-6）の入口 skill `/start-task` を新設。docs 先・テスト先の順序ゲートで実装先行を防止。判断ステップは確認ゲートに留め自動化しない（Issue #105 / PR #106） | 2026-06-07 |
 | [claude-rules-layer.md](claude-rules-layer.md) | `.claude/rules/` path-scoped ルール層を新設。テスト/docs 編集時に遵守事項を再注入（`testing.md` / `docs-upkeep.md`）。薄いポインタに徹し正本を参照、git-workflow §5.4 を新設（Issue #125 / PR #126） | 2026-06-11 |
+| [191-criteria-review-agent.md](191-criteria-review-agent.md) | 実装前に受け入れ条件・spec そのものの妥当性（テスト可能・網羅的・非曖昧・Issue 意図整合）を点検する助言エージェント `criteria-review`（Sonnet・read-only）を新設し、start-task の step 3.5 に組み込む。evaluator（実装後・適合性・ゲート）と対象が逆で補完関係、ゲート化せず助言に留める。step 番号は renumber せず 3.5 挿入。docs-guide §4.1 にエージェント/スキル変更行も追記（Issue #191 / PR #192） | 2026-07-04 |
