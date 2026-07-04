@@ -69,6 +69,7 @@ main ──┬──────────────────┬──→
 1. 対象 Issue を確認（無ければ §3 の要件で起票）。
 2. `main` を最新化し、§4 の規則でブランチを作成。
 3. docs 先・コード裏取りで調査する（[CLAUDE.md](../CLAUDE.md) の調査ルール）。**調査は読み取り専用の `investigate` サブエージェント（Sonnet）へ委譲し、主エージェントは結論（要点・関連 `path:line`）だけを受け取る**（[CLAUDE.md 調査ルール](../CLAUDE.md#調査ルール-docs-先コード裏取り)参照）。設計・実装方針の判断は委譲せず主エージェントが行う。
+   - **step 3.5（受け入れ条件レビュー）**: docs 先行・実装に入る前に、`criteria-review` サブエージェント（Sonnet）で **受け入れ条件・spec そのものの妥当性**（テスト可能・網羅的・非曖昧・Issue 意図との整合）を点検する。**助言でありゲートではない**（指摘の採否・条件の修正は主エージェント＋ユーザーが判断、§5.1）。`evaluator`（step 7）が実装の**適合性**を PR 前に独立評価するのに対し、こちらは実装前に**条件自体の妥当性**を見る（対象が逆で補完関係）。`refactor` / `docs` / `chore`（受け入れ条件を持たない作業）は対象外。
 4. **設計を `docs/spec/` / `docs/arch/` に先に反映する**（実装前にドキュメントで設計を固める。[docs-guide.md](docs-guide.md) §4 の更新先に従う）。
 5. **テストを先に書く**。テストは spec / 受け入れ条件に基づいて書き、実装に合わせて書かない（[テスト方針](testing/policy.md)）。
 6. 実装してテストを green にする。
@@ -91,6 +92,7 @@ main ──┬──────────────────┬──→
 | エージェント | モデル | 委譲する作業 | 対応するフロー | 主エージェントが受け取るもの |
 |---|---|---|---|---|
 | [`investigate`](../.claude/agents/investigate.md) | Sonnet | docs 先・コード裏取りの調査 | step 3 | 結論・関連 `path:line`・裏取りメモ |
+| [`criteria-review`](../.claude/agents/criteria-review.md) | Sonnet | 受け入れ条件・spec の妥当性を実装前に点検（助言） | step 3.5 | 受け入れ条件の指摘・改善案（採否は委譲しない） |
 | [`verify`](../.claude/agents/verify.md) | Sonnet | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・要判断項目 |
 | [`docs-check`](../.claude/agents/docs-check.md) | Sonnet | docs 整合性の点検と機械的修正 | step 7 | 点検結果・修正点・要対応項目 |
 | [`evaluator`](../.claude/agents/evaluator.md) | Opus | 受け入れ条件・spec の充足を独立評価 | step 7 | 総合判定・受け入れ条件ごとの合否・要対応項目 |
@@ -101,13 +103,15 @@ main ──┬──────────────────┬──→
 
 `evaluator` だけ Opus を使うのは、調査・検証・docs 整合が結果を客観的に検証できる機械的・探索的タスクなのに対し、評価は裁量を伴う判断であり、かつ生成側（主エージェント）も Opus のため、評価者が生成者より弱いと見落としを追認してしまうため。コストが問題になった場合は Sonnet への降格を検討する（独立性が判定力の一部を補う）。
 
+`criteria-review` は `evaluator` と対をなすが**性格が逆**で、実装前に受け入れ条件**自体**の妥当性を点検する**助言**であり、ゲート化しない（通過可否・条件の修正は主エージェント＋ユーザーが判断、§5.1）。`evaluator` のようにブランチ種別で強制はせず、受け入れ条件を持つ作業で任意に用いる。構造的な点検（測定可能性・網羅性・曖昧さ）が主で裁量は小さいため Sonnet とする。
+
 ### 5.3 スキル（オーケストレーション入口）
 
 定型の多段手順は `.claude/skills/` 配下の skill にまとめ、`/<skill 名>` で起動する。skill は**手順の入口**であり、起動条件やモデル選定などの**ルールは再定義せず §5.2 等の正本を参照**する（二重管理＝drift を避けるため）。
 
 | skill | 役割 | 対応するフロー |
 |---|---|---|
-| [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
+| [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・`criteria-review`（受け入れ条件レビュー・助言）・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
 | [`verify-gate`](../.claude/skills/verify-gate/SKILL.md) | ブランチ種別を判定し `verify` →（docs 変更時）`docs-check` →（feature/bugfix/hotfix のみ）`evaluator` を順に起動・集約 | step 7 |
 | [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・完了タスクの archive 移動（docs ブランチ＋PR） | step 9 |
 
