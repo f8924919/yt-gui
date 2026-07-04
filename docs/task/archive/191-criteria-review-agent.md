@@ -1,8 +1,9 @@
 # 受け入れ条件レビュー用サブエージェント新設と start-task 前段への組み込み
 
 - Issue: [#191](https://github.com/f8924919/yt-gui/issues/191)
+- PR: [#192](https://github.com/f8924919/yt-gui/pull/192)（マージ済み）
 - ブランチ: `feature/191-criteria-review-agent`
-- ステータス: 進行中
+- ステータス: 完了
 - 更新日: 2026-07-04
 
 ## 目的
