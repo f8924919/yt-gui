@@ -1,8 +1,9 @@
 # 設計レビュー機構の導入: design-review エージェント新設とトリガ発火条件
 
 - Issue: [#194](https://github.com/f8924919/yt-gui/issues/194)
+- PR: [#195](https://github.com/f8924919/yt-gui/pull/195)（マージ済み）
 - ブランチ: `feature/194-design-review-agent`
-- ステータス: 進行中
+- ステータス: 完了
 - 更新日: 2026-07-04
 
 ## 目的
