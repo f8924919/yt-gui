@@ -28,7 +28,7 @@ description: PR 前の検証ゲートを一括実行する。ブランチ種別�
    - 含まれないならスキップしてよい。
 
 4. **evaluator（`feature` / `bugfix` / `hotfix` ブランチのみ・省略不可）**
-   - ブランチ種別が `feature` / `bugfix` / `hotfix` なら、**必ず** `evaluator` サブエージェントを起動する（受け入れ条件・spec の充足を独立評価。§5.2 A案）。
+   - ブランチ種別が `feature` / `bugfix` / `hotfix` なら、**必ず** `evaluator` サブエージェントを起動する（受け入れ条件・spec の充足を独立評価。§5.2）。
    - **「単純だから」という理由でスキップしない**。スキップ判断自体が evaluator で排除したい自己評価バイアスに当たる。
    - `refactor` / `docs` / `chore` ブランチ（受け入れ条件を持たない作業）は対象外。スキップしてよい。
    - 必ず **`verify` を green にした後**に実行する。
