@@ -20,6 +20,7 @@
 | `cookies_path` | str | `""` | 一般タブ — Cookies（ファイル指定時） |
 | `cookies_browser` | str | `""` | 一般タブ — Cookies（ブラウザ指定時） |
 | `language` | str | `"ja"` | 一般タブ — 言語 |
+| `app_update_check_enabled` | bool | `True` | 一般タブ — 起動時に yt-gui の更新を確認（[アプリ本体の更新](features/app-update.md)。起動時自動チェックのみを制御） |
 | `video_resolution` | str | `"720"` | 画質・音質タブ — 解像度上限 |
 | `video_container` | str | `"mp4"` | 画質・音質タブ — 動画コンテナ |
 | `audio_format` | str | `"mp3"` | 画質・音質タブ — 音声形式 |

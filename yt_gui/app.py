@@ -33,6 +33,9 @@ from PySide6.QtWidgets import (
 )
 
 from . import get_resource_base, get_version, get_yt_dlp_version, i18n
+from .app_update import RELEASES_URL as APP_RELEASES_URL
+from .app_update import check_for_update as check_for_app_update
+from .app_update import should_check_on_startup, should_notify
 from .downloader import Downloader
 from .extension_server import ExtensionServer
 from .formats import (
@@ -297,6 +300,7 @@ class App(QMainWindow):
         self._sync_extension_server()
 
         QTimer.singleShot(0, self._check_dependencies)
+        QTimer.singleShot(0, self._check_app_update_on_startup)
 
     def _wire_queue_signals(self) -> None:
         """QueueController のシグナルを App スロットへ配線する。"""
@@ -519,7 +523,7 @@ class App(QMainWindow):
         self._help_menu.addAction(self._act_about)
 
     def _show_about_dialog(self) -> None:
-        """バージョン情報を表示し、「更新を確認」で yt-dlp の更新照会を起動する。"""
+        """バージョン情報を表示し、yt-gui / yt-dlp それぞれの更新照会を起動する。"""
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Information)
         box.setWindowTitle(t("menu_about"))
@@ -529,12 +533,17 @@ class App(QMainWindow):
                 ytdlp_version=get_yt_dlp_version(),
             )
         )
+        app_check_btn = box.addButton(
+            t("btn_check_app_update"), QMessageBox.ButtonRole.ActionRole
+        )
         check_btn = box.addButton(
             t("btn_check_update"), QMessageBox.ButtonRole.ActionRole
         )
         box.addButton(QMessageBox.StandardButton.Close)
         box.exec()
-        if box.clickedButton() is check_btn:
+        if box.clickedButton() is app_check_btn:
+            self._check_app_update()
+        elif box.clickedButton() is check_btn:
             self._check_yt_dlp_update()
 
     def _check_yt_dlp_update(self) -> None:
@@ -567,6 +576,58 @@ class App(QMainWindow):
         QMessageBox.warning(
             self, t("err_title"), t("update_check_failed").format(error=exc)
         )
+
+    # ── app update (yt-gui 本体) ─────────────────────────────────────────────
+
+    def _check_app_update_on_startup(self) -> None:
+        """起動時のアプリ更新チェック。新版検出時のみ通知し、失敗・最新はサイレント。
+
+        オプトアウト設定またはバージョン未解決（開発環境等）のときは照会しない。
+        """
+        current = get_version()
+        if not should_check_on_startup(
+            enabled=self._settings.app_update_check_enabled, current=current
+        ):
+            return
+        run_in_thread(
+            lambda: check_for_app_update(current),
+            on_done=self._on_startup_app_update_done,
+            on_failed=lambda exc: None,
+            parent=self,
+        )
+
+    def _on_startup_app_update_done(self, result: UpdateCheckResult) -> None:
+        if should_notify(result):
+            self._show_app_update_available(result)
+
+    def _check_app_update(self) -> None:
+        """GitHub Releases 照会をバックグラウンドで実行する（手動チェック）。"""
+        current = get_version()
+        run_in_thread(
+            lambda: check_for_app_update(current),
+            on_done=self._on_app_update_check_done,
+            on_failed=self._on_update_check_failed,
+            parent=self,
+        )
+
+    def _on_app_update_check_done(self, result: UpdateCheckResult) -> None:
+        if result.status is UpdateStatus.UPDATE_AVAILABLE:
+            self._show_app_update_available(result)
+        else:
+            QMessageBox.information(self, t("menu_about"), t("app_update_up_to_date"))
+
+    def _show_app_update_available(self, result: UpdateCheckResult) -> None:
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(t("menu_about"))
+        box.setText(t("app_update_available").format(latest=result.latest))
+        open_btn = box.addButton(
+            t("btn_open_releases"), QMessageBox.ButtonRole.ActionRole
+        )
+        box.addButton(QMessageBox.StandardButton.Close)
+        box.exec()
+        if box.clickedButton() is open_btn:
+            QDesktopServices.openUrl(QUrl(APP_RELEASES_URL))
 
     # ── widgets ───────────────────────────────────────────────────────────────
 

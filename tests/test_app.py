@@ -83,6 +83,8 @@ def app(qtbot, tmp_path, monkeypatch):
     from yt_gui.downloader import Downloader
 
     monkeypatch.setattr(Downloader, "missing_dependencies", lambda self: [])
+    # 起動時のアプリ更新チェックがテストから実ネットワークへ出ないよう無効化。
+    monkeypatch.setattr(App, "_check_app_update_on_startup", lambda self: None)
     window = App()
     qtbot.addWidget(window)
     return window

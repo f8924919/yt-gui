@@ -28,6 +28,7 @@
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | 純粋関数 | `yt_gui/extension_server.py`（`handle_request` / `ExtensionServer` ライフサイクル） | ◯ |
 | 純粋関数 | `yt_gui/yt_dlp_update.py`（`parse_latest_version` / `compare_versions` / `check_for_update`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
+| 純粋関数 | `yt_gui/app_update.py`（`parse_latest_version` / `check_for_update` / `should_check_on_startup` / `should_notify`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 
@@ -101,6 +102,8 @@ tests/
 ├── test_download_binaries.py
 ├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
 ├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
+├── test_yt_dlp_update.py          ← 純粋ロジック（yt-dlp 更新チェック）
+├── test_app_update.py             ← 純粋ロジック（アプリ本体更新チェック）
 ├── test_extension.py              ← scripts/sync_extension_version.py・extension/ 整合性
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
