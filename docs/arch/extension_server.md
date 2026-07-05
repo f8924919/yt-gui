@@ -40,6 +40,30 @@
 | `stop() -> None` | `shutdown()` / `server_close()` してスレッドを join する |
 | `bound_port` (property) | バインド済みポート（未起動/停止後は `None`） |
 
+### bind の排他制御（Windows の `SO_REUSEADDR` 仕様差・#201）
+
+`http.server.HTTPServer` は基底クラスで `allow_reuse_address = 1`（`SO_REUSEADDR`）を
+設定するが、**Windows の `SO_REUSEADDR` は POSIX と意味が異なり、他ソケットが
+LISTEN 中のポートへの bind も成功してしまう**。そのままではポートフォールバックが
+発動せず、他アプリ使用中のポートに二重 bind する（接続の行き先が不定になる）。
+
+- 対策として `ThreadingHTTPServer` のサブクラス（`_ExclusiveBindHTTPServer`）を用い、
+  `allow_reuse_address` を **Windows（`sys.platform == "win32"`）では `False`、
+  それ以外では `True`** とする。`start()` はこのサブクラスでバインドする。
+  サブクラスの**クラス属性**で与えるのは、`TCPServer.__init__` が既定
+  `bind_and_activate=True` でコンストラクタ内に `server_bind()` を呼ぶため
+  （インスタンス生成後の属性書き換えでは bind に間に合わない）。
+- POSIX で `SO_REUSEADDR` を維持するのは、`stop()`（`server_close()`）後の
+  TIME_WAIT 中ポートへの再バインド失敗（無効化→再有効化の即時再起動）を避けるため。
+- Windows では排他 bind の副作用として、アプリ再起動直後に旧接続の TIME_WAIT と
+  衝突し先頭ポートの bind に失敗することがあり得る。その場合は**フォールバック
+  ポートへ退避する（想定内の挙動）**。拡張側はフォールバック順にポートを試すため
+  利用者影響はない。TIME_WAIT は 2MSL（数分）で解消されるため、Windows で短時間に
+  連続再起動するとポートが一時的に 8719 等へ移り、解消後の再起動で 8718 へ戻る
+  「さまよい」が起こり得るが、これも許容仕様とする。
+- プラットフォーム分岐は `sys.platform` を引数に取る純関数（`resolve_allow_reuse_address`）
+  に切り出し、Linux CI でも win32 分岐を単体テストできる形にする。
+
 ## セキュリティ
 
 - バインドは `127.0.0.1` のみ（外部公開しない）。
