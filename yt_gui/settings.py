@@ -47,6 +47,8 @@ class Settings:
     cookies_browser: str = ""  # ブラウザ名（空 = ブラウザ未使用）
     download_path: str = ""  # 空文字のときは ~/Downloads を使用
     language: str = "ja"
+    # 起動時に yt-gui 本体の更新を確認（オプトアウト式。手動チェックには影響しない）
+    app_update_check_enabled: bool = True
     video_resolution: str = "720"
     mp3_bitrate: str = "192"
     audio_format: str = "mp3"

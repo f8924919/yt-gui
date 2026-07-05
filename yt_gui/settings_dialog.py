@@ -249,7 +249,12 @@ class SettingsDialog(QDialog):
         self._lang_combo.setCurrentText(current_display)
         layout.addWidget(self._lang_combo, 3, 1, 1, 2)
 
-        layout.setRowStretch(4, 1)
+        # App update check (startup opt-out)
+        self._app_update_check = QCheckBox(t("check_app_update_on_startup"))
+        self._app_update_check.setChecked(self._settings.app_update_check_enabled)
+        layout.addWidget(self._app_update_check, 4, 1, 1, 2)
+
+        layout.setRowStretch(5, 1)
 
         # Set initial state
         if self._settings.cookies_browser:
@@ -837,6 +842,7 @@ class SettingsDialog(QDialog):
         self._settings.output_template_playlist = playlist_template
         self._settings.download_path = self._download_edit.text().strip()
         self._settings.language = new_lang
+        self._settings.app_update_check_enabled = self._app_update_check.isChecked()
         self._settings.video_resolution = self._res_combo.currentText().removesuffix(
             "p"
         )
