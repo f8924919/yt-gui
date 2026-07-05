@@ -23,7 +23,13 @@
 - [x] docs 先行: [spec/features/app-update.md](../spec/features/app-update.md) /
       [arch/app_update.md](../arch/app_update.md) /
       [research/app-update.md](../research/app-update.md) / 各 index・設定 spec
-- [ ] 設計レビュー（design-review・§5.5 発火）
-- [ ] テスト先行（`tests/test_app_update.py`）
-- [ ] 実装 → green
-- [ ] verify-gate → PR
+- [x] 設計レビュー（design-review・§5.5 発火）: 直接 import 維持＋意図明記、
+      既存ボタンを「yt-dlp の更新を確認」へ改称、起動フックは `singleShot(0)` に統一
+- [x] テスト先行（`tests/test_app_update.py`）
+- [x] 実装 → green
+- [x] verify-gate（verify green / docs-check 対応済み / evaluator PASS）→ PR
+
+## メモ
+
+- `tests/test_extension_server.py::test_server_falls_back_when_port_in_use` は
+  ローカル Windows 環境で main でも失敗する既存問題（本タスクと無関係・別 Issue 候補）。
