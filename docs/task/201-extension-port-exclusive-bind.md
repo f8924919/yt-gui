@@ -23,7 +23,11 @@ Windows の `SO_REUSEADDR` 仕様差（LISTEN 中ポートへの bind が成功�
 
 - [x] Issue 起票・受け入れ条件確定（criteria-review 反映済み・案 A 確定）
 - [x] docs 先行: arch/extension_server.md に bind 方針を追記
-- [ ] 設計レビュー（design-review・§5.5 発火）
-- [ ] テスト先行（プラットフォーム分岐の単体テスト追加）
-- [ ] 実装 → green（Windows ローカルで test_server_falls_back_when_port_in_use が pass）
-- [ ] verify-gate → PR
+- [x] 設計レビュー（design-review・§5.5 発火）: クラス属性で結線する技術的根拠
+      （`bind_and_activate=True`）と Windows のポート「さまよい」許容仕様を docs に
+      追記、テストに配線検証を追加
+- [x] テスト先行（プラットフォーム分岐＋クラス配線の単体テスト追加）
+- [x] 実装 → green（Windows ローカルで test_server_falls_back_when_port_in_use が
+      pass するようになった。412 passed）
+- [x] verify-gate（verify green / docs-check OK / evaluator 条件付き PASS＝PR 本文に
+      Windows 実機結果を記載して確定）→ PR
