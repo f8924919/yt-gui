@@ -15,10 +15,34 @@ from __future__ import annotations
 
 import json
 import secrets
+import sys
 import threading
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Protocol
+
+
+def resolve_allow_reuse_address(platform: str) -> bool:
+    """プラットフォームに応じた `allow_reuse_address` の値を返す純関数（#201）。
+
+    Windows の `SO_REUSEADDR` は POSIX と意味が異なり、他ソケットが LISTEN 中の
+    ポートへの bind も成功してしまうため、Windows では False（排他 bind）にして
+    ポートフォールバックを機能させる。POSIX では `stop()` 後の TIME_WAIT 中
+    ポートへの再バインド（無効化→再有効化）を許すため True を維持する。
+    """
+    return platform != "win32"
+
+
+class _ExclusiveBindHTTPServer(ThreadingHTTPServer):
+    """Windows でのみ排他 bind にする受信サーバー（docs/arch/extension_server.md）。
+
+    クラス属性で与えるのは、`TCPServer.__init__` が既定 `bind_and_activate=True`
+    でコンストラクタ内に `server_bind()` を呼ぶため（生成後の書き換えでは bind に
+    間に合わない）。
+    """
+
+    allow_reuse_address = resolve_allow_reuse_address(sys.platform)
+
 
 # enqueue コールバック: (url, cookies, format) を受け取る。format は形式指定
 # オブジェクト（dict）または None。受理した時点で即時に戻り、実際のタイトル取得・
@@ -158,7 +182,7 @@ class ExtensionServer:
         handler = _make_handler(self._token, self._on_enqueue)
         for port in (self._port, *self._fallback_ports):
             try:
-                httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
+                httpd = _ExclusiveBindHTTPServer(("127.0.0.1", port), handler)
             except OSError:
                 continue
             self._httpd = httpd

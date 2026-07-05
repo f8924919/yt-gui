@@ -5,10 +5,18 @@
 
 import json
 import socket
+import sys
 import urllib.error
 import urllib.request
 
-from yt_gui.extension_server import ExtensionServer, handle_request
+import pytest
+
+from yt_gui.extension_server import (
+    ExtensionServer,
+    _ExclusiveBindHTTPServer,
+    handle_request,
+    resolve_allow_reuse_address,
+)
 
 TOKEN = "test-token-abc"
 EXT_ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
@@ -230,3 +238,29 @@ def test_server_falls_back_when_port_in_use():
     finally:
         server.stop()
         occupied.close()
+
+
+# ── bind の排他制御（Windows の SO_REUSEADDR 仕様差・#201） ──────────────────
+
+
+@pytest.mark.parametrize(
+    "platform, expected",
+    [
+        ("win32", False),
+        ("linux", True),
+        ("darwin", True),
+    ],
+    ids=["windows", "linux", "macos"],
+)
+def test_resolve_allow_reuse_address(platform: str, expected: bool) -> None:
+    # Windows の SO_REUSEADDR は LISTEN 中ポートへの bind も許してしまうため
+    # 排他 bind（False）にする。POSIX は TIME_WAIT 再バインドのため True を維持する。
+    assert resolve_allow_reuse_address(platform) is expected
+
+
+def test_server_class_wires_allow_reuse_address_to_platform() -> None:
+    # 純関数が正しくてもサーバークラスに結線されていなければ意味がないため、
+    # 実行中プラットフォームでの配線を検証する（Linux CI / Windows 双方で有効）。
+    assert _ExclusiveBindHTTPServer.allow_reuse_address == resolve_allow_reuse_address(
+        sys.platform
+    )
