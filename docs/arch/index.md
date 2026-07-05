@@ -34,6 +34,7 @@
 | [locales.md](locales.md) | `locales/` — 言語別文字列辞書 | [多言語対応](../spec/i18n.md) |
 | [utils.md](utils.md) | `utils.py` — 共通ユーティリティ | — |
 | [yt_dlp_update.md](yt_dlp_update.md) | `yt_dlp_update.py` — yt-dlp バージョン照会・更新チェック（Phase A）／ side-load 実体更新（Phase B）の設計 | [yt-dlp 本体の更新](../spec/features/yt-dlp-update.md) |
+| [app_update.md](app_update.md) | `app_update.py` — アプリ本体の最新版照会・更新チェック | [アプリ本体の更新](../spec/features/app-update.md) |
 
 ---
 

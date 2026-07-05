@@ -32,6 +32,7 @@
 | [ダウンロード動作](features/download-behavior.md) | ファイル名重複回避・プレイリスト・サムネイル埋め込み・字幕・区間ダウンロード・Cookies |
 | [ブラウザ拡張連携](features/browser-extension.md) | ローカル受信サーバー・拡張機能・アイテム単位 Cookies |
 | [yt-dlp 本体の更新](features/yt-dlp-update.md) | yt-dlp バージョン表示・更新チェック・通知（Phase A）／ side-load による実体更新（Phase B） |
+| [アプリ本体の更新](features/app-update.md) | yt-gui 本体の更新チェック・通知（起動時自動＋手動、GitHub Releases 照会） |
 
 ---
 
