@@ -79,7 +79,7 @@ main ──┬──────────────────┬──→
    - docs / CLAUDE.md を変更した場合は `docs-check` サブエージェント（Sonnet）で整合性（index 更新漏れ・リンク切れ・命名・関連仕様リンク）を点検する。
    - **`feature` / `bugfix` / `hotfix` ブランチでは `evaluator` サブエージェント（Opus）で評価ゲートを必ず通す**（受け入れ条件・spec の充足を独立判定。`verify` で green にした後に実行する。費用対効果での省略はしない。§5.2）。
 8. `gh` で PR を作成（ベース `main`、本文は原則日本語＝対応する Issue スレッドが日本語以外ならその言語に合わせる、関連 Issue を `Closes #<issue>` で紐付け）。
-9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。完了タスクの archive 移動を含む後処理は `/finish-task` skill で実行できる（§5.3）。
+9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。完了タスクの archive 移動は**原則 step 6〜8 の実装 PR に同梱**する（[docs-guide.md](docs-guide.md) §4.2。#222）。マージ後の後処理（main 最新化・ブランチ削除、同梱できなかった場合のまとめ archive 移動）は `/finish-task` skill で実行できる（§5.3）。
 
 ### 5.1 補足ルール
 
@@ -117,7 +117,7 @@ main ──┬──────────────────┬──→
 |---|---|---|
 | [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・`criteria-review`（受け入れ条件レビュー・助言）・（§5.5 発火時）`design-review`（設計レビュー・助言）・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
 | [`verify-gate`](../.claude/skills/verify-gate/SKILL.md) | ブランチ種別を判定し `verify` →（docs 変更時）`docs-check` →（feature/bugfix/hotfix のみ）`evaluator` を順に起動・集約 | step 7 |
-| [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・完了タスクの archive 移動（docs ブランチ＋PR） | step 9 |
+| [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・（実装 PR に同梱できなかった場合の補完として）完了タスクの archive 移動（複数タスクまとめ可・docs ブランチ＋PR） | step 9 |
 
 skill が呼ぶサブエージェントの**合否・設計判断は委譲しない**点は §5.1 / §5.2 と同じ。skill は正しい順序・条件での起動と結果集約に徹する。
 
