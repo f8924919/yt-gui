@@ -89,6 +89,7 @@
 | [132-modal-driven-qt-tests.md](132-modal-driven-qt-tests.md) | Qt UI テスト: モーダル経路を手段B（offscreen + `QTimer`/静的メソッド固定）で検証。設定ダイアログの `_clear_archive`/`_save` 確認・検証分岐、`_open_original_dialog` 追加フロー、`_open_settings` 反映ループ。omit 解除は #134 へ分離（Issue #132 / PR #133） | 2026-06-12 |
 | [137-medium-qt-tests.md](137-medium-qt-tests.md) | Qt UI テスト（優先度中・手段A）: 設定ダイアログの `_browse_*` ファイル選択反映・`_on_archive_toggled` 活性連動、`_open_log_dialog` 起動/再利用、`LogDialog.load`/`append`。`log_dialog.py` を ×→△ 格上げ（Issue #137 / PR #138） | 2026-06-12 |
 | [134-coverage-omit-release.md](134-coverage-omit-release.md) | coverage の `omit` から `app.py` / `settings_dialog.py` を解除し計測対象化。TOTAL 92%→85%（app.py 66% / settings_dialog.py 96%）。policy §1・§5、testing/index を実態へ更新（Issue #134 / PR #147） | 2026-06-14 |
+| [lint-strictness.md](lint-strictness.md) | ruff ルールセット追加（B/SIM/C4/RUF、RUF001-003 は日本語誤検知のため恒久 ignore）と mypy 厳格化（check_untyped_defs / warn_unreachable / strict_equality / warn_unused_ignores）。違反 109 件を挙動不変で修正、disallow_untyped_defs は費用対効果から見送り（Issue #212 / PR #218） | 2026-07-11 |
 
 ## ドキュメント整備
 
