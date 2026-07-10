@@ -29,7 +29,7 @@ def build_icons(src: str = _SRC, out_dir: str = _OUT_DIR) -> list[str]:
     with Image.open(src) as im:
         rgba = im.convert("RGBA")
         for size in SIZES:
-            resized = rgba.resize((size, size), Image.LANCZOS)
+            resized = rgba.resize((size, size), Image.Resampling.LANCZOS)
             path = os.path.join(out_dir, f"icon-{size}.png")
             resized.save(path, format="PNG")
             written.append(path)

@@ -16,6 +16,7 @@ _SCRIPTS = os.path.join(
 sys.path.insert(0, _SCRIPTS)
 _SCRIPT = os.path.join(_SCRIPTS, "refresh_pins.py")
 _spec = importlib.util.spec_from_file_location("refresh_pins", _SCRIPT)
+assert _spec is not None and _spec.loader is not None
 refresh_pins = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(refresh_pins)
 

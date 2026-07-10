@@ -3,6 +3,7 @@ Script to fetch platform-specific binaries (deno, ffmpeg) before building.
 Called automatically when running: pyinstaller yt-gui.spec
 Can also be run manually.
 """
+
 import hashlib
 import json
 import os
@@ -18,42 +19,49 @@ import zipfile
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPTS_DIR)
-BIN_DIR = os.path.join(_PROJECT_DIR, 'bin')
+BIN_DIR = os.path.join(_PROJECT_DIR, "bin")
 # 同梱バイナリのピン留め台帳（バージョン・URL・sha256）。取得物をこの sha256 で検証。
-PINS_PATH = os.path.join(BIN_DIR, 'pins.json')
+PINS_PATH = os.path.join(BIN_DIR, "pins.json")
 # 同梱バイナリのライセンス本文・告知の保存先（バンドル時に licenses/ へ同梱される）
-LICENSES_DIR = os.path.join(BIN_DIR, 'licenses')
+LICENSES_DIR = os.path.join(BIN_DIR, "licenses")
 
 # 配布アーカイブ内でライセンス本文とみなすファイル名（basename, 小文字比較）
-_LICENSE_BASENAMES = frozenset({
-    'license', 'license.txt', 'license.md',
-    'copying', 'copying.txt',
-    'gplv3.txt', 'gplv2.txt', 'gpl.txt',
-})
+_LICENSE_BASENAMES = frozenset(
+    {
+        "license",
+        "license.txt",
+        "license.md",
+        "copying",
+        "copying.txt",
+        "gplv3.txt",
+        "gplv2.txt",
+        "gpl.txt",
+    }
+)
 
 
 def _make_executable(path):
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         st = os.stat(path)
         os.chmod(path, st.st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def _download(url, dest):
-    print(f'  -> {url}')
+    print(f"  -> {url}")
     urllib.request.urlretrieve(url, dest)
 
 
 def _load_pins() -> dict:
     """ピン留め台帳 bin/pins.json を読み込む。"""
-    with open(PINS_PATH, encoding='utf-8') as f:
+    with open(PINS_PATH, encoding="utf-8") as f:
         return dict(json.load(f))
 
 
 def _sha256_of(path: str) -> str:
     """ファイルの sha256 を 16 進文字列で返す。"""
     h = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1 << 20), b''):
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
 
@@ -66,16 +74,16 @@ def _verify_sha256(path: str, expected: str, label: str) -> None:
     """
     if not expected:
         raise RuntimeError(
-            f'[{label}] bin/pins.json に sha256 が未設定です。ネット接続環境で取得物の '
-            f'sha256 を上流チェックサム／署名で確認のうえ台帳へ登録してください。'
+            f"[{label}] bin/pins.json に sha256 が未設定です。ネット接続環境で取得物の "
+            f"sha256 を上流チェックサム／署名で確認のうえ台帳へ登録してください。"
         )
     actual = _sha256_of(path)
     if actual.lower() != expected.lower():
         os.remove(path)
         raise RuntimeError(
-            f'[{label}] sha256 不一致のため中断します。\n'
-            f'  期待: {expected}\n  実際: {actual}\n'
-            f'取得物が台帳と異なります（改ざん、または上流が更新された可能性）。'
+            f"[{label}] sha256 不一致のため中断します。\n"
+            f"  期待: {expected}\n  実際: {actual}\n"
+            f"取得物が台帳と異なります（改ざん、または上流が更新された可能性）。"
         )
 
 
@@ -94,7 +102,7 @@ def _save_license_text(component: str, filename: str, data: bytes) -> None:
     """抽出したライセンス本文を bin/licenses/<component>/<filename> に保存する。"""
     dest_dir = os.path.join(LICENSES_DIR, component)
     os.makedirs(dest_dir, exist_ok=True)
-    with open(os.path.join(dest_dir, os.path.basename(filename)), 'wb') as f:
+    with open(os.path.join(dest_dir, os.path.basename(filename)), "wb") as f:
         f.write(data)
 
 
@@ -102,16 +110,17 @@ def _save_license_text(component: str, filename: str, data: bytes) -> None:
 # deno
 # ---------------------------------------------------------------------------
 
+
 def _deno_asset():
     machine = platform.machine().lower()
-    if sys.platform == 'win32':
-        return 'deno-x86_64-pc-windows-msvc.zip', 'deno.exe'
-    elif sys.platform == 'darwin':
-        arch = 'aarch64' if machine == 'arm64' else 'x86_64'
-        return f'deno-{arch}-apple-darwin.zip', 'deno'
+    if sys.platform == "win32":
+        return "deno-x86_64-pc-windows-msvc.zip", "deno.exe"
+    elif sys.platform == "darwin":
+        arch = "aarch64" if machine == "arm64" else "x86_64"
+        return f"deno-{arch}-apple-darwin.zip", "deno"
     else:
-        arch = 'aarch64' if machine in ('arm64', 'aarch64') else 'x86_64'
-        return f'deno-{arch}-unknown-linux-gnu.zip', 'deno'
+        arch = "aarch64" if machine in ("arm64", "aarch64") else "x86_64"
+        return f"deno-{arch}-unknown-linux-gnu.zip", "deno"
 
 
 def download_deno(force=False):
@@ -120,65 +129,66 @@ def download_deno(force=False):
     out_path = os.path.join(BIN_DIR, binary)
 
     if os.path.exists(out_path) and not force:
-        print(f'[deno] {binary} already exists. Skipping.')
+        print(f"[deno] {binary} already exists. Skipping.")
         return
 
-    pins = _load_pins()['deno']
-    url = f'{pins["base_url"]}/{asset}'
-    expected = pins['assets'].get(asset)
-    tmp = os.path.join(BIN_DIR, '_deno_tmp.zip')
-    print(f'[deno] Downloading {pins["version"]}...')
-    _download_verified(url, tmp, expected, f'deno {asset}')
+    pins = _load_pins()["deno"]
+    url = f"{pins['base_url']}/{asset}"
+    expected = pins["assets"].get(asset)
+    tmp = os.path.join(BIN_DIR, "_deno_tmp.zip")
+    print(f"[deno] Downloading {pins['version']}...")
+    _download_verified(url, tmp, expected, f"deno {asset}")
 
     with zipfile.ZipFile(tmp) as z:
         z.extract(binary, BIN_DIR)
     os.remove(tmp)
     _make_executable(out_path)
-    print(f'[deno] Saved: {out_path}')
+    print(f"[deno] Saved: {out_path}")
 
 
 # ---------------------------------------------------------------------------
 # ffmpeg
 # ---------------------------------------------------------------------------
 
+
 def download_ffmpeg(force=False):
     machine = platform.machine().lower()
-    ffmpeg_dir = os.path.join(BIN_DIR, 'ffmpeg')
+    ffmpeg_dir = os.path.join(BIN_DIR, "ffmpeg")
     os.makedirs(ffmpeg_dir, exist_ok=True)
 
-    _ext = '.exe' if sys.platform == 'win32' else ''
-    ffmpeg_path = os.path.join(ffmpeg_dir, f'ffmpeg{_ext}')
-    ffprobe_path = os.path.join(ffmpeg_dir, f'ffprobe{_ext}')
+    _ext = ".exe" if sys.platform == "win32" else ""
+    ffmpeg_path = os.path.join(ffmpeg_dir, f"ffmpeg{_ext}")
+    ffprobe_path = os.path.join(ffmpeg_dir, f"ffprobe{_ext}")
 
     if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path) and not force:
-        print('[ffmpeg] ffmpeg / ffprobe already exist. Skipping.')
+        print("[ffmpeg] ffmpeg / ffprobe already exist. Skipping.")
         return
 
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         _download_ffmpeg_windows(ffmpeg_path, ffprobe_path)
-    elif sys.platform == 'darwin':
+    elif sys.platform == "darwin":
         _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path)
     else:
         _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path)
 
-    print(f'[ffmpeg] Saved: {ffmpeg_dir}')
+    print(f"[ffmpeg] Saved: {ffmpeg_dir}")
 
 
 def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
-    pins = _load_pins()['ffmpeg-win']
-    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.zip')
-    print(f'[ffmpeg] Downloading (Windows {pins["version"]})...')
-    _download_verified(pins['url'], tmp, pins['sha256'], 'ffmpeg-win')
+    pins = _load_pins()["ffmpeg-win"]
+    tmp = os.path.join(BIN_DIR, "_ffmpeg_tmp.zip")
+    print(f"[ffmpeg] Downloading (Windows {pins['version']})...")
+    _download_verified(pins["url"], tmp, pins["sha256"], "ffmpeg-win")
 
     with zipfile.ZipFile(tmp) as z:
-        for name, out in (('ffmpeg.exe', ffmpeg_path), ('ffprobe.exe', ffprobe_path)):
-            entry = next(n for n in z.namelist() if n.endswith(f'/bin/{name}'))
-            with open(out, 'wb') as f:
+        for name, out in (("ffmpeg.exe", ffmpeg_path), ("ffprobe.exe", ffprobe_path)):
+            entry = next(n for n in z.namelist() if n.endswith(f"/bin/{name}"))
+            with open(out, "wb") as f:
                 f.write(z.read(entry))
         # BtbN ビルドはアーカイブ直下に LICENSE / COPYING 等を同梱する
         for entry in z.namelist():
-            if not entry.endswith('/') and _is_license_name(entry):
-                _save_license_text('ffmpeg', entry, z.read(entry))
+            if not entry.endswith("/") and _is_license_name(entry):
+                _save_license_text("ffmpeg", entry, z.read(entry))
     os.remove(tmp)
 
 
@@ -188,56 +198,60 @@ def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
     #   arm64  = osxexperts.net（公開値が展開後バイナリの sha256 のため展開後に検証）
     # いずれも ffmpeg / ffprobe を個別 ZIP で配布する。
     machine = platform.machine().lower()
-    arch = 'arm64' if machine == 'arm64' else 'x86_64'
-    pins = _load_pins()['ffmpeg-mac'][arch]
-    verify_mode = pins.get('verify', 'zip')
-    for tool, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
-        url = pins[tool]['url']
-        expected = pins[tool]['sha256']
-        label = f'ffmpeg-mac {arch} {tool}'
-        tmp = os.path.join(BIN_DIR, f'_{tool}_tmp.zip')
-        print(f'[ffmpeg] Downloading {tool} (macOS {arch} {pins["version"]})...')
+    arch = "arm64" if machine == "arm64" else "x86_64"
+    pins = _load_pins()["ffmpeg-mac"][arch]
+    verify_mode = pins.get("verify", "zip")
+    for tool, out_path in (("ffmpeg", ffmpeg_path), ("ffprobe", ffprobe_path)):
+        url = pins[tool]["url"]
+        expected = pins[tool]["sha256"]
+        label = f"ffmpeg-mac {arch} {tool}"
+        tmp = os.path.join(BIN_DIR, f"_{tool}_tmp.zip")
+        print(f"[ffmpeg] Downloading {tool} (macOS {arch} {pins['version']})...")
         # zip 検証なら DL 時に、binary 検証なら展開後に sha256 を照合する
-        if verify_mode == 'zip':
+        if verify_mode == "zip":
             _download_verified(url, tmp, expected, label)
         else:
             _download(url, tmp)
         with zipfile.ZipFile(tmp) as z:
             # __MACOSX/._<tool>（AppleDouble）を除外して実体エントリを選ぶ
             entry = next(
-                n for n in z.namelist()
+                n
+                for n in z.namelist()
                 if os.path.basename(n) == tool
-                and not os.path.basename(n).startswith('._')
+                and not os.path.basename(n).startswith("._")
             )
             z.extract(entry, ffmpeg_dir)
             extracted = os.path.join(ffmpeg_dir, entry)
             if extracted != out_path:
                 os.replace(extracted, out_path)
         os.remove(tmp)
-        if verify_mode == 'binary':
+        if verify_mode == "binary":
             _verify_sha256(out_path, expected, label)
         _make_executable(out_path)
 
 
 def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
-    arch = 'arm64' if machine in ('arm64', 'aarch64') else 'amd64'
-    pins = _load_pins()['ffmpeg-linux']
-    entry = pins['assets'][arch]
-    tmp = os.path.join(BIN_DIR, '_ffmpeg_tmp.tar.xz')
-    print(f'[ffmpeg] Downloading (Linux {arch} {pins["version"]})...')
-    _download_verified(entry['url'], tmp, entry['sha256'], f'ffmpeg-linux {arch}')
+    arch = "arm64" if machine in ("arm64", "aarch64") else "amd64"
+    pins = _load_pins()["ffmpeg-linux"]
+    entry = pins["assets"][arch]
+    tmp = os.path.join(BIN_DIR, "_ffmpeg_tmp.tar.xz")
+    print(f"[ffmpeg] Downloading (Linux {arch} {pins['version']})...")
+    _download_verified(entry["url"], tmp, entry["sha256"], f"ffmpeg-linux {arch}")
 
     # johnvansickle.com tarball contains both ffmpeg and ffprobe
-    with tarfile.open(tmp, 'r:xz') as t:
-        for binary, out_path in (('ffmpeg', ffmpeg_path), ('ffprobe', ffprobe_path)):
+    with tarfile.open(tmp, "r:xz") as t:
+        for binary, out_path in (("ffmpeg", ffmpeg_path), ("ffprobe", ffprobe_path)):
             member = next(
-                (m for m in t.getmembers()
-                 if os.path.basename(m.name) == binary and m.isfile()),
+                (
+                    m
+                    for m in t.getmembers()
+                    if os.path.basename(m.name) == binary and m.isfile()
+                ),
                 None,
             )
             if member:
                 src = t.extractfile(member)
-                with open(out_path, 'wb') as dst:
+                with open(out_path, "wb") as dst:
                     shutil.copyfileobj(src, dst)
                 _make_executable(out_path)
         # johnvansickle の tarball は LICENSE.txt / GPLv3.txt 等を同梱する
@@ -245,7 +259,7 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
             if member.isfile() and _is_license_name(member.name):
                 src = t.extractfile(member)
                 if src is not None:
-                    _save_license_text('ffmpeg', member.name, src.read())
+                    _save_license_text("ffmpeg", member.name, src.read())
     os.remove(tmp)
 
 
@@ -258,56 +272,63 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
 # 再現性のため master 追従ではなくコミットハッシュで固定する（pins.json が単一ソース）。
 # git のコミット SHA は内容アドレスのため、sha256 検証の対象外とする。
 
-_danmaku2ass_pin = _load_pins()['danmaku2ass']
-DANMAKU2ASS_REPO = _danmaku2ass_pin['repo']
-DANMAKU2ASS_REF = _danmaku2ass_pin['ref']
+_danmaku2ass_pin = _load_pins()["danmaku2ass"]
+DANMAKU2ASS_REPO = _danmaku2ass_pin["repo"]
+DANMAKU2ASS_REF = _danmaku2ass_pin["ref"]
 
 
 def download_danmaku2ass(force=False):
-    _ext = '.exe' if sys.platform == 'win32' else ''
-    out_path = os.path.join(BIN_DIR, f'danmaku2ass{_ext}')
+    _ext = ".exe" if sys.platform == "win32" else ""
+    out_path = os.path.join(BIN_DIR, f"danmaku2ass{_ext}")
     os.makedirs(BIN_DIR, exist_ok=True)
 
     if os.path.exists(out_path) and not force:
-        print(f'[danmaku2ass] {out_path} already exists. Skipping.')
+        print(f"[danmaku2ass] {out_path} already exists. Skipping.")
         return
 
-    tmpdir = tempfile.mkdtemp(prefix='danmaku2ass-build-')
+    tmpdir = tempfile.mkdtemp(prefix="danmaku2ass-build-")
     try:
-        print('[danmaku2ass] Cloning source...')
+        print("[danmaku2ass] Cloning source...")
         subprocess.run(
-            ['git', 'clone', '--quiet', DANMAKU2ASS_REPO, tmpdir],
+            ["git", "clone", "--quiet", DANMAKU2ASS_REPO, tmpdir],
             check=True,
         )
         subprocess.run(
-            ['git', '-C', tmpdir, 'checkout', '--quiet', DANMAKU2ASS_REF],
+            ["git", "-C", tmpdir, "checkout", "--quiet", DANMAKU2ASS_REF],
             check=True,
         )
 
-        print('[danmaku2ass] Building with PyInstaller (onefile)...')
-        work_dir = os.path.join(tmpdir, '_build')
+        print("[danmaku2ass] Building with PyInstaller (onefile)...")
+        work_dir = os.path.join(tmpdir, "_build")
         subprocess.run(
             [
-                sys.executable, '-m', 'PyInstaller',
-                '--onefile',
-                '--name', 'danmaku2ass',
-                '--distpath', BIN_DIR,
-                '--workpath', work_dir,
-                '--specpath', work_dir,
-                '--noconfirm',
-                '--log-level', 'WARN',
-                os.path.join(tmpdir, 'danmaku2ass.py'),
+                sys.executable,
+                "-m",
+                "PyInstaller",
+                "--onefile",
+                "--name",
+                "danmaku2ass",
+                "--distpath",
+                BIN_DIR,
+                "--workpath",
+                work_dir,
+                "--specpath",
+                work_dir,
+                "--noconfirm",
+                "--log-level",
+                "WARN",
+                os.path.join(tmpdir, "danmaku2ass.py"),
             ],
             check=True,
         )
         _make_executable(out_path)
-        print(f'[danmaku2ass] Saved: {out_path}')
+        print(f"[danmaku2ass] Saved: {out_path}")
 
         # clone したソースからライセンス本文を保存する
         for name in os.listdir(tmpdir):
             if _is_license_name(name) and os.path.isfile(os.path.join(tmpdir, name)):
-                with open(os.path.join(tmpdir, name), 'rb') as f:
-                    _save_license_text('danmaku2ass', name, f.read())
+                with open(os.path.join(tmpdir, name), "rb") as f:
+                    _save_license_text("danmaku2ass", name, f.read())
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -320,39 +341,39 @@ def download_danmaku2ass(force=False):
 
 COMPONENTS = [
     {
-        'name': 'FFmpeg (ffmpeg, ffprobe)',
-        'license': 'GPL（同梱ビルドは libx264/x265 等を含む GPL 構成）',
-        'copyright': 'Copyright (c) the FFmpeg developers',
-        'homepage': 'https://ffmpeg.org/',
-        'source': 'https://ffmpeg.org/download.html#get-sources',
-        'distribution': (
-            'Windows: https://github.com/BtbN/FFmpeg-Builds (win64-gpl) / '
-            'macOS x86_64: https://evermeet.cx/ffmpeg/ / '
-            'macOS arm64: https://www.osxexperts.net/ / '
-            'Linux: https://johnvansickle.com/ffmpeg/'
+        "name": "FFmpeg (ffmpeg, ffprobe)",
+        "license": "GPL（同梱ビルドは libx264/x265 等を含む GPL 構成）",
+        "copyright": "Copyright (c) the FFmpeg developers",
+        "homepage": "https://ffmpeg.org/",
+        "source": "https://ffmpeg.org/download.html#get-sources",
+        "distribution": (
+            "Windows: https://github.com/BtbN/FFmpeg-Builds (win64-gpl) / "
+            "macOS x86_64: https://evermeet.cx/ffmpeg/ / "
+            "macOS arm64: https://www.osxexperts.net/ / "
+            "Linux: https://johnvansickle.com/ffmpeg/"
         ),
-        'note': (
-            '同梱バイナリの正確なライセンス・ビルド構成は '
-            '`ffmpeg -version` の出力で確認できる。'
+        "note": (
+            "同梱バイナリの正確なライセンス・ビルド構成は "
+            "`ffmpeg -version` の出力で確認できる。"
         ),
     },
     {
-        'name': 'danmaku2ass',
-        'license': 'GPL-3.0',
-        'copyright': 'Copyright (c) Star Brilliant and danmaku2ass contributors',
-        'homepage': 'https://github.com/m13253/danmaku2ass',
-        'source': f'{DANMAKU2ASS_REPO} (ref: {DANMAKU2ASS_REF})',
-        'distribution': 'ソースから PyInstaller でビルドして同梱',
-        'note': 'ニコニコ動画コメント JSON → ASS 字幕変換に使用。',
+        "name": "danmaku2ass",
+        "license": "GPL-3.0",
+        "copyright": "Copyright (c) Star Brilliant and danmaku2ass contributors",
+        "homepage": "https://github.com/m13253/danmaku2ass",
+        "source": f"{DANMAKU2ASS_REPO} (ref: {DANMAKU2ASS_REF})",
+        "distribution": "ソースから PyInstaller でビルドして同梱",
+        "note": "ニコニコ動画コメント JSON → ASS 字幕変換に使用。",
     },
     {
-        'name': 'Deno',
-        'license': 'MIT',
-        'copyright': 'Copyright (c) the Deno authors',
-        'homepage': 'https://deno.com/',
-        'source': 'https://github.com/denoland/deno',
-        'distribution': 'https://github.com/denoland/deno/releases',
-        'note': 'yt-dlp の JavaScript ランタイムとして使用。',
+        "name": "Deno",
+        "license": "MIT",
+        "copyright": "Copyright (c) the Deno authors",
+        "homepage": "https://deno.com/",
+        "source": "https://github.com/denoland/deno",
+        "distribution": "https://github.com/denoland/deno/releases",
+        "note": "yt-dlp の JavaScript ランタイムとして使用。",
     },
 ]
 
@@ -365,40 +386,41 @@ def write_third_party_notices(dest_dir: str = LICENSES_DIR) -> str:
     """
     os.makedirs(dest_dir, exist_ok=True)
     lines = [
-        '# サードパーティライセンス',
-        '',
-        'yt-gui は以下の外部コンポーネントを同梱して配布しています。各ライセンスの',
-        '条件に従い、著作権表示・ライセンス・対応ソースコードの入手先を以下に示します。',
-        '',
-        'GPL コンポーネントの対応ソースコードは、以下「対応ソース」の URL から'
-        '入手できます。',
-        '本ファイルは GPL が要求する対応ソース提供の書面によるオファーを兼ねます。',
-        '各コンポーネントのライセンス全文は、本バンドル内の `licenses/` 配下',
-        '（取得元アーカイブに同梱されていたもの）および本体の `LICENSE`（GPLv3）を'
-        '参照してください。',
-        '',
+        "# サードパーティライセンス",
+        "",
+        "yt-gui は以下の外部コンポーネントを同梱して配布しています。各ライセンスの",
+        "条件に従い、著作権表示・ライセンス・対応ソースコードの入手先を以下に示します。",
+        "",
+        "GPL コンポーネントの対応ソースコードは、以下「対応ソース」の URL から"
+        "入手できます。",
+        "本ファイルは GPL が要求する対応ソース提供の書面によるオファーを兼ねます。",
+        "各コンポーネントのライセンス全文は、本バンドル内の `licenses/` 配下",
+        "（取得元アーカイブに同梱されていたもの）および本体の `LICENSE`（GPLv3）を"
+        "参照してください。",
+        "",
     ]
     for c in COMPONENTS:
         lines += [
-            f'## {c["name"]}',
-            '',
-            f'- ライセンス: {c["license"]}',
-            f'- 著作権表示: {c["copyright"]}',
-            f'- 公式サイト: {c["homepage"]}',
-            f'- 配布元: {c["distribution"]}',
-            f'- 対応ソース: {c["source"]}',
-            f'- 備考: {c["note"]}',
-            '',
+            f"## {c['name']}",
+            "",
+            f"- ライセンス: {c['license']}",
+            f"- 著作権表示: {c['copyright']}",
+            f"- 公式サイト: {c['homepage']}",
+            f"- 配布元: {c['distribution']}",
+            f"- 対応ソース: {c['source']}",
+            f"- 備考: {c['note']}",
+            "",
         ]
-    content = '\n'.join(lines)
-    out_path = os.path.join(dest_dir, 'THIRD-PARTY-NOTICES.md')
-    with open(out_path, 'w', encoding='utf-8') as f:
+    content = "\n".join(lines)
+    out_path = os.path.join(dest_dir, "THIRD-PARTY-NOTICES.md")
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(content)
-    print(f'[licenses] Wrote: {out_path}')
+    print(f"[licenses] Wrote: {out_path}")
     return out_path
 
 
 # ---------------------------------------------------------------------------
+
 
 def _prompt_ffmpeg_consent() -> bool:
     """Show ffmpeg license notice and prompt for consent. Returns True if accepted."""
@@ -415,13 +437,15 @@ def _prompt_ffmpeg_consent() -> bool:
     print("License details: https://ffmpeg.org/legal.html")
     print("=" * 60)
     try:
-        answer = input(
-            "Do you agree to download ffmpeg under the GPL license? [y/N] "
-        ).strip().lower()
-    except (EOFError, KeyboardInterrupt):
+        answer = (
+            input("Do you agree to download ffmpeg under the GPL license? [y/N] ")
+            .strip()
+            .lower()
+        )
+    except EOFError, KeyboardInterrupt:
         print()
         return False
-    return answer in ('y', 'yes')
+    return answer in ("y", "yes")
 
 
 def _prompt_danmaku2ass_consent() -> bool:
@@ -439,32 +463,37 @@ def _prompt_danmaku2ass_consent() -> bool:
     print("Repository: https://github.com/m13253/danmaku2ass")
     print("=" * 60)
     try:
-        answer = input(
-            "Do you agree to build danmaku2ass under the GPL-3.0 license? [y/N] "
-        ).strip().lower()
-    except (EOFError, KeyboardInterrupt):
+        answer = (
+            input("Do you agree to build danmaku2ass under the GPL-3.0 license? [y/N] ")
+            .strip()
+            .lower()
+        )
+    except EOFError, KeyboardInterrupt:
         print()
         return False
-    return answer in ('y', 'yes')
+    return answer in ("y", "yes")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--update', action='store_true', help='Force re-download of existing binaries'
+        "--update", action="store_true", help="Force re-download of existing binaries"
     )
     parser.add_argument(
-        '--yes', '-y', action='store_true',
-        help='Skip all confirmation prompts (for CI/automated builds)'
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip all confirmation prompts (for CI/automated builds)",
     )
     args = parser.parse_args()
 
     download_deno(force=args.update)
 
-    _ext = '.exe' if sys.platform == 'win32' else ''
-    _ffmpeg_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffmpeg{_ext}')
-    _ffprobe_path = os.path.join(BIN_DIR, 'ffmpeg', f'ffprobe{_ext}')
+    _ext = ".exe" if sys.platform == "win32" else ""
+    _ffmpeg_path = os.path.join(BIN_DIR, "ffmpeg", f"ffmpeg{_ext}")
+    _ffprobe_path = os.path.join(BIN_DIR, "ffmpeg", f"ffprobe{_ext}")
     _needs_ffmpeg = (
         not (os.path.exists(_ffmpeg_path) and os.path.exists(_ffprobe_path))
         or args.update
@@ -472,17 +501,17 @@ if __name__ == '__main__':
 
     if _needs_ffmpeg and not args.yes:
         if not _prompt_ffmpeg_consent():
-            print('[ffmpeg] Download cancelled.')
+            print("[ffmpeg] Download cancelled.")
             sys.exit(0)
 
     download_ffmpeg(force=args.update)
 
-    _danmaku2ass_path = os.path.join(BIN_DIR, f'danmaku2ass{_ext}')
+    _danmaku2ass_path = os.path.join(BIN_DIR, f"danmaku2ass{_ext}")
     _needs_danmaku2ass = not os.path.exists(_danmaku2ass_path) or args.update
 
     if _needs_danmaku2ass and not args.yes:
         if not _prompt_danmaku2ass_consent():
-            print('[danmaku2ass] Build cancelled.')
+            print("[danmaku2ass] Build cancelled.")
             sys.exit(0)
 
     download_danmaku2ass(force=args.update)

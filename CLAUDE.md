@@ -68,14 +68,14 @@ uv run ruff check .
 # Lint + 自動修正
 uv run ruff check --fix .
 
-# フォーマット（差分確認のみ）
-uv run ruff format --check yt_gui/
+# フォーマット（差分確認のみ。CI も同じくリポジトリ全体を対象）
+uv run ruff format --check .
 
 # フォーマット（適用）
-uv run ruff format yt_gui/
+uv run ruff format .
 
-# 型チェック
-uv run mypy yt_gui/
+# 型チェック（対象は pyproject.toml の [tool.mypy] files で管理）
+uv run mypy
 ```
 
 ## テスト

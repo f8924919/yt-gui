@@ -108,7 +108,7 @@ def test_resolve_resolution_uses_given_value() -> None:
     r = resolve_extension_format(
         {"kind": "resolution", "resolution": "1080"}, **_DEFAULTS
     )
-    assert r is not None
+    assert isinstance(r, ResolvedExtensionFormat)
     assert r.format_id == "fmt_720p"
     assert r.resolution == "1080"
 
@@ -117,14 +117,14 @@ def test_resolve_resolution_clamps_unknown_to_default() -> None:
     r = resolve_extension_format(
         {"kind": "resolution", "resolution": "9999"}, **_DEFAULTS
     )
-    assert r is not None
+    assert isinstance(r, ResolvedExtensionFormat)
     assert r.format_id == "fmt_720p"
     assert r.resolution == "720"  # 既定へフォールバック
 
 
 def test_resolve_resolution_missing_uses_default() -> None:
     r = resolve_extension_format({"kind": "resolution"}, **_DEFAULTS)
-    assert r is not None
+    assert isinstance(r, ResolvedExtensionFormat)
     assert r.resolution == "720"
 
 
@@ -142,7 +142,7 @@ def test_resolve_audio_uses_given_format_and_bitrate() -> None:
 
 def test_resolve_audio_flac() -> None:
     r = resolve_extension_format({"kind": "audio", "audio_format": "flac"}, **_DEFAULTS)
-    assert r is not None
+    assert isinstance(r, ResolvedExtensionFormat)
     assert r.format_id == "fmt_mp3"
     assert r.audio_format == "flac"
 
@@ -151,7 +151,7 @@ def test_resolve_audio_clamps_unknown_format_and_bitrate() -> None:
     r = resolve_extension_format(
         {"kind": "audio", "audio_format": "ogg", "mp3_bitrate": "999"}, **_DEFAULTS
     )
-    assert r is not None
+    assert isinstance(r, ResolvedExtensionFormat)
     assert r.audio_format == "mp3"  # 既定
     assert r.mp3_bitrate == "192"  # 既定
 

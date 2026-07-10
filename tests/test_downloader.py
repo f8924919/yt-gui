@@ -471,6 +471,7 @@ class _FakeYDL:
     """`_resolve_unique_path` 用の最小スタブ。`extract_info` の戻り値を注入する。"""
 
     _next_info = None  # クラス属性で各テストが差し替える
+    calls: list[str] = []  # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
 
     def __init__(self, opts):
         pass
@@ -1295,10 +1296,12 @@ def test_convert_comments_uses_niconico_format_and_json_input(
     downloader.log_callback = lambda m: None
 
     captured: dict = {}
-    monkeypatch.setattr(
-        "yt_gui.downloader.subprocess.run",
-        lambda cmd, **k: captured.__setitem__("cmd", cmd) or type("R", (), {})(),
-    )
+
+    def _fake_run(cmd, **k):
+        captured["cmd"] = cmd
+        return type("R", (), {})()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
 
     downloader._convert_nico_comments_to_ass(str(tmp_path / "動画"), "comments", {})
 
@@ -1354,10 +1357,12 @@ def test_embed_danmaku_uses_danmaku_ass_input(
     downloader.log_callback = lambda m: None
 
     captured: dict = {}
-    monkeypatch.setattr(
-        "yt_gui.downloader.subprocess.run",
-        lambda cmd, **k: captured.__setitem__("cmd", cmd) or type("R", (), {})(),
-    )
+
+    def _fake_run(cmd, **k):
+        captured["cmd"] = cmd
+        return type("R", (), {})()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
 
     downloader._embed_nico_comments_into_mkv(
         str(tmp_path / "動画"), ".mp4", "danmaku", {}
@@ -1525,7 +1530,7 @@ def test_strip_sidecar_only_subs_pp_removes_sidecar_langs() -> None:
     from yt_gui.downloader import _StripSidecarOnlySubsBeforeEmbedPP
 
     pp = _StripSidecarOnlySubsBeforeEmbedPP()
-    info = {
+    info: dict = {
         "requested_subtitles": {
             "en": {},
             "live_chat": {},
@@ -1541,7 +1546,7 @@ def test_strip_sidecar_only_subs_pp_noop_without_sidecar_langs() -> None:
     from yt_gui.downloader import _StripSidecarOnlySubsBeforeEmbedPP
 
     pp = _StripSidecarOnlySubsBeforeEmbedPP()
-    info = {"requested_subtitles": {"en": {}, "ja": {}}}
+    info: dict = {"requested_subtitles": {"en": {}, "ja": {}}}
     _ret, out = pp.run(info)
     assert set(out["requested_subtitles"]) == {"en", "ja"}
 
