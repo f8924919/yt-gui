@@ -132,7 +132,7 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 2. 対応する `tests/test_*.py` にテストを追加 / 修正する
 3. 実装する
 4. `uv run pytest` が pass することを確認する
-5. `uv run pytest --cov=yt_gui --cov-report=term-missing` でカバレッジを確認する
+5. `uv run pytest --cov=yt_gui --cov-report=term-missing` でカバレッジを確認する（CI でも同オプションで自動計測される。§5）
 6. 仕様の削除 / 統合時は **対応するテストも併せて削除** する
 
 ---
@@ -140,6 +140,7 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 ## 5. カバレッジ運用
 
 - **数値閾値は初期は設けません**（計測のみ）
+- CI（[`test.yml`](../../.github/workflows/test.yml)）の pytest は `--cov=yt_gui --cov-report=term-missing` 付きで実行され、実行ログでカバレッジ表を確認できます（#210）。`--cov-fail-under` は指定しないため、pytest ステップの pass/fail はテスト結果のみで決まります
 - 数サイクル運用後、実績値からプロジェクト全体・モジュール別に最低ラインを設定します
 - 計測対象は `yt_gui` 全体ですが、UI ウィンドウ統合のうち `original_format_panel.py` / `log_dialog.py`・`thumbnail_cache.py`・`locales` は `omit` で除外し **ロジック層が対象** になります。`downloader.py` はロジック部分をテスト済みのため `omit` から外しています（#95）。`app.py` / `settings_dialog.py` も #134 で `omit` から解除し計測対象に含めています
 - **§1 で `△`（対象）に格上げ済みでも `omit` には残している**モジュールがあります（`log_dialog.py`）。これは段階導入（§1 ノート）の方針で、テストは追加しつつ一括解除によるカバレッジ急落を避けるための意図的な据え置きです。`app.py` / `settings_dialog.py` は #134 で `omit` から解除済みで、解除後の実測 TOTAL は約 85%（`app.py` 単体は約 66%）です。`app.py` の未到達はウィンドウ構築・各種スロット等の UI 配線部分が中心で、テスト追加で段階的に引き上げます

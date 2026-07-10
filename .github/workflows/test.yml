@@ -54,5 +54,8 @@ jobs:
       - name: Type check (mypy)
         run: uv run mypy yt_gui/
 
+      # カバレッジは計測のみ（--cov-fail-under なし。pass/fail はテスト結果のみで決まる）。
+      # --cov=yt_gui は pyproject の [tool.coverage.run] source と重複するが、
+      # docs 記載のローカルコマンドと表記を揃えるため明示している（#210）。
       - name: Test (pytest)
-        run: uv run pytest
+        run: uv run pytest --cov=yt_gui --cov-report=term-missing

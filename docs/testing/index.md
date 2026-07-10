@@ -34,6 +34,8 @@ HTML レポートは `htmlcov/index.html` に出力されます。
 
 `pull_request` と `main` への `push` で [`.github/workflows/test.yml`](../../.github/workflows/test.yml) が起動し、Ubuntu ランナー上で `ruff check` / `ruff format --check` / `mypy` / `pytest` を実行します。Python は `requires-python>=3.14` に合わせて `uv python install 3.14` で取得します。
 
+pytest は `--cov=yt_gui --cov-report=term-missing` 付きで実行され、カバレッジを自動計測します（実行ログで `TOTAL` 行を含む表を確認できます）。閾値（`--cov-fail-under`）は設けておらず、pytest ステップの pass/fail はテスト結果のみで決まります（[policy.md](policy.md) §5 の「計測のみ」方針。#210）。
+
 ワークフローには Qt の offscreen 実行に必要な OS 側 C ライブラリ導入と `QT_QPA_PLATFORM=offscreen` を先行して含めており、後続で導入予定の Qt UI テスト（[docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md)）がそのまま乗る構成です。
 
 ---
