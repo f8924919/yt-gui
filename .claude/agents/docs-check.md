@@ -21,6 +21,7 @@ tools: Read, Edit, Grep, Glob, Bash
 4. **命名規則**: `docs/spec/` 配下は kebab-case、`docs/arch/` は対応モジュール名と一致する snake_case（docs-guide §2.1）。
 5. **ドキュメントマップ / 構成表**: フォルダ・ファイル種別を追加したら CLAUDE.md のドキュメントマップと docs-guide §2.1 の表が追従しているか（docs-guide §2.3 / §5）。
 6. **タスク連動**: コード変更があるなら docs-guide §4.1 の「変更箇所別の更新先」に沿った docs 更新が伴っているか。タスク完了なら §4.2 の移動手順（`docs/task/` → `archive/`、両 index 更新）が踏まれているか。
+7. **テスト設定の同期**: `docs/testing/policy.md` と `pyproject.toml` が**双方向に**整合しているか（docs-guide §4.1「テスト方針・スコープ変更」行）。具体的には、(a) `[tool.coverage.run] omit` の各モジュールが policy.md §1 の対象表（◯/△/×）・§5 の「omit から解除済み」記述と矛盾しないか（docs 先行・pyproject 先行のどちらのドリフトも対象）、(b) `[tool.pytest.ini_options] markers` の各マーカーが policy.md §2.5 で説明されているか。
 
 ## 進め方
 

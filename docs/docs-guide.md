@@ -174,7 +174,7 @@ CLAUDE.md にも記載のとおり、**コードまたは仕様を変更・拡�
 | 新言語追加 | `docs/spec/i18n.md` + `docs/arch/locales.md` |
 | ビルド構成・同梱バイナリ変更 | `docs/build.md` |
 | 翻訳キー追加・変更のみ | ドキュメント更新不要（キー一覧は記載しない方針） |
-| テスト方針・スコープ変更 | `docs/testing/policy.md` + `pyproject.toml` の `[tool.coverage.run] omit` |
+| テスト方針・スコープ変更 | `docs/testing/policy.md` + `pyproject.toml` の `[tool.coverage.run] omit` / `[tool.pytest.ini_options] markers` |
 | テスト対象モジュール追加 | `tests/test_{module}.py` 新規 + `docs/testing/policy.md` のスコープ表更新 |
 | リファクタリング（振る舞い不変） | 該当 `arch/{module}.md` のみ（必要に応じて） |
 | エージェント / スキルの追加・変更 (`.claude/agents/` `.claude/skills/`) | 該当 `.claude/` 定義 + `docs/git-workflow.md` §5.2（エージェント表）/ §5.3（スキル表）を更新 |
