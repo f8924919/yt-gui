@@ -48,7 +48,9 @@ def _grid_cells(layout: QGridLayout) -> list[tuple[int, int]]:
     """
     cells: list[tuple[int, int]] = []
     for idx in range(layout.count()):
-        r, c, rs, cs = layout.getItemPosition(idx)
+        pos = layout.getItemPosition(idx)
+        assert isinstance(pos, tuple)  # PySide6 スタブは object を返す型のため絞り込む
+        r, c, rs, cs = pos
         for dr in range(rs):
             for dc in range(cs):
                 cells.append((r + dr, c + dc))

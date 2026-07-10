@@ -28,7 +28,9 @@ _MANIFEST = os.path.join(_ROOT, "extension", "manifest.json")
 def read_project_version(pyproject_path: str = _PYPROJECT) -> str:
     """`pyproject.toml` の `[project] version` を返す。"""
     with open(pyproject_path, "rb") as fh:
-        return tomllib.load(fh)["project"]["version"]
+        version = tomllib.load(fh)["project"]["version"]
+    assert isinstance(version, str)
+    return version
 
 
 def sync_manifest_version(manifest_path: str, version: str) -> bool:

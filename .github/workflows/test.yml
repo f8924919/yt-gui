@@ -49,10 +49,11 @@ jobs:
         run: uv run ruff check .
 
       - name: Format check (ruff format)
-        run: uv run ruff format --check yt_gui/
+        run: uv run ruff format --check .
 
+      # 対象は pyproject.toml の [tool.mypy] files で管理（#211）
       - name: Type check (mypy)
-        run: uv run mypy yt_gui/
+        run: uv run mypy
 
       # カバレッジは計測のみ（--cov-fail-under なし。pass/fail はテスト結果のみで決まる）。
       # --cov=yt_gui は pyproject の [tool.coverage.run] source と重複するが、

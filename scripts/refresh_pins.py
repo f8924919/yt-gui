@@ -96,7 +96,8 @@ def _parse_jvs_version(readme: str) -> str:
 def _http_text(url: str, headers: dict | None = None) -> str:
     req = urllib.request.Request(url, headers={**_UA, **(headers or {})})
     with urllib.request.urlopen(req, timeout=60) as resp:
-        return resp.read().decode("utf-8", "replace")
+        text: str = resp.read().decode("utf-8", "replace")
+    return text
 
 
 def _http_json(url: str, headers: dict | None = None) -> Any:

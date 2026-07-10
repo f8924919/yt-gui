@@ -15,6 +15,7 @@ _SCRIPT = os.path.join(
     "download_binaries.py",
 )
 _spec = importlib.util.spec_from_file_location("download_binaries", _SCRIPT)
+assert _spec is not None and _spec.loader is not None
 download_binaries = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(download_binaries)
 
