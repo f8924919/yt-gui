@@ -12,10 +12,10 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [開発ワークフロー改善調査](workflow-improvement-survey.md) | 進行中 | A-1〜A-3（#210〜#212）完了。A-4（#213）・A-5（#214）を順次実施中 | 2026-07-11 |
+| [開発ワークフロー改善調査](workflow-improvement-survey.md) | 進行中 | A-1〜A-5（#210〜#214）完了。B-1（#222）対応中、B-2・C・D 群は未検討 | 2026-07-11 |
 
 ## 完了タスク
 
 完了したタスクは [archive/index.md](archive/index.md) にテーマ別で記録しています。
 
-> **運用**: タスク完了時は `docs/task/{slug}.md` を `docs/task/archive/` へ移動し、上記「進行中・未着手」テーブルから該当行を削除して `archive/index.md` の該当テーマ表に追記してください。
+> **運用**: タスク完了時は `docs/task/{slug}.md` を `docs/task/archive/` へ移動し、上記「進行中・未着手」テーブルから該当行を削除して `archive/index.md` の該当テーマ表に追記してください。この移動は**原則タスクを完結させる実装 PR に同梱**します（[docs-guide.md](../docs-guide.md) §4.2）。
