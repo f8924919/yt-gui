@@ -59,4 +59,4 @@
 - [x] 実測・設計案の作成（2026-07-10）
 - [x] design-review（2026-07-10。設計妥当。warn_unreachable の追加提案を採用、pyproject へのインライン注記を推奨→採用。app.py 19 件の Qt 挙動変更リスクは低いと確認）
 - [x] ユーザー承認（2026-07-10。RUF001-003 ignore・warn_unreachable 追加・1 PR コミット 3 分割を承認）
-- [ ] 実装・違反修正・CI green
+- [x] 実装・違反修正（2026-07-11。ruff 52 件 + mypy 57 件。type: ignore・overrides 不使用、挙動変更なし）

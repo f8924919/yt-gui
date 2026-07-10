@@ -500,20 +500,18 @@ if __name__ == "__main__":
         or args.update
     )
 
-    if _needs_ffmpeg and not args.yes:
-        if not _prompt_ffmpeg_consent():
-            print("[ffmpeg] Download cancelled.")
-            sys.exit(0)
+    if _needs_ffmpeg and not args.yes and not _prompt_ffmpeg_consent():
+        print("[ffmpeg] Download cancelled.")
+        sys.exit(0)
 
     download_ffmpeg(force=args.update)
 
     _danmaku2ass_path = os.path.join(BIN_DIR, f"danmaku2ass{_ext}")
     _needs_danmaku2ass = not os.path.exists(_danmaku2ass_path) or args.update
 
-    if _needs_danmaku2ass and not args.yes:
-        if not _prompt_danmaku2ass_consent():
-            print("[danmaku2ass] Build cancelled.")
-            sys.exit(0)
+    if _needs_danmaku2ass and not args.yes and not _prompt_danmaku2ass_consent():
+        print("[danmaku2ass] Build cancelled.")
+        sys.exit(0)
 
     download_danmaku2ass(force=args.update)
 

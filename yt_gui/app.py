@@ -1,3 +1,4 @@
+import contextlib
 import dataclasses
 import os
 import sys
@@ -1416,10 +1417,8 @@ class App(QMainWindow):
         """終了時にサーバーを停止し、一時 cookies ディレクトリを掃除する。"""
         self._stop_extension_server()
         if self._ext_cookies_dir is not None:
-            try:
+            with contextlib.suppress(OSError):
                 self._ext_cookies_dir.cleanup()
-            except OSError:
-                pass
             self._ext_cookies_dir = None
         super().closeEvent(event)
 

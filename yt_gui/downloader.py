@@ -1,3 +1,4 @@
+import contextlib
 import glob
 import os
 import re
@@ -1017,10 +1018,8 @@ class Downloader:
             os.replace(outfile, infile)
         except (subprocess.CalledProcessError, OSError) as e:
             if os.path.exists(outfile):
-                try:
+                with contextlib.suppress(OSError):
                     os.remove(outfile)
-                except OSError:
-                    pass
             if self.log_callback:
                 detail = (
                     e.stderr.strip()

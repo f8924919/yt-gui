@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from yt_gui.formats import build_720p_spec, build_best_spec
@@ -265,7 +267,7 @@ def test_original_requires_panel() -> None:
 
 def test_jobspec_frozen() -> None:
     job = build_job_spec("fmt_best_mp4", Settings())
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         job.format_id = "fmt_mp3"  # type: ignore[misc]
 
 

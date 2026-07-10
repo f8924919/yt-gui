@@ -59,7 +59,7 @@ def queue_tree(qtbot):
 
 
 def test_edit_targets_returns_waiting_subset_when_not_editing(queue_tree):
-    tree, state = queue_tree
+    tree, _state = queue_tree
     waiting = _make_item("waiting")
     downloading = _make_item("downloading")
 
@@ -74,7 +74,7 @@ def test_edit_targets_empty_while_editing(queue_tree):
 
 
 def test_edit_targets_empty_when_no_waiting(queue_tree):
-    tree, state = queue_tree
+    tree, _state = queue_tree
 
     assert tree._edit_targets([_make_item("downloading"), _make_item("done")]) == []
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -473,7 +474,8 @@ class _FakeYDL:
 
     _next_info = None  # クラス属性で各テストが差し替える
     _stem: Path  # prepare_filename が返す stem（_patch_fake_ydl が設定）
-    calls: list[str] = []  # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
+    # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
+    calls: ClassVar[list[str]] = []
 
     def __init__(self, opts):
         pass
@@ -534,7 +536,7 @@ def test_resolve_unique_path_no_skip_when_ignore_archive(tmp_path, monkeypatch) 
         monkeypatch, tmp_path, info={"id": "vid", "extractor_key": "Youtube"}
     )
 
-    stem, ext = dl._resolve_unique_path(
+    _stem, ext = dl._resolve_unique_path(
         {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
     )
     assert ext == ".mp4"
@@ -949,7 +951,7 @@ def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_pat
 class _StubYDL:
     """`extract_info` が固定 info を返す YoutubeDL スタブ。"""
 
-    info: dict | None = {}
+    info: ClassVar[dict | None] = {}
 
     def __init__(self, opts):
         pass

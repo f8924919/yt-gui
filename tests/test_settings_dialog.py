@@ -79,9 +79,12 @@ def _download_tab_grid(dialog: SettingsDialog) -> QGridLayout:
         assert page is not None
         layout = page.layout()
         # ダウンロードタブは「同時ダウンロード数」スピンボックスを持つ
-        if isinstance(layout, QGridLayout) and hasattr(dialog, "_max_concurrent_spin"):
-            if layout.indexOf(dialog._max_concurrent_spin) != -1:
-                return layout
+        if (
+            isinstance(layout, QGridLayout)
+            and hasattr(dialog, "_max_concurrent_spin")
+            and layout.indexOf(dialog._max_concurrent_spin) != -1
+        ):
+            return layout
     raise AssertionError("download tab grid not found")
 
 
