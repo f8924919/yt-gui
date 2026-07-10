@@ -12,6 +12,8 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -471,7 +473,9 @@ class _FakeYDL:
     """`_resolve_unique_path` 用の最小スタブ。`extract_info` の戻り値を注入する。"""
 
     _next_info = None  # クラス属性で各テストが差し替える
-    calls: list[str] = []  # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
+    _stem: Path  # prepare_filename が返す stem（_patch_fake_ydl が設定）
+    # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
+    calls: ClassVar[list[str]] = []
 
     def __init__(self, opts):
         pass
@@ -532,7 +536,7 @@ def test_resolve_unique_path_no_skip_when_ignore_archive(tmp_path, monkeypatch) 
         monkeypatch, tmp_path, info={"id": "vid", "extractor_key": "Youtube"}
     )
 
-    stem, ext = dl._resolve_unique_path(
+    _stem, ext = dl._resolve_unique_path(
         {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
     )
     assert ext == ".mp4"
@@ -902,7 +906,7 @@ def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypa
 
 def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
     downloader.status_callback = lambda *a, **k: None
-    logs = []
+    logs: list[str] = []
     downloader.log_callback = logs.append
     ffmpeg = tmp_path / "ffmpeg"
     ffmpeg.write_text("")
@@ -947,7 +951,7 @@ def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_pat
 class _StubYDL:
     """`extract_info` が固定 info を返す YoutubeDL スタブ。"""
 
-    info: dict | None = {}
+    info: ClassVar[dict | None] = {}
 
     def __init__(self, opts):
         pass

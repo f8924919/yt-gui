@@ -123,7 +123,7 @@ class OriginalFormatDialog(QDialog):
             self.add_requested.emit()
         self.accept()
 
-    def reject(self) -> None:  # noqa: D401 - QDialog override
+    def reject(self) -> None:
         if self._mode == "edit":
             self.edit_cancelled.emit()
         super().reject()

@@ -54,7 +54,7 @@ def test_verify_sha256_rejects_missing_expected(tmp_path):
     """期待値が未設定（None / 空）なら RuntimeError を送出する。"""
     f = tmp_path / "blob.bin"
     f.write_bytes(b"data")
-    with pytest.raises(RuntimeError, match="pins.json"):
+    with pytest.raises(RuntimeError, match=r"pins\.json"):
         download_binaries._verify_sha256(str(f), None, "test")
 
 
@@ -87,8 +87,8 @@ def test_pins_json_is_valid_and_complete():
 def test_danmaku2ass_constants_come_from_pins():
     """モジュール定数がピン台帳由来であること（単一ソース）。"""
     pins = download_binaries._load_pins()
-    assert download_binaries.DANMAKU2ASS_REF == pins["danmaku2ass"]["ref"]
-    assert download_binaries.DANMAKU2ASS_REPO == pins["danmaku2ass"]["repo"]
+    assert pins["danmaku2ass"]["ref"] == download_binaries.DANMAKU2ASS_REF
+    assert pins["danmaku2ass"]["repo"] == download_binaries.DANMAKU2ASS_REPO
 
 
 # --- THIRD-PARTY-NOTICES 生成 ---------------------------------------------
@@ -98,7 +98,8 @@ def test_write_third_party_notices_lists_all_components(tmp_path):
     """全コンポーネントの名称・ライセンス・対応ソースが告知に含まれる。"""
     out = download_binaries.write_third_party_notices(str(tmp_path))
     assert os.path.basename(out) == "THIRD-PARTY-NOTICES.md"
-    text = open(out, encoding="utf-8").read()
+    with open(out, encoding="utf-8") as fh:
+        text = fh.read()
     for component in download_binaries.COMPONENTS:
         assert component["name"] in text
         assert component["license"] in text

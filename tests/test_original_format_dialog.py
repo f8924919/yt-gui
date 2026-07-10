@@ -14,11 +14,11 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtWidgets import QDialog  # noqa: E402
+from PySide6.QtWidgets import QDialog
 
-from yt_gui import i18n  # noqa: E402
-from yt_gui.downloader import Downloader  # noqa: E402
-from yt_gui.original_format_dialog import OriginalFormatDialog  # noqa: E402
+from yt_gui import i18n
+from yt_gui.downloader import Downloader
+from yt_gui.original_format_dialog import OriginalFormatDialog
 
 pytestmark = pytest.mark.qt
 

@@ -12,7 +12,7 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from yt_gui.log_dialog import LogDialog  # noqa: E402
+from yt_gui.log_dialog import LogDialog
 
 pytestmark = pytest.mark.qt
 

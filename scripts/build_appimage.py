@@ -116,7 +116,10 @@ def _build_appdir(collect_dir: str, appdir: str) -> None:
 
 
 def build_appimage(force: bool = False) -> str:
-    if sys.platform != "linux":
+    # ローカル変数経由で受けて mypy の sys.platform 特別扱い（プラットフォーム固定）を
+    # 外し、Linux 専用処理が他プラットフォームで到達不能扱いされるのを避ける。
+    plat = sys.platform
+    if plat != "linux":
         raise RuntimeError("AppImage build is only supported on Linux.")
 
     collect_dir = os.path.join(DIST_DIR, APP_NAME)
@@ -164,7 +167,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if sys.platform != "linux":
+    plat = sys.platform
+    if plat != "linux":
         print("[appimage] Skipping: only Linux is supported.")
         sys.exit(0)
 

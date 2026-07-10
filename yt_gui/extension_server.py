@@ -121,7 +121,7 @@ def _make_handler(
 ) -> type[BaseHTTPRequestHandler]:
     class _Handler(BaseHTTPRequestHandler):
         # クッキー・トークンが標準出力へ漏れないようアクセスログを無効化する。
-        def log_message(self, *args: Any) -> None:  # noqa: A002
+        def log_message(self, *args: Any) -> None:
             pass
 
         def _dispatch(self, method: str) -> None:
@@ -142,10 +142,10 @@ def _make_handler(
             self.end_headers()
             self.wfile.write(raw)
 
-        def do_POST(self) -> None:  # noqa: N802
+        def do_POST(self) -> None:
             self._dispatch("POST")
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             self._dispatch("GET")
 
     return _Handler

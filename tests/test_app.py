@@ -11,22 +11,24 @@
 対応 arch: [app.py](../docs/arch/app.md)。
 """
 
+from typing import Any
+
 import pytest
 
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtGui import QAction  # noqa: E402
-from PySide6.QtWidgets import QMessageBox  # noqa: E402
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMessageBox
 
-from yt_gui import app as app_module  # noqa: E402
-from yt_gui import i18n  # noqa: E402
-from yt_gui.app import App, _QueueTree  # noqa: E402
-from yt_gui.i18n import t  # noqa: E402
-from yt_gui.job_spec import PanelSnapshot, build_job_spec  # noqa: E402
-from yt_gui.queue_controller import _QueueItem  # noqa: E402
-from yt_gui.settings import Settings  # noqa: E402
-from yt_gui.yt_dlp_update import UpdateCheckResult, UpdateStatus  # noqa: E402
+from yt_gui import app as app_module
+from yt_gui import i18n
+from yt_gui.app import App, _QueueTree
+from yt_gui.i18n import t
+from yt_gui.job_spec import PanelSnapshot, build_job_spec
+from yt_gui.queue_controller import _QueueItem
+from yt_gui.settings import Settings
+from yt_gui.yt_dlp_update import UpdateCheckResult, UpdateStatus
 
 pytestmark = pytest.mark.qt
 
@@ -57,7 +59,7 @@ def queue_tree(qtbot):
 
 
 def test_edit_targets_returns_waiting_subset_when_not_editing(queue_tree):
-    tree, state = queue_tree
+    tree, _state = queue_tree
     waiting = _make_item("waiting")
     downloading = _make_item("downloading")
 
@@ -72,7 +74,7 @@ def test_edit_targets_empty_while_editing(queue_tree):
 
 
 def test_edit_targets_empty_when_no_waiting(queue_tree):
-    tree, state = queue_tree
+    tree, _state = queue_tree
 
     assert tree._edit_targets([_make_item("downloading"), _make_item("done")]) == []
 
@@ -147,11 +149,11 @@ def test_open_original_dialog_warns_on_empty_url(app, monkeypatch):
     warned = []
     from PySide6.QtWidgets import QMessageBox
 
-    monkeypatch.setattr(
-        QMessageBox,
-        "warning",
-        lambda *a, **kw: warned.append(a) or QMessageBox.StandardButton.Ok,
-    )
+    def _warn(*a, **kw):
+        warned.append(a)
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
     app.url_entry.clear()
 
     dialog = app._open_original_dialog()
@@ -197,9 +199,11 @@ def test_validate_section_rejects_invalid_time(app, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
 
     warned = []
-    monkeypatch.setattr(
-        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
-    )
+
+    def _warn(*a, **k):
+        warned.append(a[2])
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
     _enable_section(app, "abc", "00:04:00")
     assert app._validate_section() is False
     assert warned
@@ -211,9 +215,11 @@ def test_validate_section_rejects_start_after_end(app, monkeypatch):
     from yt_gui.i18n import t
 
     warned = []
-    monkeypatch.setattr(
-        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
-    )
+
+    def _warn(*a, **k):
+        warned.append(a[2])
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
     _enable_section(app, "00:05:00", "00:04:00")
     assert app._validate_section() is False
     assert warned == [t("warn_section_range")]
@@ -231,13 +237,18 @@ def test_playlist_with_section_warns_and_aborts(app, monkeypatch):
     from yt_gui.i18n import t
 
     warned = []
-    monkeypatch.setattr(
-        QMessageBox, "warning", lambda *a, **k: warned.append(a[2]) or None
-    )
+
+    def _warn(*a, **k):
+        warned.append(a[2])
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
     calls = []
-    monkeypatch.setattr(
-        app.queue, "enqueue_playlist", lambda *a, **k: calls.append(a) or []
-    )
+
+    def _enqueue(*a, **k):
+        calls.append(a)
+        return []
+
+    monkeypatch.setattr(app.queue, "enqueue_playlist", _enqueue)
 
     job = build_job_spec(
         "fmt_best_mp4", Settings(), section_start="10", section_end="20"
@@ -425,7 +436,8 @@ def test_open_settings_retranslates_on_language_change(app, monkeypatch):
 def test_open_log_dialog_creates_loads_and_shows(app):
     """初回起動で `LogDialog` を生成し、既存ログを読み込んで表示する。"""
     app._log_entries = ["[12:00:00] テストログ"]
-    assert app._log_dialog is None
+    before = app._log_dialog
+    assert before is None
 
     app._open_log_dialog()
 
@@ -485,7 +497,7 @@ def test_write_extension_cookies_creates_file(app):
 
 def test_on_extension_enqueue_threads_cookies(app, monkeypatch):
     """受信 cookies が一時ファイル化され、item_cookies_path として流れる。"""
-    captured = {}
+    captured: dict[str, Any] = {}
 
     def _fake_start(
         url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
@@ -509,7 +521,7 @@ def test_on_extension_enqueue_threads_cookies(app, monkeypatch):
 
 
 def test_on_extension_enqueue_without_cookies(app, monkeypatch):
-    captured = {}
+    captured: dict[str, Any] = {}
 
     def _fake_start(
         url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
@@ -525,7 +537,7 @@ def test_on_extension_enqueue_without_cookies(app, monkeypatch):
 
 def _capture_enqueue_job(app, monkeypatch):
     """`_start_add_thread` をフックして (job, label) を捕捉するヘルパ。"""
-    captured = {}
+    captured: dict[str, Any] = {}
 
     def _fake_start(
         url, cookies_path, cookies_browser, job, label, *, item_cookies_path=None
@@ -741,7 +753,7 @@ def test_extension_original_serializes_multiple_requests(app, monkeypatch):
     直列化の検証にダイアログ内部は不要なため、`_make_original_dialog` を
     スタブ化して exec 中の再入ガードと待ち行列の捌け方だけを確認する。
     """
-    opened = []
+    opened: list[bool] = []
 
     class _StubDialog:
         def exec(self):
@@ -858,7 +870,7 @@ def test_check_update_up_to_date_runs_in_background_and_notifies(
         current="2026.06.09", latest="2026.06.09", status=UpdateStatus.UP_TO_DATE
     )
     monkeypatch.setattr(app_module, "check_for_update", lambda current: result)
-    seen = {}
+    seen: dict[str, Any] = {}
     monkeypatch.setattr(
         QMessageBox,
         "information",
@@ -900,7 +912,7 @@ def test_check_update_failure_notifies_and_does_not_crash(app, qtbot, monkeypatc
         raise OSError("offline")
 
     monkeypatch.setattr(app_module, "check_for_update", boom)
-    seen = {}
+    seen: dict[str, Any] = {}
     monkeypatch.setattr(
         QMessageBox, "warning", lambda *a, **k: seen.setdefault("msg", a[2])
     )

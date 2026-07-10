@@ -219,18 +219,19 @@ class _AudioListWidget(_ToggleListWidget):
 
         self._suppress_enforce = True
         try:
-            if auto_selected and (skip_selected or audio_rows):
+            if (
+                auto_selected
+                and (skip_selected or audio_rows)
                 # 「自動」が他と同時選択されたら自動を解除
-                if len(sel) > 1:
-                    if auto_item is not None:
-                        auto_item.setSelected(False)
-            if skip_selected and audio_rows:
-                if skip_item is not None:
-                    skip_item.setSelected(False)
-            if skip_selected and auto_selected:
-                # 上で auto を解除済みの可能性があるが念のため
-                if auto_item is not None:
-                    auto_item.setSelected(False)
+                and len(sel) > 1
+                and auto_item is not None
+            ):
+                auto_item.setSelected(False)
+            if skip_selected and audio_rows and skip_item is not None:
+                skip_item.setSelected(False)
+            # 上で auto を解除済みの可能性があるが念のため
+            if skip_selected and auto_selected and auto_item is not None:
+                auto_item.setSelected(False)
         finally:
             self._suppress_enforce = False
 

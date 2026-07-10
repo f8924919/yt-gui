@@ -3,6 +3,8 @@
 対応仕様: docs/spec/features/download-formats.md
 """
 
+from typing import cast
+
 import pytest
 
 from yt_gui.formats import (
@@ -182,7 +184,8 @@ def test_resolve_original_returns_original_intent() -> None:
 def test_original_intent_is_distinct_from_none_and_resolved() -> None:
     """OriginalIntent は None（既定）とも ResolvedExtensionFormat とも区別される。"""
     assert ORIGINAL_INTENT is not None
-    assert not isinstance(ORIGINAL_INTENT, ResolvedExtensionFormat)
+    # 実行時の型区別を検証する意図のため、静的型を隠して isinstance を評価する。
+    assert not isinstance(cast(object, ORIGINAL_INTENT), ResolvedExtensionFormat)
     # 余分なパラメータが付いても original の意味は変わらない（パラメータを持たない）
     r = resolve_extension_format(
         {"kind": "original", "resolution": "1080"}, **_DEFAULTS

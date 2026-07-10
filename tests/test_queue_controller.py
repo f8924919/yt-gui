@@ -11,11 +11,11 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtWidgets import QTreeWidget  # noqa: E402
+from PySide6.QtWidgets import QTreeWidget
 
-from yt_gui.job_spec import build_job_spec  # noqa: E402
-from yt_gui.queue_controller import QueueController  # noqa: E402
-from yt_gui.settings import Settings  # noqa: E402
+from yt_gui.job_spec import build_job_spec
+from yt_gui.queue_controller import QueueController
+from yt_gui.settings import Settings
 
 pytestmark = pytest.mark.qt
 
@@ -417,7 +417,8 @@ def test_overall_progress_reflects_finished_ratio(controller, qtbot):
 def test_mark_ignore_archive_sets_flag_on_waiting(controller):
     a = _enqueue(controller, "A")
     b = _enqueue(controller, "B")
-    assert a.job.ignore_archive is False
+    before = a.job.ignore_archive
+    assert before is False
 
     n = controller.mark_ignore_archive([a, b])
 

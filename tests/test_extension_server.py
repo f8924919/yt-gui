@@ -151,7 +151,7 @@ def test_get_method_returns_405():
 
 def test_invalid_json_returns_400():
     headers = {"Origin": EXT_ORIGIN, "X-YtGui-Token": TOKEN}
-    status, data, captured = _call("POST", "/enqueue", headers, b"not json")
+    status, _data, captured = _call("POST", "/enqueue", headers, b"not json")
     assert status == 400
     assert captured == []
 

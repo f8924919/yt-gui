@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from yt_gui.threading_utils import run_in_thread  # noqa: E402
+from yt_gui.threading_utils import run_in_thread
 
 pytestmark = pytest.mark.qt
 
