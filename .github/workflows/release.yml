@@ -63,6 +63,8 @@ jobs:
         with:
           ref: v${{ needs.version-gate.outputs.version }}   # タグ付けしたソースを正確にビルド
       - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true   # 依存キャッシュ（キーは OS・uv.lock から自動生成。#213）
       - run: uv python install 3.14
       - name: Install Linux build deps
         if: runner.os == 'Linux'
