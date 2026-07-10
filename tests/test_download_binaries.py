@@ -87,8 +87,8 @@ def test_pins_json_is_valid_and_complete():
 def test_danmaku2ass_constants_come_from_pins():
     """モジュール定数がピン台帳由来であること（単一ソース）。"""
     pins = download_binaries._load_pins()
-    assert download_binaries.DANMAKU2ASS_REF == pins["danmaku2ass"]["ref"]
-    assert download_binaries.DANMAKU2ASS_REPO == pins["danmaku2ass"]["repo"]
+    assert pins["danmaku2ass"]["ref"] == download_binaries.DANMAKU2ASS_REF
+    assert pins["danmaku2ass"]["repo"] == download_binaries.DANMAKU2ASS_REPO
 
 
 # --- THIRD-PARTY-NOTICES 生成 ---------------------------------------------

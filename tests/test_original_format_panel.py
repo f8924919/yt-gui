@@ -9,9 +9,9 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtWidgets import QAbstractItemView  # noqa: E402
+from PySide6.QtWidgets import QAbstractItemView
 
-from yt_gui.original_format_panel import (  # noqa: E402
+from yt_gui.original_format_panel import (
     _AUTO_SENTINEL,
     _SKIP_SENTINEL,
     OriginalFormatPanel,

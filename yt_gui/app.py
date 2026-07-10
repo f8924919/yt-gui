@@ -1386,7 +1386,7 @@ class App(QMainWindow):
         """サーバースレッドから呼ばれる。Qt シグナルでメインスレッドへ委譲する。"""
         self._signals.extension_enqueue.emit(url, cookies, fmt)
 
-    def closeEvent(self, event):  # noqa: N802
+    def closeEvent(self, event):
         """終了時にサーバーを停止し、一時 cookies ディレクトリを掃除する。"""
         self._stop_extension_server()
         if self._ext_cookies_dir is not None:

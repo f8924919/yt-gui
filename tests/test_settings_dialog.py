@@ -11,7 +11,7 @@
 対応 arch: [settings_dialog.py](../docs/arch/settings_dialog.md)。
 """
 
-import os  # noqa: E402
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,10 +19,10 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtWidgets import QGridLayout  # noqa: E402
+from PySide6.QtWidgets import QGridLayout
 
-from yt_gui.settings import Settings  # noqa: E402
-from yt_gui.settings_dialog import SettingsDialog  # noqa: E402
+from yt_gui.settings import Settings
+from yt_gui.settings_dialog import SettingsDialog
 
 pytestmark = pytest.mark.qt
 

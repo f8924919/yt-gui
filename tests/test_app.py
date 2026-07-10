@@ -16,17 +16,17 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtGui import QAction  # noqa: E402
-from PySide6.QtWidgets import QMessageBox  # noqa: E402
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMessageBox
 
-from yt_gui import app as app_module  # noqa: E402
-from yt_gui import i18n  # noqa: E402
-from yt_gui.app import App, _QueueTree  # noqa: E402
-from yt_gui.i18n import t  # noqa: E402
-from yt_gui.job_spec import PanelSnapshot, build_job_spec  # noqa: E402
-from yt_gui.queue_controller import _QueueItem  # noqa: E402
-from yt_gui.settings import Settings  # noqa: E402
-from yt_gui.yt_dlp_update import UpdateCheckResult, UpdateStatus  # noqa: E402
+from yt_gui import app as app_module
+from yt_gui import i18n
+from yt_gui.app import App, _QueueTree
+from yt_gui.i18n import t
+from yt_gui.job_spec import PanelSnapshot, build_job_spec
+from yt_gui.queue_controller import _QueueItem
+from yt_gui.settings import Settings
+from yt_gui.yt_dlp_update import UpdateCheckResult, UpdateStatus
 
 pytestmark = pytest.mark.qt
 
