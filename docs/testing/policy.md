@@ -78,7 +78,7 @@ Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、
 Qt UI（状態機械・ロジック）行のテストを記述・実行する際の取り決めです。具体の `conftest.py` 実装と `pytest-qt` 導入は後続タスクで行います。
 
 - **ヘッドレス**: `QT_QPA_PLATFORM=offscreen` を前提とする（`conftest.py` で `os.environ.setdefault` 固定、CI は [`test.yml`](../../.github/workflows/test.yml) の env で設定済み）。
-- **マーカー分離と skip**: Qt UI テストは `@pytest.mark.qt`（選択用。`--strict-markers` のため `pyproject.toml` に登録）を付ける。Qt 非導入環境での skip はモジュール冒頭の `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` で行う（import 失敗より前にモジュール単位で skip され、ロジック層テストは従来どおり通る）。
+- **マーカー分離と skip**: Qt UI テストは `@pytest.mark.qt`（選択用。`--strict-markers` のため `pyproject.toml` に登録）を付ける。マーカーを追加・変更するときは `pyproject.toml` の `[tool.pytest.ini_options] markers` と本節を併せて更新する。Qt 非導入環境での skip はモジュール冒頭の `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` で行う（import 失敗より前にモジュール単位で skip され、ロジック層テストは従来どおり通る）。
 - **副作用の抑制**: `offscreen` ではモーダル `QMessageBox.warning/critical/information/question` が無限ブロックするため no-op 化する（`conftest.py` の `_silence_qt_modal_dialogs` が `qt` マーカー付きテストへ autouse で適用）。`App` 構築時は `Downloader.missing_dependencies()`（PATH 実走査）が走るため、決定性確保のためモックする。
 - **モーダル経路の駆動（手段B）**: 分岐や状態反映を検証したい場合は、autouse の no-op を**テスト内で上書き**する。`QMessageBox.question` は `monkeypatch.setattr(..., lambda *a, **kw: QMessageBox.StandardButton.Yes)` で Yes/No を固定し、`QFileDialog.get*` は返却パスを固定値に差し替える。`QDialog.exec()` は `monkeypatch` で no-op 化（即 return）するか、`QTimer.singleShot(0, ...)` で `QApplication.activeModalWidget()` を取得して `accept()`/ボタン押下する。シグナル経由で検証できる箇所（`add_requested` 等）は `exec()` を介さず `_make_*` でダイアログを生成してシグナルを直接 emit する方を優先する。
 - **イベントループ / 後始末**: `qtbot.waitSignal` / `qtbot.waitUntil` で条件待ちする。`run_in_thread` は daemon スレッドで Qt シグナルをキュー発火するため、受信側 QObject がテスト終了時に破棄されないよう、シグナル受信を待ち切ってからテストを終える。
