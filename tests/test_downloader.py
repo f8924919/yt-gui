@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -471,6 +472,7 @@ class _FakeYDL:
     """`_resolve_unique_path` 用の最小スタブ。`extract_info` の戻り値を注入する。"""
 
     _next_info = None  # クラス属性で各テストが差し替える
+    _stem: Path  # prepare_filename が返す stem（_patch_fake_ydl が設定）
     calls: list[str] = []  # 呼び出し記録（_patch_fake_ydl がテストごとにリセット）
 
     def __init__(self, opts):
@@ -902,7 +904,7 @@ def test_cut_section_replaces_original_on_success(downloader, tmp_path, monkeypa
 
 def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
     downloader.status_callback = lambda *a, **k: None
-    logs = []
+    logs: list[str] = []
     downloader.log_callback = logs.append
     ffmpeg = tmp_path / "ffmpeg"
     ffmpeg.write_text("")

@@ -417,7 +417,8 @@ def test_overall_progress_reflects_finished_ratio(controller, qtbot):
 def test_mark_ignore_archive_sets_flag_on_waiting(controller):
     a = _enqueue(controller, "A")
     b = _enqueue(controller, "B")
-    assert a.job.ignore_archive is False
+    before = a.job.ignore_archive
+    assert before is False
 
     n = controller.mark_ignore_archive([a, b])
 

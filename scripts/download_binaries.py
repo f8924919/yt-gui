@@ -251,6 +251,7 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
             )
             if member:
                 src = t.extractfile(member)
+                assert src is not None  # isfile() 済みメンバーなので None にならない
                 with open(out_path, "wb") as dst:
                     shutil.copyfileobj(src, dst)
                 _make_executable(out_path)

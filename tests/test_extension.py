@@ -22,6 +22,7 @@ _SCRIPTS = os.path.join(_ROOT, "scripts")
 def _load(name):
     path = os.path.join(_SCRIPTS, f"{name}.py")
     spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

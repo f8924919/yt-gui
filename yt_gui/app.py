@@ -8,7 +8,13 @@ from datetime import datetime
 from os.path import expanduser
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices, QIcon
+from PySide6.QtGui import (
+    QAction,
+    QDesktopServices,
+    QIcon,
+    QStandardItem,
+    QStandardItemModel,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -28,6 +34,7 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QToolTip,
     QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -111,7 +118,7 @@ class _QueueTree(QTreeWidget):
         self,
         parent=None,
         *,
-        get_item: Callable[[object], _QueueItem | None],
+        get_item: Callable[[QTreeWidgetItem], _QueueItem | None],
         get_thumbnail_b64: Callable[[str], str | None],
         is_editing: Callable[[], bool],
         is_archive_enabled: Callable[[], bool],
@@ -227,6 +234,21 @@ class _QueueTree(QTreeWidget):
 
 
 class App(QMainWindow):
+    # `_create_widgets` で構築するウィジェット属性の型注釈。
+    # 生成メソッドより前に定義された `_retranslate_ui` 等から参照されるため、
+    # mypy が型を推論できるよう明示する。
+    format_combo: QComboBox
+    _queue_tree: _QueueTree
+    _mp3_thumb_check: QCheckBox
+    _lbl_queue_title: QLabel
+    add_button: QPushButton
+    _cancel_edit_button: QPushButton
+    _detail_button: QPushButton
+    start_queue_button: QPushButton
+    pause_queue_button: QPushButton
+    remove_item_button: QPushButton
+    status_label: QLabel
+
     def __init__(self):
         super().__init__()
 
@@ -346,7 +368,11 @@ class App(QMainWindow):
     def _set_original_format_enabled(self, enabled: bool):
         if _ORIGINAL_KEY not in FORMAT_KEYS:
             return
-        item = self.format_combo.model().item(FORMAT_KEYS.index(_ORIGINAL_KEY))
+        # QComboBox の既定モデルは QStandardItemModel（item() を持つ）。
+        model = self.format_combo.model()
+        assert isinstance(model, QStandardItemModel)
+        # item() は無効な行に対し実行時 None を返し得る（stub は非 Optional）ため明示。
+        item: QStandardItem | None = model.item(FORMAT_KEYS.index(_ORIGINAL_KEY))
         if item is None:
             return
         if enabled:

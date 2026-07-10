@@ -57,11 +57,26 @@ def _grid_cells(layout: QGridLayout) -> list[tuple[int, int]]:
     return cells
 
 
+def _grid_row(grid: QGridLayout, index: int) -> int:
+    """`getItemPosition` の行番号を返す（スタブは object 型なので絞り込む）。"""
+    pos = grid.getItemPosition(index)
+    assert isinstance(pos, tuple)
+    return int(pos[0])
+
+
+def _grid_item_widget(grid: QGridLayout, index: int):
+    """グリッド `index` のアイテムが保持するウィジェットを返す。"""
+    item = grid.itemAt(index)
+    assert item is not None
+    return item.widget()
+
+
 def _download_tab_grid(dialog: SettingsDialog) -> QGridLayout:
     tabs = dialog._tabs
     assert tabs is not None
     for i in range(tabs.count()):
         page = tabs.widget(i)
+        assert page is not None
         layout = page.layout()
         # ダウンロードタブは「同時ダウンロード数」スピンボックスを持つ
         if isinstance(layout, QGridLayout) and hasattr(dialog, "_max_concurrent_spin"):
@@ -97,15 +112,15 @@ def test_download_tab_archive_note_at_bottom(qtbot):
         for w in dialog.findChildren(QLabel)
         if w.text() == note_text and grid.indexOf(w) != -1
     )
-    note_row = grid.getItemPosition(grid.indexOf(note))[0]
-    check_row = grid.getItemPosition(grid.indexOf(dialog._archive_check))[0]
+    note_row = _grid_row(grid, grid.indexOf(note))
+    check_row = _grid_row(grid, grid.indexOf(dialog._archive_check))
 
     # 注記はアーカイブ有効化チェックより下にあり、かつグリッド最下段にある
     assert note_row > check_row
     other_rows = [
-        grid.getItemPosition(idx)[0]
+        _grid_row(grid, idx)
         for idx in range(grid.count())
-        if grid.itemAt(idx).widget() is not note
+        if _grid_item_widget(grid, idx) is not note
     ]
     assert note_row >= max(other_rows), "注記が最下段になく、重なりの疑いがある"
 
@@ -141,11 +156,12 @@ def test_clear_archive_yes_removes_file(qtbot, tmp_path, monkeypatch):
         QMessageBox, "question", lambda *a, **kw: QMessageBox.StandardButton.Yes
     )
     informed: list = []
-    monkeypatch.setattr(
-        QMessageBox,
-        "information",
-        lambda *a, **kw: informed.append(a) or QMessageBox.StandardButton.Ok,
-    )
+
+    def _inform(*a, **kw):
+        informed.append(a)
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "information", _inform)
 
     dialog._clear_archive()
 
@@ -183,11 +199,12 @@ def test_clear_archive_failure_warns(qtbot, tmp_path, monkeypatch):
         QMessageBox, "question", lambda *a, **kw: QMessageBox.StandardButton.Yes
     )
     warned: list = []
-    monkeypatch.setattr(
-        QMessageBox,
-        "warning",
-        lambda *a, **kw: warned.append(a) or QMessageBox.StandardButton.Ok,
-    )
+
+    def _warn(*a, **kw):
+        warned.append(a)
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
 
     def _raise(_path):
         raise OSError("permission denied")
@@ -432,6 +449,7 @@ def test_sidebar_has_seven_pages_with_locale_labels(qtbot):
 
     nav = dialog.findChild(QListWidget)
     stack = dialog.findChild(QStackedWidget)
+    assert nav is not None and stack is not None
     assert dialog._tabs.count() == 7
     assert nav.count() == 7
     assert stack.count() == 7
@@ -445,6 +463,7 @@ def test_sidebar_selection_switches_page(qtbot):
     dialog = _make_dialog(qtbot, Settings())
     nav = dialog.findChild(QListWidget)
     stack = dialog.findChild(QStackedWidget)
+    assert nav is not None and stack is not None
 
     nav.setCurrentRow(dialog._proxy_tab_index)
 
@@ -459,6 +478,7 @@ def test_set_current_index_syncs_nav_and_page(qtbot):
     dialog = _make_dialog(qtbot, Settings())
     nav = dialog.findChild(QListWidget)
     stack = dialog.findChild(QStackedWidget)
+    assert nav is not None and stack is not None
 
     dialog._tabs.setCurrentIndex(dialog._template_tab_index)
 

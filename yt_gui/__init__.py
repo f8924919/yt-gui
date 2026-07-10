@@ -35,6 +35,7 @@ def get_resource_base() -> str:
 
     PyInstaller バンドル時は sys._MEIPASS、開発時はプロジェクトルートを返す。
     """
-    if getattr(sys, "_MEIPASS", None):
-        return str(sys._MEIPASS)
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return str(meipass)
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
