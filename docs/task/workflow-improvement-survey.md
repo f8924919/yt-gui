@@ -101,7 +101,7 @@ B-1 完了後、investigate ×2 で再調査した。タスクメモの現状認
 
 #### C-3. 大型モジュール × カバレッジ除外の重なり
 
-- 現状: 500 行超は `yt_gui/app.py`（1,544 行・カバレッジ約 66%）、`yt_gui/original_format_panel.py`（1,280 行・omit で計測除外）、`yt_gui/downloader.py`（1,212 行）。`settings_dialog.py`（923 行）も準大型。フェーズ 1〜7 の計画的リファクタ実施済み（`docs/task/archive/refactor-overview.md`）の残存規模であり無秩序な肥大化ではないが、「大きい × 計測されていない」箇所が品質リスクの集中点。
+- 現状: 500 行超は `yt_gui/app.py`（1,544 行・カバレッジ約 66%）、`yt_gui/original_format_panel.py`（1,280 行・調査時点では omit で計測除外。#224 で解除済み・実測約 63%）、`yt_gui/downloader.py`（1,212 行）。`settings_dialog.py`（923 行）も準大型。フェーズ 1〜7 の計画的リファクタ実施済み（`docs/task/archive/refactor-overview.md`）の残存規模であり無秩序な肥大化ではないが、「大きい × 計測されていない」箇所が品質リスクの集中点。
 - 方針メモ: `docs/testing/policy.md` の段階導入方針（omit の段階解除）に沿って、omit 解除の次ステップを計画する。A-1（CI 計測）が先。
 
 #### C-4. SAST（CodeQL 等）の導入
