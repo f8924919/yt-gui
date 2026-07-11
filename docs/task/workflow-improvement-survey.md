@@ -20,6 +20,12 @@ B・C・D 群は上記完了後に再検討する（未選定のまま保留）�
 
 A-1〜A-5 完了後、ユーザー判断により **B-1 に着手**（[#222](https://github.com/f8924919/yt-gui/issues/222)）。方針は「**(a) 実装 PR への同梱を原則、(b) まとめ docs PR を補完**」を採用（選択肢 (a)/(b)/(c) から）。正本 docs-guide §4.2・git-workflow step 9/§5.3・`/finish-task` skill・docs-upkeep rule・task/index 運用注記を更新。
 
+### B-2・C・D 群の再検討（2026-07-11）
+
+B-1 完了後、investigate ×2 で再調査した。タスクメモの現状認識は実態と一致（C-1 hooks/pre-commit 未導入・C-4 SAST なし・B-2 定量ログなし・D 変化なし）。ただし **C-3 に docs⇔実装の drift を発見**: `original_format_panel.py` / `log_dialog.py` はテスト追加済みなのに coverage omit に残存しており、policy.md:37 の「テスト追加と同時に解除」方針と乖離していた。
+
+ユーザー判断により **C-3 に着手**（[#224](https://github.com/f8924919/yt-gui/issues/224)）。omit 解除で TOTAL 86% → 81%（`original_format_panel.py` 単体 63%）となるが、`app.py` の前例（#134・66% で解除し段階的引き上げ）に倣い**両モジュール解除**を選択。C-2（Windows CI）・C-4（CodeQL）・C-1 残（hooks/pre-commit）・B-2・D 群は今回未選定（保留）。
+
 ## 目的
 
 このプロジェクトの開発ワークフロー（docs 運用・CI・品質ゲート・Git 運用）を、開発効率と成果物品質の観点で棚卸しし、改善候補を優先度付きで整理する。後日、項目単位でタスク化・Issue 化して対応するための調査メモ。
@@ -95,7 +101,7 @@ A-1〜A-5 完了後、ユーザー判断により **B-1 に着手**（[#222](htt
 
 #### C-3. 大型モジュール × カバレッジ除外の重なり
 
-- 現状: 500 行超は `yt_gui/app.py`（1,544 行・カバレッジ約 66%）、`yt_gui/original_format_panel.py`（1,280 行・omit で計測除外）、`yt_gui/downloader.py`（1,212 行）。`settings_dialog.py`（923 行）も準大型。フェーズ 1〜7 の計画的リファクタ実施済み（`docs/task/archive/refactor-overview.md`）の残存規模であり無秩序な肥大化ではないが、「大きい × 計測されていない」箇所が品質リスクの集中点。
+- 現状: 500 行超は `yt_gui/app.py`（1,544 行・カバレッジ約 66%）、`yt_gui/original_format_panel.py`（1,280 行・調査時点では omit で計測除外。#224 で解除済み・実測約 63%）、`yt_gui/downloader.py`（1,212 行）。`settings_dialog.py`（923 行）も準大型。フェーズ 1〜7 の計画的リファクタ実施済み（`docs/task/archive/refactor-overview.md`）の残存規模であり無秩序な肥大化ではないが、「大きい × 計測されていない」箇所が品質リスクの集中点。
 - 方針メモ: `docs/testing/policy.md` の段階導入方針（omit の段階解除）に沿って、omit 解除の次ステップを計画する。A-1（CI 計測）が先。
 
 #### C-4. SAST（CodeQL 等）の導入
@@ -129,4 +135,6 @@ A-1〜A-5 完了後、ユーザー判断により **B-1 に着手**（[#222](htt
 - [x] 選定項目の Issue 起票（2026-07-10、#210〜#214）
 - [x] 選定項目の個別対応（2026-07-11 完了。A-1 #210=PR #216 / A-2 #211=PR #217 / A-3 #212=PR #218 / A-4 #213=PR #220 / A-5 #214=PR #221）
 - [x] B-1 の方針決定・正本ルール更新（2026-07-11、#222。(a) 原則同梱 + (b) 補完を採用）
-- [ ] B-2・C・D 群の再検討
+- [x] B-2・C・D 群の再検討（2026-07-11、C-3 を選定し #224 起票。C-2/C-4/C-1 残/B-2/D は保留）
+- [ ] C-3 の対応（#224）
+- [ ] 保留項目（C-2/C-4/C-1 残/B-2/D）の扱いの最終確認

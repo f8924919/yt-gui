@@ -58,10 +58,10 @@ pytest は `--cov=yt_gui --cov-report=term-missing` 付きで実行され、カ�
 | セクション | 内容 |
 |---|---|
 | `[tool.pytest.ini_options]` | `testpaths = ["tests"]` ・ `addopts = "--strict-markers"` |
-| `[tool.coverage.run]` | `source = ["yt_gui"]` ・ `omit` で一部 UI モジュール（`original_format_panel.py` / `log_dialog.py` / `thumbnail_cache.py`）・`locales` を除外（`downloader.py` / `app.py` / `settings_dialog.py` は解除済み） |
+| `[tool.coverage.run]` | `source = ["yt_gui"]` ・ `omit` でテスト未追加の `thumbnail_cache.py`・`__main__.py`・`locales` を除外（`downloader.py` / `app.py` / `settings_dialog.py` / `original_format_panel.py` / `log_dialog.py` は解除済み） |
 | `[tool.coverage.report]` | `show_missing = true` |
 
-カバレッジの計測対象はロジック層に加えて Qt UI 層の一部（`app.py` / `settings_dialog.py`）も含みます。詳細は [policy.md](policy.md) のスコープ管理を参照してください。
+カバレッジの計測対象はロジック層に加えて Qt UI 層の一部（`app.py` / `settings_dialog.py` / `original_format_panel.py` / `log_dialog.py`）も含みます。詳細は [policy.md](policy.md) のスコープ管理を参照してください。
 
 ---
 
