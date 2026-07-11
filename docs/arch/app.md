@@ -163,6 +163,8 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 `_retranslate_ui()` は本ヘルパに加えてメニュー・ラベル・ボタンなど **言語切替時のみ更新が必要な要素** を再翻訳する。キュー行の再描画は `self.queue.refresh_all_tree_items()` に委譲。
 
+再翻訳は手動列挙方式（対象ウィジェットの `setText` / `setTitle` を明示的に呼び直す）のため、**ウィジェットを追加したら `_retranslate_ui()` にも登録が必要**。区間指定 UI（`_build_section_widget()` で構築するチェック・ラジオ・ラベル群）も対象に含まれる。このためラベルは匿名ローカルではなくインスタンス属性で保持する（#238: 登録漏れにより言語切替が再起動まで反映されないバグがあった）。区間入力欄（`QLineEdit`）の placeholder（`"00:01:30"` 等）は時刻フォーマット例示で言語非依存のため再翻訳対象外。
+
 ### `_check_dependencies()`
 
 起動時に `QTimer.singleShot(0, ...)` で ffmpeg・ffprobe・deno の存在チェック。判定は `self.downloader.missing_dependencies()` (公開 API) に委譲し、見つからないツールがあれば `QMessageBox.warning()` を表示する。バイナリパス (`_ffmpeg_path` 等) の private 属性アクセスは行わない。

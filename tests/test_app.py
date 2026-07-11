@@ -546,6 +546,33 @@ def test_open_settings_retranslates_on_language_change(app, monkeypatch):
     assert called
 
 
+def test_retranslate_ui_updates_section_widgets(app):
+    """言語切替時に区間ダウンロード UI の文言も即時に再翻訳されること（#238）。
+
+    再翻訳は手動列挙方式のため、`_build_section_widget` のウィジェット群が
+    `_retranslate_ui` に登録されていないと再起動まで旧言語のまま残る。
+    切替先ロケールの `STRINGS` 対応値とのテキスト一致まで検証する。"""
+    from yt_gui.locales import en
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+
+    i18n.set_language("en")
+    app._retranslate_ui()
+
+    expected = {
+        app._section_check: "section_enable",
+        app._section_mode_time: "section_mode_time",
+        app._section_mode_chapter: "section_mode_chapter",
+        app._section_start_label: "section_start",
+        app._section_end_label: "section_end",
+        app._section_chapter_label: "section_chapter_pattern",
+        app._section_keyframe_check: "section_force_keyframes",
+    }
+    for widget, key in expected.items():
+        assert widget.text() == en.STRINGS[key]
+
+
 # ── ログダイアログの起動・再表示（_open_log_dialog） ─────────────────────────
 #
 # 対応 spec: [ログダイアログ](../docs/spec/screens/log-dialog.md)。
