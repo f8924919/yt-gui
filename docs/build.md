@@ -196,7 +196,7 @@ public リポジトリでは GITHUB_TOKEN の既定権限が外部 PR にも及�
 - **対象言語**: `python`（`yt_gui/` / `tests/` / `scripts/`）と `actions`（`.github/workflows/**` のワークフロー定義自体）。
 - **トリガ**: `pull_request`・`main` への `push`・週次 `schedule`（`update-binaries.yml` の月曜 06:00 UTC と分散させた火曜 03:00 UTC）。
 - **クエリセット**: default（精度重視）。誤検知ノイズが許容できる範囲で必要になれば `security-extended` への強化を再検討する。
-- **必須チェックにはしない**: `main` の branch protection は `test` / `test-windows` のみ（[git-workflow.md](git-workflow.md)）。CodeQL は情報提供として運用し、alert は Security > Code scanning で確認する。
+- **必須チェックにはしない**: `main` の branch protection は `test` / `test-windows` のみ（[testing/index.md](testing/index.md)）。CodeQL は情報提供として運用し、alert は Security > Code scanning で確認する。
 - **誤検知の運用**: 誤検知・許容と判断した alert は GitHub 上で dismiss reason を付けて記録する（コード側に抑制コメントは書かない）。
 
 ### 依存の自動更新（Dependabot）
