@@ -32,11 +32,16 @@ HTML レポートは `htmlcov/index.html` に出力されます。
 
 ## CI 実行
 
-`pull_request` と `main` への `push` で [`.github/workflows/test.yml`](../../.github/workflows/test.yml) が起動し、Ubuntu ランナー上で `ruff check` / `ruff format --check` / `mypy` / `pytest` を実行します。Python は `requires-python>=3.14` に合わせて `uv python install 3.14` で取得します。
+`pull_request` と `main` への `push` で [`.github/workflows/test.yml`](../../.github/workflows/test.yml) が起動し、2 つのジョブを実行します（#227）。Python はいずれも `requires-python>=3.14` に合わせて `uv python install 3.14` で取得します。
 
-pytest は `--cov=yt_gui --cov-report=term-missing` 付きで実行され、カバレッジを自動計測します（実行ログで `TOTAL` 行を含む表を確認できます）。閾値（`--cov-fail-under`）は設けておらず、pytest ステップの pass/fail はテスト結果のみで決まります（[policy.md](policy.md) §5 の「計測のみ」方針。#210）。
+- **`test`（ubuntu-latest）**: `ruff check` / `ruff format --check` / `mypy` / `pytest`（`--cov` 付き）を実行する。lint / format / 型チェックは OS 非依存のため Ubuntu 単体でのみ実行する。
+- **`test-windows`（windows-latest）**: `pytest` のみを実行する。`extension_server.py` のソケット bind（#201 で Windows 実機のみ再現した退行の検出経路）や `settings.py` の `APPDATA` 分岐など、OS ネイティブ挙動に依存する箇所を Windows 上で検証する。
 
-ワークフローには Qt の offscreen 実行に必要な OS 側 C ライブラリ導入と `QT_QPA_PLATFORM=offscreen` を先行して含めており、後続で導入予定の Qt UI テスト（[docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md)）がそのまま乗る構成です。
+pytest は `test` ジョブでのみ `--cov=yt_gui --cov-report=term-missing` 付きで実行され、カバレッジを自動計測します（実行ログで `TOTAL` 行を含む表を確認できます）。計測の正本を 1 つに保つため `test-windows` では計測しません。閾値（`--cov-fail-under`）は設けておらず、pytest ステップの pass/fail はテスト結果のみで決まります（[policy.md](policy.md) §5 の「計測のみ」方針。#210）。
+
+Qt の offscreen 実行のため、両ジョブとも `QT_QPA_PLATFORM=offscreen` を設定します。Ubuntu では offscreen 実行に必要な OS 側 C ライブラリを apt-get で導入します（Windows は追加ライブラリ不要）。後続で導入予定の Qt UI テスト（[docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md)）がそのまま乗る構成です。
+
+`main` への branch protection では `test` / `test-windows` の両ジョブを必須チェックとします（`test-windows` は #227 の初回 CI green 確認後に追加）。
 
 ---
 

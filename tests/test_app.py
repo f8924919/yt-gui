@@ -81,7 +81,13 @@ def test_edit_targets_empty_when_no_waiting(queue_tree):
 
 @pytest.fixture
 def app(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
+    # HOME の差し替えは Windows（APPDATA 参照）では効かないため、
+    # 設定ディレクトリの解決関数を直接差し替えて OS 非依存に分離する。
+    # デフォルト保存先（~/Downloads）は迂回されないが、App 構築時に
+    # 書き込みは発生しないため分離は保たれる。
+    monkeypatch.setattr(
+        "yt_gui.settings._get_config_dir", lambda: str(tmp_path / "yt-gui")
+    )
     from yt_gui.downloader import Downloader
 
     monkeypatch.setattr(Downloader, "missing_dependencies", lambda self: [])

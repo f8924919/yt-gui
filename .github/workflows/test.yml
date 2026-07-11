@@ -60,3 +60,27 @@ jobs:
       # docs 記載のローカルコマンドと表記を揃えるため明示している（#210）。
       - name: Test (pytest)
         run: uv run pytest --cov=yt_gui --cov-report=term-missing
+
+  # Windows ネイティブ挙動に依存する箇所（extension_server のソケット bind、
+  # settings の APPDATA 分岐など）を検証する pytest 専用ジョブ（#227）。
+  # #201（SO_REUSEADDR の Windows 仕様差）のような Windows 実機のみで再現する
+  # 退行を CI で検出する。lint / format / mypy は OS 非依存のため ubuntu 側のみ、
+  # カバレッジ計測も正本を 1 つに保つため ubuntu 側のみで行う。
+  # Qt offscreen に必要な DLL は PySide6 wheel に同梱されるため追加導入は不要。
+  test-windows:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.14   # requires-python>=3.14 のため明示取得
+
+      - run: uv sync
+
+      - name: Test (pytest)
+        run: uv run pytest
