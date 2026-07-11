@@ -66,8 +66,10 @@ class JobSpec:
     recode_video: bool = False
     # 区間ダウンロード (yt-dlp --download-sections 相当)。生の入力文字列を保持し、
     # 秒への変換は downloader 側で行う。形式非依存・アイテム単位。
+    # 時間範囲 (section_start/end) とチャプター名 (section_chapter_regex) は排他。
     section_start: str | None = None
     section_end: str | None = None
+    section_chapter_regex: str | None = None
     section_force_keyframes: bool = False
     # アイテム単位でダウンロードアーカイブを無視して再取得するか。build_job_spec では
     # 立てず、QueueController.mark_ignore_archive が後付けで replace する（#76）。
@@ -87,6 +89,7 @@ def build_job_spec(
     mp3_thumb_check: bool = False,
     section_start: str | None = None,
     section_end: str | None = None,
+    section_chapter_regex: str | None = None,
     section_force_keyframes: bool = False,
 ) -> JobSpec:
     """`format_id` から `JobSpec` を組み立てる pure function。
@@ -94,15 +97,21 @@ def build_job_spec(
     - `fmt_original` のときは `panel` 必須。
     - `fmt_mp3` のときは `mp3_thumb_check` がサムネ埋め込みチェック状態。
     - `section_*` は区間ダウンロードの設定。形式非依存で、指定されていれば
-      末尾で全 format_id の JobSpec へ一律付与する。
+      末尾で全 format_id の JobSpec へ一律付与する。時間範囲とチャプター名は
+      排他で、同時指定は `ValueError`（UI バグ時のサイレント誤動作防止）。
     - その他の format_id でも防御的に値を返す (catch-all)。
     """
+    if (section_start or section_end) and section_chapter_regex:
+        raise ValueError(
+            "section_start/section_end and section_chapter_regex are exclusive"
+        )
     spec = _dispatch_job_spec(format_id, settings, panel, mp3_thumb_check)
-    if section_start or section_end or section_force_keyframes:
+    if section_start or section_end or section_chapter_regex or section_force_keyframes:
         spec = replace(
             spec,
             section_start=section_start,
             section_end=section_end,
+            section_chapter_regex=section_chapter_regex,
             section_force_keyframes=section_force_keyframes,
         )
     return spec

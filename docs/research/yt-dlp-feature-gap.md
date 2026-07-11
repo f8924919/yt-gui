@@ -41,7 +41,7 @@ yt-gui は yt-dlp を **Python ライブラリ**として利用している。�
 | yt-dlp 機能 | CLI オプション | 現状・備考 |
 |---|---|---|
 | ~~**SponsorBlock**（スポンサー区間のスキップ / 除去）~~ | `--sponsorblock-mark` / `--sponsorblock-remove` | ✅ 対応済み（設定の「SponsorBlock」タブ、#57）。[設定ダイアログ](../spec/screens/settings-dialog.md#sponsorblock-タブ)参照 |
-| ~~**区間ダウンロード**（時間範囲の切り出し）~~ | `--download-sections` | ✅ 対応済み（メインウィンドウの区間指定、#81）。安定性優先で**フル取得→ローカル ffmpeg 切り出し**方式（ネイティブ `download_ranges` は不使用）。[区間ダウンロード](../spec/features/download-behavior.md#区間ダウンロード)参照。チャプター指定は将来対応 |
+| ~~**区間ダウンロード**（時間範囲 / チャプターの切り出し）~~ | `--download-sections` | ✅ 対応済み（メインウィンドウの区間指定。時間範囲 #81・チャプター名正規表現 #83）。安定性優先で**フル取得→ローカル ffmpeg 切り出し**方式（ネイティブ `download_ranges` は不使用）。[区間ダウンロード](../spec/features/download-behavior.md#区間ダウンロード)参照 |
 | ~~**ダウンロードアーカイブ**（既 DL 動画を記録してスキップ）~~ | `--download-archive` | ✅ 対応済み（設定の「ダウンロード」タブ、#75）。[ダウンロードアーカイブ](../spec/features/download-behavior.md#ダウンロードアーカイブ)参照 |
 | ~~**速度制限**~~ | `--limit-rate` | ✅ 対応済み（設定の「ダウンロード」タブ、#64）。[設定ダイアログ](../spec/screens/settings-dialog.md#ダウンロードタブ)参照 |
 | ~~**並列フラグメント DL（高速化）**~~ | `--concurrent-fragments` (`-N`) | ✅ 対応済み（設定の「ダウンロード」タブ、#53）。[設定ダイアログ](../spec/screens/settings-dialog.md#ダウンロードタブ)参照 |
@@ -132,7 +132,7 @@ yt-gui は yt-dlp を **Python ライブラリ**として利用している。�
   1. ~~**SponsorBlock**~~ — ✅ 対応済み（#57、設定の「SponsorBlock」タブ）
   2. ~~**並列フラグメント DL（`concurrent_fragments`）**~~ — ✅ 対応済み（#53、設定の「ダウンロード」タブ）
   3. ~~**ダウンロードアーカイブ**~~ — ✅ 対応済み（#75、設定の「ダウンロード」タブ）。アイテム単位の再取得は #76
-  4. ~~**区間ダウンロード（`download_sections`）**~~ — ✅ 対応済み（#81、メインウィンドウの区間指定。時間範囲のみ・チャプター指定は将来）
+  4. ~~**区間ダウンロード（`download_sections`）**~~ — ✅ 対応済み（メインウィンドウの区間指定。時間範囲 #81・チャプター名正規表現 #83）
 - §5.6 のアプリ機能レベルの欠落のうち、**並列ダウンロード＋行単位進捗は Issue #108 で起票済み**。yt-dlp 本体の更新機能は体験影響が大きく次点候補。
 
 > Issue 化する場合は [git-workflow](../git-workflow.md) のテンプレに沿い、対応する [spec](../spec/index.md) / [arch](../arch/index.md) の更新方針もあわせて起票する。

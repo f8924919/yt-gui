@@ -8,7 +8,7 @@ import threading
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.utils import DownloadCancelled, DownloadError
+from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
 from . import get_resource_base
 from .i18n import t
@@ -498,7 +498,7 @@ class Downloader:
         if self.log_callback:
             self.log_callback(msg)
 
-        effective_stem, final_ext = self._resolve_unique_path(
+        effective_stem, final_ext, chapters = self._resolve_unique_path(
             ydl_opts, url, job, extra_info=extra_info
         )
 
@@ -512,8 +512,12 @@ class Downloader:
         # 区間指定があれば、取得済みファイルからローカル ffmpeg で切り出す。
         # （yt-dlp のネイティブ区間 DL は https/DASH で ffmpeg にネットワーク取得を
         #  任せる経路となりバンドル ffmpeg では不安定なため、フル取得後に切り出す。）
+        # 時間範囲とチャプター名は排他（build_job_spec が保証）。万一両方セット
+        # されても時間範囲を優先する。
         if job.section_start and job.section_end:
             self._cut_section(effective_stem, final_ext, job)
+        elif job.section_chapter_regex:
+            self._cut_chapter_sections(effective_stem, final_ext, job, chapters)
 
         nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
         sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
@@ -522,6 +526,16 @@ class Downloader:
             (lang for lang in sub_langs if lang in _COMMENT_DANMAKU_LANGS), None
         )
         if (
+            nico_comments_opts
+            and nico_comments_opts.get("convert_to_ass")
+            and comment_lang
+            and job.section_chapter_regex
+        ):
+            # チャプター名モードは原本を削除するため、原本前提のコメント後処理
+            # とは併用できない。黙って失敗させず明示スキップする。
+            if self.log_callback:
+                self.log_callback(t("warn_section_chapter_nico_skip"))
+        elif (
             nico_comments_opts
             and nico_comments_opts.get("convert_to_ass")
             and comment_lang
@@ -760,12 +774,14 @@ class Downloader:
         job: JobSpec,
         *,
         extra_info: dict | None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, list | None]:
         """同名ファイル衝突を避けるため `(stem, final_ext)` を予測し、
         必要なら `outtmpl` を ` (N)` 付きに上書きする。
 
-        戻り値: `(effective_stem, final_ext)` — ニコニコ動画コメントの
-        後処理がファイル名を組み立てるのに使う。
+        戻り値: `(effective_stem, final_ext, chapters)` — stem/ext は
+        ニコニコ動画コメントの後処理がファイル名を組み立てるのに使う。
+        `chapters` はドライラン info の `chapters`（チャプター名モードの
+        区間ダウンロードが使う。追加フェッチはしない）。
 
         ダウンロードアーカイブが有効で、対象がアーカイブ済みの場合は
         ここで `DownloadSkipped` を送出する。`download_archive` opt を渡すと
@@ -790,6 +806,7 @@ class Downloader:
                 # AttributeError を出す前に、原因の分かるエラーにする。
                 raise DownloadError(t("err_extract_info_none"))
             raw_path = ydl.prepare_filename(info)
+            chapters = info.get("chapters")
 
         stem, raw_ext = os.path.splitext(raw_path)
         if job.is_audio_extraction:
@@ -812,7 +829,7 @@ class Downloader:
             ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
             effective_stem = f"{stem} ({n})"
 
-        return effective_stem, final_ext
+        return effective_stem, final_ext, chapters
 
     def _run_download(
         self,
@@ -958,20 +975,25 @@ class Downloader:
         start: str,
         end: str,
         force_keyframes: bool,
+        drop_chapters: bool = False,
     ) -> list[str]:
         """区間切り出しの ffmpeg コマンドを組み立てる（純関数・テスト用に分離）。
 
         - `force_keyframes=False`（既定）: 入力側シーク + stream copy。高速・無劣化
           だがカット境界は最寄りのキーフレームに揃う。
         - `force_keyframes=True`: 出力側シーク + 再エンコード。指定時刻に正確だが遅い。
+        - `drop_chapters=True`（チャプター名モード）: `-map_chapters -1` で
+          埋め込み済みの元動画チャプター目次をクリップへ複製しない。
 
-        `start` / `end` は ffmpeg がそのまま解釈できる時刻文字列（`HH:MM:SS` 等）。
+        `start` / `end` は ffmpeg がそのまま解釈できる時刻文字列（`HH:MM:SS` / 秒）。
         """
         cmd = [ffmpeg, "-y", "-loglevel", "error"]
         if force_keyframes:
             cmd += ["-i", infile, "-ss", start, "-to", end]
         else:
             cmd += ["-ss", start, "-to", end, "-i", infile, "-c", "copy"]
+        if drop_chapters:
+            cmd += ["-map_chapters", "-1"]
         cmd += [outfile]
         return cmd
 
@@ -1027,6 +1049,116 @@ class Downloader:
                     else str(e)
                 )
                 self.log_callback(t("warn_section_failed").format(error=detail))
+
+    @staticmethod
+    def _resolve_chapter_sections(
+        chapters: list | None, regex: str
+    ) -> list[tuple[str, float, float]]:
+        """チャプター一覧から正規表現にマッチする区間を解決する（純関数）。
+
+        yt-dlp の `download_range_func` と同じ `re.search`（部分一致）で
+        タイトルを判定し、動画内の出現順で `(title, start, end)` を返す。
+        防御: 不正な正規表現は 0 件扱い。`start_time` / `end_time` を欠く・
+        `start >= end` の異常チャプターはスキップする。
+        """
+        try:
+            pattern = re.compile(regex)
+        except re.error:
+            return []
+        sections: list[tuple[str, float, float]] = []
+        for chapter in chapters or []:
+            title = chapter.get("title") or ""
+            start = chapter.get("start_time")
+            end = chapter.get("end_time")
+            if start is None or end is None or start >= end:
+                continue
+            if pattern.search(title):
+                sections.append((title, start, end))
+        return sections
+
+    def _cut_chapter_sections(
+        self, stem: str, final_ext: str, job: JobSpec, chapters: list | None
+    ) -> None:
+        """正規表現にマッチした各チャプターを個別ファイルへ切り出す（#83）。
+
+        時間範囲モード（`_cut_section` = 原本を同名置換）と違い、
+        `{stem} - {チャプター名}{ext}` へ分割出力し、1 件以上成功したら
+        原本を削除する。マッチ 0 件・chapters なし・全件失敗は原本を残して
+        警告ログのみ（非致命）。
+        """
+        infile = f"{stem}{final_ext}"
+        if not os.path.exists(infile):
+            if self.log_callback:
+                base = os.path.basename(infile)
+                self.log_callback(t("warn_section_skip_missing").format(filename=base))
+            return
+        if not os.path.exists(self._ffmpeg_path):
+            if self.log_callback:
+                self.log_callback(t("warn_section_skip_no_ffmpeg"))
+            return
+
+        sections = self._resolve_chapter_sections(
+            chapters, job.section_chapter_regex or ""
+        )
+        if not sections:
+            if self.log_callback:
+                self.log_callback(
+                    t("warn_section_chapter_no_match").format(
+                        pattern=job.section_chapter_regex or ""
+                    )
+                )
+            return
+
+        msg = t("status_section_cutting")
+        self.status_callback(msg, 0)
+        if self.log_callback:
+            self.log_callback(msg)
+
+        succeeded = 0
+        used_names: set[str] = set()
+        for i, (title, start, end) in enumerate(sections, start=1):
+            # Windows の MAX_PATH 超過を避けるため過長チャプター名は切り詰める
+            name = sanitize_filename(title).strip()[:80] or f"chapter {i}"
+            outfile = f"{stem} - {name}{final_ext}"
+            n = 0
+            while outfile in used_names or os.path.exists(outfile):
+                n += 1
+                outfile = f"{stem} - {name} ({n}){final_ext}"
+            used_names.add(outfile)
+            cmd = self._build_cut_cmd(
+                self._ffmpeg_path,
+                infile,
+                outfile,
+                str(start),
+                str(end),
+                job.section_force_keyframes,
+                drop_chapters=True,
+            )
+            try:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                succeeded += 1
+            except (subprocess.CalledProcessError, OSError) as e:
+                if os.path.exists(outfile):
+                    with contextlib.suppress(OSError):
+                        os.remove(outfile)
+                if self.log_callback:
+                    detail = (
+                        e.stderr.strip()
+                        if isinstance(e, subprocess.CalledProcessError) and e.stderr
+                        else str(e)
+                    )
+                    self.log_callback(t("warn_section_failed").format(error=detail))
+
+        if succeeded:
+            with contextlib.suppress(OSError):
+                os.remove(infile)
 
     def _embed_nico_comments_into_mkv(
         self, stem: str, final_ext: str, lang: str, opts: dict

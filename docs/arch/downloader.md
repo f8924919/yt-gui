@@ -216,8 +216,20 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
   - `force_keyframes=False`（既定）: `-ss start -to end -i infile -c copy`。入力側シーク + stream copy で高速・無劣化だが、カット境界は最寄りのキーフレームに揃う。
   - `force_keyframes=True`: `-i infile -ss start -to end`（再エンコード）。出力側シークで指定時刻に正確だが遅い。
 - 一時ファイル `{stem}.section{final_ext}` に書き出し、成功時のみ `os.replace` で原本へ上書きする。前提ファイル不在・ffmpeg 欠如・切り出し失敗はいずれも**非致命**としてログのみ残し、フル動画は保持する。
-- 区間は動画固有・形式非依存の実行設定なので、`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec`（`section_start` / `section_end` / `section_force_keyframes`）に持つ。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
+- 区間は動画固有・形式非依存の実行設定なので、`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec`（`section_start` / `section_end` / `section_chapter_regex` / `section_force_keyframes`）に持つ。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
 - **トレードオフ**: フル動画をダウンロードしてから切り出すため**通信量の節約にはならない**。出力は区間クリップだが、取得量は動画全体。これは安定性（ネットワーク ffmpeg を避ける）を優先した結果。
+
+#### チャプター名指定（#83）
+
+時間範囲の代わりにチャプタータイトルの正規表現で区間を指定するモード（`JobSpec.section_chapter_regex`。時間範囲とは排他で、排他性は UI 側が保証する）。フル取得 → ローカル切り出しの方式は共通で、チャプター名から切り出し区間（秒）への解決だけが追加になる。
+
+- **チャプター情報の入手**: `_resolve_unique_path` が衝突回避のために行うドライラン `extract_info(download=False)` の `info` から `info.get("chapters")` を取り出し、戻り値に加えて `download_video` へ返す（追加のネットワークアクセスは発生しない）。`chapters` は `[{"title": str, "start_time": float, "end_time": float}, ...]` 形式。**返り値契約が `tuple[str, str]` → `tuple[str, str, list | None]` に変わる**ため、既存テストの同関数スタブ（2-tuple）も合わせて更新する。
+- **マッチ解決**: 純関数 `_resolve_chapter_sections(chapters, regex)` が、yt-dlp の `download_range_func` と同じ **`re.search(regex, chapter["title"])`** セマンティクスでマッチしたチャプターを動画内の出現順で `[(title, start_time, end_time), ...]` として返す（テスト容易性のため分離）。防御: `re.error` は 0 件扱い。`start_time` / `end_time` を欠く・`start_time >= end_time` の異常チャプターはスキップする。
+- **切り出し**: `download_video` は `_run_download` 成功後、`section_chapter_regex` があるとき `_cut_chapter_sections(stem, final_ext, job, chapters)` を呼ぶ。マッチした各チャプターを `_build_cut_cmd`（`start` / `end` は秒の文字列表現）で `{stem} - {チャプター名}{final_ext}` へ個別に切り出す。チャプター名は `yt_dlp.utils.sanitize_filename` でサニタイズし（空になる場合は `chapter {N}` にフォールバック、過長は切り詰め）、同名衝突時は ` (N)` を付与する。**チャプターモードの切り出しコマンドには `-map_chapters -1` を付与**し、埋め込み済みの元動画全チャプター目次がクリップへ複製されないようにする（時間範囲モードは従来どおり付けない）。
+- **原本の扱い**: 少なくとも 1 件の切り出しに成功したらフル動画の原本を削除する。**マッチ 0 件・`chapters` が空 / None・全件切り出し失敗**の場合は原本を残し、警告ログのみ（既存の切り出し失敗時と同じ非致命ポリシー）。
+- **排他と優先順位**: `section_start/end` と `section_chapter_regex` の排他は UI に加えて `build_job_spec` でも防御する（同時指定は `ValueError`。[job_spec.md](job_spec.md)）。`download_video` 側の分岐も `if 時間範囲 → elif チャプター` とし、万一両方セットされた場合は時間範囲を優先することを明示する。
+- **ニコニコ動画コメント後処理との関係**: チャプターモードは原本を削除するため、後段のコメント ASS 変換 / 埋め込み / 焼き込み（`effective_stem` の原本前提）とは**非対応**。`section_chapter_regex` があり nico_comments 系の後処理が要求されている場合は、後処理を実行せず警告ログを 1 行出して明示スキップする（黙って失敗させない）。
+- 時間範囲モード（`section_start` / `section_end`）の単一区間・原本置き換え（`_cut_section`）の挙動は従来のまま変更しない。
 
 ### SponsorBlock
 
