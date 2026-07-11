@@ -28,6 +28,8 @@ B-1 完了後、investigate ×2 で再調査した。タスクメモの現状認
 
 C-3 完了後、ユーザー判断により **C-2 に着手**（[#227](https://github.com/f8924919/yt-gui/issues/227)）。方針: pytest 専用の `test-windows` ジョブ追加（既存 `test` ジョブと branch protection のチェック名 `"test"` を無傷に保つ）・カバレッジは Ubuntu のみ・green 確認後に `test-windows` を必須チェック化。設計レビュー実施済み。なお **macOS ランナーは本件スコープ外**（アプリは macOS もターゲットのため、`_get_config_dir` の darwin 分岐等は CI 未検証のまま。将来課題）。
 
+C-2 完了後、ユーザー判断により **C-4 に着手**（[#229](https://github.com/f8924919/yt-gui/issues/229)）。方針: CodeQL advanced setup（workflow 方式）・クエリ default・対象言語 python + actions・トリガ PR / push main / 週次・必須チェック化なし。なお調査で `docs/build.md` の「public 化後に有効化するリポジトリ設定」節が未来形のまま（実際は有効化済み）という別件 drift を発見（スコープ外・未対応）。
+
 ## 目的
 
 このプロジェクトの開発ワークフロー（docs 運用・CI・品質ゲート・Git 運用）を、開発効率と成果物品質の観点で棚卸しし、改善候補を優先度付きで整理する。後日、項目単位でタスク化・Issue 化して対応するための調査メモ。
