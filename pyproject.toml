@@ -74,7 +74,7 @@ indent-style = "space"
 
 [tool.mypy]
 # 検査対象はここで管理する（CI・ローカルとも引数なしの `uv run mypy` で実行。#211）
-files = ["yt_gui", "tests", "scripts", "main.py"]
+files = ["yt_gui", "tests", "scripts", "main.py", ".claude/hooks/block_main_commit.py"]
 python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true

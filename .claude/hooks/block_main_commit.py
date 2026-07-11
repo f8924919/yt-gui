@@ -10,11 +10,19 @@
   git commit / git push 一致のみ。`git -c k=v commit` のようなオプション挟み込みや
   文字列内の擦り抜けは追わない（誤ブロック回避を優先。docs/git-workflow.md §1）。
 
+ブランチ判定は cwd を起点にした実効ディレクトリに対して行う（#240）:
+
+- 複合コマンド内の `cd <path>` セグメントを追跡し、後続セグメントは移動先で判定する
+- git のグローバルオプション `-C <path>`（複数指定は累積）を解決して判定する
+- `--git-dir` / `--work-tree`・クォート付きパス（スペース含む）・パス解決不能は
+  一律フェイルオープン（通す）
+
 ブロック時は permissionDecision: deny と理由を JSON で stdout に返す。
 標準ライブラリのみに依存し、Windows / macOS / Linux で動作する。
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,20 +48,84 @@ def _current_branch(cwd: str | None) -> str | None:
     return result.stdout.strip() or None
 
 
-def _blocked_subcommand(command: str) -> str | None:
-    """コマンド文字列に main 上で禁止する git サブコマンドがあれば返す。"""
+def _resolve_dir(base: str | None, path: str) -> str | None:
+    """path を base 起点で解決する。相対パスで base 不明なら None（通す）。"""
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    if base is None:
+        return None
+    return os.path.normpath(os.path.join(base, path))
+
+
+def _git_subcommand(tokens: list[str]) -> tuple[str, list[str]] | None:
+    """git セグメントのサブコマンドと `-C` パス列を返す。判定不能なら None。
+
+    `-C <path>` は引数を取るグローバルオプションとして読み飛ばしつつ収集する。
+    `--git-dir` / `--work-tree`（空白形・`=` 形とも）はスコープ外のため None
+    （フェイルオープン）。その他のオプションは従来どおり引数なしとして読み飛ばす。
+    """
+    c_paths: list[str] = []
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if token == "-C":
+            if i + 1 >= len(tokens):
+                return None  # 引数欠落 → フェイルオープン
+            c_paths.append(tokens[i + 1])
+            i += 2
+            continue
+        if token.startswith("--git-dir") or token.startswith("--work-tree"):
+            return None  # 別リポジトリ指定のうちスコープ外の形 → フェイルオープン
+        if token.startswith("-"):
+            i += 1
+            continue
+        return token, c_paths
+    return None
+
+
+def _blocked_violation(command: str, base_cwd: str | None) -> str | None:
+    """main 上で禁止する git サブコマンドが実行されるなら、そのサブコマンドを返す。
+
+    セグメントを順に走査し、`cd <path>` で実効ディレクトリを更新する。
+    cwd が None のまま（hook 入力に cwd が無い）の場合は従来どおり
+    プロセス cwd での判定に落ちる。cd の解決に失敗した以降は判定不能として
+    git セグメントを通す（フェイルオープン）。ただし `-C` の絶対パスなど
+    実効ディレクトリに依存せず解決できる場合は判定する。
+    """
+    cwd = base_cwd
+    unknown = False
     for segment in SEGMENT_SPLIT.split(command):
         tokens = segment.strip().split()
-        if not tokens or tokens[0] != "git":
+        if not tokens:
             continue
-        # git 直後のオプション（引数を取らない形式のみ）を読み飛ばし、
-        # サブコマンド位置のトークンを判定する
-        for token in tokens[1:]:
-            if token.startswith("-"):
-                continue
-            if token in BLOCKED_SUBCOMMANDS:
-                return token
-            break
+        if tokens[0] == "cd":
+            if len(tokens) == 2:
+                cwd = _resolve_dir(None if unknown else cwd, tokens[1])
+                unknown = cwd is None
+            else:
+                # 引数なし cd（ホーム移動）やクォート割れ（スペース含むパス）は
+                # 移動先を解決しない → 以降は判定不能
+                cwd, unknown = None, True
+            continue
+        if tokens[0] != "git":
+            continue
+        parsed = _git_subcommand(tokens)
+        if parsed is None:
+            continue
+        subcommand, c_paths = parsed
+        if subcommand not in BLOCKED_SUBCOMMANDS:
+            continue
+        target = None if unknown else cwd
+        resolvable = True
+        for path in c_paths:
+            target = _resolve_dir(target, path)
+            if target is None:
+                resolvable = False
+                break
+        if not resolvable or (unknown and not c_paths):
+            continue
+        if _current_branch(target) == "main":
+            return subcommand
     return None
 
 
@@ -67,12 +139,9 @@ def main() -> None:
     if not isinstance(command, str) or not command:
         return
 
-    subcommand = _blocked_subcommand(command)
+    cwd = hook_input.get("cwd")
+    subcommand = _blocked_violation(command, cwd if isinstance(cwd, str) else None)
     if subcommand is None:
-        return
-
-    branch = _current_branch(hook_input.get("cwd"))
-    if branch != "main":
         return
 
     reason = (
