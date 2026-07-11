@@ -26,6 +26,8 @@ B-1 完了後、investigate ×2 で再調査した。タスクメモの現状認
 
 ユーザー判断により **C-3 に着手**（[#224](https://github.com/f8924919/yt-gui/issues/224)）。omit 解除で TOTAL 86% → 81%（`original_format_panel.py` 単体 63%）となるが、`app.py` の前例（#134・66% で解除し段階的引き上げ）に倣い**両モジュール解除**を選択。C-2（Windows CI）・C-4（CodeQL）・C-1 残（hooks/pre-commit）・B-2・D 群は今回未選定（保留）。
 
+C-3 完了後、ユーザー判断により **C-2 に着手**（[#227](https://github.com/f8924919/yt-gui/issues/227)）。方針: pytest 専用の `test-windows` ジョブ追加（既存 `test` ジョブと branch protection のチェック名 `"test"` を無傷に保つ）・カバレッジは Ubuntu のみ・green 確認後に `test-windows` を必須チェック化。設計レビュー実施済み。なお **macOS ランナーは本件スコープ外**（アプリは macOS もターゲットのため、`_get_config_dir` の darwin 分岐等は CI 未検証のまま。将来課題）。
+
 ## 目的
 
 このプロジェクトの開発ワークフロー（docs 運用・CI・品質ゲート・Git 運用）を、開発効率と成果物品質の観点で棚卸しし、改善候補を優先度付きで整理する。後日、項目単位でタスク化・Issue 化して対応するための調査メモ。
