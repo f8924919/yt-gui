@@ -41,7 +41,7 @@ pytest は `test` ジョブでのみ `--cov=yt_gui --cov-report=term-missing` �
 
 Qt の offscreen 実行のため、両ジョブとも `QT_QPA_PLATFORM=offscreen` を設定します。Ubuntu では offscreen 実行に必要な OS 側 C ライブラリを apt-get で導入します（Windows は追加ライブラリ不要）。後続で導入予定の Qt UI テスト（[docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md)）がそのまま乗る構成です。
 
-`main` への branch protection では `test` / `test-windows` の両ジョブを必須チェックとしています。
+`main` への branch protection では `test` / `test-windows` の両ジョブを必須チェックとします（`test-windows` は #227 の初回 CI green 確認後に追加）。
 
 ---
 
