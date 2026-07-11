@@ -14,6 +14,13 @@
 - すべての変更は `main` から切ったフィーチャーブランチで行い、`main` へ PR を出してマージする。
 - **`main` で直接コミットしない。**
 
+このルールは二段構えで機械的に強制されている（#232）。
+
+- **クライアント側（早期警告）**: Claude Code の PreToolUse hook（[.claude/hooks/block_main_commit.py](../.claude/hooks/block_main_commit.py)・[.claude/settings.json](../.claude/settings.json)）が、カレントブランチが `main` のときの `git commit` / `git push` をコミット前にブロックする。対象は Claude Code の Bash / PowerShell ツール経由のコマンドのみ（matcher `Bash|PowerShell`）。判定はカレントブランチのみで、git コマンド失敗時等は**フェイルオープン**（誤って全コマンドをブロックしない）。起動子は `uv run --no-sync python`（本リポジトリの必須ツールである uv を使う。素の `python` は Windows で Microsoft Store スタブに化けることがあるため不採用）。uv 不在等で hook 自体が起動できない場合も Claude Code は非ブロッキング扱いでコマンドを通す（フェイルオープン）が、その状態では hook が無効なので注意。
+- **サーバー側（最後の砦）**: branch protection の `enforce_admins` が有効で、feature ブランチからの `git push origin main` を含む main への直 push は管理者であっても GitHub 側で拒否される。PR 経由のマージには影響しない。緊急時にどうしても直 push が必要な場合は `gh api -X DELETE repos/f8924919/yt-gui/branches/main/protection/enforce_admins` で一時解除し、対応後に `-X PUT` で必ず再有効化する。
+
+hook の検出は「単発・複合コマンド（`&&` / `;` / `|` 区切り）のサブコマンド位置での `git commit` / `git push` 一致」に留める（`git -c k=v commit` のようなオプション挟み込みや文字列内の擦り抜けは追わず、サーバー側の enforce_admins に委ねる。誤ブロック回避を優先する設計）。
+
 ```
 main ──┬──────────────────┬──→ (本番)
        │ feature/12-foo    │

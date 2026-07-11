@@ -30,6 +30,8 @@ C-3 完了後、ユーザー判断により **C-2 に着手**（[#227](https://g
 
 C-2 完了後、ユーザー判断により **C-4 に着手**（[#229](https://github.com/f8924919/yt-gui/issues/229)）。方針: CodeQL advanced setup（workflow 方式）・クエリ default・対象言語 python + actions・トリガ PR / push main / 週次・必須チェック化なし。なお調査で `docs/build.md` の「public 化後に有効化するリポジトリ設定」節が未来形のまま（実際は有効化済み）という別件 drift を発見（スコープ外・未対応）。
 
+C-4 完了後、ユーザー判断により **B-2 は保留（現状問題なし）**とし、**C-1 残に着手**（[#232](https://github.com/f8924919/yt-gui/issues/232)）。方針: (a') enforce_admins 有効化 + (b) Claude Code hooks（main 上の commit/push をブロック・フェイルオープン・matcher は Bash|PowerShell）の二段構え。(c) pre-commit は見送り。
+
 ## 目的
 
 このプロジェクトの開発ワークフロー（docs 運用・CI・品質ゲート・Git 運用）を、開発効率と成果物品質の観点で棚卸しし、改善候補を優先度付きで整理する。後日、項目単位でタスク化・Issue 化して対応するための調査メモ。
@@ -96,7 +98,7 @@ C-2 完了後、ユーザー判断により **C-4 に着手**（[#229](https://g
 #### C-1. ルールの機械的強制（hooks / branch protection / pre-commit）
 
 - 現状: 「main で直接作業しない」「ブランチ命名規則」「マージはユーザー承認後」（`docs/git-workflow.md:15,50-63`）はすべてドキュメント上の合意のみ。`.claude/settings.json` は context7 プラグイン有効化のみで hooks 未設定、`.claude/settings.local.json` も空。pre-commit 未導入（docs 内に導入検討の記述もなし）。GitHub 側の branch protection 設定の有無は本調査（ローカルファイルのみ）では未確認。
-- 方針メモ: 候補は (a) GitHub branch protection で main 直 push を禁止（最優先・設定のみ）、(b) Claude Code hooks で main 上のコミットをブロック、(c) pre-commit で ruff/mypy をローカル強制。まず GitHub 側設定の現状確認から。
+- 方針メモ: 候補は (a) GitHub branch protection で main 直 push を禁止（最優先・設定のみ）、(b) Claude Code hooks で main 上のコミットをブロック、(c) pre-commit で ruff/mypy をローカル強制。まず GitHub 側設定の現状確認から。（2026-07-11: (a) は確認済み・(a') enforce_admins 有効化 + (b) hooks を #232 で対応、(c) は verify ゲート・CI と三重になるため見送り）
 
 #### C-2. テスト CI の Windows 追加
 

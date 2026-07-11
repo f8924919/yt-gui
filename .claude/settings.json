@@ -1,5 +1,18 @@
 {
   "enabledPlugins": {
     "context7@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-sync --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/block_main_commit.py\""
+          }
+        ]
+      }
+    ]
   }
 }
