@@ -186,14 +186,50 @@ def test_section_inputs_hidden_until_enabled(app):
     assert app._section_inputs.isHidden()
 
 
+def _enable_chapter_section(app, pattern: str, force: bool = False) -> None:
+    app._section_check.setChecked(True)
+    app._section_mode_chapter.setChecked(True)
+    app._section_chapter_edit.setText(pattern)
+    app._section_keyframe_check.setChecked(force)
+
+
 def test_read_section_none_when_disabled(app):
     app._section_check.setChecked(False)
-    assert app._read_section() == (None, None, False)
+    assert app._read_section() == (None, None, None, False)
 
 
 def test_read_section_returns_values_when_enabled(app):
     _enable_section(app, "00:01:30", "00:04:00", force=True)
-    assert app._read_section() == ("00:01:30", "00:04:00", True)
+    assert app._read_section() == ("00:01:30", "00:04:00", None, True)
+
+
+def test_section_mode_defaults_to_time_range(app):
+    app._section_check.setChecked(True)
+    assert app._section_mode_time.isChecked() is True
+    assert app._section_mode_chapter.isChecked() is False
+
+
+def test_section_mode_chapter_switches_input_rows(app):
+    """モード切り替えで選択中モードの入力行だけが表示される。"""
+    app._section_check.setChecked(True)
+    assert not app._section_time_row.isHidden()
+    assert app._section_chapter_row.isHidden()
+
+    app._section_mode_chapter.setChecked(True)
+    assert app._section_time_row.isHidden()
+    assert not app._section_chapter_row.isHidden()
+
+    app._section_mode_time.setChecked(True)
+    assert not app._section_time_row.isHidden()
+    assert app._section_chapter_row.isHidden()
+
+
+def test_read_section_returns_chapter_regex_in_chapter_mode(app):
+    _enable_chapter_section(app, "^OP", force=True)
+    # 排他: チャプターモードでは時間範囲は返さない（残存入力があっても無視）
+    app._section_start.setText("10")
+    app._section_end.setText("20")
+    assert app._read_section() == (None, None, "^OP", True)
 
 
 def test_validate_section_ok_when_disabled(app):
@@ -233,6 +269,36 @@ def test_validate_section_rejects_start_after_end(app, monkeypatch):
 
 def test_validate_section_ok_with_valid_range(app):
     _enable_section(app, "90", "4:00")
+    assert app._validate_section() is True
+
+
+@pytest.mark.parametrize("pattern", ["[invalid", "", "   "], ids=["bad", "empty", "ws"])
+def test_validate_section_rejects_bad_chapter_pattern(app, monkeypatch, pattern):
+    from PySide6.QtWidgets import QMessageBox
+
+    from yt_gui.i18n import t
+
+    warned = []
+
+    def _warn(*a, **k):
+        warned.append(a[2])
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
+    _enable_chapter_section(app, pattern)
+    assert app._validate_section() is False
+    assert warned == [t("warn_section_chapter_invalid")]
+
+
+def test_validate_section_ok_with_valid_chapter_regex(app):
+    _enable_chapter_section(app, "^Chapter \\d+$")
+    assert app._validate_section() is True
+
+
+def test_validate_section_chapter_mode_ignores_time_fields(app):
+    # チャプターモードでは時間範囲欄の内容は検証しない
+    _enable_chapter_section(app, "^OP")
+    app._section_start.setText("abc")
+    app._section_end.setText("")
     assert app._validate_section() is True
 
 
@@ -295,6 +361,52 @@ def test_restore_section_clears_when_no_section(app):
     assert app._section_check.isChecked() is False
     assert app._section_start.text() == ""
     assert app._section_inputs.isHidden()
+
+
+def test_restore_section_chapter_from_job(app):
+    job = build_job_spec(
+        "fmt_best_mp4",
+        Settings(),
+        section_chapter_regex="^OP",
+        section_force_keyframes=True,
+    )
+    app._restore_section_from_job(job)
+    assert app._section_check.isChecked() is True
+    assert app._section_mode_chapter.isChecked() is True
+    assert app._section_chapter_edit.text() == "^OP"
+    assert app._section_keyframe_check.isChecked() is True
+
+
+def test_playlist_with_chapter_section_warns_and_aborts(app, monkeypatch):
+    """チャプター指定でも時間範囲と同様にプレイリスト後追い中断する。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    from yt_gui.i18n import t
+
+    warned = []
+
+    def _warn(*a, **k):
+        warned.append(a[2])
+
+    monkeypatch.setattr(QMessageBox, "warning", _warn)
+    calls = []
+
+    def _enqueue(*a, **k):
+        calls.append(a)
+        return []
+
+    monkeypatch.setattr(app.queue, "enqueue_playlist", _enqueue)
+
+    job = build_job_spec("fmt_best_mp4", Settings(), section_chapter_regex="^OP")
+    payload = {
+        "result": {"type": "playlist", "entries": [{"id": "a"}], "title": "PL"},
+        "job": job,
+        "format_label": "MP4",
+    }
+    app._on_fetch_for_add_done(payload)
+
+    assert warned == [t("warn_playlist_section")]
+    assert calls == []
 
 
 # ── 複数音声 MKV 昇格通知 × 再エンコードの干渉 ─────────────────────────────

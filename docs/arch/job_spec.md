@@ -12,7 +12,7 @@
 |---|---|
 | `JobSpec` (`@dataclass(frozen=True)`) | 1 ジョブの実行設定。`Downloader.download_video()` の入力 |
 | `PanelSnapshot` (`@dataclass(frozen=True)`) | `OriginalFormatPanel.get_snapshot()` が返す UI 非依存スナップショット |
-| `build_job_spec(format_id, settings, *, panel=None, mp3_thumb_check=False, section_start=None, section_end=None, section_force_keyframes=False)` | format_id から JobSpec を組み立てる pure function |
+| `build_job_spec(format_id, settings, *, panel=None, mp3_thumb_check=False, section_start=None, section_end=None, section_chapter_regex=None, section_force_keyframes=False)` | format_id から JobSpec を組み立てる pure function |
 
 ### `JobSpec` の主要プロパティ
 
@@ -32,8 +32,9 @@
 | `recode_video` | `bool` | 映像を H.264 / 音声を AAC へ再エンコードして MP4 出力（互換性優先。既定 `False`）。`audio_only` / `remux_only` とは排他。`True` のとき `video_container` は `"mp4"` に固定される |
 | `orig_settings` | `dict \| None` | panel snapshot の raw dict (復元・nico_comments 取り出し用) |
 | `is_multi_audio` | `bool` | 複数音声ストリーム結合モード (downloader 側の `allow_multiple_audio_streams` 制御) |
-| `section_start` | `str \| None` | 区間ダウンロードの開始時刻（生の入力文字列。`HH:MM:SS` 等）。未指定なら `None` |
-| `section_end` | `str \| None` | 区間ダウンロードの終了時刻（生の入力文字列）。未指定なら `None` |
+| `section_start` | `str \| None` | 区間ダウンロード（時間範囲モード）の開始時刻（生の入力文字列。`HH:MM:SS` 等）。未指定なら `None` |
+| `section_end` | `str \| None` | 区間ダウンロード（時間範囲モード）の終了時刻（生の入力文字列）。未指定なら `None` |
+| `section_chapter_regex` | `str \| None` | 区間ダウンロード（チャプター名モード）の正規表現（生の入力文字列）。`section_start` / `section_end` とは排他（UI 側が保証）。未指定なら `None` |
 | `section_force_keyframes` | `bool` | 区間カット時にキーフレーム境界を再エンコードして正確に合わせるか（既定 `False`） |
 | `ignore_archive` | `bool` | アイテム単位でダウンロードアーカイブを無視して再取得するか（既定 `False`）。`True` のとき downloader は `download_archive` opt を渡さず、`in_download_archive` チェックもスキップする |
 | `is_audio_extraction` (property) | `bool` | `audio_only or format_id == "fmt_mp3"` の派生プロパティ |
@@ -46,10 +47,11 @@
 | `settings` | `Settings` | アプリ設定 (解像度・コンテナ・音声形式・ビットレート) |
 | `panel` | `PanelSnapshot \| None` | `fmt_original` のとき必須。`OriginalFormatPanel.get_snapshot()` の返り値 |
 | `mp3_thumb_check` | `bool` | `fmt_mp3` のときのサムネ埋め込みチェック状態。他形式では無視 |
-| `section_start` / `section_end` | `str \| None` | 区間ダウンロードの開始 / 終了時刻（生の文字列）。全 format_id に一律で透過 |
+| `section_start` / `section_end` | `str \| None` | 区間ダウンロード（時間範囲モード）の開始 / 終了時刻（生の文字列）。全 format_id に一律で透過 |
+| `section_chapter_regex` | `str \| None` | 区間ダウンロード（チャプター名モード）の正規表現（生の文字列）。全 format_id に一律で透過 |
 | `section_force_keyframes` | `bool` | 区間カット時の再エンコード指定。全 format_id に一律で透過 |
 
-`fmt_original` 以外で `panel` を渡しても無視される。`fmt_original` で `panel=None` のときは `ValueError`。区間引数は形式非依存で、`build_job_spec` の末尾で `dataclasses.replace` により（区間が指定されていれば）全 format_id の `JobSpec` へ一律付与する。
+`fmt_original` 以外で `panel` を渡しても無視される。`fmt_original` で `panel=None` のときは `ValueError`。区間引数は形式非依存で、`build_job_spec` の末尾で `dataclasses.replace` により（区間が指定されていれば）全 format_id の `JobSpec` へ一律付与する。**時間範囲（`section_start` / `section_end`）とチャプター名（`section_chapter_regex`）は排他**で、UI のモード切り替えに加えて `build_job_spec` でも防御する（同時指定は `ValueError`。UI バグ時のサイレント誤動作防止）。
 
 `ignore_archive` は `build_job_spec` の引数ではない。キュー追加後のユーザー操作（右クリック →「アーカイブを無視して再取得」）で `QueueController.mark_ignore_archive` が `dataclasses.replace(item.job, ignore_archive=True)` として後付けする。そのため「形式を変更」で編集すると `build_job_spec` による再生成でフラグは `False` に戻る（[queue_controller.md](queue_controller.md)）。
 

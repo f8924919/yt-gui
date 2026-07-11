@@ -39,6 +39,7 @@ def _job(
     is_multi_audio: bool = False,
     section_start: str | None = None,
     section_end: str | None = None,
+    section_chapter_regex: str | None = None,
     section_force_keyframes: bool = False,
     ignore_archive: bool = False,
 ) -> JobSpec:
@@ -59,6 +60,7 @@ def _job(
         is_multi_audio=is_multi_audio,
         section_start=section_start,
         section_end=section_end,
+        section_chapter_regex=section_chapter_regex,
         section_force_keyframes=section_force_keyframes,
         ignore_archive=ignore_archive,
     )
@@ -536,7 +538,7 @@ def test_resolve_unique_path_no_skip_when_ignore_archive(tmp_path, monkeypatch) 
         monkeypatch, tmp_path, info={"id": "vid", "extractor_key": "Youtube"}
     )
 
-    _stem, ext = dl._resolve_unique_path(
+    _stem, ext, _ = dl._resolve_unique_path(
         {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
     )
     assert ext == ".mp4"
@@ -782,7 +784,7 @@ def test_download_video_cleans_up_and_reraises_on_cancel(downloader, tmp_path) -
     part = tmp_path / "動画.mp4.part"
     part.write_text("x")
 
-    downloader._resolve_unique_path = lambda *a, **k: (stem, ".mp4")
+    downloader._resolve_unique_path = lambda *a, **k: (stem, ".mp4", None)
 
     def _raise(*a, **k):
         raise DownloadCancelled()
@@ -800,7 +802,11 @@ def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> 
     downloader.request_cancel()  # 前回の中断要求が残っている状態を模す
 
     seen = {}
-    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+    downloader._resolve_unique_path = lambda *a, **k: (
+        str(tmp_path / "v"),
+        ".mp4",
+        None,
+    )
 
     def _run(*a, **k):
         seen["cancel_set"] = downloader._cancel_requested.is_set()
@@ -930,7 +936,11 @@ def test_cut_section_keeps_full_on_failure(downloader, tmp_path, monkeypatch):
 
 def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_path):
     downloader.status_callback = lambda *a, **k: None
-    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4")
+    downloader._resolve_unique_path = lambda *a, **k: (
+        str(tmp_path / "v"),
+        ".mp4",
+        None,
+    )
     downloader._run_download = lambda *a, **k: None
 
     calls = []
@@ -943,6 +953,273 @@ def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_pat
     calls.clear()
     downloader.download_video("https://example.com/v", _job())  # 区間なし
     assert calls == []
+
+
+# ── 区間ダウンロード（チャプター名モード・#83） ──────────────────────────────
+
+
+_CHAPTERS = [
+    {"title": "OP", "start_time": 0.0, "end_time": 90.0},
+    {"title": "Chapter 1", "start_time": 90.0, "end_time": 300.0},
+    {"title": "OP 2", "start_time": 300.0, "end_time": 390.0},
+    {"title": "ED", "start_time": 390.0, "end_time": 450.0},
+]
+
+
+def test_chapter_section_omits_native_download_ranges(downloader, tmp_path) -> None:
+    """チャプターモードでも yt-dlp のネイティブ区間 opts は渡さない。"""
+    opts = downloader._build_ydl_opts(
+        _job(section_chapter_regex="^OP"),
+        out_dir=str(tmp_path),
+        is_playlist=False,
+        cookies_path=None,
+        cookies_browser=None,
+    )
+
+    assert "download_ranges" not in opts
+    assert "force_keyframes_at_cuts" not in opts
+
+
+def test_resolve_chapter_sections_matches_by_re_search() -> None:
+    # yt-dlp download_range_func と同じ re.search（部分一致）・出現順
+    result = Downloader._resolve_chapter_sections(_CHAPTERS, "^OP")
+    assert result == [("OP", 0.0, 90.0), ("OP 2", 300.0, 390.0)]
+
+    result = Downloader._resolve_chapter_sections(_CHAPTERS, "apter")
+    assert result == [("Chapter 1", 90.0, 300.0)]
+
+
+@pytest.mark.parametrize(
+    ("chapters", "regex"),
+    [
+        (_CHAPTERS, "^ZZZ"),  # マッチ 0 件
+        (_CHAPTERS, "[invalid"),  # 不正な正規表現（防御: re.error は 0 件扱い）
+        (None, "^OP"),  # chapters 情報なし
+        ([], "^OP"),  # chapters 空
+    ],
+    ids=["no-match", "bad-regex", "none", "empty"],
+)
+def test_resolve_chapter_sections_returns_empty(chapters, regex) -> None:
+    assert Downloader._resolve_chapter_sections(chapters, regex) == []
+
+
+def test_resolve_chapter_sections_skips_malformed_chapters() -> None:
+    chapters = [
+        {"title": "OP", "start_time": None, "end_time": 90.0},  # start 欠落
+        {"title": "OP mid", "start_time": 10.0},  # end 欠落
+        {"title": "OP rev", "start_time": 50.0, "end_time": 50.0},  # start >= end
+        {"title": "OP ok", "start_time": 0.0, "end_time": 90.0},
+    ]
+    assert Downloader._resolve_chapter_sections(chapters, "^OP") == [
+        ("OP ok", 0.0, 90.0)
+    ]
+
+
+def test_build_cut_cmd_drop_chapters_appends_map_chapters() -> None:
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg",
+        "in.mp4",
+        "out.mp4",
+        "0.0",
+        "90.0",
+        force_keyframes=False,
+        drop_chapters=True,
+    )
+    # 元動画の全チャプター目次をクリップへ複製しない（-map_chapters -1）
+    i = cmd.index("-map_chapters")
+    assert cmd[i + 1] == "-1"
+    assert cmd[-1] == "out.mp4"
+
+    # 既定（時間範囲モード）は従来どおり付与しない
+    cmd = Downloader._build_cut_cmd(
+        "ffmpeg", "in.mp4", "out.mp4", "10", "20", force_keyframes=False
+    )
+    assert "-map_chapters" not in cmd
+
+
+def _fake_cut_run(captured: list):
+    """subprocess.run の代わりに outfile を生成する fake。"""
+
+    def _run(cmd, **kwargs):
+        captured.append(cmd)
+        with open(cmd[-1], "w") as f:
+            f.write("CUT")
+
+        class _R:
+            returncode = 0
+
+        return _R()
+
+    return _run
+
+
+def test_cut_chapter_sections_splits_and_deletes_original(
+    downloader, tmp_path, monkeypatch
+):
+    downloader.status_callback = lambda *a, **k: None
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    cmds: list = []
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_cut_run(cmds))
+
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex="^OP"), _CHAPTERS
+    )
+
+    # マッチした各チャプターが個別ファイルに分割される
+    assert (tmp_path / "動画 - OP.mp4").read_text() == "CUT"
+    assert (tmp_path / "動画 - OP 2.mp4").read_text() == "CUT"
+    # 1 件以上成功したので原本は削除される
+    assert not infile.exists()
+    # 各切り出しコマンドにはチャプター目次除去が付く
+    assert all("-map_chapters" in cmd for cmd in cmds)
+
+
+def test_cut_chapter_sections_keeps_original_when_no_match(
+    downloader, tmp_path, monkeypatch
+):
+    downloader.status_callback = lambda *a, **k: None
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_cut_run([]))
+
+    # マッチ 0 件・chapters なしのいずれもフル動画を残して警告ログ
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex="^ZZZ"), _CHAPTERS
+    )
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex="^OP"), None
+    )
+
+    assert infile.read_text() == "ORIGINAL"
+    assert len(logs) >= 2
+
+
+def test_cut_chapter_sections_keeps_original_when_all_cuts_fail(
+    downloader, tmp_path, monkeypatch
+):
+    downloader.status_callback = lambda *a, **k: None
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    infile = tmp_path / "動画.mp4"
+    infile.write_text("ORIGINAL")
+
+    def _fail_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd, stderr="boom")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fail_run)
+
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex="^OP"), _CHAPTERS
+    )
+
+    assert infile.read_text() == "ORIGINAL"  # 全件失敗時は原本を保持
+    assert any("boom" in m for m in logs)
+
+
+def test_cut_chapter_sections_dedupes_same_chapter_title(
+    downloader, tmp_path, monkeypatch
+):
+    downloader.status_callback = lambda *a, **k: None
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    (tmp_path / "動画.mp4").write_text("ORIGINAL")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_cut_run([]))
+
+    chapters = [
+        {"title": "OP", "start_time": 0.0, "end_time": 10.0},
+        {"title": "OP", "start_time": 20.0, "end_time": 30.0},
+    ]
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex="^OP"), chapters
+    )
+
+    assert (tmp_path / "動画 - OP.mp4").exists()
+    assert (tmp_path / "動画 - OP (1).mp4").exists()
+
+
+def test_cut_chapter_sections_falls_back_when_title_sanitizes_empty(
+    downloader, tmp_path, monkeypatch
+):
+    downloader.status_callback = lambda *a, **k: None
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text("")
+    downloader._ffmpeg_path = str(ffmpeg)
+    stem = str(tmp_path / "動画")
+    (tmp_path / "動画.mp4").write_text("ORIGINAL")
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_cut_run([]))
+
+    chapters = [{"title": "", "start_time": 0.0, "end_time": 10.0}]
+    downloader._cut_chapter_sections(
+        stem, ".mp4", _job(section_chapter_regex=""), chapters
+    )
+
+    # 空タイトルは "chapter N"（1 始まり）へフォールバック
+    assert (tmp_path / "動画 - chapter 1.mp4").exists()
+
+
+def test_download_video_invokes_cut_chapters_when_regex_set(downloader, tmp_path):
+    downloader.status_callback = lambda *a, **k: None
+    downloader._resolve_unique_path = lambda *a, **k: (
+        str(tmp_path / "v"),
+        ".mp4",
+        _CHAPTERS,
+    )
+    downloader._run_download = lambda *a, **k: None
+
+    calls = []
+    downloader._cut_chapter_sections = lambda stem, ext, job, chapters: calls.append(
+        (stem, ext, job, chapters)
+    )
+
+    downloader.download_video(
+        "https://example.com/v", _job(section_chapter_regex="^OP")
+    )
+    assert len(calls) == 1
+    assert calls[0][3] == _CHAPTERS  # ドライラン info の chapters が渡る
+
+
+def test_download_video_skips_nico_processing_in_chapter_mode(downloader, tmp_path):
+    """チャプターモードは原本を削除するため、ニコニコ後処理は明示スキップする。"""
+    downloader.status_callback = lambda *a, **k: None
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4", [])
+    downloader._run_download = lambda *a, **k: None
+    downloader._cut_chapter_sections = lambda *a, **k: None
+
+    converted = []
+    downloader._convert_nico_comments_to_ass = lambda *a, **k: converted.append(a)
+
+    job = _job(
+        section_chapter_regex="^OP",
+        subtitle_opts={"subtitleslangs": ["comments"]},
+        orig_settings={"nico_comments": {"convert_to_ass": True}},
+    )
+    downloader.download_video("https://example.com/v", job)
+
+    assert converted == []  # 後処理は実行しない
+    assert logs  # 警告ログを 1 行出して黙殺しない
 
 
 # ── fetch_formats / fetch_title_or_entries（YoutubeDL スタブ） ───────────────
@@ -1559,7 +1836,7 @@ def test_resolve_unique_path_audio_extraction_uses_codec_ext(
     downloader, tmp_path, monkeypatch
 ) -> None:
     _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
-    _stem, ext = downloader._resolve_unique_path(
+    _stem, ext, _ = downloader._resolve_unique_path(
         {},
         "https://example.com/v",
         _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
@@ -1574,7 +1851,7 @@ def test_resolve_unique_path_appends_suffix_on_collision(
     _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
     (tmp_path / "動画.mp4").write_text("x")  # 既存ファイルで衝突を起こす
     opts: dict = {}
-    stem, ext = downloader._resolve_unique_path(
+    stem, ext, _ = downloader._resolve_unique_path(
         opts, "https://example.com/v", _job(remux_only=True), extra_info=None
     )
     assert ext == ".mp4"

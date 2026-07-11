@@ -328,11 +328,12 @@ def test_jobspec_eq() -> None:
 
 
 def test_section_defaults_to_none() -> None:
-    # 区間引数を渡さなければ全 format_id で None / None / False
+    # 区間引数を渡さなければ全 format_id で None / None / None / False
     for fmt in ("fmt_best_mp4", "fmt_720p", "fmt_mp3"):
         job = build_job_spec(fmt, Settings())
         assert job.section_start is None
         assert job.section_end is None
+        assert job.section_chapter_regex is None
         assert job.section_force_keyframes is False
 
 
@@ -361,6 +362,42 @@ def test_section_passed_through_original() -> None:
     assert job.section_start == "10"
     assert job.section_end == "20"
     assert job.section_force_keyframes is False
+
+
+@pytest.mark.parametrize("fmt", ["fmt_best_mp4", "fmt_720p", "fmt_mp3"])
+def test_section_chapter_regex_passed_through_all_formats(fmt: str) -> None:
+    job = build_job_spec(
+        fmt,
+        Settings(),
+        section_chapter_regex="^OP",
+        section_force_keyframes=True,
+    )
+    assert job.section_chapter_regex == "^OP"
+    assert job.section_start is None
+    assert job.section_end is None
+    assert job.section_force_keyframes is True
+
+
+def test_section_chapter_regex_passed_through_original() -> None:
+    job = build_job_spec(
+        "fmt_original",
+        Settings(),
+        panel=_panel(),
+        section_chapter_regex="Chapter \\d+",
+    )
+    assert job.section_chapter_regex == "Chapter \\d+"
+
+
+def test_section_chapter_regex_exclusive_with_time_range() -> None:
+    # 時間範囲とチャプター名の同時指定は UI バグ由来のサイレント誤動作を防ぐため拒否
+    with pytest.raises(ValueError):
+        build_job_spec(
+            "fmt_best_mp4",
+            Settings(),
+            section_start="10",
+            section_end="20",
+            section_chapter_regex="^OP",
+        )
 
 
 def test_ignore_archive_defaults_false() -> None:

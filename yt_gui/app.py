@@ -1,6 +1,7 @@
 import contextlib
 import dataclasses
 import os
+import re
 import sys
 import tempfile
 from collections import deque
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QRadioButton,
     QStatusBar,
     QToolTip,
     QTreeWidget,
@@ -213,6 +215,12 @@ class _QueueTree(QTreeWidget):
                         s = qi.job.section_start or ""
                         e = qi.job.section_end or ""
                         lines.append(f"<b>{t('tooltip_section')}:</b> {s}〜{e}")
+                    elif qi.job.section_chapter_regex:
+                        lines.append(
+                            f"<b>{t('tooltip_section')}:</b> "
+                            f"{t('tooltip_section_chapter')} "
+                            f"{qi.job.section_chapter_regex}"
+                        )
                     if qi.format_id == _ORIGINAL_KEY and qi.job.format_spec:
                         lines.append(
                             f"<b>{t('tooltip_format_spec')}:</b> {qi.job.format_spec}"
@@ -827,8 +835,9 @@ class App(QMainWindow):
     def _build_section_widget(self) -> QWidget:
         """区間ダウンロードの入力群を組み立てる。
 
-        有効化チェック（常時表示）と、チェック時のみ表示する入力群（開始 / 終了 /
-        再エンコードトグル）からなる。"""
+        有効化チェック（常時表示）と、チェック時のみ表示する入力群からなる。
+        入力群はモードラジオ（時間範囲 / チャプター名・排他）で切り替え、
+        選択中モードの入力行だけを表示する。再エンコードトグルは共通。"""
         frame = QWidget()
         vbox = QVBoxLayout(frame)
         vbox.setContentsMargins(0, 0, 0, 0)
@@ -839,8 +848,23 @@ class App(QMainWindow):
         vbox.addWidget(self._section_check)
 
         self._section_inputs = QWidget()
-        row = QHBoxLayout(self._section_inputs)
-        row.setContentsMargins(16, 0, 0, 0)
+        inputs = QVBoxLayout(self._section_inputs)
+        inputs.setContentsMargins(16, 0, 0, 0)
+        inputs.setSpacing(2)
+
+        mode_row = QHBoxLayout()
+        self._section_mode_time = QRadioButton(t("section_mode_time"))
+        self._section_mode_time.setChecked(True)
+        self._section_mode_chapter = QRadioButton(t("section_mode_chapter"))
+        self._section_mode_time.toggled.connect(self._on_section_mode_changed)
+        mode_row.addWidget(self._section_mode_time)
+        mode_row.addWidget(self._section_mode_chapter)
+        mode_row.addStretch()
+        inputs.addLayout(mode_row)
+
+        self._section_time_row = QWidget()
+        row = QHBoxLayout(self._section_time_row)
+        row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(QLabel(t("section_start")))
         self._section_start = QLineEdit()
         self._section_start.setPlaceholderText("00:01:30")
@@ -851,9 +875,24 @@ class App(QMainWindow):
         self._section_end.setPlaceholderText("00:04:00")
         self._section_end.setMaximumWidth(110)
         row.addWidget(self._section_end)
-        self._section_keyframe_check = QCheckBox(t("section_force_keyframes"))
-        row.addWidget(self._section_keyframe_check)
         row.addStretch()
+        inputs.addWidget(self._section_time_row)
+
+        self._section_chapter_row = QWidget()
+        chap = QHBoxLayout(self._section_chapter_row)
+        chap.setContentsMargins(0, 0, 0, 0)
+        chap.addWidget(QLabel(t("section_chapter_pattern")))
+        self._section_chapter_edit = QLineEdit()
+        self._section_chapter_edit.setPlaceholderText("^Chapter 1$")
+        self._section_chapter_edit.setMaximumWidth(240)
+        chap.addWidget(self._section_chapter_edit)
+        chap.addStretch()
+        self._section_chapter_row.setVisible(False)
+        inputs.addWidget(self._section_chapter_row)
+
+        self._section_keyframe_check = QCheckBox(t("section_force_keyframes"))
+        inputs.addWidget(self._section_keyframe_check)
+
         self._section_inputs.setVisible(False)
         vbox.addWidget(self._section_inputs)
 
@@ -862,21 +901,48 @@ class App(QMainWindow):
     def _on_section_toggled(self, checked: bool) -> None:
         self._section_inputs.setVisible(checked)
 
-    def _read_section(self) -> tuple[str | None, str | None, bool]:
-        """UI から区間設定を読み取る。チェック無効なら (None, None, False)。"""
+    def _on_section_mode_changed(self) -> None:
+        is_time = self._section_mode_time.isChecked()
+        self._section_time_row.setVisible(is_time)
+        self._section_chapter_row.setVisible(not is_time)
+
+    def _read_section(self) -> tuple[str | None, str | None, str | None, bool]:
+        """UI から区間設定を読み取る。
+
+        戻り値は `(start, end, chapter_regex, force_keyframes)`。チェック無効
+        なら全て未指定。モードは排他で、非選択モードの入力は無視する。"""
         if not self._section_check.isChecked():
-            return None, None, False
+            return None, None, None, False
+        force = self._section_keyframe_check.isChecked()
+        if self._section_mode_chapter.isChecked():
+            return None, None, self._section_chapter_edit.text().strip() or None, force
         return (
             self._section_start.text().strip() or None,
             self._section_end.text().strip() or None,
-            self._section_keyframe_check.isChecked(),
+            None,
+            force,
         )
 
     def _validate_section(self) -> bool:
-        """区間チェック時の入力検証。OK（または無効）なら True。
+        """区間チェック時の入力検証（選択中モードのみ）。OK（または無効）なら True。
 
         不正時は警告を表示して False を返す。"""
         if not self._section_check.isChecked():
+            return True
+        if self._section_mode_chapter.isChecked():
+            pattern = self._section_chapter_edit.text().strip()
+            if not pattern:
+                QMessageBox.warning(
+                    self, t("warn_title"), t("warn_section_chapter_invalid")
+                )
+                return False
+            try:
+                re.compile(pattern)
+            except re.error:
+                QMessageBox.warning(
+                    self, t("warn_title"), t("warn_section_chapter_invalid")
+                )
+                return False
             return True
         start = parse_time_to_seconds(self._section_start.text())
         end = parse_time_to_seconds(self._section_end.text())
@@ -893,11 +959,18 @@ class App(QMainWindow):
         self._section_frame.setEnabled(enabled)
 
     def _restore_section_from_job(self, job: JobSpec) -> None:
-        """編集モードで対象アイテムの区間設定を UI へ復元する。"""
-        has_section = bool(job.section_start or job.section_end)
+        """編集モードで対象アイテムの区間設定（モード含む）を UI へ復元する。"""
+        has_section = bool(
+            job.section_start or job.section_end or job.section_chapter_regex
+        )
         self._section_check.setChecked(has_section)
+        if job.section_chapter_regex:
+            self._section_mode_chapter.setChecked(True)
+        else:
+            self._section_mode_time.setChecked(True)
         self._section_start.setText(job.section_start or "")
         self._section_end.setText(job.section_end or "")
+        self._section_chapter_edit.setText(job.section_chapter_regex or "")
         self._section_keyframe_check.setChecked(job.section_force_keyframes)
         self._section_inputs.setVisible(has_section)
 
@@ -927,13 +1000,16 @@ class App(QMainWindow):
             return
 
         mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-        section_start, section_end, section_force = self._read_section()
+        section_start, section_end, section_chapter, section_force = (
+            self._read_section()
+        )
         job = build_job_spec(
             format_id,
             self._settings,
             mp3_thumb_check=mp3_thumb,
             section_start=section_start,
             section_end=section_end,
+            section_chapter_regex=section_chapter,
             section_force_keyframes=section_force,
         )
         self._start_add_thread(url, cookies_path, cookies_browser, job, format_label)
@@ -1087,13 +1163,16 @@ class App(QMainWindow):
         format_label = self._format_display[FORMAT_KEYS.index(_ORIGINAL_KEY)]
         audio_only = panel.get_audio_only()
         snapshot = panel.get_snapshot()
-        section_start, section_end, section_force = self._read_section()
+        section_start, section_end, section_chapter, section_force = (
+            self._read_section()
+        )
         job = build_job_spec(
             _ORIGINAL_KEY,
             self._settings,
             panel=snapshot,
             section_start=section_start,
             section_end=section_end,
+            section_chapter_regex=section_chapter,
             section_force_keyframes=section_force,
         )
         self._notify_container_promotion_if_needed(job)
@@ -1188,7 +1267,7 @@ class App(QMainWindow):
             self._signals.status_update.emit(t("status_title_added"), 0)
         else:
             # 区間指定はプレイリストに適用できない（取得後に判明するため後追いで弾く）。
-            if job.section_start or job.section_end:
+            if job.section_start or job.section_end or job.section_chapter_regex:
                 QMessageBox.warning(self, t("warn_title"), t("warn_playlist_section"))
                 self._signals.status_update.emit(t("status_ready"), 0)
                 return
@@ -1311,13 +1390,16 @@ class App(QMainWindow):
             return
 
         mp3_thumb = bool(self._mp3_thumb_check.isChecked())
-        section_start, section_end, section_force = self._read_section()
+        section_start, section_end, section_chapter, section_force = (
+            self._read_section()
+        )
         job = build_job_spec(
             format_id,
             self._settings,
             mp3_thumb_check=mp3_thumb,
             section_start=section_start,
             section_end=section_end,
+            section_chapter_regex=section_chapter,
             section_force_keyframes=section_force,
         )
         self.queue.apply_edit(format_label, job)
