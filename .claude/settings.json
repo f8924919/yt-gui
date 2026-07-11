@@ -9,7 +9,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --no-sync --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/block_main_commit.py\""
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-sync",
+              "--project",
+              "${CLAUDE_PROJECT_DIR}",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/block_main_commit.py"
+            ]
           }
         ]
       }
