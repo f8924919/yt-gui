@@ -1,0 +1,50 @@
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 週次スキャン。update-binaries.yml（月曜 06:00 UTC）と負荷を分散させるため火曜 03:00 UTC。
+    - cron: "0 3 * * 2"
+
+# 解析結果（SARIF）を Security タブへアップロードするための最小権限。
+# checkout には contents: read が必要（docs/build.md §ワークフロー権限）。
+permissions:
+  contents: read
+  security-events: write
+
+# 同一 ref で連続 push された場合は古い実行をキャンセルする。
+# ただし schedule / main push の実行は週次スキャン・正本の解析結果を
+# 取りこぼさないよう巻き添えキャンセルしない（PR 実行のみキャンセル可）。
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # python: yt_gui / tests / scripts を含むリポジトリ全体の .py を解析。
+          # actions: .github/workflows/** のワークフロー定義自体を解析。
+          # いずれも非ビルド言語のため build-mode: none を明示（autobuild 回避）。
+          - language: python
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      # クエリセットは default（精度重視）。誤検知ノイズが許容範囲なら
+      # security-extended への強化を再検討する（docs/build.md §静的解析）。
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
