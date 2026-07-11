@@ -43,6 +43,7 @@
 | [160-settings-menu-role.md](160-settings-menu-role.md) | macOS で設定メニュー項目の置き場所が言語で異なる不具合（`menuRole` 未指定＝英語テキスト依存マージ）を、`_act_settings` に `PreferencesRole` を明示して言語非依存にアプリメニュー配下へ統一（Issue #160 / PR #161） | 2026-06-15 |
 | [175-extension-original-label.md](175-extension-original-label.md) | 拡張から `kind:"original"` 送信時にキュー表示が「最高画質」に化けるバグを修正。`_build_original_job` のラベル基点をコンボの `currentText()` から `_format_display[FORMAT_KEYS.index(fmt_original)]` 固定へ（拡張フローはコンボ非操作のため既定 fmt_best_mp4 に化けていた偶発結合を解消）（Issue #175 / PR #176） | 2026-06-19 |
 | [201-extension-port-exclusive-bind.md](201-extension-port-exclusive-bind.md) | Windows で拡張連携サーバーのポートフォールバックが発動しない不具合を修正。Windows の SO_REUSEADDR 仕様差（LISTEN 中ポートへの bind が成功）が原因。`resolve_allow_reuse_address` 純関数＋`_ExclusiveBindHTTPServer` サブクラスで win32 のみ排他 bind 化、POSIX は TIME_WAIT 再バインドのため維持（Issue #201 / PR #202） | 2026-07-05 |
+| [238-section-ui-retranslate.md](238-section-ui-retranslate.md) | 区間ダウンロード UI の言語切替即時反映漏れを修正。`_retranslate_ui()`（手動列挙方式）に区間 UI 7 ウィジェットを登録、匿名 QLabel 3 つをインスタンス属性へ昇格（Issue #238 / PR #239） | 2026-07-11 |
 
 ## ニコニコ動画コメント取得
 
