@@ -322,6 +322,14 @@ def test_fails_open_cd_with_quoted_spaced_path(main_repo, tmp_path):
     assert not _is_denied(out)
 
 
+def test_fails_open_dash_c_with_quoted_spaced_path(main_repo, tmp_path):
+    """クォート付き（スペース含む）パスの -C も追跡不能 → フェイルオープン。"""
+    spaced = tmp_path / "dir with space"
+    code, out = _hook_decision(f'git -C "{spaced}" commit -m x', main_repo)
+    assert code == 0
+    assert not _is_denied(out)
+
+
 def test_fails_open_cd_without_argument(main_repo):
     """引数なし cd（ホーム移動）は移動先を解決しない → 以降はフェイルオープン。"""
     code, out = _hook_decision("cd; git commit -m x", main_repo)
