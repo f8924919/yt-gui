@@ -44,6 +44,7 @@
 | [175-extension-original-label.md](175-extension-original-label.md) | 拡張から `kind:"original"` 送信時にキュー表示が「最高画質」に化けるバグを修正。`_build_original_job` のラベル基点をコンボの `currentText()` から `_format_display[FORMAT_KEYS.index(fmt_original)]` 固定へ（拡張フローはコンボ非操作のため既定 fmt_best_mp4 に化けていた偶発結合を解消）（Issue #175 / PR #176） | 2026-06-19 |
 | [201-extension-port-exclusive-bind.md](201-extension-port-exclusive-bind.md) | Windows で拡張連携サーバーのポートフォールバックが発動しない不具合を修正。Windows の SO_REUSEADDR 仕様差（LISTEN 中ポートへの bind が成功）が原因。`resolve_allow_reuse_address` 純関数＋`_ExclusiveBindHTTPServer` サブクラスで win32 のみ排他 bind 化、POSIX は TIME_WAIT 再バインドのため維持（Issue #201 / PR #202） | 2026-07-05 |
 | [238-section-ui-retranslate.md](238-section-ui-retranslate.md) | 区間ダウンロード UI の言語切替即時反映漏れを修正。`_retranslate_ui()`（手動列挙方式）に区間 UI 7 ウィジェットを登録、匿名 QLabel 3 つをインスタンス属性へ昇格（Issue #238 / PR #239） | 2026-07-11 |
+| [240-hook-cross-repo.md](240-hook-cross-repo.md) | main 保護 hook のクロスリポジトリ誤ブロックを修正。複合コマンドの `cd` 追跡＋実効ディレクトリでのブランチ判定・`-C <path>` の累積解決（検出漏れも解消）・`--git-dir`/`--work-tree` 等はフェイルオープン。hook を mypy 対象化し policy.md スコープ表へ追記（Issue #240 / PR #241） | 2026-07-12 |
 
 ## ニコニコ動画コメント取得
 
