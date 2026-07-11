@@ -34,7 +34,7 @@
 
 Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。モーダルダイアログ（`QMessageBox.question` / `QFileDialog` / `QDialog.exec()`）を経由する経路は **手段B**（§2.5・`QTimer.singleShot` で能動的に閉じる、または静的メソッドを固定値へ差し替える）で「開く→操作→状態反映」までを通しますが、フル画面操作の E2E は引き続き対象外です。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイント・手段A〜Dの整理は [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) §5・§8 を参照）。
 
-> **段階導入**: テストが存在しないモジュールは当面 `omit` に残し、テスト追加と同時に該当モジュールのみ `omit` から外します（一括解除でカバレッジが急落しないようにするため）。`downloader.py` はネットワーク・subprocess に依存しないロジック（フォーマット分類・パス解決・ログ整形等）を `YoutubeDL` スタブでテストし、`omit` から解除済み（#95）。実 DL・ffmpeg/danmaku2ass の subprocess 正常系は外部 I/O のため引き続きカバレッジ対象外（`△`）。`app.py` / `settings_dialog.py` は #132（PR #133）でモーダル経路を手段Bでテスト化し、#134 で `omit` から解除済み（`pytest-qt` ベースの UI ロジックに限定して計測。ウィンドウ全体の E2E は対象外）。残る Qt UI のウィンドウ統合系（`original_format_panel.py` / `log_dialog.py`）は引き続き段階導入の対象とし、テスト追加と同時に `omit` から外す。
+> **段階導入**: テストが存在しないモジュールは当面 `omit` に残し、テスト追加と同時に該当モジュールのみ `omit` から外します（一括解除でカバレッジが急落しないようにするため）。`downloader.py` はネットワーク・subprocess に依存しないロジック（フォーマット分類・パス解決・ログ整形等）を `YoutubeDL` スタブでテストし、`omit` から解除済み（#95）。実 DL・ffmpeg/danmaku2ass の subprocess 正常系は外部 I/O のため引き続きカバレッジ対象外（`△`）。`app.py` / `settings_dialog.py` は #132（PR #133）でモーダル経路を手段Bでテスト化し、#134 で `omit` から解除済み（`pytest-qt` ベースの UI ロジックに限定して計測。ウィンドウ全体の E2E は対象外）。`original_format_panel.py` / `log_dialog.py` もテスト追加済みのため #224 で `omit` から解除済み。残る `omit` はテスト未追加の `thumbnail_cache.py` とエントリーポイント・翻訳辞書のみ。
 
 スコープ拡張時は本ドキュメントと `pyproject.toml` の `[tool.coverage.run] omit` を併せて更新してください。
 
@@ -142,8 +142,8 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 - **数値閾値は初期は設けません**（計測のみ）
 - CI（[`test.yml`](../../.github/workflows/test.yml)）の pytest は `--cov=yt_gui --cov-report=term-missing` 付きで実行され、実行ログでカバレッジ表を確認できます（#210）。`--cov-fail-under` は指定しないため、pytest ステップの pass/fail はテスト結果のみで決まります
 - 数サイクル運用後、実績値からプロジェクト全体・モジュール別に最低ラインを設定します
-- 計測対象は `yt_gui` 全体ですが、UI ウィンドウ統合のうち `original_format_panel.py` / `log_dialog.py`・`thumbnail_cache.py`・`locales` は `omit` で除外し **ロジック層が対象** になります。`downloader.py` はロジック部分をテスト済みのため `omit` から外しています（#95）。`app.py` / `settings_dialog.py` も #134 で `omit` から解除し計測対象に含めています
-- **§1 で `△`（対象）に格上げ済みでも `omit` には残している**モジュールがあります（`log_dialog.py`）。これは段階導入（§1 ノート）の方針で、テストは追加しつつ一括解除によるカバレッジ急落を避けるための意図的な据え置きです。`app.py` / `settings_dialog.py` は #134 で `omit` から解除済みで、解除後の実測 TOTAL は約 85%（`app.py` 単体は約 66%）です。`app.py` の未到達はウィンドウ構築・各種スロット等の UI 配線部分が中心で、テスト追加で段階的に引き上げます
+- 計測対象は `yt_gui` 全体ですが、テスト未追加の `thumbnail_cache.py`・エントリーポイント（`__main__.py`）・翻訳辞書（`locales`）は `omit` で除外しています。`downloader.py` はロジック部分をテスト済みのため `omit` から外しています（#95）。`app.py` / `settings_dialog.py` は #134、`original_format_panel.py` / `log_dialog.py` は #224 で `omit` から解除し計測対象に含めています
+- #224 の解除で実測 TOTAL は約 86% → 約 81% に低下しました（ほぼ全量が `original_format_panel.py` 単体・実測約 63% によるもの。`log_dialog.py` は約 86%）。これは omit 解除に伴う既知の事象であり、テスト未追加の改修によるものではありません。`original_format_panel.py` の未到達は `app.py`（単体約 66%）と同様にウィンドウ構築・UI 配線部分が中心で、テスト追加で段階的に引き上げます
 - カバレッジが急に下がった場合、テスト未追加の改修が無いかをレビューで確認します
 
 ---

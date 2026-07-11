@@ -46,8 +46,6 @@ markers = [
 source = ["yt_gui"]
 omit = [
     "yt_gui/__main__.py",
-    "yt_gui/original_format_panel.py",
-    "yt_gui/log_dialog.py",
     "yt_gui/thumbnail_cache.py",
     "yt_gui/locales/*.py",
 ]
