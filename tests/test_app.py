@@ -546,31 +546,106 @@ def test_open_settings_retranslates_on_language_change(app, monkeypatch):
     assert called
 
 
-def test_retranslate_ui_updates_section_widgets(app):
-    """言語切替時に区間ダウンロード UI の文言も即時に再翻訳されること（#238）。
+def test_translation_bindings_cover_all_static_texts(app):
+    """レジストリ全件について、言語切替後の表示が切替先ロケール値と一致すること（#243）。
 
-    再翻訳は手動列挙方式のため、`_build_section_widget` のウィジェット群が
-    `_retranslate_ui` に登録されていないと再起動まで旧言語のまま残る。
-    切替先ロケールの `STRINGS` 対応値とのテキスト一致まで検証する。"""
+    #238 のハードコード対応表テストの後継。バインディングレジストリを走査する
+    ため、ウィジェット追加（バインド登録）に自動追従する。期待値にはバインディング
+    自身の transform を適用する（ウィンドウタイトルのバージョン合成等が追従する）。
+    不一致は全件収集して 1 回で報告する。"""
     from yt_gui.locales import en
+
+    # 区間 UI（#238 の 7 ウィジェット）を含む static 26 箇所が登録されている前提。
+    # 空レジストリでの空振り green を防ぐため件数下限も検証する（macOS では
+    # `_act_quit` 非生成のため 25）。
+    assert len(app._translation_bindings) >= 25
 
     i18n.set_language("ja")
     app._retranslate_ui()
+    i18n.set_language("en")
+    app._retranslate_ui()
+
+    mismatches = []
+    for binding in app._translation_bindings:
+        expected = en.STRINGS[binding.key]
+        if binding.transform is not None:
+            expected = binding.transform(expected)
+        actual = binding.getter()
+        if actual != expected:
+            mismatches.append(f"{binding.key}: {actual!r} != {expected!r}")
+    assert not mismatches, "再翻訳されていないバインディング:\n" + "\n".join(mismatches)
+
+
+def test_retranslate_leaves_no_japanese_text_after_switch_to_en(app):
+    """セーフティネット: 英語切替後に ja 固有文字列が UI に残らないこと（#243）。
+
+    バインド登録し忘れの検知網。ウィジェットツリー（`text` / `title` /
+    `placeholderText`）に加え、`findChildren(QWidget)` では拾えない `QAction`
+    （メニュー項目）・ウィンドウタイトル・キューツリーヘッダー列も走査する。
+    偽陽性を避けるため ja/en で値が異なるキーの ja 値との完全一致のみを違反とする。
+    デフォルト状態の UI のみ走査するため、状態依存テキストは個別テストで担保する。"""
+    from PySide6.QtWidgets import QWidget
+
+    from yt_gui.locales import en, ja
 
     i18n.set_language("en")
     app._retranslate_ui()
 
-    expected = {
-        app._section_check: "section_enable",
-        app._section_mode_time: "section_mode_time",
-        app._section_mode_chapter: "section_mode_chapter",
-        app._section_start_label: "section_start",
-        app._section_end_label: "section_end",
-        app._section_chapter_label: "section_chapter_pattern",
-        app._section_keyframe_check: "section_force_keyframes",
+    ja_only = {
+        value for key, value in ja.STRINGS.items() if en.STRINGS.get(key) != value
     }
-    for widget, key in expected.items():
-        assert widget.text() == en.STRINGS[key]
+
+    displayed: list[str] = []
+    for widget in app.findChildren(QWidget):
+        for accessor in ("text", "title", "placeholderText"):
+            getter = getattr(widget, accessor, None)
+            if callable(getter):
+                displayed.append(getter())
+    displayed.extend(action.text() for action in app.findChildren(QAction))
+    displayed.append(app.windowTitle())
+    header = app._queue_tree.headerItem()
+    displayed.extend(header.text(col) for col in range(app._queue_tree.columnCount()))
+
+    leftovers = sorted({text for text in displayed if text in ja_only})
+    assert not leftovers, f"日本語のまま残っている表示: {leftovers}"
+
+
+def test_retranslate_updates_multi_edit_url_entry(app):
+    """複数選択編集中の言語切替で `url_entry` の複数選択表示が再翻訳されること（#243）。
+
+    `edit_multiple_selected` は #238 と同型の再翻訳漏れ（未登録）だったもの。
+    セーフティネットはデフォルト状態しか走査しないため個別に担保する。"""
+    from yt_gui.locales import en, ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    items = [
+        _make_item("waiting", url="https://example.com/v1"),
+        _make_item("waiting", url="https://example.com/v2"),
+    ]
+    assert app.queue.enter_edit_mode(items)
+    assert app.url_entry.text() == ja.STRINGS["edit_multiple_selected"].format(count=2)
+
+    i18n.set_language("en")
+    app._retranslate_ui()
+
+    assert app.url_entry.text() == en.STRINGS["edit_multiple_selected"].format(count=2)
+
+
+def test_retranslate_keeps_apply_edit_button_text_in_edit_mode(app):
+    """編集モード中の言語切替で `add_button` が `btn_apply_edit` 側で追従すること。
+
+    #238 由来テストの置き換えで既存担保が失われないよう明示的に残す（#243）。"""
+    from yt_gui.locales import en
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    assert app.queue.enter_edit_mode([_make_item("waiting")])
+
+    i18n.set_language("en")
+    app._retranslate_ui()
+
+    assert app.add_button.text() == en.STRINGS["btn_apply_edit"]
 
 
 # ── ログダイアログの起動・再表示（_open_log_dialog） ─────────────────────────

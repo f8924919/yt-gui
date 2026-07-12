@@ -8,6 +8,7 @@ from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
+from typing import Protocol
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import (
@@ -78,6 +79,41 @@ from .yt_dlp_update import (
 )
 
 _ORIGINAL_KEY = "fmt_original"
+
+
+class _TextTarget(Protocol):
+    """`setText` / `text` を持つ翻訳バインド対象。
+
+    QLabel / QAbstractButton / QAction 等が該当する。
+    """
+
+    def setText(self, text: str, /) -> None: ...
+
+    def text(self) -> str: ...
+
+
+@dataclasses.dataclass(frozen=True)
+class _TranslationBinding:
+    """翻訳キーと表示先の束縛（#243）。
+
+    生成時に登録することで、初期表示と言語切替後の再表示を同一コードパス
+    （`apply`）に一本化し、`_retranslate_ui` への登録漏れを構造的に防ぐ。
+    `getter` はテストがレジストリ全件の「キー ⇔ 表示」一致を機械検証するために持つ。
+    `transform` は `t(key)` の値を加工して表示する合成テキスト用。
+    """
+
+    key: str
+    setter: Callable[[str], None]
+    getter: Callable[[], str]
+    transform: Callable[[str], str] | None = None
+
+    def apply(self) -> None:
+        value = t(self.key)
+        if self.transform is not None:
+            value = self.transform(value)
+        self.setter(value)
+
+
 _MP3_KEY = "fmt_mp3"
 # オリジナル形式の詳細設定を別画面化し、メイン上段が幅を要求しなくなったため
 # 既定幅を狭めた（旧 940）。最小幅は手動で更に絞れるよう既定より小さくする。
@@ -265,7 +301,13 @@ class App(QMainWindow):
         self._settings = self._settings_manager.load()
         i18n.set_language(self._settings.language)
 
-        self.setWindowTitle(self._window_title())
+        self._translation_bindings: list[_TranslationBinding] = []
+        self._bind_translation(
+            "app_title",
+            self.setWindowTitle,
+            self.windowTitle,
+            transform=lambda s: f"{s} v{get_version()}",
+        )
         self.resize(_WIN_W, _WIN_H_DEFAULT)
         self.setMinimumSize(_WIN_MIN_W, 380)
 
@@ -422,52 +464,70 @@ class App(QMainWindow):
         # オリジナル形式の詳細設定は別画面（開くたびに現在の言語・設定で生成）の
         # ため、ここでの永続パネル再翻訳は不要。
 
-    def _window_title(self) -> str:
-        """ウィンドウタイトル（アプリ名 + バージョン）を返す。"""
-        return f"{t('app_title')} v{get_version()}"
+    def _bind_translation(
+        self,
+        key: str,
+        setter: Callable[[str], None],
+        getter: Callable[[], str],
+        *,
+        transform: Callable[[str], str] | None = None,
+    ) -> None:
+        """翻訳バインディングを登録し、その場で初期テキストも設定する（#243）。
+
+        永続ウィジェットの翻訳テキストは必ず本ヘルパ（または `_bind_text`）
+        経由で設定すること。生成側で直接 `setText(t(key))` と書くと
+        `_retranslate_ui` への登録漏れが再発する。
+        """
+        binding = _TranslationBinding(
+            key=key, setter=setter, getter=getter, transform=transform
+        )
+        self._translation_bindings.append(binding)
+        binding.apply()
+
+    def _bind_text(
+        self,
+        widget: _TextTarget,
+        key: str,
+        *,
+        transform: Callable[[str], str] | None = None,
+    ) -> None:
+        """`setText` / `text` を持つウィジェット向けの `_bind_translation` ラッパ。"""
+        self._bind_translation(key, widget.setText, widget.text, transform=transform)
+
+    def _bind_header_column(self, item: QTreeWidgetItem, col: int, key: str) -> None:
+        """ツリーヘッダーの 1 列を翻訳バインドする（列番号をクロージャで固定）。"""
+
+        def _set(text: str) -> None:
+            item.setText(col, text)
+
+        def _get() -> str:
+            return item.text(col)
+
+        self._bind_translation(key, _set, _get)
 
     def _retranslate_ui(self):
-        self.setWindowTitle(self._window_title())
+        # static テキストは生成時登録のバインディングを再適用するだけ（#243）。
+        for binding in self._translation_bindings:
+            binding.apply()
 
-        self._file_menu.setTitle(t("menu_file"))
-        self._act_settings.setText(t("menu_settings"))
-        self._act_log.setText(t("menu_log"))
-        if self._act_quit is not None:
-            self._act_quit.setText(t("menu_quit"))
-        self._help_menu.setTitle(t("menu_help"))
-        self._act_about.setText(t("menu_about"))
-
-        self._lbl_url.setText(t("label_url"))
-        self._lbl_format.setText(t("label_format"))
-
+        # フォーマットコンボは設定値も加味して都度再構築するためバインド対象外。
         self._refresh_format_labels()
-        self._mp3_thumb_check.setText(t("mp3_embed_thumbnail"))
-
-        self._section_check.setText(t("section_enable"))
-        self._section_mode_time.setText(t("section_mode_time"))
-        self._section_mode_chapter.setText(t("section_mode_chapter"))
-        self._section_start_label.setText(t("section_start"))
-        self._section_end_label.setText(t("section_end"))
-        self._section_chapter_label.setText(t("section_chapter_pattern"))
-        self._section_keyframe_check.setText(t("section_force_keyframes"))
-
-        self._lbl_queue_title.setText(f"<b>{t('queue_title')}</b>")
-        self._queue_tree.setHeaderLabels(
-            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
-        )
-
-        self.add_button.setText(
-            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
-        )
-        self._cancel_edit_button.setText(t("btn_cancel_edit"))
-        self._detail_button.setText(t("btn_open_detail"))
-        self.start_queue_button.setText(t("btn_start_queue"))
-        self.pause_queue_button.setText(t("btn_pause_queue"))
-        self.remove_item_button.setText(t("btn_remove_item"))
 
         self.queue.refresh_all_tree_items()
 
+        # 以下は状態に応じて表示キーが切り替わるため、生成時 1 回のバインドでは
+        # 表現できず手動で再翻訳する（バインド対象外の理由）。
+        self.add_button.setText(
+            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
+        )
+        if self.queue.edit_mode and len(self.queue.editing_items) > 1:
+            # 複数選択編集中の URL 欄は件数入りの案内文を表示している
+            # （#243 で発見した #238 と同型の再翻訳漏れの解消）。
+            self.url_entry.setText(
+                t("edit_multiple_selected").format(count=len(self.queue.editing_items))
+            )
         if not self.queue.is_running:
+            # 実行中は進捗ステータスが頻繁に上書きするため、次の更新イベントに委ねる。
             self.status_label.setText(
                 t("status_edit_mode") if self.queue.edit_mode else t("status_ready")
             )
@@ -533,9 +593,13 @@ class App(QMainWindow):
 
     def _create_menu(self):
         menubar = self.menuBar()
-        self._file_menu = menubar.addMenu(t("menu_file"))
+        self._file_menu = menubar.addMenu("")
+        self._bind_translation(
+            "menu_file", self._file_menu.setTitle, self._file_menu.title
+        )
 
-        self._act_settings = QAction(t("menu_settings"), self)
+        self._act_settings = QAction(self)
+        self._bind_text(self._act_settings, "menu_settings")
         self._act_settings.setShortcut("Ctrl+,")
         # macOS では menuRole に応じて項目がアプリメニューへ自動移動する。既定の
         # TextHeuristicRole はテキストを英語キーワードで判定するため、英語
@@ -546,19 +610,25 @@ class App(QMainWindow):
         self._act_settings.triggered.connect(self._open_settings)
         self._file_menu.addAction(self._act_settings)
 
-        self._act_log = QAction(t("menu_log"), self)
+        self._act_log = QAction(self)
+        self._bind_text(self._act_log, "menu_log")
         self._act_log.triggered.connect(self._open_log_dialog)
         self._file_menu.addAction(self._act_log)
 
         self._act_quit: QAction | None = None
         if sys.platform != "darwin":
             self._file_menu.addSeparator()
-            self._act_quit = QAction(t("menu_quit"), self)
+            self._act_quit = QAction(self)
+            self._bind_text(self._act_quit, "menu_quit")
             self._act_quit.triggered.connect(self.close)
             self._file_menu.addAction(self._act_quit)
 
-        self._help_menu = menubar.addMenu(t("menu_help"))
-        self._act_about = QAction(t("menu_about"), self)
+        self._help_menu = menubar.addMenu("")
+        self._bind_translation(
+            "menu_help", self._help_menu.setTitle, self._help_menu.title
+        )
+        self._act_about = QAction(self)
+        self._bind_text(self._act_about, "menu_about")
         # macOS では AboutRole によりアプリメニュー（「yt-gui について」）へ自動移動
         # する。設定の PreferencesRole と同じくプラットフォーム慣習に合わせる。
         self._act_about.setMenuRole(QAction.MenuRole.AboutRole)
@@ -689,13 +759,15 @@ class App(QMainWindow):
         layout.setColumnStretch(1, 1)
 
         # Row 0: URL
-        self._lbl_url = QLabel(t("label_url"))
+        self._lbl_url = QLabel()
+        self._bind_text(self._lbl_url, "label_url")
         layout.addWidget(self._lbl_url, 0, 0, Qt.AlignmentFlag.AlignRight)
         self.url_entry = QLineEdit()
         layout.addWidget(self.url_entry, 0, 1, 1, 2)
 
         # Row 1: Format combo
-        self._lbl_format = QLabel(t("label_format"))
+        self._lbl_format = QLabel()
+        self._bind_text(self._lbl_format, "label_format")
         layout.addWidget(self._lbl_format, 1, 0, Qt.AlignmentFlag.AlignRight)
         self._format_display = self._build_format_display()
         self.format_combo = QComboBox()
@@ -708,7 +780,8 @@ class App(QMainWindow):
         detail_frame = QWidget()
         detail_layout = QHBoxLayout(detail_frame)
         detail_layout.setContentsMargins(0, 0, 0, 0)
-        self._detail_button = QPushButton(t("btn_open_detail"))
+        self._detail_button = QPushButton()
+        self._bind_text(self._detail_button, "btn_open_detail")
         self._detail_button.clicked.connect(self._open_original_dialog)
         self._detail_button.setVisible(False)
         detail_layout.addWidget(self._detail_button)
@@ -719,7 +792,8 @@ class App(QMainWindow):
         self._mp3_frame = QWidget()
         mp3_layout = QHBoxLayout(self._mp3_frame)
         mp3_layout.setContentsMargins(0, 0, 0, 0)
-        self._mp3_thumb_check = QCheckBox(t("mp3_embed_thumbnail"))
+        self._mp3_thumb_check = QCheckBox()
+        self._bind_text(self._mp3_thumb_check, "mp3_embed_thumbnail")
         mp3_layout.addWidget(self._mp3_thumb_check)
         mp3_layout.addStretch()
         self._mp3_frame.setVisible(False)
@@ -733,10 +807,13 @@ class App(QMainWindow):
         add_frame = QWidget()
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(0, 8, 0, 2)
+        # add_button は編集モード等で表示キーが切り替わるためバインド対象外
+        # （_retranslate_ui の状態依存ブロックで再翻訳する）。
         self.add_button = QPushButton(t("btn_add"))
         self.add_button.clicked.connect(self._add_url)
         add_layout.addWidget(self.add_button)
-        self._cancel_edit_button = QPushButton(t("btn_cancel_edit"))
+        self._cancel_edit_button = QPushButton()
+        self._bind_text(self._cancel_edit_button, "btn_cancel_edit")
         self._cancel_edit_button.clicked.connect(self._cancel_edit)
         self._cancel_edit_button.setVisible(False)
         add_layout.addWidget(self._cancel_edit_button)
@@ -754,7 +831,10 @@ class App(QMainWindow):
         qbl.setContentsMargins(6, 6, 6, 6)
         qbl.setSpacing(4)
 
-        self._lbl_queue_title = QLabel(f"<b>{t('queue_title')}</b>")
+        self._lbl_queue_title = QLabel()
+        self._bind_text(
+            self._lbl_queue_title, "queue_title", transform=lambda s: f"<b>{s}</b>"
+        )
         qbl.addWidget(self._lbl_queue_title)
 
         # self.queue は _create_widgets の後で生成されるため lambda 経由で遅延参照
@@ -769,9 +849,15 @@ class App(QMainWindow):
             self._ignore_archive_refetch
         )
         self._queue_tree.setColumnCount(4)
-        self._queue_tree.setHeaderLabels(
-            ["#", t("queue_col_title"), t("queue_col_format"), t("queue_col_status")]
-        )
+        # 0 列目「#」は言語非依存。1〜3 列目はヘッダー項目へ列単位でバインドする。
+        self._queue_tree.setHeaderLabels(["#", "", "", ""])
+        header_item = self._queue_tree.headerItem()
+        for col, key in (
+            (1, "queue_col_title"),
+            (2, "queue_col_format"),
+            (3, "queue_col_status"),
+        ):
+            self._bind_header_column(header_item, col, key)
         hdr = self._queue_tree.header()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -790,12 +876,15 @@ class App(QMainWindow):
         queue_btn_frame = QWidget()
         qbfl = QHBoxLayout(queue_btn_frame)
         qbfl.setContentsMargins(0, 0, 0, 0)
-        self.start_queue_button = QPushButton(t("btn_start_queue"))
+        self.start_queue_button = QPushButton()
+        self._bind_text(self.start_queue_button, "btn_start_queue")
         self.start_queue_button.clicked.connect(self._start_queue)
-        self.pause_queue_button = QPushButton(t("btn_pause_queue"))
+        self.pause_queue_button = QPushButton()
+        self._bind_text(self.pause_queue_button, "btn_pause_queue")
         self.pause_queue_button.clicked.connect(self._pause_queue)
         self.pause_queue_button.setVisible(False)
-        self.remove_item_button = QPushButton(t("btn_remove_item"))
+        self.remove_item_button = QPushButton()
+        self._bind_text(self.remove_item_button, "btn_remove_item")
         self.remove_item_button.clicked.connect(self._remove_selected)
         qbfl.addWidget(self.start_queue_button)
         qbfl.addWidget(self.pause_queue_button)
@@ -809,6 +898,8 @@ class App(QMainWindow):
         # Status bar
         status_bar = QStatusBar()
         self.setStatusBar(status_bar)
+        # status_label は実行状況に応じて表示キーが切り替わるためバインド対象外
+        # （_retranslate_ui の状態依存ブロックで再翻訳する）。
         self.status_label = QLabel(t("status_ready"))
         status_bar.addWidget(self.status_label, 1)
         self.progress_bar = QProgressBar()
@@ -851,7 +942,8 @@ class App(QMainWindow):
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(2)
 
-        self._section_check = QCheckBox(t("section_enable"))
+        self._section_check = QCheckBox()
+        self._bind_text(self._section_check, "section_enable")
         self._section_check.toggled.connect(self._on_section_toggled)
         vbox.addWidget(self._section_check)
 
@@ -861,9 +953,11 @@ class App(QMainWindow):
         inputs.setSpacing(2)
 
         mode_row = QHBoxLayout()
-        self._section_mode_time = QRadioButton(t("section_mode_time"))
+        self._section_mode_time = QRadioButton()
+        self._bind_text(self._section_mode_time, "section_mode_time")
         self._section_mode_time.setChecked(True)
-        self._section_mode_chapter = QRadioButton(t("section_mode_chapter"))
+        self._section_mode_chapter = QRadioButton()
+        self._bind_text(self._section_mode_chapter, "section_mode_chapter")
         self._section_mode_time.toggled.connect(self._on_section_mode_changed)
         mode_row.addWidget(self._section_mode_time)
         mode_row.addWidget(self._section_mode_chapter)
@@ -873,13 +967,15 @@ class App(QMainWindow):
         self._section_time_row = QWidget()
         row = QHBoxLayout(self._section_time_row)
         row.setContentsMargins(0, 0, 0, 0)
-        self._section_start_label = QLabel(t("section_start"))
+        self._section_start_label = QLabel()
+        self._bind_text(self._section_start_label, "section_start")
         row.addWidget(self._section_start_label)
         self._section_start = QLineEdit()
         self._section_start.setPlaceholderText("00:01:30")
         self._section_start.setMaximumWidth(110)
         row.addWidget(self._section_start)
-        self._section_end_label = QLabel(t("section_end"))
+        self._section_end_label = QLabel()
+        self._bind_text(self._section_end_label, "section_end")
         row.addWidget(self._section_end_label)
         self._section_end = QLineEdit()
         self._section_end.setPlaceholderText("00:04:00")
@@ -891,7 +987,8 @@ class App(QMainWindow):
         self._section_chapter_row = QWidget()
         chap = QHBoxLayout(self._section_chapter_row)
         chap.setContentsMargins(0, 0, 0, 0)
-        self._section_chapter_label = QLabel(t("section_chapter_pattern"))
+        self._section_chapter_label = QLabel()
+        self._bind_text(self._section_chapter_label, "section_chapter_pattern")
         chap.addWidget(self._section_chapter_label)
         self._section_chapter_edit = QLineEdit()
         self._section_chapter_edit.setPlaceholderText("^Chapter 1$")
@@ -901,7 +998,8 @@ class App(QMainWindow):
         self._section_chapter_row.setVisible(False)
         inputs.addWidget(self._section_chapter_row)
 
-        self._section_keyframe_check = QCheckBox(t("section_force_keyframes"))
+        self._section_keyframe_check = QCheckBox()
+        self._bind_text(self._section_keyframe_check, "section_force_keyframes")
         inputs.addWidget(self._section_keyframe_check)
 
         self._section_inputs.setVisible(False)

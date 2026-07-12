@@ -163,7 +163,21 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 `_retranslate_ui()` は本ヘルパに加えてメニュー・ラベル・ボタンなど **言語切替時のみ更新が必要な要素** を再翻訳する。キュー行の再描画は `self.queue.refresh_all_tree_items()` に委譲。
 
-再翻訳は手動列挙方式（対象ウィジェットの `setText` / `setTitle` を明示的に呼び直す）のため、**ウィジェットを追加したら `_retranslate_ui()` にも登録が必要**。区間指定 UI（`_build_section_widget()` で構築するチェック・ラジオ・ラベル群）も対象に含まれる。このためラベルは匿名ローカルではなくインスタンス属性で保持する（#238: 登録漏れにより言語切替が再起動まで反映されないバグがあった）。区間入力欄（`QLineEdit`）の placeholder（`"00:01:30"` 等）は時刻フォーマット例示で言語非依存のため再翻訳対象外。
+### 翻訳バインディング（生成時登録方式・#243）
+
+静的テキストの再翻訳は、手動列挙ではなく**生成時登録のバインディングレジストリ**で行う（#238 の再翻訳漏れの恒久対策。仕様は [docs/spec/i18n.md](../spec/i18n.md)）。
+
+- **`_TranslationBinding`**: `key`（翻訳キー）・`setter: Callable[[str], None]`・`getter: Callable[[], str]`・`transform: Callable[[str], str] | None` を保持する凍結 dataclass。`getter` はテストから「キー ⇔ 表示」の一致を機械検証するために持つ。`transform` は `t(key)` の値を加工してから表示する合成テキスト用（ウィンドウタイトルのバージョン合成、キュー見出しの `<b>` 装飾）。
+- **`_bind_translation(key, setter, getter, *, transform=None)`**: バインディングを `self._translation_bindings: list[_TranslationBinding]` に登録し、**その場で初期テキストも設定する**汎用ヘルパ。QMenu の `setTitle`/`title` などはクロージャで渡す。ツリーヘッダー列は列番号をクロージャで固定する専用ラッパ **`_bind_header_column(item, col, key)`** を使う。
+- **`_bind_text(widget, key, *, transform=None)`**: `setText`/`text` を持つウィジェット（`QLabel` / `QCheckBox` / `QRadioButton` / `QPushButton` / `QAction`）向けの薄い便宜ラッパ。
+- `_retranslate_ui()` の静的テキスト部分はレジストリ走査（各バインディングの `setter(transform(t(key)))` 再適用）のみ。
+
+**永続ウィジェットの翻訳テキストは必ずバインドヘルパ経由で設定すること**（生成側で直接 `widget.setText(t(key))` と書くと登録漏れが再発する）。初期テキストもバインドヘルパが設定するため、**ウィジェットのコンストラクタには翻訳テキストを渡さない**（二重設定で単一ソース性を損なわない）。条件付きで生成されるウィジェット（`_act_quit` は macOS 以外のみ）はバインドも同じ分岐内で行う。レジストリ全件の「キー ⇔ 表示」一致検証テストでは、期待値側にも各バインディングの `transform` を適用して比較する（バージョン合成等が自動追従）。以下は例外としてバインド対象外:
+
+- **状態依存テキスト**（`_retranslate_ui()` 内で個別に再翻訳。理由コメント付き）: `add_button`（`btn_add`/`btn_apply_edit` を `edit_mode` で分岐）、`status_label`（実行中は次のステータス更新に委ねて再翻訳をスキップ）、`url_entry` の複数選択編集表示（`edit_multiple_selected`、format 引数あり）
+- **フォーマットコンボ**: 設定値を加味して `_refresh_format_labels()` で都度再構築
+- **一時テキスト（transient）**: コンテキストメニュー・`QToolTip.showText()`・インライン `QMessageBox`（About / 更新確認 / 各種警告）・ログ・ステータス emit 等、表示のたびに `t()` で組み立てるもの。構造的に再翻訳漏れが起きないため登録不要
+- 区間入力欄（`QLineEdit`）の placeholder（`"00:01:30"` 等）は時刻フォーマット例示で言語非依存のため翻訳対象外
 
 ### `_check_dependencies()`
 
