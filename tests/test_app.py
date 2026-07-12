@@ -651,7 +651,7 @@ def test_retranslate_keeps_apply_edit_button_text_in_edit_mode(app):
 # ── URL 取得中の add_button 状態保持（#244） ─────────────────────────────────
 #
 # 対応 spec: [メインウィンドウ](../docs/spec/screens/main-window.md)
-# #状態の重なりと表示の優先順位244。
+# の「状態の重なりと表示の優先順位（#244）」。
 # タイトル取得中はテキスト解決の優先順位が fetching > edit_mode > 通常となり、
 # 言語切替・編集モードの出入りでも「取得中...」表示が失われないことを検証する。
 
