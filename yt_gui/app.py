@@ -494,14 +494,19 @@ class App(QMainWindow):
         """`setText` / `text` を持つウィジェット向けの `_bind_translation` ラッパ。"""
         self._bind_translation(key, widget.setText, widget.text, transform=transform)
 
-    def _bind_header_column(self, item: QTreeWidgetItem, col: int, key: str) -> None:
-        """ツリーヘッダーの 1 列を翻訳バインドする（列番号をクロージャで固定）。"""
+    def _bind_header_column(self, col: int, key: str) -> None:
+        """ツリーヘッダーの 1 列を翻訳バインドする（列番号をクロージャで固定）。
+
+        ヘッダー項目（`QTreeWidgetItem`）は QWidget ではなくツリー内部の C++
+        破棄カスケードで消えるため、クロージャで参照を保持せず適用時に
+        `headerItem()` を都度取得する（wrapper 寿命をレジストリが延ばさない。#246）。
+        """
 
         def _set(text: str) -> None:
-            item.setText(col, text)
+            self._queue_tree.headerItem().setText(col, text)
 
         def _get() -> str:
-            return item.text(col)
+            return self._queue_tree.headerItem().text(col)
 
         self._bind_translation(key, _set, _get)
 
@@ -851,13 +856,12 @@ class App(QMainWindow):
         self._queue_tree.setColumnCount(4)
         # 0 列目「#」は言語非依存。1〜3 列目はヘッダー項目へ列単位でバインドする。
         self._queue_tree.setHeaderLabels(["#", "", "", ""])
-        header_item = self._queue_tree.headerItem()
         for col, key in (
             (1, "queue_col_title"),
             (2, "queue_col_format"),
             (3, "queue_col_status"),
         ):
-            self._bind_header_column(header_item, col, key)
+            self._bind_header_column(col, key)
         hdr = self._queue_tree.header()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
