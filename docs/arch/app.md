@@ -174,7 +174,9 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 
 **永続ウィジェットの翻訳テキストは必ずバインドヘルパ経由で設定すること**（生成側で直接 `widget.setText(t(key))` と書くと登録漏れが再発する）。初期テキストもバインドヘルパが設定するため、**ウィジェットのコンストラクタには翻訳テキストを渡さない**（二重設定で単一ソース性を損なわない）。条件付きで生成されるウィジェット（`_act_quit` は macOS 以外のみ）はバインドも同じ分岐内で行う。レジストリ全件の「キー ⇔ 表示」一致検証テストでは、期待値側にも各バインディングの `transform` を適用して比較する（バージョン合成等が自動追従）。以下は例外としてバインド対象外:
 
-- **状態依存テキスト**（`_retranslate_ui()` 内で個別に再翻訳。理由コメント付き）: `add_button`（`btn_add`/`btn_apply_edit` を `edit_mode` で分岐）、`status_label`（実行中は次のステータス更新に委ねて再翻訳をスキップ）、`url_entry` の複数選択編集表示（`edit_multiple_selected`、format 引数あり）
+- **状態依存テキスト**（`_retranslate_ui()` 内で個別に再翻訳。理由コメント付き）: `add_button`（下記 `_refresh_add_button_text()` で解決）、`status_label`（実行中は次のステータス更新に委ねて再翻訳をスキップ）、`url_entry` の複数選択編集表示（`edit_multiple_selected`、format 引数あり）
+
+`add_button` のテキスト解決は **`_refresh_add_button_text()`** に集約する（#244）。優先順位は **`_fetching` > `queue.edit_mode` > 通常**（`btn_adding` > `btn_apply_edit` > `btn_add`）。`_fetching` はタイトル取得スレッドの実行中フラグで、`_start_add_thread` で True・`_reset_add_button`（`run_in_thread` の `on_finished`、全経路共通の復帰口）で False になる。取得中の状態表現をボタンテキスト自体に依存させない（テキストは何度上書きされても解決し直せる）ため、`_retranslate_ui` / `_on_edit_mode_entered` / `_on_edit_mode_exited` を含め **`add_button.setText` の直接呼び出しは本メソッド以外に置かない**（生成時のコンストラクタ初期テキスト `QPushButton(t("btn_add"))` は状態依存テキストの例外に該当し `setText` でもないため対象外として残す）。`_fetching` と `add_button` の enabled はガードと表示の別責務だが、`_start_add_thread` / `_reset_add_button` で「フラグ設定 → enabled 設定 → `_refresh_add_button_text()`」の順に常に対で動かし、状態を一致させる。仕様は [docs/spec/screens/main-window.md](../spec/screens/main-window.md) の「状態の重なりと表示の優先順位」を参照。
 - **フォーマットコンボ**: 設定値を加味して `_refresh_format_labels()` で都度再構築
 - **一時テキスト（transient）**: コンテキストメニュー・`QToolTip.showText()`・インライン `QMessageBox`（About / 更新確認 / 各種警告）・ログ・ステータス emit 等、表示のたびに `t()` で組み立てるもの。構造的に再翻訳漏れが起きないため登録不要
 - 区間入力欄（`QLineEdit`）の placeholder（`"00:01:30"` 等）は時刻フォーマット例示で言語非依存のため翻訳対象外
