@@ -320,6 +320,9 @@ class App(QMainWindow):
             if os.path.isfile(default):
                 self._settings.cookies_path = default
 
+        # タイトル取得スレッドの実行中フラグ（#244）。add_button のテキスト解決
+        # （_refresh_add_button_text）が参照するため、UI 構築より前に初期化する。
+        self._fetching = False
         self._showing_pause_button = False
         self._log_entries: list[str] = []
         self._log_dialog: LogDialog | None = None
@@ -522,9 +525,7 @@ class App(QMainWindow):
 
         # 以下は状態に応じて表示キーが切り替わるため、生成時 1 回のバインドでは
         # 表現できず手動で再翻訳する（バインド対象外の理由）。
-        self.add_button.setText(
-            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
-        )
+        self._refresh_add_button_text()
         if self.queue.edit_mode and len(self.queue.editing_items) > 1:
             # 複数選択編集中の URL 欄は件数入りの案内文を表示している
             # （#243 で発見した #238 と同型の再翻訳漏れの解消）。
@@ -536,6 +537,23 @@ class App(QMainWindow):
             self.status_label.setText(
                 t("status_edit_mode") if self.queue.edit_mode else t("status_ready")
             )
+
+    def _refresh_add_button_text(self) -> None:
+        """`add_button` のテキストを現在の状態から解決する（#244）。
+
+        優先順位は fetching > edit_mode > 通常。「取得中」の状態はボタンテキスト
+        ではなく `_fetching` フラグが持つため、言語切替・編集モードの出入りで
+        何度上書きが起きてもここで解決し直せる。**`add_button.setText` は本メソッド
+        以外から呼ばないこと**（仕様は docs/spec/screens/main-window.md
+        「状態の重なりと表示の優先順位」）。
+        """
+        if self._fetching:
+            key = "btn_adding"
+        elif self.queue.edit_mode:
+            key = "btn_apply_edit"
+        else:
+            key = "btn_add"
+        self.add_button.setText(t(key))
 
     def _resolve_download_path(self) -> str:
         path = self._settings.download_path
@@ -812,8 +830,8 @@ class App(QMainWindow):
         add_frame = QWidget()
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(0, 8, 0, 2)
-        # add_button は編集モード等で表示キーが切り替わるためバインド対象外
-        # （_retranslate_ui の状態依存ブロックで再翻訳する）。
+        # add_button は取得中・編集モードで表示キーが切り替わるためバインド対象外
+        # （_refresh_add_button_text が fetching > edit_mode > 通常の優先順位で解決）。
         self.add_button = QPushButton(t("btn_add"))
         self.add_button.clicked.connect(self._add_url)
         add_layout.addWidget(self.add_button)
@@ -1323,8 +1341,11 @@ class App(QMainWindow):
         *,
         item_cookies_path: str | None = None,
     ):
+        # フラグ設定 → enabled 設定 → テキスト解決の順で対に動かす（#244。
+        # enabled は多重起動ガード、_fetching は表示の責務だが状態は一致させる）。
+        self._fetching = True
         self.add_button.setEnabled(False)
-        self.add_button.setText(t("btn_adding"))
+        self._refresh_add_button_text()
         self._update_status(t("status_fetching_title"), 0)
 
         def _work():
@@ -1355,10 +1376,10 @@ class App(QMainWindow):
         )
 
     def _reset_add_button(self):
+        """取得完了時の共通復帰口（`run_in_thread` の on_finished。成功・失敗共通）。"""
+        self._fetching = False
         self.add_button.setEnabled(True)
-        self.add_button.setText(
-            t("btn_apply_edit") if self.queue.edit_mode else t("btn_add")
-        )
+        self._refresh_add_button_text()
 
     def _on_fetch_for_add_done(self, payload: dict):
         result = payload["result"]
@@ -1474,7 +1495,7 @@ class App(QMainWindow):
         # ダイアログ側で行う（編集モードのダイアログが orig_settings を受け取り
         # restore_from_settings + trigger_fetch を実行する）。
 
-        self.add_button.setText(t("btn_apply_edit"))
+        self._refresh_add_button_text()
         self._cancel_edit_button.setVisible(True)
 
         if not self.queue.is_running:
@@ -1525,7 +1546,7 @@ class App(QMainWindow):
         self.url_entry.clear()
         self.url_entry.setReadOnly(False)
 
-        self.add_button.setText(t("btn_add"))
+        self._refresh_add_button_text()
         self._cancel_edit_button.setVisible(False)
 
         self._set_original_format_enabled(True)

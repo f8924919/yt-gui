@@ -648,6 +648,143 @@ def test_retranslate_keeps_apply_edit_button_text_in_edit_mode(app):
     assert app.add_button.text() == en.STRINGS["btn_apply_edit"]
 
 
+# ── URL 取得中の add_button 状態保持（#244） ─────────────────────────────────
+#
+# 対応 spec: [メインウィンドウ](../docs/spec/screens/main-window.md)
+# の「状態の重なりと表示の優先順位（#244）」。
+# タイトル取得中はテキスト解決の優先順位が fetching > edit_mode > 通常となり、
+# 言語切替・編集モードの出入りでも「取得中...」表示が失われないことを検証する。
+
+
+def _start_fetch(app, monkeypatch) -> dict:
+    """タイトル取得開始直後の状態を実経路（`_start_add_thread`）で作る。
+
+    スレッドは起動せず、`run_in_thread` に渡されるコールバックを捕捉して返す
+    （`on_finished` = `_reset_add_button` を後から呼べるようにする）。"""
+    captured: dict = {}
+
+    def fake_run_in_thread(
+        work, *, on_done=None, on_failed=None, on_finished=None, parent=None
+    ):
+        captured.update(on_done=on_done, on_failed=on_failed, on_finished=on_finished)
+
+    monkeypatch.setattr(app_module, "run_in_thread", fake_run_in_thread)
+    app._start_add_thread(
+        "https://example.com/v",
+        None,
+        None,
+        build_job_spec("fmt_best_mp4", Settings()),
+        "MP4",
+    )
+    return captured
+
+
+def test_retranslate_keeps_btn_adding_while_fetching(app, monkeypatch):
+    """取得中に言語を切り替えても切替先ロケールの btn_adding を表示し続ける。"""
+    from yt_gui.locales import en, ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    _start_fetch(app, monkeypatch)
+    assert app.add_button.text() == ja.STRINGS["btn_adding"]
+    assert not app.add_button.isEnabled()
+
+    i18n.set_language("en")
+    app._retranslate_ui()
+
+    assert app.add_button.text() == en.STRINGS["btn_adding"]
+    assert not app.add_button.isEnabled()
+
+
+def test_enter_edit_mode_keeps_btn_adding_while_fetching(app, monkeypatch):
+    """取得中の編集モード入りでも btn_adding 維持、取得完了後 btn_apply_edit。"""
+    from yt_gui.locales import ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    captured = _start_fetch(app, monkeypatch)
+
+    assert app.queue.enter_edit_mode([_make_item("waiting")])
+    assert app.add_button.text() == ja.STRINGS["btn_adding"]
+
+    captured["on_finished"]()  # = _reset_add_button（取得完了）
+
+    assert app._fetching is False
+    assert app.add_button.isEnabled()
+    assert app.add_button.text() == ja.STRINGS["btn_apply_edit"]
+
+
+def test_exit_edit_mode_keeps_btn_adding_while_fetching(app, monkeypatch):
+    """取得中に編集モードを抜けても btn_adding が維持される（消失経路 3）。"""
+    from yt_gui.locales import ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    _start_fetch(app, monkeypatch)
+
+    assert app.queue.enter_edit_mode([_make_item("waiting")])
+    app.queue.cancel_edit()
+
+    assert app.add_button.text() == ja.STRINGS["btn_adding"]
+    assert not app.add_button.isEnabled()
+
+
+def test_reset_add_button_restores_normal_text_after_fetch(app, monkeypatch):
+    """取得完了後は通常状態なら btn_add へ復帰する（成功経路の baseline）。"""
+    from yt_gui.locales import ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    captured = _start_fetch(app, monkeypatch)
+
+    captured["on_finished"]()
+
+    assert app._fetching is False
+    assert app.add_button.isEnabled()
+    assert app.add_button.text() == ja.STRINGS["btn_add"]
+
+
+def test_reset_add_button_restores_after_fetch_failure(app, monkeypatch):
+    """取得失敗（on_failed 経由）でも _fetching が戻り btn_add へ復帰する。
+
+    `run_in_thread` は成功・失敗を問わず最後に on_finished を呼ぶ契約
+    （threading_utils）であり、失敗時も同じ復帰口を通ることを検証する。"""
+    from yt_gui.locales import ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    captured = _start_fetch(app, monkeypatch)
+
+    captured["on_failed"](Exception("boom"))  # QMessageBox は autouse で no-op
+    captured["on_finished"]()
+
+    assert app._fetching is False
+    assert app.add_button.isEnabled()
+    assert app.add_button.text() == ja.STRINGS["btn_add"]
+
+
+def test_btn_adding_survives_combined_transitions_while_fetching(app, monkeypatch):
+    """複合: 取得中の「編集入り→言語切替→編集抜け」でも常に btn_adding。"""
+    from yt_gui.locales import en, ja
+
+    i18n.set_language("ja")
+    app._retranslate_ui()
+    captured = _start_fetch(app, monkeypatch)
+
+    assert app.queue.enter_edit_mode([_make_item("waiting")])
+    assert app.add_button.text() == ja.STRINGS["btn_adding"]
+
+    i18n.set_language("en")
+    app._retranslate_ui()
+    assert app.add_button.text() == en.STRINGS["btn_adding"]
+
+    app.queue.cancel_edit()
+    assert app.add_button.text() == en.STRINGS["btn_adding"]
+
+    captured["on_finished"]()
+    assert app.add_button.text() == en.STRINGS["btn_add"]
+
+
 # ── ログダイアログの起動・再表示（_open_log_dialog） ─────────────────────────
 #
 # 対応 spec: [ログダイアログ](../docs/spec/screens/log-dialog.md)。
