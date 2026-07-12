@@ -2,7 +2,7 @@
 
 - Issue: https://github.com/f8924919/yt-gui/issues/246
 - ブランチ: `bugfix/246-flaky-qt-teardown`
-- ステータス: 進行中
+- ステータス: 完了（2026-07-12）
 
 ## 背景
 
@@ -26,9 +26,14 @@
 - [x] Issue 起票（#246）
 - [x] ブランチ作成
 - [x] 調査（investigate）
-- [ ] 受け入れ条件レビュー（criteria-review）
+- [x] 受け入れ条件レビュー（criteria-review → flush 機構の決定論的テスト追加・コメント要件の具体化・qt マーカー必須注記を採用し Issue 更新）
 - [x] docs 先行（testing/policy.md §2.5・arch/app.md）
-- [ ] 設計レビュー（design-review — investigate 推奨 yes）
-- [ ] テスト先行
-- [ ] 実装 → green
-- [ ] verify-gate → PR
+- [x] 設計レビュー（design-review → flush 1 回呼び切り・helper は conftest 内・主/補助のコミット分離を採用）
+- [x] テスト先行（tests/test_conftest.py: deleteLater → flush → destroyed の決定論的検証 3 本）
+- [x] 実装 → green（ruff / format / mypy / pytest 480 件）
+- [x] verify-gate → PR
+
+## 実装サマリ
+
+- 主対策（コミット 1/2）: conftest に `flush_deferred_deletes` ヘルパ＋autouse フィクスチャ `_flush_qt_deferred_deletes`（qt マーカー限定）。teardown で `sendPostedEvents(None, DeferredDelete)` を 1 回呼び、遅延破棄をテスト境界内で消化。順序保証の根拠（pytest-qt のフック構造）はコードコメントに明記。
+- 補助対策（コミット 2/2）: `_bind_header_column(col, key)` 化。ヘッダー項目参照をクロージャで保持せず `headerItem()` を都度取得。

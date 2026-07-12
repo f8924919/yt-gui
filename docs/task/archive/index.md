@@ -45,7 +45,8 @@
 | [201-extension-port-exclusive-bind.md](201-extension-port-exclusive-bind.md) | Windows で拡張連携サーバーのポートフォールバックが発動しない不具合を修正。Windows の SO_REUSEADDR 仕様差（LISTEN 中ポートへの bind が成功）が原因。`resolve_allow_reuse_address` 純関数＋`_ExclusiveBindHTTPServer` サブクラスで win32 のみ排他 bind 化、POSIX は TIME_WAIT 再バインドのため維持（Issue #201 / PR #202） | 2026-07-05 |
 | [238-section-ui-retranslate.md](238-section-ui-retranslate.md) | 区間ダウンロード UI の言語切替即時反映漏れを修正。`_retranslate_ui()`（手動列挙方式）に区間 UI 7 ウィジェットを登録、匿名 QLabel 3 つをインスタンス属性へ昇格（Issue #238 / PR #239） | 2026-07-11 |
 | [240-hook-cross-repo.md](240-hook-cross-repo.md) | main 保護 hook のクロスリポジトリ誤ブロックを修正。複合コマンドの `cd` 追跡＋実効ディレクトリでのブランチ判定・`-C <path>` の累積解決（検出漏れも解消）・`--git-dir`/`--work-tree` 等はフェイルオープン。hook を mypy 対象化し policy.md スコープ表へ追記（Issue #240 / PR #241） | 2026-07-12 |
-| [243-retranslate-registry.md](243-retranslate-registry.md) | 再翻訳の手動列挙方式を生成時登録のバインディングレジストリへ置き換え（#238 の恒久対策）。`_TranslationBinding`＋`_bind_text` 系ヘルパで static 26 箇所を生成時バインド化、レジストリ全件検証＋ja 残留セーフティネットの 2 段テストを新設。調査で発見した複数選択編集時 `edit_multiple_selected` の再翻訳漏れも解消（Issue #243） | 2026-07-12 |
+| [243-retranslate-registry.md](243-retranslate-registry.md) | 再翻訳の手動列挙方式を生成時登録のバインディングレジストリへ置き換え（#238 の恒久対策）。`_TranslationBinding`＋`_bind_text` 系ヘルパで static 26 箇所を生成時バインド化、レジストリ全件検証＋ja 残留セーフティネットの 2 段テストを新設。調査で発見した複数選択編集時 `edit_multiple_selected` の再翻訳漏れも解消（Issue #243 / PR #245） | 2026-07-12 |
+| [246-flaky-qt-teardown.md](246-flaky-qt-teardown.md) | CI の非決定的 SIGABRT（先行テストのウィジェット遅延破棄が後続テストのイベントループ中に実行される テスト間リーク）対策。conftest の autouse フィクスチャ（qt マーカー限定）が teardown で `sendPostedEvents(None, DeferredDelete)` を呼び遅延破棄をテスト境界内で消化、flush 機構の決定論的テストを新設。補助として `_bind_header_column` のヘッダー項目参照を都度取得化（Issue #246） | 2026-07-12 |
 
 ## ニコニコ動画コメント取得
 
