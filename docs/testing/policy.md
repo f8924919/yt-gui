@@ -83,6 +83,8 @@ Qt UI（状態機械・ロジック）行のテストを記述・実行する際
 - **副作用の抑制**: `offscreen` ではモーダル `QMessageBox.warning/critical/information/question` が無限ブロックするため no-op 化する（`conftest.py` の `_silence_qt_modal_dialogs` が `qt` マーカー付きテストへ autouse で適用）。`App` 構築時は `Downloader.missing_dependencies()`（PATH 実走査）が走るため、決定性確保のためモックする。
 - **モーダル経路の駆動（手段B）**: 分岐や状態反映を検証したい場合は、autouse の no-op を**テスト内で上書き**する。`QMessageBox.question` は `monkeypatch.setattr(..., lambda *a, **kw: QMessageBox.StandardButton.Yes)` で Yes/No を固定し、`QFileDialog.get*` は返却パスを固定値に差し替える。`QDialog.exec()` は `monkeypatch` で no-op 化（即 return）するか、`QTimer.singleShot(0, ...)` で `QApplication.activeModalWidget()` を取得して `accept()`/ボタン押下する。シグナル経由で検証できる箇所（`add_requested` 等）は `exec()` を介さず `_make_*` でダイアログを生成してシグナルを直接 emit する方を優先する。
 - **イベントループ / 後始末**: `qtbot.waitSignal` / `qtbot.waitUntil` で条件待ちする。`run_in_thread` は daemon スレッドで Qt シグナルをキュー発火するため、受信側 QObject がテスト終了時に破棄されないよう、シグナル受信を待ち切ってからテストを終える。
+- **遅延破棄の決定論化（#246）**: ウィジェットの `deleteLater()` による破棄イベント（`DeferredDelete`）を**テスト境界を越えて漏らさない**。pytest-qt は `pytest_runtest_teardown` フック（fixture finalizer より前）で登録ウィジェットの close / `deleteLater()` と `processEvents()` を行うが、Qt は DeferredDelete を loop-level ガードで遅延させるため `processEvents()` では消化されないことがある。積み残しが後続テストのイベントループ処理中に実行されると、Python GC と C++ デストラクタ連鎖の順序次第で二重解放（SIGABRT）を起こしうる。`conftest.py` の autouse フィクスチャ（`qt` マーカー限定）が teardown ——fixture finalizer は qtbot のフック後に走るため必ず close / `deleteLater()` の後になる——で `QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)`（event_type 明示によりガードを迂回して強制 flush）により確実に消化する。これにより、参照サイクル等で生き残っている wrapper については C++ 側の破棄が Python 側 GC より先行する順序が保証される。flush 機構自体の動作は `tests/test_conftest.py` で決定論的に検証する。
+- **`qt` マーカーの付与は必須**: qtbot・ウィジェット・`QApplication` を使うテストには必ず `@pytest.mark.qt`（モジュール単位なら `pytestmark`）を付ける。上記の遅延破棄 flush と `_silence_qt_modal_dialogs` は `qt` マーカー限定で適用されるため、付け忘れると保護の対象外になる。
 - 要件の詳細・つまずきポイントは [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) を参照。
 
 ---
@@ -92,7 +94,8 @@ Qt UI（状態機械・ロジック）行のテストを記述・実行する際
 ```
 tests/
 ├── __init__.py
-├── conftest.py            ← 共有フィクスチャ（i18n 復元・offscreen 固定・QMessageBox 抑制）
+├── conftest.py            ← 共有フィクスチャ（i18n 復元・offscreen 固定・QMessageBox 抑制・遅延破棄 flush）
+├── test_conftest.py       ← Qt（@pytest.mark.qt）。conftest 共有ヘルパ（遅延破棄 flush）の検証
 ├── test_utils.py
 ├── test_formats.py
 ├── test_job_spec.py
