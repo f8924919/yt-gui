@@ -168,7 +168,7 @@ URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` /
 静的テキストの再翻訳は、手動列挙ではなく**生成時登録のバインディングレジストリ**で行う（#238 の再翻訳漏れの恒久対策。仕様は [docs/spec/i18n.md](../spec/i18n.md)）。
 
 - **`_TranslationBinding`**: `key`（翻訳キー）・`setter: Callable[[str], None]`・`getter: Callable[[], str]`・`transform: Callable[[str], str] | None` を保持する凍結 dataclass。`getter` はテストから「キー ⇔ 表示」の一致を機械検証するために持つ。`transform` は `t(key)` の値を加工してから表示する合成テキスト用（ウィンドウタイトルのバージョン合成、キュー見出しの `<b>` 装飾）。
-- **`_bind_translation(key, setter, getter, *, transform=None)`**: バインディングを `self._translation_bindings: list[_TranslationBinding]` に登録し、**その場で初期テキストも設定する**汎用ヘルパ。QMenu の `setTitle`/`title` などはクロージャで渡す。ツリーヘッダー列は列番号をクロージャで固定する専用ラッパ **`_bind_header_column(item, col, key)`** を使う。
+- **`_bind_translation(key, setter, getter, *, transform=None)`**: バインディングを `self._translation_bindings: list[_TranslationBinding]` に登録し、**その場で初期テキストも設定する**汎用ヘルパ。QMenu の `setTitle`/`title` などはクロージャで渡す。ツリーヘッダー列は列番号をクロージャで固定する専用ラッパ **`_bind_header_column(col, key)`** を使う。ヘッダー項目（`QTreeWidgetItem`）の参照はクロージャで保持せず、適用時に `_queue_tree.headerItem()` を都度取得する（ヘッダー項目は QWidget ではなく qtbot にも登録されず、ツリー内部の C++ 破棄カスケードで消えるため、レジストリによる wrapper 寿命延長の影響が他のバインド対象より出やすい。#246）。
 - **`_bind_text(widget, key, *, transform=None)`**: `setText`/`text` を持つウィジェット（`QLabel` / `QCheckBox` / `QRadioButton` / `QPushButton` / `QAction`）向けの薄い便宜ラッパ。
 - `_retranslate_ui()` の静的テキスト部分はレジストリ走査（各バインディングの `setter(transform(t(key)))` 再適用）のみ。
 
