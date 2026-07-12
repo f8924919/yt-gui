@@ -32,7 +32,7 @@ yt-dlp は `downloader.py` で **Python API として密結合**している
 | 最新版照会 | `yt_dlp_update.check_for_update()` が PyPI JSON API（`pypi.org/pypi/yt-dlp/json` の `info.version`）を stdlib `urllib` で取得。HTTP は `fetch` 引数で差し替え可能 |
 | レスポンス解析 | `yt_dlp_update.parse_latest_version()`（純関数。`info.version` を取り出す） |
 | 比較 | `yt_dlp_update.compare_versions()`（純関数。`packaging.version` で比較し `UpdateStatus` を返す） |
-| UI 接続 | `app.py` の `_create_menu` にヘルプメニュー＋「バージョン情報 / 更新を確認」（1 項目）を追加。`QMessageBox` でバージョン併記・照会結果を表示し、古い場合は `QDesktopServices.openUrl` で yt-dlp GitHub releases を開く。`_window_title` がバージョン表示の前例 |
+| UI 接続 | `app.py` の `_create_menu` にヘルプメニュー＋「バージョン情報 / 更新を確認」（1 項目）を追加。`QMessageBox` でバージョン併記・照会結果を表示し、古い場合は `QDesktopServices.openUrl` で yt-dlp GitHub releases を開く。ウィンドウタイトルのバージョン合成（`app_title` の翻訳バインディング transform、[app.md](app.md)）がバージョン表示の前例 |
 
 - ネットワーク照会は**バックグラウンドスレッド**で行い、結果は Qt の
   `Signal`/`Slot` でメインスレッドへ戻す（[app.md](app.md) のスレッド間通信
