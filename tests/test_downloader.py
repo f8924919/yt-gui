@@ -71,6 +71,14 @@ def downloader(tmp_path):
     return Downloader(output_dir=str(tmp_path))
 
 
+@pytest.fixture(autouse=True)
+def _clear_path_reservations():
+    """パス予約集合はクラス属性（プロセス内共有）のため毎テスト空に戻す。"""
+    Downloader._reserved_paths.clear()
+    yield
+    Downloader._reserved_paths.clear()
+
+
 def _pp_keys(opts: dict) -> list[str]:
     return [pp["key"] for pp in opts.get("postprocessors", [])]
 
@@ -510,6 +518,13 @@ def _patch_fake_ydl(monkeypatch, tmp_path, *, info):
     monkeypatch.setattr(dl_mod, "YoutubeDL", _FakeYDL)
 
 
+class _FakeReservation:
+    """`_resolve_unique_path` をスタブする際の予約トークン代用。"""
+
+    def release(self) -> None:
+        pass
+
+
 def test_resolve_unique_path_skipped_when_archived_info_none(
     tmp_path, monkeypatch
 ) -> None:
@@ -538,7 +553,7 @@ def test_resolve_unique_path_no_skip_when_ignore_archive(tmp_path, monkeypatch) 
         monkeypatch, tmp_path, info={"id": "vid", "extractor_key": "Youtube"}
     )
 
-    _stem, ext, _ = dl._resolve_unique_path(
+    _stem, ext, _, _ = dl._resolve_unique_path(
         {}, "https://example.com/v", _job(ignore_archive=True), extra_info=None
     )
     assert ext == ".mp4"
@@ -784,7 +799,12 @@ def test_download_video_cleans_up_and_reraises_on_cancel(downloader, tmp_path) -
     part = tmp_path / "動画.mp4.part"
     part.write_text("x")
 
-    downloader._resolve_unique_path = lambda *a, **k: (stem, ".mp4", None)
+    downloader._resolve_unique_path = lambda *a, **k: (
+        stem,
+        ".mp4",
+        None,
+        _FakeReservation(),
+    )
 
     def _raise(*a, **k):
         raise DownloadCancelled()
@@ -806,6 +826,7 @@ def test_download_video_clears_previous_cancel_request(downloader, tmp_path) -> 
         str(tmp_path / "v"),
         ".mp4",
         None,
+        _FakeReservation(),
     )
 
     def _run(*a, **k):
@@ -940,6 +961,7 @@ def test_download_video_invokes_cut_section_when_section_set(downloader, tmp_pat
         str(tmp_path / "v"),
         ".mp4",
         None,
+        _FakeReservation(),
     )
     downloader._run_download = lambda *a, **k: None
 
@@ -1184,6 +1206,7 @@ def test_download_video_invokes_cut_chapters_when_regex_set(downloader, tmp_path
         str(tmp_path / "v"),
         ".mp4",
         _CHAPTERS,
+        _FakeReservation(),
     )
     downloader._run_download = lambda *a, **k: None
 
@@ -1204,7 +1227,12 @@ def test_download_video_skips_nico_processing_in_chapter_mode(downloader, tmp_pa
     downloader.status_callback = lambda *a, **k: None
     logs: list[str] = []
     downloader.log_callback = logs.append
-    downloader._resolve_unique_path = lambda *a, **k: (str(tmp_path / "v"), ".mp4", [])
+    downloader._resolve_unique_path = lambda *a, **k: (
+        str(tmp_path / "v"),
+        ".mp4",
+        [],
+        _FakeReservation(),
+    )
     downloader._run_download = lambda *a, **k: None
     downloader._cut_chapter_sections = lambda *a, **k: None
 
@@ -1836,7 +1864,7 @@ def test_resolve_unique_path_audio_extraction_uses_codec_ext(
     downloader, tmp_path, monkeypatch
 ) -> None:
     _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
-    _stem, ext, _ = downloader._resolve_unique_path(
+    _stem, ext, _, _ = downloader._resolve_unique_path(
         {},
         "https://example.com/v",
         _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
@@ -1851,12 +1879,275 @@ def test_resolve_unique_path_appends_suffix_on_collision(
     _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
     (tmp_path / "動画.mp4").write_text("x")  # 既存ファイルで衝突を起こす
     opts: dict = {}
-    stem, ext, _ = downloader._resolve_unique_path(
+    stem, ext, _, _ = downloader._resolve_unique_path(
         opts, "https://example.com/v", _job(remux_only=True), extra_info=None
     )
     assert ext == ".mp4"
     assert stem.endswith("動画 (1)")
     assert opts["outtmpl"].endswith("動画 (1).%(ext)s")
+
+
+# ── 並列ダウンロード時のパス予約（#249） ─────────────────────────────────────
+# 対応仕様: docs/spec/features/download-behavior.md「並列ダウンロード時の
+# 衝突回避（パス予約）」。検証はタイミング依存にせず、予約状態の直接注入と
+# threading.Barrier で競合区間を決定的に再現する。
+
+
+def test_resolve_unique_path_reserves_base_path_and_releases(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    # 衝突が無くても基底パスを予約登録し、release() で解除される。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    _stem, _, _, reservation = downloader._resolve_unique_path(
+        {}, "https://example.com/v", _job(remux_only=True), extra_info=None
+    )
+    assert str(tmp_path / "動画.mp4") in Downloader._reserved_paths
+    reservation.release()
+    assert Downloader._reserved_paths == set()
+
+
+def test_resolve_unique_path_second_worker_sees_reservation(
+    tmp_path, monkeypatch
+) -> None:
+    # TOCTOU 回帰: ファイルがまだ 1 つも無くても、先行ワーカーの予約により
+    # 後続ワーカーは (1) へ分離される。同一 URL の重複登録も別 URL の同名
+    # タイトルも、resolve から見える条件は「同じパスに解決される」で同一。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    dl_a = Downloader(output_dir=str(tmp_path))
+    dl_b = Downloader(output_dir=str(tmp_path))  # 並列ワーカーは別インスタンス
+
+    stem_a, _, _, _ = dl_a._resolve_unique_path(
+        {}, "https://example.com/v", _job(remux_only=True), extra_info=None
+    )
+    opts_b: dict = {}
+    stem_b, _, _, _ = dl_b._resolve_unique_path(
+        opts_b, "https://example.com/v2", _job(remux_only=True), extra_info=None
+    )
+    assert stem_a.endswith("動画")
+    assert stem_b.endswith("動画 (1)")
+    assert opts_b["outtmpl"].endswith("動画 (1).%(ext)s")
+
+
+def test_resolve_unique_path_reservation_covers_playlist_subfolder(
+    tmp_path, monkeypatch
+) -> None:
+    # プレイリスト内の同名タイトルエントリ（サブフォルダ内衝突）も分離される。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    _FakeYDL._stem = tmp_path / "PL" / "動画.mp4"
+    dl_a = Downloader(output_dir=str(tmp_path))
+    dl_b = Downloader(output_dir=str(tmp_path))
+
+    stem_a, _, _, _ = dl_a._resolve_unique_path(
+        {}, "https://example.com/v1", _job(remux_only=True), extra_info=None
+    )
+    stem_b, _, _, _ = dl_b._resolve_unique_path(
+        {}, "https://example.com/v2", _job(remux_only=True), extra_info=None
+    )
+    assert stem_a == str(tmp_path / "PL" / "動画")
+    assert stem_b == str(tmp_path / "PL" / "動画 (1)")
+
+
+def test_resolve_unique_path_reserves_intermediate_path(tmp_path, monkeypatch) -> None:
+    # 最終拡張子が違っても（MP3 vs FLAC）中間ファイル（.webm）が衝突するため
+    # 後続は (1) へ分離される。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    _FakeYDL._stem = tmp_path / "動画.webm"
+    dl_a = Downloader(output_dir=str(tmp_path))
+    dl_b = Downloader(output_dir=str(tmp_path))
+
+    stem_a, _, _, _ = dl_a._resolve_unique_path(
+        {},
+        "https://example.com/v",
+        _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
+        extra_info=None,
+    )
+    stem_b, _, _, _ = dl_b._resolve_unique_path(
+        {},
+        "https://example.com/v",
+        _job(format_id="fmt_flac", audio_only=True, audio_codec="flac"),
+        extra_info=None,
+    )
+    assert stem_a.endswith("動画")
+    assert stem_b.endswith("動画 (1)")
+
+
+def test_resolve_unique_path_single_n_satisfies_final_and_intermediate(
+    tmp_path, monkeypatch
+) -> None:
+    # n は最終・中間の両パスで空きを満たす単一値を選ぶ。
+    # 既存: 動画.mp3（最終が衝突）・動画 (1).webm（中間が衝突）→ (2) を採用。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    _FakeYDL._stem = tmp_path / "動画.webm"
+    (tmp_path / "動画.mp3").write_text("x")
+    (tmp_path / "動画 (1).webm").write_text("x")
+    dl = Downloader(output_dir=str(tmp_path))
+
+    stem, _, _, _ = dl._resolve_unique_path(
+        {},
+        "https://example.com/v",
+        _job(format_id="fmt_mp3", audio_only=True, audio_codec="mp3"),
+        extra_info=None,
+    )
+    assert stem.endswith("動画 (2)")
+
+
+def test_resolve_unique_path_concurrent_resolution_is_atomic(
+    tmp_path, monkeypatch
+) -> None:
+    # 2 スレッドが extract_info（ロック外）を終えてから同時にパス確定へ進む
+    # よう Barrier で揃える。ロックにより一方が基底、他方が (1) を得る。
+    import threading
+
+    import yt_gui.downloader as dl_mod
+
+    barrier = threading.Barrier(2)
+
+    class _BarrierYDL(_FakeYDL):
+        def extract_info(self, url, download, extra_info=None):
+            barrier.wait(timeout=5)
+            return type(self)._next_info
+
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    monkeypatch.setattr(dl_mod, "YoutubeDL", _BarrierYDL)
+
+    results: list[str] = []
+    errors: list[Exception] = []
+
+    def _worker() -> None:
+        try:
+            dl = Downloader(output_dir=str(tmp_path))
+            stem, _, _, _ = dl._resolve_unique_path(
+                {}, "https://example.com/v", _job(remux_only=True), extra_info=None
+            )
+            results.append(stem)
+        except Exception as e:  # スレッド内の失敗をテスト失敗として観測する
+            errors.append(e)
+
+    threads = [threading.Thread(target=_worker) for _ in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(timeout=10)
+
+    assert errors == []
+    assert sorted(results) == [
+        str(tmp_path / "動画"),
+        str(tmp_path / "動画 (1)"),
+    ]
+
+
+def test_download_video_releases_reservation_on_success(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    downloader.status_callback = lambda *a, **k: None
+    downloader._run_download = lambda *a, **k: None
+
+    downloader.download_video("https://example.com/v", _job(remux_only=True))
+    assert Downloader._reserved_paths == set()
+
+
+def test_download_video_releases_reservation_on_postprocess_failure(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    # 「失敗」はダウンロード本体だけでなく後処理（区間切り出し等）の失敗も含む。
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    downloader.status_callback = lambda *a, **k: None
+    downloader._run_download = lambda *a, **k: None
+
+    def _boom(*a, **k):
+        raise RuntimeError("boom")
+
+    downloader._cut_section = _boom
+
+    with pytest.raises(RuntimeError):
+        downloader.download_video(
+            "https://example.com/v",
+            _job(remux_only=True, section_start="00:00:01", section_end="00:00:02"),
+        )
+    assert Downloader._reserved_paths == set()
+
+
+def test_download_video_cancel_cleans_partials_before_release(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    # キャンセル時は「部分ファイル掃除 → 予約解除」の順であること。順序が
+    # 逆だと、解除直後に同名基底を予約した別ワーカーの .part を掃除が巻き込む。
+    from yt_dlp.utils import DownloadCancelled
+
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    downloader.status_callback = lambda *a, **k: None
+
+    held_at_cleanup: dict[str, bool] = {}
+    orig_cleanup = downloader._cleanup_partial_files
+
+    def _spy_cleanup(stem: str) -> None:
+        held_at_cleanup["held"] = bool(Downloader._reserved_paths)
+        orig_cleanup(stem)
+
+    downloader._cleanup_partial_files = _spy_cleanup
+
+    def _raise(*a, **k):
+        raise DownloadCancelled()
+
+    downloader._run_download = _raise
+
+    with pytest.raises(DownloadCancelled):
+        downloader.download_video("https://example.com/v", _job(remux_only=True))
+
+    assert held_at_cleanup["held"] is True  # 掃除の時点では予約が生きている
+    assert Downloader._reserved_paths == set()  # 解除は掃除の後に行われた
+
+
+def test_resolve_unique_path_base_reusable_after_cancel_release(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    # キャンセルで予約が解除された後の新規予約は、ファイルが残っていなければ
+    # サフィックス無しの基底パスを得る（不要な (n) が付かない）。
+    from yt_dlp.utils import DownloadCancelled
+
+    _patch_fake_ydl(monkeypatch, tmp_path, info={"id": "v"})
+    downloader.status_callback = lambda *a, **k: None
+
+    def _raise(*a, **k):
+        raise DownloadCancelled()
+
+    downloader._run_download = _raise
+    with pytest.raises(DownloadCancelled):
+        downloader.download_video("https://example.com/v", _job(remux_only=True))
+
+    dl_b = Downloader(output_dir=str(tmp_path))
+    stem, _, _, _ = dl_b._resolve_unique_path(
+        {}, "https://example.com/v", _job(remux_only=True), extra_info=None
+    )
+    assert stem.endswith("動画")
+    assert not stem.endswith("(1)")
+
+
+def test_cleanup_partial_files_keeps_sibling_suffixed_item_files(
+    downloader, tmp_path
+) -> None:
+    # #249: 基底 stem の掃除が並列中の「(n) 付き兄弟アイテム」の一時ファイルを
+    # 巻き込まないこと（stem 直後がドットのファイルだけを対象にする）。
+    stem = str(tmp_path / "動画")
+    targets = [
+        tmp_path / "動画.mp4.part",
+        tmp_path / "動画.ytdl",
+    ]
+    siblings = [
+        tmp_path / "動画 (1).mp4.part",
+        tmp_path / "動画 (1).ytdl",
+        tmp_path / "動画 (1).en.srt",
+    ]
+    for p in targets + siblings:
+        p.write_text("x")
+
+    downloader._cleanup_partial_files(stem)
+
+    for p in targets:
+        assert not p.exists(), f"{p.name} は削除されるべき"
+    for p in siblings:
+        assert p.exists(), f"{p.name} は並列中の別アイテムの一時ファイルなので残すべき"
 
 
 def test_cut_section_skips_when_ffmpeg_missing(

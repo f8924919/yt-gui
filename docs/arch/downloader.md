@@ -98,6 +98,16 @@ WebM は非対応のため自動スキップ。
 
 同名ファイルが存在する場合は `(n)` サフィックスを付けて保存（MP4/MKV/WebM 全コンテナ対応）。
 
+並列ダウンロード（複数ワーカー）でも衝突しないよう、**出力パス予約**で排他する（#249。仕様は [ダウンロード動作 — 並列ダウンロード時の衝突回避](../spec/features/download-behavior.md#並列ダウンロード時の衝突回避パス予約)）。
+
+- `Downloader` の**クラス属性**として予約集合 `_reserved_paths: set[str]` とロック `_reservation_lock: threading.Lock` を持つ。並列実行時は `QueueController` がワーカーごとに専用の `Downloader` インスタンスを使うため（[ダウンロードの中断](#ダウンロードの中断)参照）、インスタンス属性では共有できない。予約キーは絶対パス（`outtmpl` は `os.path.join(out_dir, template)` で組み立てる）なので、出力先が複数あってもキー空間は自然に分離される。
+- `_resolve_unique_path` の処理順: ①`extract_info(download=False)` でパス予測（**ロック外**。ネットワーク処理を直列化しないため）→ ②ロック内で `(n)` を決定・予約登録 → ③衝突時のみ `outtmpl` を上書き。判定と登録が同一ロック内なので TOCTOU レースは起きない。ロック内の `os.path.exists` はローカル stat のみで、ダウンロード時間に対し無視できる。
+- `(n)` の決定は、最終パス（`effective_stem + final_ext`）と中間パス（`effective_stem + raw_ext`、final と異なる場合のみ）の**両方**が「ファイル存在せず・予約中でもない」を満たす単一の n を選び、両パスをまとめて予約する。衝突が無い場合（n=0、サフィックス無し）でも**基底パスを必ず予約登録**する（登録しないと後続ワーカーが検知できない）。
+- 中間パスの予約は、同一動画を MP3 と FLAC で並列取得するような「最終拡張子は違うが取得ファイルが同じ」ケースで stem の分離（`(n)` 付与）をトリガするためのもの。分離の本質的な保証は **`outtmpl` の上書きが `.part`・`.fNNN.` フラグメント・最終ファイルまで全派生名に伝播する**ことにあり、派生ファイルを個別に予約する必要はない。
+- 予約の解除は予約トークン経由で行う。`_resolve_unique_path` は返り値に予約トークンを加えた 4-tuple `(effective_stem, final_ext, chapters, reservation)` を返し（**返り値契約の変更**。既存テストの 3-tuple スタブも更新する）、`download_video()` の try/finally で `reservation.release()` を呼ぶ。完了・後処理（区間切り出し・コメント変換・埋め込み）失敗・`DownloadCancelled` の全経路で解除される。`DownloadSkipped`(アーカイブ済み) は予約前に送出されるため解除不要。
+- **解除は部分ファイル掃除より後**であること: `DownloadCancelled` 時は `except` 節の `_cleanup_partial_files` が先に走り、`finally` の解除はその後になる（現構造で自然に成立するが、順序が逆だと、解除直後に同名基底を予約した別ワーカーの `.part` を掃除が巻き込む）。
+- 既知の限界: 予約集合・存在チェックとも文字列の完全一致であり、Windows のケース非依存ファイルシステムでの異ケース同名（`Title.mp4` と `title.mp4`）は検知しない（従来の exists 判定と同じ限界）。予約はインメモリのためプロセス内限定で、多重起動・外部プロセスとの競合は防がない。
+
 ### OUTPUT TEMPLATE の適用
 
 `outtmpl` は `os.path.join(out_dir, template)` で組み立てる。プレイリスト要素のダウンロード時は `extract_info(url, extra_info={...})` でプレイリスト名・番号を yt-dlp の `info_dict` に注入し、`%(playlist_title)s` / `%(playlist_index)s` を解決する。テンプレートがサブフォルダ（`/`）を含む場合は yt-dlp が自動でディレクトリを作成する。
@@ -272,7 +282,9 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 #### 部分ファイル・字幕の削除: `_cleanup_partial_files`
 
-`effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + "*")` を走査し、`_is_cleanup_target` が真のファイルだけを削除する。
+`effective_stem`（`_resolve_unique_path` が予測する実効ステム）を基に `glob(escape(stem) + ".*")` を走査し、`_is_cleanup_target` が真のファイルだけを削除する。
+
+パターンが `stem + "."` 始まりなのは並列ダウンロード時のワーカー間干渉を防ぐため（#249）。yt-dlp の派生ファイル（`.part` / `.ytdl` / `.fNNN.` / 字幕サイドカー）はすべて stem 直後にドットが続く一方、パス予約で分離された兄弟アイテムの stem は `stem + " (n)"`（スペース始まり）なので、`stem + "*"` の貪欲マッチだと基底 stem のキャンセル掃除が並列中の `(n)` 付きアイテムの `.part` を削除してしまう。既知の限界: タイトル自体がドット区切りの前方一致（`T` と `T.foo`）になっているアイテム同士が並列中にキャンセルされるケースは区別できない。
 
 - 一時ファイル: `.part` / `.ytdl` で終わるファイル、`.part-Frag*` を含むファイル、`.fNNN.` 形式の中間フォーマットファイル。
 - 字幕サイドカー: 拡張子が `_SUBTITLE_CLEANUP_EXTS`（`srt` / `vtt` / `ttml` / `ass` / `ssa` / `lrc` / `srv1` / `srv2` / `srv3` / `json3`）のファイル、および `.live_chat.json` / `.comments.json` / `.danmaku.xml`（サイドカー専用字幕）。中断後に再ダウンロードすると先頭からやり直すため、書き出し済みの字幕を残さない。
