@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 import threading
+from typing import ClassVar
 
 from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
@@ -60,6 +61,23 @@ class DownloadSkipped(Exception):
     """
 
 
+class _PathReservation:
+    """`_resolve_unique_path` が確保した出力パスの予約（#249）。
+
+    `release()` で `Downloader._reserved_paths` から解放する。解放は
+    `download_video()` の finally で全経路（完了・後処理失敗・中断）に
+    ついて保証される。多重呼び出しは無害（discard）。
+    """
+
+    def __init__(self, paths: tuple[str, ...]) -> None:
+        self._paths = paths
+
+    def release(self) -> None:
+        with Downloader._reservation_lock:
+            for path in self._paths:
+                Downloader._reserved_paths.discard(path)
+
+
 class _YtdlpLogger:
     """yt-dlp logger that routes significant messages to app's log_callback.
 
@@ -103,6 +121,14 @@ class _StripSidecarOnlySubsBeforeEmbedPP(PostProcessor):
 
 
 class Downloader:
+    # 並列ワーカー間で出力パスを排他するプロセス内共有の予約状態（#249）。
+    # 並列時はワーカーごとに専用インスタンスが使われるため、インスタンス属性
+    # では共有できずクラス属性とする。キーは絶対パスなので複数出力先でも
+    # 衝突しない。仕様: docs/spec/features/download-behavior.md、実装意図:
+    # docs/arch/downloader.md「同名ファイルの衝突回避」。
+    _reservation_lock: ClassVar[threading.Lock] = threading.Lock()
+    _reserved_paths: ClassVar[set[str]] = set()
+
     def __init__(
         self,
         output_dir="downloads",
@@ -498,61 +524,72 @@ class Downloader:
         if self.log_callback:
             self.log_callback(msg)
 
-        effective_stem, final_ext, chapters = self._resolve_unique_path(
+        effective_stem, final_ext, chapters, reservation = self._resolve_unique_path(
             ydl_opts, url, job, extra_info=extra_info
         )
 
+        # 予約解除（reservation.release）は完了・後処理失敗・中断の全経路で
+        # 必要なため finally で行う。中断時の部分ファイル掃除は解除より前で
+        # あること（逆順だと、解除直後に同名基底を予約した別ワーカーの
+        # `.part` を掃除が巻き込む）。
         try:
-            self._run_download(ydl_opts, url, job, extra_info=extra_info)
-        except DownloadCancelled:
-            # 中断時は部分ファイルを掃除してから呼び出し側へ再送出する。
-            self._cleanup_partial_files(effective_stem)
-            raise
+            try:
+                self._run_download(ydl_opts, url, job, extra_info=extra_info)
+            except DownloadCancelled:
+                # 中断時は部分ファイルを掃除してから呼び出し側へ再送出する。
+                self._cleanup_partial_files(effective_stem)
+                raise
 
-        # 区間指定があれば、取得済みファイルからローカル ffmpeg で切り出す。
-        # （yt-dlp のネイティブ区間 DL は https/DASH で ffmpeg にネットワーク取得を
-        #  任せる経路となりバンドル ffmpeg では不安定なため、フル取得後に切り出す。）
-        # 時間範囲とチャプター名は排他（build_job_spec が保証）。万一両方セット
-        # されても時間範囲を優先する。
-        if job.section_start and job.section_end:
-            self._cut_section(effective_stem, final_ext, job)
-        elif job.section_chapter_regex:
-            self._cut_chapter_sections(effective_stem, final_ext, job, chapters)
+            # 区間指定があれば、取得済みファイルからローカル ffmpeg で切り出す。
+            # （yt-dlp のネイティブ区間 DL は https/DASH で ffmpeg にネットワーク
+            #  取得を任せる経路となりバンドル ffmpeg では不安定なため、フル取得後
+            #  に切り出す。）
+            # 時間範囲とチャプター名は排他（build_job_spec が保証）。万一両方
+            # セットされても時間範囲を優先する。
+            if job.section_start and job.section_end:
+                self._cut_section(effective_stem, final_ext, job)
+            elif job.section_chapter_regex:
+                self._cut_chapter_sections(effective_stem, final_ext, job, chapters)
 
-        nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
-        sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
-        # 単一動画では一方の lang しか出ないため対象は最大 1 件
-        comment_lang = next(
-            (lang for lang in sub_langs if lang in _COMMENT_DANMAKU_LANGS), None
-        )
-        if (
-            nico_comments_opts
-            and nico_comments_opts.get("convert_to_ass")
-            and comment_lang
-            and job.section_chapter_regex
-        ):
-            # チャプター名モードは原本を削除するため、原本前提のコメント後処理
-            # とは併用できない。黙って失敗させず明示スキップする。
-            if self.log_callback:
-                self.log_callback(t("warn_section_chapter_nico_skip"))
-        elif (
-            nico_comments_opts
-            and nico_comments_opts.get("convert_to_ass")
-            and comment_lang
-        ):
-            self._convert_nico_comments_to_ass(
-                effective_stem, comment_lang, nico_comments_opts
+            nico_comments_opts = (job.orig_settings or {}).get("nico_comments")
+            sub_langs = (job.subtitle_opts or {}).get("subtitleslangs") or []
+            # 単一動画では一方の lang しか出ないため対象は最大 1 件
+            comment_lang = next(
+                (lang for lang in sub_langs if lang in _COMMENT_DANMAKU_LANGS), None
             )
-
-            if nico_comments_opts.get("embed_to_mkv") and not job.is_audio_extraction:
-                self._embed_nico_comments_into_mkv(
-                    effective_stem, final_ext, comment_lang, nico_comments_opts
+            if (
+                nico_comments_opts
+                and nico_comments_opts.get("convert_to_ass")
+                and comment_lang
+                and job.section_chapter_regex
+            ):
+                # チャプター名モードは原本を削除するため、原本前提のコメント
+                # 後処理とは併用できない。黙って失敗させず明示スキップする。
+                if self.log_callback:
+                    self.log_callback(t("warn_section_chapter_nico_skip"))
+            elif (
+                nico_comments_opts
+                and nico_comments_opts.get("convert_to_ass")
+                and comment_lang
+            ):
+                self._convert_nico_comments_to_ass(
+                    effective_stem, comment_lang, nico_comments_opts
                 )
 
-            if nico_comments_opts.get("burn_in") and not job.is_audio_extraction:
-                self._burn_nico_comments_into_video(
-                    effective_stem, final_ext, comment_lang, nico_comments_opts
-                )
+                if (
+                    nico_comments_opts.get("embed_to_mkv")
+                    and not job.is_audio_extraction
+                ):
+                    self._embed_nico_comments_into_mkv(
+                        effective_stem, final_ext, comment_lang, nico_comments_opts
+                    )
+
+                if nico_comments_opts.get("burn_in") and not job.is_audio_extraction:
+                    self._burn_nico_comments_into_video(
+                        effective_stem, final_ext, comment_lang, nico_comments_opts
+                    )
+        finally:
+            reservation.release()
 
     def _build_ydl_opts(
         self,
@@ -774,14 +811,24 @@ class Downloader:
         job: JobSpec,
         *,
         extra_info: dict | None,
-    ) -> tuple[str, str, list | None]:
+    ) -> tuple[str, str, list | None, _PathReservation]:
         """同名ファイル衝突を避けるため `(stem, final_ext)` を予測し、
         必要なら `outtmpl` を ` (N)` 付きに上書きする。
 
-        戻り値: `(effective_stem, final_ext, chapters)` — stem/ext は
-        ニコニコ動画コメントの後処理がファイル名を組み立てるのに使う。
-        `chapters` はドライラン info の `chapters`（チャプター名モードの
-        区間ダウンロードが使う。追加フェッチはしない）。
+        戻り値: `(effective_stem, final_ext, chapters, reservation)` —
+        stem/ext はニコニコ動画コメントの後処理がファイル名を組み立てるのに
+        使う。`chapters` はドライラン info の `chapters`（チャプター名モードの
+        区間ダウンロードが使う。追加フェッチはしない）。`reservation` は
+        確保した出力パスの予約で、呼び出し側が finally で `release()` する。
+
+        並列ワーカー間の排他（#249）: `(n)` の決定は「ファイルが存在する or
+        予約中」で判定し、判定と予約登録を `_reservation_lock` 内で原子的に
+        行う。最終パスと中間パス（変換前の取得ファイル。最終と異なる場合）は
+        単一の n で両方の空きを満たすものを選び、まとめて予約する。中間パスの
+        予約は「最終拡張子は違うが取得ファイルが同じ」ケース（MP3 と FLAC の
+        並列取得など）で stem の分離をトリガするためのもので、`.part` 等の
+        派生名は `outtmpl` の上書きが伝播するため個別予約は不要。ネットワーク
+        処理（extract_info）はロック外。
 
         ダウンロードアーカイブが有効で、対象がアーカイブ済みの場合は
         ここで `DownloadSkipped` を送出する。`download_archive` opt を渡すと
@@ -821,15 +868,29 @@ class Downloader:
         else:
             final_ext = raw_ext
 
-        effective_stem = stem
-        if os.path.exists(stem + final_ext):
-            n = 1
-            while os.path.exists(f"{stem} ({n}){final_ext}"):
-                n += 1
-            ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
-            effective_stem = f"{stem} ({n})"
+        def _candidate_paths(s: str) -> tuple[str, ...]:
+            if raw_ext and raw_ext != final_ext:
+                return (s + final_ext, s + raw_ext)
+            return (s + final_ext,)
 
-        return effective_stem, final_ext, chapters
+        def _taken(s: str) -> bool:
+            return any(
+                os.path.exists(p) or p in Downloader._reserved_paths
+                for p in _candidate_paths(s)
+            )
+
+        with Downloader._reservation_lock:
+            effective_stem = stem
+            if _taken(stem):
+                n = 1
+                while _taken(f"{stem} ({n})"):
+                    n += 1
+                ydl_opts["outtmpl"] = f"{stem} ({n}).%(ext)s"
+                effective_stem = f"{stem} ({n})"
+            reserved = _candidate_paths(effective_stem)
+            Downloader._reserved_paths.update(reserved)
+
+        return effective_stem, final_ext, chapters, _PathReservation(reserved)
 
     def _run_download(
         self,
@@ -869,8 +930,13 @@ class Downloader:
 
         `effective_stem` を基に出力ディレクトリ内の掃除対象だけを削除する。
         完成済みの最終ファイル・メタデータ（`.info.json`）・サムネイルは残す。
+
+        パターンは `stem + ".*"`（stem 直後がドット）に限定する（#249）。
+        yt-dlp の派生ファイルはすべて stem 直後にドットが続く一方、パス予約で
+        分離された兄弟アイテムの stem は `stem + " (n)"` なので、`stem + "*"`
+        の前方一致だと並列中の別アイテムの一時ファイルを巻き込んでしまう。
         """
-        for path in glob.glob(glob.escape(effective_stem) + "*"):
+        for path in glob.glob(glob.escape(effective_stem) + ".*"):
             if not self._is_cleanup_target(path):
                 continue
             try:
