@@ -41,4 +41,4 @@
 - [x] design-review（§5.5 発火: investigate 推奨 yes）→ 指摘反映（2026-07-13）
 - [x] テスト先行（予約・並列競合・掃除 glob の決定的テストを追加、2026-07-13）
 - [x] 実装 → green（全 497 テスト・ruff・mypy クリーン、2026-07-13）
-- [ ] verify-gate → PR
+- [x] verify-gate（verify green・docs-check 指摘なし・evaluator PASS 8/8）→ PR #250（2026-07-13）

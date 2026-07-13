@@ -48,6 +48,7 @@
 | [243-retranslate-registry.md](243-retranslate-registry.md) | 再翻訳の手動列挙方式を生成時登録のバインディングレジストリへ置き換え（#238 の恒久対策）。`_TranslationBinding`＋`_bind_text` 系ヘルパで static 26 箇所を生成時バインド化、レジストリ全件検証＋ja 残留セーフティネットの 2 段テストを新設。調査で発見した複数選択編集時 `edit_multiple_selected` の再翻訳漏れも解消（Issue #243 / PR #245） | 2026-07-12 |
 | [246-flaky-qt-teardown.md](246-flaky-qt-teardown.md) | CI の非決定的 SIGABRT（先行テストのウィジェット遅延破棄が後続テストのイベントループ中に実行される テスト間リーク）対策。conftest の autouse フィクスチャ（qt マーカー限定）が teardown で `sendPostedEvents(None, DeferredDelete)` を呼び遅延破棄をテスト境界内で消化、flush 機構の決定論的テストを新設。補助として `_bind_header_column` のヘッダー項目参照を都度取得化（Issue #246 / PR #247） | 2026-07-12 |
 | [244-btn-adding-state.md](244-btn-adding-state.md) | URL タイトル取得中の add_button 状態消失を修正。`_fetching` フラグ＋テキスト解決の `_refresh_add_button_text()` 集約（優先順位 fetching > edit_mode > 通常）で、言語切替・編集モードの出入りの 3 経路すべてで「取得中...」表示が維持されるようにした。`add_button.setText` の直接呼び出しは同メソッド 1 箇所のみの規約に（Issue #244） | 2026-07-12 |
+| [249-parallel-filename-race.md](249-parallel-filename-race.md) | 並列 DL 時の同名ファイル衝突（TOCTOU レース）をパス予約方式で修正。`(n)` 決定を「存在 or 予約中」のロック内原子判定に変更・中間パスも単一 n で予約・try/finally で全経路解除・キャンセル掃除 glob を `stem + ".*"` に厳密化（design-review で発見した兄弟アイテム巻き込みも解消）（Issue #249 / PR #250） | 2026-07-13 |
 
 ## ニコニコ動画コメント取得
 
