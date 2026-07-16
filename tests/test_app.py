@@ -1499,6 +1499,17 @@ def test_self_update_rejects_extracted_dir_without_exe(app, monkeypatch, tmp_pat
     assert "close" not in calls
 
 
+def test_self_update_dialog_is_application_modal(app):
+    """進捗ダイアログはモーダル（表示中のキュー開始等をブロックする）。"""
+    from PySide6.QtCore import Qt
+
+    dialog = app._create_self_update_dialog()
+    try:
+        assert dialog.windowModality() == Qt.WindowModality.ApplicationModal
+    finally:
+        dialog.deleteLater()
+
+
 def test_self_update_progress_slot_updates_dialog(app, monkeypatch, tmp_path):
     _frozen_install(monkeypatch, tmp_path)
     dialog = app._create_self_update_dialog()

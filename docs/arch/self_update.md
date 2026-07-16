@@ -91,9 +91,10 @@
 - 実装方式は **PowerShell（.ps1）生成**（2026-07-17 ユーザー確認済み。バッチは
   構文が脆くロールバックロジックのテスト性が低い。GPO で ExecutionPolicy を
   強制する環境は既知の制限として割り切る）。
-- `build_replace_script(install_dir, new_dir, backup_dir, staging_dir, pid,
-  exe_relpath, *, wait_timeout_sec, retry_count, retry_initial_ms,
-  show_dialog_on_failure)` が全パラメータを埋め込んだソースを返す。待機・
+- `build_replace_script(*, install_dir, new_dir, pid, exe_relpath,
+  wait_timeout_sec, retry_count, retry_initial_ms, show_dialog_on_failure)`
+  が全パラメータを埋め込んだソースを返す（`.bak`・ステージングのパスは
+  `install_dir` から内部導出し、他所での導出との食い違いを防ぐ）。待機・
   リトライ値を引数化しているのは**テストで短い値を注入して実スクリプトを
   高速実行する**ため。`show_dialog_on_failure=False` は二重失敗テストで
   メッセージボックスがテストをブロックしないための注入点。

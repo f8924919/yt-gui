@@ -34,7 +34,7 @@ design-review の指摘反映（2026-07-17）:
 - [x] design-review（§5.5 発火: 新 API・新画面・外部プロセス連携）→ 指摘を docs へ反映
 - [x] テスト先行（test_self_update.py へ B-2 追記・test_app.py へ UI テスト追記）
 - [x] 実装 → green（569 passed・ruff / mypy クリーン）
-- [ ] verify-gate（verify / docs-check / evaluator）
+- [x] verify-gate: verify green（570 passed）/ docs-check pass（指摘 1 件 = arch/index.md 説明文を修正）/ evaluator 要対応 2 件（.bak 削除失敗のサイレント性テスト・進捗ダイアログのモーダル性アサート）を追加対応。要判断 3 件は主エージェント判断: ロールバックテストは段階別の個別テストで意図充足（Issue 文言を「parametrize または個別テスト」へ明確化）/ E2E はヘッドレス駆動で可（task メモに開示済み）/ arch の build_replace_script 引数表記ドリフトを修正
 - [x] Windows 実機 E2E（ヘッドレス駆動で実施・結果を下記に記録）
 - [ ] PR
 

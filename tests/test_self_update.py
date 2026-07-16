@@ -553,6 +553,26 @@ def test_cleanup_leftovers_is_silent_when_absent(tmp_path: Path) -> None:
     cleanup_leftovers(install)  # 例外を出さない
 
 
+def test_cleanup_leftovers_is_silent_on_removal_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """削除失敗（ロック・権限等）は例外を漏らさずサイレントに持ち越す。"""
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    (install / "app.txt").write_bytes(b"x")
+    bak = tmp_path / "yt-gui.bak"
+    bak.mkdir()
+
+    def _locked(*args, **kwargs):
+        raise OSError("locked by another process")
+
+    monkeypatch.setattr(shutil, "rmtree", _locked)
+    cleanup_leftovers(install)  # 例外を出さない（起動を妨げない）
+    # 削除は次回へ持ち越し、インストール本体には触れない。
+    assert bak.exists()
+    assert (install / "app.txt").exists()
+
+
 # --- 差し替えスクリプトの生成（純関数・全 OS で検証） ---
 
 
