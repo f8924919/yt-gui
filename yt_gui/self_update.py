@@ -38,11 +38,12 @@ ATTESTATIONS_URL_TEMPLATE = (
 )
 # GitHub Actions の OIDC issuer（attestation 証明書の発行元として固定）。
 GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
-# 証明書 SAN の identity。ref はダウンロード対象バージョンのタグに完全一致で
-# ピンする（緩いピンは同一 repo の別 workflow / 別 ref による署名を許すため）。
-_IDENTITY_TEMPLATE = (
-    "https://github.com/f8924919/yt-gui/.github/workflows/release.yml"
-    "@refs/tags/v{version}"
+# 証明書 SAN の identity（完全一致でピン）。release.yml は main への push で
+# 起動しタグを同一実行内で作成するため、SAN の ref は refs/heads/main になる
+# （タグ ref ではない。実 attestation で確認済み・#252）。バージョンとの
+# 紐付けは subject digest 照合と単調性チェックが担う。
+EXPECTED_IDENTITY = (
+    "https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/heads/main"
 )
 # Windows 用配布アセット名（release.yml の成果物命名に一致させる）。
 _WINDOWS_ASSET_TEMPLATE = "yt-gui-{version}-windows-x64.zip"
@@ -74,11 +75,6 @@ class SelfUpdateResult:
 
 class _Cancelled(Exception):
     """ダウンロードのキャンセル要求（内部制御用。外へは漏らさない）。"""
-
-
-def build_expected_identity(version: str) -> str:
-    """attestation 証明書に要求する identity（SAN）を組み立てる純関数。"""
-    return _IDENTITY_TEMPLATE.format(version=version)
 
 
 def resolve_windows_asset(
@@ -288,11 +284,10 @@ def download_and_verify_update(
         return SelfUpdateResult(SelfUpdateStatus.NO_ATTESTATION, version=latest)
 
     # 4. 検証: ポリシー通過＋subject digest 一致の attestation が 1 件あれば成功。
-    identity = build_expected_identity(latest)
     verified = False
     for bundle in bundles:
         try:
-            statement = verify_bundle(bundle, identity, GITHUB_OIDC_ISSUER)
+            statement = verify_bundle(bundle, EXPECTED_IDENTITY, GITHUB_OIDC_ISSUER)
         except Exception:
             continue
         if _statement_matches_digest(statement, digest):

@@ -25,9 +25,9 @@ import pytest
 
 from yt_gui.self_update import (
     ATTESTATIONS_URL_TEMPLATE,
+    EXPECTED_IDENTITY,
     SelfUpdateResult,
     SelfUpdateStatus,
-    build_expected_identity,
     download_and_verify_update,
     resolve_windows_asset,
     safe_extract,
@@ -158,11 +158,12 @@ def test_resolve_windows_asset_returns_none_when_missing(
     assert resolve_windows_asset(release, "0.5.0") is None
 
 
-def test_build_expected_identity_pins_release_workflow_and_tag() -> None:
-    # ref はダウンロード対象バージョンのタグに完全一致でピンする（#252）。
-    assert build_expected_identity("0.5.0") == (
+def test_expected_identity_pins_release_workflow_on_main() -> None:
+    # release.yml は main への push で起動するため SAN の ref は
+    # refs/heads/main（タグ ref ではない。実 attestation で確認済み・#252）。
+    assert EXPECTED_IDENTITY == (
         "https://github.com/f8924919/yt-gui/.github/workflows/release.yml"
-        "@refs/tags/v0.5.0"
+        "@refs/heads/main"
     )
 
 
@@ -199,12 +200,7 @@ def test_download_and_verify_update_passes_pinned_identity_to_verifier(
 
     result = _run_update(zip_data, tmp_path, verify_bundle=verify_bundle)
     assert result.status is SelfUpdateStatus.SUCCESS
-    assert seen == [
-        (
-            build_expected_identity("0.5.0"),
-            "https://token.actions.githubusercontent.com",
-        )
-    ]
+    assert seen == [(EXPECTED_IDENTITY, "https://token.actions.githubusercontent.com")]
 
 
 def test_download_and_verify_update_accepts_second_attestation(

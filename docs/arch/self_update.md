@@ -51,12 +51,16 @@
      ポリシー通過＋digest 一致が 1 件あれば成功（「digest で API 照会して
      存在すれば OK」という循環は禁止）。
    - ポリシーは `policy.Identity` で **identity =
-     `https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/tags/v{version}`
-     （対象バージョンのタグに完全一致）・issuer =
-     `https://token.actions.githubusercontent.com`** を厳格にピンする。
-   - Verifier は通常 `Verifier.production()`（オンライン TUF 更新。実体更新は
+     `https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/heads/main`
+     （完全一致）・issuer = `https://token.actions.githubusercontent.com`**
+     を厳格にピンする。`release.yml` は main への push で起動しタグを同一
+     実行内で作成するため、証明書 SAN の ref は**タグ ref ではなく
+     `refs/heads/main`** になる（実 attestation で確認済み・#252）。
+     バージョンとの紐付けは subject digest 照合と単調性チェックが担う。
+   - Verifier は `Verifier.production()`（オンライン TUF 更新。実体更新は
      どのみちオンライン時にしか行えない）。同梱トラストルート＋
-     `offline=True` の成立性は PoC で確認し、採用構成は research メモに記録。
+     `offline=True` でも検証が成立することは PoC で確認済み（TUF キャッシュ
+     なしの新規マシン相当で成功）。オフラインフォールバックの実装は不要。
 5. **展開**: 検証済み zip をアプリ内（同一プロセス）で展開する。
    **zip slip / 絶対パスエントリ対策**として、全エントリの展開先が指定
    ディレクトリ配下に収まることを確認してから展開する。展開後の差し替え
@@ -79,7 +83,7 @@
 | 単調性比較 | `yt_dlp_update.compare_versions()` / `UpdateStatus` を再利用（利用者 3 件目。中立モジュールへの切り出しは見送り、B-2 完了後に再評価） |
 | 更新チェック（Phase A） | [app_update.md](app_update.md)。B-2 で「新版あり」ダイアログから本モジュールの DL → 検証 → 展開を呼ぶ |
 | UI・スレッド | B-2 で `app.py` に進捗シグナル付きワーカーを新設（`run_in_thread` は進捗を持たないため流用しない） |
-| PyInstaller 同梱 | `yt-gui.spec` に sigstore のトラストルート data files・`copy_metadata('sigstore')`・`rfc3161_client`（Rust 拡張）等の収集を追加（PoC で確定） |
+| PyInstaller 同梱 | `yt-gui.spec` で `collect_all('sigstore')` / `collect_all('tuf')` / `collect_all('rfc3161_client')`（埋め込みトラストルート・TUF メタデータ・Rust 拡張の収集）＋`copy_metadata('sigstore')`。サイズ増は非圧縮約 21 MB（PoC 実測・#252） |
 
 ## 既存コードへの影響範囲
 

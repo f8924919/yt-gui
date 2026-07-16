@@ -130,10 +130,12 @@ provenance attestation を活かした自前方式が成立することが判明
   ルートは年数回ローテーションするため完全静的同梱のみに依存すると将来の
   attestation が検証不能になりうる（sigstore-python 追加調査・2026-07-16）。
   そこで**通常はオンライン TUF 更新（`Verifier.production()`。実体更新は
-  どのみちオンライン時にしか行えない）**とし、同梱トラストルート＋
-  `offline=True` の成立性を PoC（Phase B-1）で確認してフォールバック採否を
-  決める。検証不能時は手動ダウンロードへ誘導し「self-update 自体が壊れる」
-  自己矛盾を避ける。
+  どのみちオンライン時にしか行えない）**とする。PoC（#252・2026-07-16）で
+  同梱トラストルート＋`offline=True` でも検証が成立することを確認済み
+  （TUF キャッシュなしの新規マシン相当で成功。`collect_all('sigstore')` が
+  埋め込みトラストルートを同梱するため）で、オフラインフォールバックの
+  実装は不要と判断した。検証不能時は手動ダウンロードへ誘導し
+  「self-update 自体が壊れる」自己矛盾を避ける。
 - トレードオフ: 差分更新なし（毎回フル zip 数百 MB）。更新頻度・
   ユーザー規模的に許容し、帯域が問題化したら差分方式を再検討する。
 
@@ -173,11 +175,14 @@ design-review（[git-workflow.md](../git-workflow.md) §5.5 発火: 新モジュ
   存在したら OK」という循環を禁止）。
 - `policy.Identity` は本リポジトリの `release.yml` の証明書 identity
   （workflow パス）＋ issuer `https://token.actions.githubusercontent.com`
-  を厳格にピンする。**ref 成分は確定済み（2026-07-16・#252）**: 証明書の
-  SAN にはタグ ref が含まれるため、ダウンロード対象バージョンのタグから
-  `https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/tags/v{version}`
-  を動的生成して**完全一致**でピンする（対象バージョンは単調性チェック済み
-  のため、任意の旧タグを許容する緩いピンにはしない）。
+  を厳格にピンする。**ref 成分は確定済み（2026-07-16・#252 PoC で実
+  attestation を確認）**: 本リポジトリの `release.yml` は main への push で
+  起動しタグを同一実行内で作成するため、証明書 SAN の ref は**タグ ref では
+  なく `refs/heads/main`** になる。よって
+  `https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/heads/main`
+  の固定文字列に**完全一致**でピンする。この identity を得られるのは本
+  リポジトリの main push で走る release.yml のみでピン強度は同等であり、
+  バージョンとの紐付けは subject digest 照合＋単調性チェックが担う。
 - zip の展開は検証直後に**アプリ内（同一プロセス）**で行い、差し替え
   スクリプトには「配置済みフォルダの rename」だけをさせる（TOCTOU 回避）。
 
