@@ -634,6 +634,26 @@ def test_launch_replace_script_writes_ps1_and_spawns(tmp_path: Path) -> None:
     assert "Write-Output 'hi'" in raw.decode("utf-8-sig")
 
 
+@windows_only
+def test_launch_replace_script_default_spawn_executes_powershell(
+    tmp_path: Path,
+) -> None:
+    """既定の spawn が実際に PowerShell を実行できること（フラグ検証）。
+
+    DETACHED_PROCESS と CREATE_NO_WINDOW は排他で、併用すると PowerShell が
+    起動直後に死ぬ（#253 E2E で検出）。マーカーファイルの出現で実行を確認する。
+    """
+    import time
+
+    marker = tmp_path / "marker.txt"
+    script = f"Set-Content -LiteralPath '{marker}' -Value 'ok'"
+    assert launch_replace_script(script, script_dir=tmp_path) is True
+    deadline = time.time() + 30
+    while time.time() < deadline and not marker.exists():
+        time.sleep(0.2)
+    assert marker.exists(), "既定 spawn で PowerShell が実行されていない"
+
+
 def test_launch_replace_script_returns_false_on_spawn_failure(tmp_path: Path) -> None:
     def _boom(argv: list[str]) -> None:
         raise OSError("blocked")

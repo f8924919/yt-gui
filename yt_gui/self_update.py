@@ -553,10 +553,18 @@ def build_replace_script(
 
 
 def _default_spawn(argv: list[str]) -> None:
-    """スクリプトをアプリから切り離したプロセスとして起動する（Windows 前提）。"""
+    """スクリプトをアプリから切り離したプロセスとして起動する（Windows 前提）。
+
+    CREATE_NO_WINDOW（隠しコンソール）を使う。DETACHED_PROCESS はコンソール
+    自体を与えず PowerShell が起動直後に死ぬため併用しない（両者は排他。
+    #253 の E2E で検出）。Windows の子プロセスは親終了後も生存するため、
+    これでアプリ終了後の差し替えが成立する。
+    """
     creationflags = 0
     if sys.platform == "win32":
-        creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+        creationflags = (
+            subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
     subprocess.Popen(argv, creationflags=creationflags, close_fds=True)
 
 

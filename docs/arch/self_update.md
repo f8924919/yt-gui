@@ -83,7 +83,7 @@
 | `resolve_staging_dir(install_dir)` | `install_dir.parent / f"{install_dir.name}.update-staging"` を返す純関数。呼び出し側は開始時に残骸を削除してから `download_and_verify_update(work_dir=...)` へ渡す |
 | `looks_like_app_dir(new_dir, exe_name)` | 展開結果のルート直下に exe があるかの健全性確認（release.yml の zip はルートプレフィックスなし。`Compress-Archive -Path dist/yt-gui/*`） |
 | `build_replace_script(...)` | 差し替え PowerShell スクリプトのソースを返す**純関数**（下記） |
-| `launch_replace_script(script_text, script_dir)` | スクリプトを対象ツリー外（%TEMP%）へ書き出し、`powershell.exe -NoProfile -ExecutionPolicy Bypass -File` を `DETACHED_PROCESS | CREATE_NO_WINDOW` で起動する。書き出し・起動の失敗は例外を漏らさず失敗として返す（呼び出し側はアプリを終了せず「更新失敗」通知へ戻す） |
+| `launch_replace_script(script_text, script_dir)` | スクリプトを対象ツリー外（%TEMP%）へ書き出し、`powershell.exe -NoProfile -ExecutionPolicy Bypass -File` を `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP` で起動する（`DETACHED_PROCESS` は排他フラグで PowerShell が即死するため使わない。#253 E2E で検出）。書き出し・起動の失敗は例外を漏らさず失敗として返す（呼び出し側はアプリを終了せず「更新失敗」通知へ戻す） |
 | `cleanup_leftovers(install_dir)` | `{name}.bak` と `{name}.update-staging` を `shutil.rmtree(ignore_errors=True)` で削除（`.bak` はヘルスチェックのため次回起動まで残るが、staging は起動時点で常に不要のため無条件削除）。失敗はサイレント持ち越し（起動を妨げない） |
 
 ### 差し替えスクリプト（PowerShell）
