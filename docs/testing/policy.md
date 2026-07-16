@@ -109,6 +109,7 @@ tests/
 ├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
 ├── test_yt_dlp_update.py          ← 純粋ロジック（yt-dlp 更新チェック）
 ├── test_app_update.py             ← 純粋ロジック（アプリ本体更新チェック）
+├── test_self_update.py            ← 純粋ロジック（実体更新コア：DL・attestation 検証・展開）
 ├── test_extension.py              ← scripts/sync_extension_version.py・extension/ 整合性
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
