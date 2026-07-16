@@ -2,7 +2,7 @@
 
 - **対応 Issue**: [#252](https://github.com/f8924919/yt-gui/issues/252)
 - **ブランチ**: `feature/252-self-update-core`
-- **設計の正本**: [research/app-update.md](../research/app-update.md) の「追加調査と方式決定（2026-07-16）」「設計詳細」（Phase B 全体設計は design-review 済み）
+- **設計の正本**: [research/app-update.md](../../research/app-update.md) の「追加調査と方式決定（2026-07-16）」「設計詳細」（Phase B 全体設計は design-review 済み）
 - **後続**: Phase B-2 = [#253](https://github.com/f8924919/yt-gui/issues/253)（Windows 差し替え＋UI。本タスクの完了が前提）
 
 ## 目的
