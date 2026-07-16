@@ -3,7 +3,7 @@
 - Issue: [#253](https://github.com/f8924919/yt-gui/issues/253)（受け入れ条件の正本）
 - 前提: Phase B-1 = [#252](https://github.com/f8924919/yt-gui/issues/252)（PR #255・マージ済み）
 - ブランチ: `feature/253-self-update-apply`
-- 関連 docs: [spec/features/app-update.md](../spec/features/app-update.md) Phase B 節 / [arch/self_update.md](../arch/self_update.md) / [arch/app.md](../arch/app.md)
+- 関連 docs: [spec/features/app-update.md](../../spec/features/app-update.md) Phase B 節 / [arch/self_update.md](../../arch/self_update.md) / [arch/app.md](../../arch/app.md)
 
 ## 設計判断（2026-07-17・ユーザー確認済み）
 
@@ -36,7 +36,7 @@ design-review の指摘反映（2026-07-17）:
 - [x] 実装 → green（569 passed・ruff / mypy クリーン）
 - [x] verify-gate: verify green（570 passed）/ docs-check pass（指摘 1 件 = arch/index.md 説明文を修正）/ evaluator 要対応 2 件（.bak 削除失敗のサイレント性テスト・進捗ダイアログのモーダル性アサート）を追加対応。要判断 3 件は主エージェント判断: ロールバックテストは段階別の個別テストで意図充足（Issue 文言を「parametrize または個別テスト」へ明確化）/ E2E はヘッドレス駆動で可（task メモに開示済み）/ arch の build_replace_script 引数表記ドリフトを修正
 - [x] Windows 実機 E2E（ヘッドレス駆動で実施・結果を下記に記録）
-- [ ] PR
+- [x] PR（#256）
 
 ## E2E 手動確認手順（正常系・実施後に結果を記録）
 

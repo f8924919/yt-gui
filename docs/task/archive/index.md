@@ -36,6 +36,7 @@
 | [198-app-update-phase-a.md](198-app-update-phase-a.md) | アプリ更新 Phase A: yt-gui 本体の更新チェック＋通知。GitHub Releases API 照会の純関数 `app_update.py`（yt_dlp_update 同型）、起動時自動チェック＋オプトアウト設定（既定オン）、バージョン情報ダイアログに「yt-gui の更新を確認」追加・既存ボタンは「yt-dlp の更新を確認」へ改称。Phase B 方式調査は research/app-update.md に記録（Issue #198 / PR #199） | 2026-07-05 |
 | [app-update-phase-b.md](app-update-phase-b.md) | アプリ更新 Phase B の方式設計を確定する調査タスク。追加調査で tufup を棄却（timestamp 失効・鍵管理・macOS 非対応）し、自前アップデータ（Releases ＋ Sigstore attestation のアプリ内検証）・Windows 先行・手動適用を決定。design-review 反映の設計詳細を research/app-update.md に記録し、実装 Issue #252（B-1: コア PoC）/ #253（B-2: 差し替え・UI）を起票 | 2026-07-16 |
 | [252-self-update-core.md](252-self-update-core.md) | アプリ更新 Phase B-1: 実体更新コア `self_update.py` を新規実装（DL 進捗/キャンセル・attestation の fail-closed 検証・zip slip 対策付き展開・正規化結果型・sigstore 遅延 import）。PoC で sigstore の PyInstaller 同梱（+21.4 MB）・オフライン検証・実リリース E2E の成立を確認し、identity ピンを refs/heads/main 固定に修正（Issue #252） | 2026-07-16 |
+| [253-self-update-apply.md](253-self-update-apply.md) | アプリ更新 Phase B-2: Windows 実体更新の適用を実装。新版検出ダイアログに「更新して再起動」（プリフライト＋キュー実行中無効化）、モーダル進捗＋daemon ワーカー、差し替え PowerShell スクリプト（PID 名照合待機・指数バックオフ rename・.bak ロールバック・自己削除）、起動時の残骸掃除。実 PowerShell 実行テストと実リリース E2E（spawn フラグ不具合を検出・修正）で成立を確認（Issue #253 / PR #256） | 2026-07-17 |
 
 ## バグ修正
 
