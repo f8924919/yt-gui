@@ -15,6 +15,17 @@ STRINGS: dict[str, str] = {
     "app_update_up_to_date": "yt-gui is up to date.",
     "app_update_available": "A newer yt-gui ({latest}) is available.",
     "update_check_failed": "Failed to check for updates:\n{error}",
+    "btn_update_and_restart": "Update and Restart",
+    "app_update_queue_running_hint": (
+        "Updating is unavailable while downloads are running. "
+        "Please try again after they finish."
+    ),
+    "self_update_progress_title": "yt-gui Update",
+    "self_update_downloading": "Downloading update...",
+    "self_update_failed": (
+        "The update failed. Your existing installation was not modified.\n"
+        "Please download it manually from the releases page."
+    ),
     "label_url": "Video URL:",
     "label_format": "Format:",
     "status_ready": "Enter a URL and select a format",

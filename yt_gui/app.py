@@ -4,10 +4,12 @@ import os
 import re
 import sys
 import tempfile
+import threading
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from os.path import expanduser
+from pathlib import Path
 from typing import Protocol
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl, Signal
@@ -33,6 +35,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QRadioButton,
     QStatusBar,
@@ -43,7 +46,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import get_resource_base, get_version, get_yt_dlp_version, i18n
+from . import get_resource_base, get_version, get_yt_dlp_version, i18n, self_update
 from .app_update import RELEASES_URL as APP_RELEASES_URL
 from .app_update import check_for_update as check_for_app_update
 from .app_update import should_check_on_startup, should_notify
@@ -136,6 +139,11 @@ class _AppSignals(QObject):
     # ブラウザ拡張連携: サーバースレッドからの enqueue をメインスレッドへ委譲する。
     # (url, cookies: str | None, format: str | None)
     extension_enqueue = Signal(str, object, object)
+    # アプリ実体更新（self_update）: ワーカースレッドからの進捗・完了を
+    # メインスレッド（進捗ダイアログ・適用フロー）へ委譲する。
+    # (received: int, total: int | None) / (result: SelfUpdateResult)
+    self_update_progress = Signal(object, object)
+    self_update_finished = Signal(object)
 
 
 class _QueueTree(QTreeWidget):
@@ -375,8 +383,16 @@ class App(QMainWindow):
         self._signals.extension_enqueue.connect(self._on_extension_enqueue)
         self._sync_extension_server()
 
+        # アプリ実体更新（Phase B-2）: ワーカーからの進捗・完了を受けるスロット。
+        self._self_update_cancel: threading.Event | None = None
+        self._self_update_dialog: QProgressDialog | None = None
+        self._signals.self_update_progress.connect(self._on_self_update_progress)
+        self._signals.self_update_finished.connect(self._on_self_update_finished)
+
         QTimer.singleShot(0, self._check_dependencies)
         QTimer.singleShot(0, self._check_app_update_on_startup)
+        # メインウィンドウ表示後の残骸掃除（簡易ヘルスチェック通過後に .bak を消す）。
+        QTimer.singleShot(0, self._cleanup_update_leftovers)
 
     def _wire_queue_signals(self) -> None:
         """QueueController のシグナルを App スロットへ配線する。"""
@@ -753,10 +769,154 @@ class App(QMainWindow):
             QMessageBox.information(self, t("menu_about"), t("app_update_up_to_date"))
 
     def _show_app_update_available(self, result: UpdateCheckResult) -> None:
+        box, update_btn, open_btn = self._create_app_update_box(result)
+        box.exec()
+        clicked = box.clickedButton()
+        if update_btn is not None and clicked is update_btn:
+            self._start_self_update()
+        elif clicked is open_btn:
+            QDesktopServices.openUrl(QUrl(APP_RELEASES_URL))
+
+    def _create_app_update_box(
+        self, result: UpdateCheckResult
+    ) -> tuple[QMessageBox, QPushButton | None, QPushButton]:
+        """新版検出ダイアログを組み立てる（表示条件をテスト可能にする分離）。
+
+        「更新して再起動」はプリフライト（`can_self_update`）通過時のみ表示し、
+        キュー実行中は無効化して案内文言を添える（判定は表示時点の静的判定。
+        spec: docs/spec/features/app-update.md「Phase B」節）。
+        """
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Information)
         box.setWindowTitle(t("menu_about"))
-        box.setText(t("app_update_available").format(latest=result.latest))
+        text = t("app_update_available").format(latest=result.latest)
+        update_btn: QPushButton | None = None
+        if self._can_self_update():
+            update_btn = box.addButton(
+                t("btn_update_and_restart"), QMessageBox.ButtonRole.ActionRole
+            )
+            if self.queue.is_running:
+                update_btn.setEnabled(False)
+                text = text + "\n\n" + t("app_update_queue_running_hint")
+        box.setText(text)
+        open_btn = box.addButton(
+            t("btn_open_releases"), QMessageBox.ButtonRole.ActionRole
+        )
+        box.addButton(QMessageBox.StandardButton.Close)
+        return box, update_btn, open_btn
+
+    def _can_self_update(self) -> bool:
+        return self_update.can_self_update(
+            platform=sys.platform,
+            current=get_version(),
+            install_dir=self_update.get_install_dir(),
+        )
+
+    def _create_self_update_dialog(self) -> QProgressDialog:
+        """実体更新の進捗ダイアログ（モーダル・キャンセル可）を生成する。"""
+        dialog = QProgressDialog(
+            t("self_update_downloading"), t("btn_cancel"), 0, 0, self
+        )
+        dialog.setWindowTitle(t("self_update_progress_title"))
+        # 表示中のキュー開始等（インストール先のロック要因）をブロックする。
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setMinimumDuration(0)
+        return dialog
+
+    def _start_self_update(self) -> None:
+        """「更新して再起動」: DL → 検証 → 展開を専用ワーカーで実行する。
+
+        ワーカーは daemon（プロセス終了を妨げない: 差し替えは完全終了が前提）。
+        進捗・完了は Signal 経由でメインスレッドへ戻す。
+        """
+        install_dir = self_update.get_install_dir()
+        if install_dir is None:
+            return
+        # 前回失敗の残骸（.bak / ステージング）を掃除してから始める。
+        self_update.cleanup_leftovers(install_dir)
+        staging = self_update.resolve_staging_dir(install_dir)
+        cancel = threading.Event()
+        self._self_update_cancel = cancel
+        dialog = self._create_self_update_dialog()
+        self._self_update_dialog = dialog
+        dialog.canceled.connect(cancel.set)
+        current = get_version()
+
+        def worker() -> None:
+            result = self_update.download_and_verify_update(
+                current,
+                staging,
+                progress=lambda received, total: (
+                    self._signals.self_update_progress.emit(received, total)
+                ),
+                cancel=cancel,
+            )
+            self._signals.self_update_finished.emit(result)
+
+        threading.Thread(target=worker, daemon=True, name="self-update-worker").start()
+        dialog.show()
+
+    def _on_self_update_progress(self, received: object, total: object) -> None:
+        dialog = self._self_update_dialog
+        if dialog is None:
+            return
+        if total:
+            dialog.setMaximum(int(total))  # type: ignore[call-overload]
+            dialog.setValue(int(received))  # type: ignore[call-overload]
+        else:
+            # Content-Length 欠落時は不定進捗（busy）表示。
+            dialog.setMaximum(0)
+            dialog.setValue(0)
+
+    def _on_self_update_finished(self, result: object) -> None:
+        assert isinstance(result, self_update.SelfUpdateResult)
+        dialog = self._self_update_dialog
+        self._self_update_dialog = None
+        if dialog is not None:
+            dialog.close()
+            dialog.deleteLater()
+        cancel = self._self_update_cancel
+        self._self_update_cancel = None
+
+        if result.status is self_update.SelfUpdateStatus.CANCELLED:
+            return  # ユーザー起点のキャンセルは通知なしで閉じる
+        if cancel is not None and cancel.is_set():
+            # 検証完了とキャンセルの競合: 適用直前に再確認し、適用しない。
+            return
+        if result.status is not self_update.SelfUpdateStatus.SUCCESS:
+            self._show_self_update_failed()
+            return
+
+        install_dir = self_update.get_install_dir()
+        exe_name = Path(sys.executable).name
+        if (
+            install_dir is None
+            or result.extracted_dir is None
+            or not self_update.looks_like_app_dir(result.extracted_dir, exe_name)
+        ):
+            # 展開結果の健全性確認に失敗: 差し替えに進まない（fail-closed）。
+            self._show_self_update_failed()
+            return
+        script = self_update.build_replace_script(
+            install_dir=install_dir,
+            new_dir=result.extracted_dir,
+            pid=os.getpid(),
+            exe_relpath=exe_name,
+        )
+        if not self_update.launch_replace_script(script):
+            # スクリプトを起動できなければアプリを終了しない。
+            self._show_self_update_failed()
+            return
+        self.close()
+
+    def _show_self_update_failed(self) -> None:
+        """更新失敗を穏当に通知し、手動ダウンロード導線を案内する。"""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(t("menu_about"))
+        box.setText(t("self_update_failed"))
         open_btn = box.addButton(
             t("btn_open_releases"), QMessageBox.ButtonRole.ActionRole
         )
@@ -764,6 +924,23 @@ class App(QMainWindow):
         box.exec()
         if box.clickedButton() is open_btn:
             QDesktopServices.openUrl(QUrl(APP_RELEASES_URL))
+
+    def _cleanup_update_leftovers(self) -> None:
+        """前回更新の `.bak` / ステージング残骸を削除する（表示後・非同期）。
+
+        メインウィンドウ表示後に呼ばれることが簡易ヘルスチェックを兼ねる
+        （起動直後にクラッシュする新版なら `.bak` が残り手動復旧できる）。
+        失敗はサイレントに次回へ持ち越す。
+        """
+        install_dir = self_update.get_install_dir()
+        if install_dir is None:
+            return
+        run_in_thread(
+            lambda: self_update.cleanup_leftovers(install_dir),
+            on_done=lambda _result: None,
+            on_failed=lambda _exc: None,
+            parent=self,
+        )
 
     # ── widgets ───────────────────────────────────────────────────────────────
 
