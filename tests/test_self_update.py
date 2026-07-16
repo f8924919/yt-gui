@@ -13,6 +13,7 @@ import email.message
 import hashlib
 import io
 import json
+import shutil
 import subprocess
 import sys
 import threading
@@ -28,7 +29,16 @@ from yt_gui.self_update import (
     EXPECTED_IDENTITY,
     SelfUpdateResult,
     SelfUpdateStatus,
+    build_replace_script,
+    can_self_update,
+    cleanup_leftovers,
     download_and_verify_update,
+    get_install_dir,
+    is_parent_writable,
+    launch_replace_script,
+    looks_like_app_dir,
+    resolve_backup_dir,
+    resolve_staging_dir,
     resolve_windows_asset,
     safe_extract,
 )
@@ -428,3 +438,343 @@ def test_sigstore_is_not_imported_at_module_import() -> None:
         "for m in sys.modules), 'sigstore must be lazily imported'"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase B-2: プリフライト・差し替えスクリプト・残骸掃除（#253）
+# ═══════════════════════════════════════════════════════════════════════════
+
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32", reason="PowerShell 実行テストは Windows 限定"
+)
+
+
+# --- インストール先の特定（frozen 判定） ---
+
+
+def test_get_install_dir_returns_none_when_not_frozen(monkeypatch) -> None:
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    assert get_install_dir() is None
+
+
+def test_get_install_dir_returns_exe_parent_when_frozen(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exe = tmp_path / "apps" / "yt-gui" / "yt-gui.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe))
+    assert get_install_dir() == exe.parent
+
+
+# --- プリフライト（親ディレクトリの書き込み可否） ---
+
+
+def test_is_parent_writable_true_for_writable_parent(tmp_path: Path) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    assert is_parent_writable(install) is True
+
+
+def test_is_parent_writable_false_when_parent_missing(tmp_path: Path) -> None:
+    install = tmp_path / "missing" / "yt-gui"
+    assert is_parent_writable(install) is False
+
+
+def test_can_self_update_true_when_all_conditions_met(tmp_path: Path) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    assert can_self_update(platform="win32", current="0.5.0", install_dir=install)
+
+
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
+def test_can_self_update_false_on_non_windows(tmp_path: Path, platform: str) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    assert not can_self_update(platform=platform, current="0.5.0", install_dir=install)
+
+
+def test_can_self_update_false_when_version_unknown(tmp_path: Path) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    assert not can_self_update(platform="win32", current="unknown", install_dir=install)
+
+
+def test_can_self_update_false_when_not_frozen() -> None:
+    # 開発環境（バンドル外）では get_install_dir() が None を返す。
+    assert not can_self_update(platform="win32", current="0.5.0", install_dir=None)
+
+
+def test_can_self_update_false_when_parent_not_writable(tmp_path: Path) -> None:
+    install = tmp_path / "missing" / "yt-gui"
+    assert not can_self_update(platform="win32", current="0.5.0", install_dir=install)
+
+
+# --- 兄弟ディレクトリの導出（フォルダ名を尊重する不変条件） ---
+
+
+def test_resolve_staging_and_backup_derive_from_install_name(tmp_path: Path) -> None:
+    # ユーザーがインストールフォルダをリネームしていても name 基準で導出する。
+    install = tmp_path / "my-renamed-app"
+    assert resolve_staging_dir(install) == tmp_path / "my-renamed-app.update-staging"
+    assert resolve_backup_dir(install) == tmp_path / "my-renamed-app.bak"
+
+
+def test_looks_like_app_dir(tmp_path: Path) -> None:
+    new_dir = tmp_path / "new"
+    new_dir.mkdir()
+    assert looks_like_app_dir(new_dir, "yt-gui.exe") is False
+    (new_dir / "yt-gui.exe").write_bytes(b"")
+    assert looks_like_app_dir(new_dir, "yt-gui.exe") is True
+    assert looks_like_app_dir(tmp_path / "absent", "yt-gui.exe") is False
+
+
+# --- 残骸掃除（.bak / .update-staging） ---
+
+
+def test_cleanup_leftovers_removes_bak_and_staging(tmp_path: Path) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    bak = tmp_path / "yt-gui.bak"
+    staging = tmp_path / "yt-gui.update-staging"
+    for d in (bak, staging):
+        d.mkdir()
+        (d / "f.txt").write_bytes(b"x")
+    cleanup_leftovers(install)
+    assert not bak.exists()
+    assert not staging.exists()
+    assert install.exists()  # インストール本体は触らない
+
+
+def test_cleanup_leftovers_is_silent_when_absent(tmp_path: Path) -> None:
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    cleanup_leftovers(install)  # 例外を出さない
+
+
+# --- 差し替えスクリプトの生成（純関数・全 OS で検証） ---
+
+
+def _build_script(tmp_path: Path, **kwargs) -> str:
+    install = kwargs.pop("install_dir", tmp_path / "yt-gui")
+    new_dir = kwargs.pop("new_dir", tmp_path / "yt-gui.update-staging" / "new")
+    return build_replace_script(
+        install_dir=install,
+        new_dir=new_dir,
+        pid=kwargs.pop("pid", 4242),
+        exe_relpath=kwargs.pop("exe_relpath", "yt-gui.exe"),
+        **kwargs,
+    )
+
+
+def test_build_replace_script_embeds_parameters(tmp_path: Path) -> None:
+    script = _build_script(
+        tmp_path, wait_timeout_sec=33, retry_count=5, retry_initial_ms=123
+    )
+    assert str(tmp_path / "yt-gui") in script
+    assert str(tmp_path / "yt-gui.update-staging" / "new") in script
+    assert str(tmp_path / "yt-gui.bak") in script  # install 名から導出した .bak
+    assert "4242" in script
+    assert "yt-gui.exe" in script
+    assert "33" in script
+    assert "123" in script
+
+
+def test_build_replace_script_escapes_single_quotes(tmp_path: Path) -> None:
+    # ユーザー名等にシングルクォートが含まれても構文が壊れないこと。
+    install = tmp_path / "O'Brien" / "yt-gui"
+    script = _build_script(tmp_path, install_dir=install)
+    assert "O''Brien" in script
+    # エスケープされていない生の O'Brien が残っていないこと。
+    assert "O'Brien" not in script.replace("O''Brien", "")
+
+
+def test_build_replace_script_checks_process_name(tmp_path: Path) -> None:
+    # PID 再利用の誤検知対策としてプロセス名も照合する。
+    script = _build_script(tmp_path, exe_relpath="yt-gui.exe")
+    assert "ProcessName" in script
+    assert "'yt-gui'" in script
+
+
+def test_build_replace_script_self_deletes(tmp_path: Path) -> None:
+    script = _build_script(tmp_path)
+    assert "MyInvocation" in script
+
+
+def test_build_replace_script_dialog_flag(tmp_path: Path) -> None:
+    # 二重失敗時の案内は MessageBox。テストでは無効化できる（ブロック防止）。
+    with_dialog = _build_script(tmp_path, show_dialog_on_failure=True)
+    without_dialog = _build_script(tmp_path, show_dialog_on_failure=False)
+    assert "MessageBox" in with_dialog
+    assert ".bak" in with_dialog  # 案内文言に手動復旧先（.bak）を含める
+    assert "MessageBox" not in without_dialog
+
+
+# --- スクリプトの書き出しと起動 ---
+
+
+def test_launch_replace_script_writes_ps1_and_spawns(tmp_path: Path) -> None:
+    spawned: list[list[str]] = []
+    ok = launch_replace_script(
+        "Write-Output 'hi'", script_dir=tmp_path, spawn=spawned.append
+    )
+    assert ok is True
+    assert len(spawned) == 1
+    argv = spawned[0]
+    assert argv[0] == "powershell.exe"
+    assert "-NoProfile" in argv
+    assert "-ExecutionPolicy" in argv
+    assert "Bypass" in argv
+    script_path = Path(argv[-1])
+    assert script_path.suffix == ".ps1"
+    # PowerShell 5.1 が非 ASCII パスを正しく読めるよう BOM 付き UTF-8 で書く。
+    raw = script_path.read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf")
+    assert "Write-Output 'hi'" in raw.decode("utf-8-sig")
+
+
+def test_launch_replace_script_returns_false_on_spawn_failure(tmp_path: Path) -> None:
+    def _boom(argv: list[str]) -> None:
+        raise OSError("blocked")
+
+    # 例外を漏らさず False を返す（呼び出し側はアプリを終了しない）。
+    assert launch_replace_script("x", script_dir=tmp_path, spawn=_boom) is False
+
+
+# --- 差し替えスクリプトの実行（Windows 限定・実 PowerShell） ---
+
+
+def _dead_pid() -> int:
+    proc = subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.DEVNULL)
+    proc.wait()
+    return proc.pid
+
+
+def _make_layout(tmp_path: Path) -> dict[str, Path]:
+    """ダミーのインストール構成（旧版・ステージング済み新版）を作る。"""
+    install = tmp_path / "yt-gui"
+    install.mkdir()
+    (install / "old.txt").write_bytes(b"old")
+    (install / "yt-gui.exe").write_bytes(b"not a real exe")
+    staging = tmp_path / "yt-gui.update-staging"
+    new_dir = staging / "yt-gui-9.9.9-new"
+    new_dir.mkdir(parents=True)
+    (new_dir / "new.txt").write_bytes(b"new")
+    (new_dir / "yt-gui.exe").write_bytes(b"not a real exe")
+    return {"install": install, "staging": staging, "new_dir": new_dir}
+
+
+def _run_script(tmp_path: Path, script: str) -> subprocess.CompletedProcess:
+    script_path = tmp_path / "replace.ps1"
+    script_path.write_text(script, encoding="utf-8-sig")
+    return subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+_FAST = {"wait_timeout_sec": 10, "retry_count": 2, "retry_initial_ms": 10}
+
+
+@windows_only
+def test_replace_script_swaps_install_and_cleans_up(tmp_path: Path) -> None:
+    layout = _make_layout(tmp_path)
+    script = build_replace_script(
+        install_dir=layout["install"],
+        new_dir=layout["new_dir"],
+        pid=_dead_pid(),
+        exe_relpath="yt-gui.exe",
+        show_dialog_on_failure=False,
+        **_FAST,
+    )
+    result = _run_script(tmp_path, script)
+    assert result.returncode == 0, result.stderr
+    # 新版が配置され、旧版は .bak に退避、ステージングは掃除済み。
+    assert (layout["install"] / "new.txt").exists()
+    assert not (layout["install"] / "old.txt").exists()
+    assert (tmp_path / "yt-gui.bak" / "old.txt").exists()
+    assert not layout["staging"].exists()
+    # スクリプトは自己削除する。
+    assert not (tmp_path / "replace.ps1").exists()
+
+
+@windows_only
+def test_replace_script_replaces_stale_backup(tmp_path: Path) -> None:
+    layout = _make_layout(tmp_path)
+    stale = tmp_path / "yt-gui.bak"
+    stale.mkdir()
+    (stale / "stale.txt").write_bytes(b"stale")
+    script = build_replace_script(
+        install_dir=layout["install"],
+        new_dir=layout["new_dir"],
+        pid=_dead_pid(),
+        exe_relpath="yt-gui.exe",
+        show_dialog_on_failure=False,
+        **_FAST,
+    )
+    result = _run_script(tmp_path, script)
+    assert result.returncode == 0, result.stderr
+    # .bak は 1 世代のみ: 古い残骸は消え、今回の旧版に置き換わる。
+    assert (tmp_path / "yt-gui.bak" / "old.txt").exists()
+    assert not (tmp_path / "yt-gui.bak" / "stale.txt").exists()
+
+
+@windows_only
+def test_replace_script_rolls_back_when_new_dir_missing(tmp_path: Path) -> None:
+    layout = _make_layout(tmp_path)
+    shutil.rmtree(layout["new_dir"])  # 新→旧パス rename を失敗させる
+    script = build_replace_script(
+        install_dir=layout["install"],
+        new_dir=layout["new_dir"],
+        pid=_dead_pid(),
+        exe_relpath="yt-gui.exe",
+        show_dialog_on_failure=False,
+        **_FAST,
+    )
+    result = _run_script(tmp_path, script)
+    assert result.returncode == 2, result.stderr
+    # ロールバック: 旧版がインストールパスへ復旧し、.bak は残らない。
+    assert (layout["install"] / "old.txt").exists()
+    assert not (tmp_path / "yt-gui.bak").exists()
+    assert not (tmp_path / "replace.ps1").exists()
+
+
+@windows_only
+def test_replace_script_times_out_without_touching_install(tmp_path: Path) -> None:
+    layout = _make_layout(tmp_path)
+    # PID 待機を確実に発火させるため、プロセス名が一致する生存プロセスを使う。
+    alive = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+    )
+    try:
+        exe_name = Path(sys.executable).name  # プロセス名を一致させる（python.exe）
+        script = build_replace_script(
+            install_dir=layout["install"],
+            new_dir=layout["new_dir"],
+            pid=alive.pid,
+            exe_relpath=exe_name,
+            wait_timeout_sec=1,
+            retry_count=2,
+            retry_initial_ms=10,
+            show_dialog_on_failure=False,
+        )
+        result = _run_script(tmp_path, script)
+    finally:
+        alive.kill()
+        alive.wait()
+    assert result.returncode == 1, result.stderr
+    # タイムアウト時はインストール先・ステージングに一切触れない。
+    assert (layout["install"] / "old.txt").exists()
+    assert not (tmp_path / "yt-gui.bak").exists()
+    assert layout["new_dir"].exists()

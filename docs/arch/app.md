@@ -30,10 +30,21 @@ PySide6 メインウィンドウ。アプリケーションのエントリーポ
 | `log_message` | `str` | ログ追記 |
 | `show_error` | `str, str` | エラーダイアログ表示（title, message） |
 | `extension_enqueue` | `str, object, object` | ブラウザ拡張連携。サーバースレッドからの enqueue（url, cookies, format）をメインスレッドへ委譲 |
+| `self_update_progress` | `object, object` | 実体更新（[self_update.md](self_update.md)）のダウンロード進捗（received, total。total は `None` あり）。ワーカースレッドから進捗ダイアログへ |
+| `self_update_finished` | `object` | 実体更新ワーカーの完了（`SelfUpdateResult`）。成功時は差し替えスクリプトを起動してアプリを終了する |
 
 URL タイトル取得 (`_start_add_thread`) は `run_in_thread` の `on_done` / `on_failed` / `on_finished` コールバックでメインスレッドの UI 操作を完結させる。`on_failed` 内で `_update_status` / `_log` / `QMessageBox.critical` を直接呼び、`on_finished` で「追加」ボタンを再有効化する。
 
 `OriginalFormatPanel` も同じパターンで `run_in_thread` を使う（詳細は [original_format_panel.md](original_format_panel.md) 参照）。
+
+### 実体更新（Phase B-2）の UI フロー
+
+仕様の正本は [spec/features/app-update.md](../spec/features/app-update.md) の Phase B 節、実装 API は [self_update.md](self_update.md)。`app.py` 側の責務:
+
+- `_show_app_update_available` に「更新して再起動」ボタンを追加（表示条件は `self_update.can_self_update`、キュー実行中は `queue.is_running` で無効化＋案内文言）。
+- 押下でモーダル `QProgressDialog`（キャンセル可）を表示し、専用ワーカー（**daemon** の `threading.Thread`。プロセス終了を妨げない）で `download_and_verify_update` を実行。進捗・完了は `self_update_progress` / `self_update_finished` シグナルでメインスレッドへ戻し、キャンセルは `threading.Event` を set する（`run_in_thread` は進捗を持たないため使わない）。`total` が `None`（Content-Length 欠落）のときは不定進捗（busy）表示へ切り替える。
+- 完了時: 成功ならキャンセル状態を再確認したうえで差し替えスクリプトを起動して `close()`（スクリプトが PID 消滅を待つため競合しない）。スクリプト起動失敗時はアプリを終了せず「更新失敗」通知へ戻す。失敗は「更新失敗」通知＋「リリースページを開く」導線、キャンセルはサイレント。
+- 起動時（メインウィンドウ表示後）に `self_update.cleanup_leftovers` を `run_in_thread` で実行し、前回更新の `.bak` とステージング残骸を削除する（失敗はサイレント）。
 
 ## 初期化順序
 
