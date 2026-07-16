@@ -34,6 +34,7 @@
 | [178-ytdlp-update-phase-a.md](178-ytdlp-update-phase-a.md) | yt-dlp 更新 Phase A: ヘルプメニューに「バージョン情報 / 更新を確認」を追加。yt-gui/yt-dlp 版を併記し、PyPI JSON API 照会で最新版と比較・通知（古い場合は GitHub releases 導線）。照会は純関数 `yt_dlp_update.py`（HTTP 差し替え可）＋ `run_in_thread` でバックグラウンド実行（Issue #178 / PR #182） | 2026-06-20 |
 | [83-section-chapter-regex.md](83-section-chapter-regex.md) | 区間ダウンロードにチャプター名の正規表現指定モードを追加。フル取得→ローカル ffmpeg 切り出し方式を踏襲し、ドライラン info の chapters から `re.search` で区間解決・マッチ毎に個別ファイル分割出力・時間範囲と排他 UI（Issue #83） | 2026-07-11 |
 | [198-app-update-phase-a.md](198-app-update-phase-a.md) | アプリ更新 Phase A: yt-gui 本体の更新チェック＋通知。GitHub Releases API 照会の純関数 `app_update.py`（yt_dlp_update 同型）、起動時自動チェック＋オプトアウト設定（既定オン）、バージョン情報ダイアログに「yt-gui の更新を確認」追加・既存ボタンは「yt-dlp の更新を確認」へ改称。Phase B 方式調査は research/app-update.md に記録（Issue #198 / PR #199） | 2026-07-05 |
+| [app-update-phase-b.md](app-update-phase-b.md) | アプリ更新 Phase B の方式設計を確定する調査タスク。追加調査で tufup を棄却（timestamp 失効・鍵管理・macOS 非対応）し、自前アップデータ（Releases ＋ Sigstore attestation のアプリ内検証）・Windows 先行・手動適用を決定。design-review 反映の設計詳細を research/app-update.md に記録し、実装 Issue #252（B-1: コア PoC）/ #253（B-2: 差し替え・UI）を起票 | 2026-07-16 |
 
 ## バグ修正
 

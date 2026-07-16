@@ -5,8 +5,11 @@ yt-gui 本体はポータブル zip / AppImage で配布しており（インス
 よう、**Phase A: 更新チェック＋通知**を提供する。
 
 本仕様は Issue [#198](https://github.com/f8924919/yt-gui/issues/198) に基づく。
-実体の自動更新（Phase B: tufup 等）は方式調査
-（[research/app-update.md](../../research/app-update.md)）を経て別 Issue で扱う。
+実体の自動更新（Phase B）は方式調査
+（[research/app-update.md](../../research/app-update.md)）で「GitHub Releases
+＋ Sigstore attestation 検証」の自前方式に決定済みで、実装 Issue
+[#252](https://github.com/f8924919/yt-gui/issues/252) /
+[#253](https://github.com/f8924919/yt-gui/issues/253) で扱う。
 設計の意図・接続点は [arch/app_update.md](../../arch/app_update.md) を参照。
 
 ## 照会先（データソース）
@@ -71,7 +74,10 @@ yt-dlp 更新（[yt-dlp-update.md](yt-dlp-update.md)）の「明示操作起点�
 
 ## Phase B: 実体の自動更新（本仕様のスコープ外）
 
-tufup / Velopack / 自前アップデータの方式比較・ホスティング課題・鍵管理の
-検討は [research/app-update.md](../../research/app-update.md) に記録している。
-方式・ホスティングの設計が確定した時点で別 Issue として起票し、本仕様へ
-Phase B 節を追加する。
+方式は「GitHub Releases のフル zip ＋ Sigstore attestation のアプリ内検証」
+の自前アップデータに決定済み（対象は Windows のみ先行・手動適用のみ。
+比較検討・決定の経緯と設計詳細は
+[research/app-update.md](../../research/app-update.md)）。実装は
+[#252](https://github.com/f8924919/yt-gui/issues/252)（コア・PoC）/
+[#253](https://github.com/f8924919/yt-gui/issues/253)（Windows 差し替え・UI）
+で行い、本仕様への Phase B 節追加は実装タスク側の docs 先行で行う。
