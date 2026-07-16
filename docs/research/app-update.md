@@ -126,10 +126,14 @@ provenance attestation を活かした自前方式が成立することが判明
   消滅する（通常リリースをそのまま更新ソースに使う。Phase A の照会先
   GitHub Releases API とも一本化されたまま）。
 - ただし sigstore-python は**内部で TUF を使いトラストルートを管理**する
-  ため「失効リスクが完全にゼロ」ではない（design-review 指摘）。同梱
-  トラストルートによるオフライン検証を既定とし、検証不能時は手動
-  ダウンロードへ誘導することで「self-update 自体が壊れる」自己矛盾を
-  避ける。オフライン検証の成立可否は PoC（Phase B-1）で確認する。
+  ため「失効リスクが完全にゼロ」ではない（design-review 指摘）。トラスト
+  ルートは年数回ローテーションするため完全静的同梱のみに依存すると将来の
+  attestation が検証不能になりうる（sigstore-python 追加調査・2026-07-16）。
+  そこで**通常はオンライン TUF 更新（`Verifier.production()`。実体更新は
+  どのみちオンライン時にしか行えない）**とし、同梱トラストルート＋
+  `offline=True` の成立性を PoC（Phase B-1）で確認してフォールバック採否を
+  決める。検証不能時は手動ダウンロードへ誘導し「self-update 自体が壊れる」
+  自己矛盾を避ける。
 - トレードオフ: 差分更新なし（毎回フル zip 数百 MB）。更新頻度・
   ユーザー規模的に許容し、帯域が問題化したら差分方式を再検討する。
 
@@ -156,13 +160,24 @@ design-review（[git-workflow.md](../git-workflow.md) §5.5 発火: 新モジュ
 - 検証が通るまで一切 実行/展開/差し替えしない。検証失敗・attestation 取得
   失敗はすべて「更新失敗」に落とし、手動ダウンロード（リリースページ）へ誘導。
 - 検証は必ず**ダウンロードした実バイト**に対して行う: DL した zip の
-  sha256 を算出 → その digest で attestations API を照会 →
-  `Verifier.verify_artifact()` に**実バイト**を渡して sigstore 側に
-  再計算・照合させる（「digest で照会して存在したら OK」という循環を禁止）。
+  sha256 を算出 → その digest で attestations API を照会（レスポンスの
+  `attestations[].bundle` にバンドル JSON が埋め込み・複数返り得る）→
+  **`Verifier.verify_dsse(bundle, policy)`** で署名・証明書チェーン・
+  透明性ログを検証する（attest-build-provenance は DSSE / in-toto 形式の
+  ため。`verify_artifact` は hashedrekord 用で使えない。
+  sigstore-python 追加調査・2026-07-16）。
+- **`verify_dsse` は subject digest とアセットの照合を行わない**ため、
+  返却された in-toto Statement の `subject[].digest.sha256` と自算出
+  digest の一致確認を必ず自前で行う。複数 attestation は 1 件ずつ検証し、
+  ポリシー通過＋digest 一致が 1 件あれば成功とする（「digest で照会して
+  存在したら OK」という循環を禁止）。
 - `policy.Identity` は本リポジトリの `release.yml` の証明書 identity
   （workflow パス）＋ issuer `https://token.actions.githubusercontent.com`
-  を厳格にピンする。ref 成分の扱い（タグ ref を許容する範囲）は
-  Phase B-1 実装時に確定する。
+  を厳格にピンする。**ref 成分は確定済み（2026-07-16・#252）**: 証明書の
+  SAN にはタグ ref が含まれるため、ダウンロード対象バージョンのタグから
+  `https://github.com/f8924919/yt-gui/.github/workflows/release.yml@refs/tags/v{version}`
+  を動的生成して**完全一致**でピンする（対象バージョンは単調性チェック済み
+  のため、任意の旧タグを許容する緩いピンにはしない）。
 - zip の展開は検証直後に**アプリ内（同一プロセス）**で行い、差し替え
   スクリプトには「配置済みフォルダの rename」だけをさせる（TOCTOU 回避）。
 

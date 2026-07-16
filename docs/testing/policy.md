@@ -29,6 +29,7 @@
 | 純粋関数 | `yt_gui/extension_server.py`（`handle_request` / `ExtensionServer` ライフサイクル / `resolve_allow_reuse_address` の bind 排他分岐） | ◯ |
 | 純粋関数 | `yt_gui/yt_dlp_update.py`（`parse_latest_version` / `compare_versions` / `check_for_update`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
 | 純粋関数 | `yt_gui/app_update.py`（`parse_latest_version` / `check_for_update` / `should_check_on_startup` / `should_notify`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
+| 純粋関数 | `yt_gui/self_update.py`（アセット解決 / DL 進捗・キャンセル / attestation 検証 / 安全展開。HTTP は `fetch`、sigstore 検証は検証関数の差し替えでオフライン検証） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 | 開発ツール（Claude Code hook） | `.claude/hooks/block_main_commit.py`（コマンド解析・実効ディレクトリ解決のロジック。パッケージ外のため `importlib` で読み込み、ブランチ判定は一時 git リポジトリで検証。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#240） | ◯ |
