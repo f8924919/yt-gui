@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （現在、進行中・未着手のタスクはありません） | — | — | — |
+| [262-attestation-bundle-url](262-attestation-bundle-url.md) | 進行中 | self-update: attestations API の bundle_url 化（snappy）で検証失敗する問題の修正（[#262](https://github.com/f8924919/yt-gui/issues/262)） | 2026-07-18 |
 
 ## 完了タスク
 

@@ -29,6 +29,7 @@ from yt_gui.self_update import (
     EXPECTED_IDENTITY,
     SelfUpdateResult,
     SelfUpdateStatus,
+    _decode_raw_snappy,
     build_replace_script,
     can_self_update,
     cleanup_leftovers,
@@ -44,6 +45,8 @@ from yt_gui.self_update import (
 )
 
 ASSET_URL = "https://example.invalid/yt-gui-0.5.0-windows-x64.zip"
+BUNDLE_URL = "https://blob.example.invalid/attestations/1"
+FIXTURE_DIR = Path(__file__).parent / "data"
 
 
 def _make_zip(entries: dict[str, bytes]) -> bytes:
@@ -68,16 +71,45 @@ def _attestations_payload(count: int = 1) -> bytes:
     ).encode("utf-8")
 
 
+def _attestation_entries_payload(entries: list[dict]) -> bytes:
+    """`attestations[]` の各要素（bundle / bundle_url の混在）を指定して組む。"""
+    return json.dumps({"attestations": entries}).encode("utf-8")
+
+
+def _snappy_literal(data: bytes) -> bytes:
+    """テスト用の最小 snappy 圧縮（raw block format・literal 要素のみ）。"""
+    out = bytearray()
+    n = len(data)
+    while n >= 0x80:
+        out.append((n & 0x7F) | 0x80)
+        n >>= 7
+    out.append(n)
+    for i in range(0, len(data), 60):
+        chunk = data[i : i + 60]
+        out.append((len(chunk) - 1) << 2)
+        out += chunk
+    return bytes(out)
+
+
 def _statement_for(data: bytes) -> dict:
     return {"subject": [{"digest": {"sha256": hashlib.sha256(data).hexdigest()}}]}
 
 
 def _make_fetch(
-    release: bytes, attestations: bytes | Exception
+    release: bytes,
+    attestations: bytes | Exception,
+    bundle_responses: dict[str, bytes | Exception] | None = None,
 ) -> Callable[[str], bytes]:
+    """URL 種別（release / attestations API / bundle_url）で応答を出し分ける。"""
+
     def fetch(url: str) -> bytes:
         if url.endswith("/releases/latest"):
             return release
+        if bundle_responses is not None and url in bundle_responses:
+            response = bundle_responses[url]
+            if isinstance(response, Exception):
+                raise response
+            return response
         if isinstance(attestations, Exception):
             raise attestations
         return attestations
@@ -109,6 +141,7 @@ def _run_update(
     current: str = "0.4.0",
     release: bytes | None = None,
     attestations: bytes | Exception | None = None,
+    bundle_responses: dict[str, bytes | Exception] | None = None,
     open_stream: Callable[[str], tuple[int | None, Iterator[bytes]]] | None = None,
     verify_bundle: Callable[[dict, str, str], dict] | None = None,
     progress: Callable[[int, int | None], None] | None = None,
@@ -123,6 +156,7 @@ def _run_update(
             if release is not None
             else _release_payload("v0.5.0", ["yt-gui-0.5.0-windows-x64.zip"]),
             attestations if attestations is not None else _attestations_payload(),
+            bundle_responses,
         ),
         open_stream=open_stream
         if open_stream is not None
@@ -393,6 +427,192 @@ def test_unexpected_verifier_exception_does_not_leak(tmp_path: Path) -> None:
         _make_zip({"a.txt": b"x"}), tmp_path, verify_bundle=broken_verify
     )
     assert result.status is SelfUpdateStatus.VERIFICATION_FAILED
+
+
+# --- attestation バンドル解決（bundle_url 化への追従・#262） ---
+
+
+def test_bundle_url_snappy_bundle_verifies(tmp_path: Path) -> None:
+    # bundle が null でも bundle_url の snappy 圧縮バンドルを展開して検証に使う。
+    zip_data = _make_zip({"a.txt": b"x"})
+    seen: list[dict] = []
+
+    def verify_bundle(bundle: dict, identity: str, issuer: str) -> dict:
+        seen.append(bundle)
+        return _statement_for(zip_data)
+
+    result = _run_update(
+        zip_data,
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [{"bundle": None, "bundle_url": BUNDLE_URL}]
+        ),
+        bundle_responses={
+            BUNDLE_URL: _snappy_literal(json.dumps({"idx": 42}).encode("utf-8"))
+        },
+        verify_bundle=verify_bundle,
+    )
+    assert result.status is SelfUpdateStatus.SUCCESS
+    assert seen == [{"idx": 42}]
+
+
+def test_bundle_url_plain_json_bundle_verifies(tmp_path: Path) -> None:
+    # 将来 bundle_url が素の JSON を返してもそのままパースして検証に使う。
+    zip_data = _make_zip({"a.txt": b"x"})
+    result = _run_update(
+        zip_data,
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [{"bundle": None, "bundle_url": BUNDLE_URL}]
+        ),
+        bundle_responses={BUNDLE_URL: json.dumps({"idx": 1}).encode("utf-8")},
+    )
+    assert result.status is SelfUpdateStatus.SUCCESS
+
+
+def test_bundle_and_url_both_missing_is_verification_failed(tmp_path: Path) -> None:
+    result = _run_update(
+        _make_zip({"a.txt": b"x"}),
+        tmp_path,
+        attestations=_attestation_entries_payload([{"bundle": None}]),
+    )
+    assert result.status is SelfUpdateStatus.VERIFICATION_FAILED
+
+
+def test_bundle_url_fetch_failure_is_network_error(tmp_path: Path) -> None:
+    # bundle_url の GET 失敗で 1 件も検証できない場合はネットワーク起因として返す。
+    result = _run_update(
+        _make_zip({"a.txt": b"x"}),
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [{"bundle": None, "bundle_url": BUNDLE_URL}]
+        ),
+        bundle_responses={BUNDLE_URL: OSError("blob unreachable")},
+    )
+    assert result.status is SelfUpdateStatus.NETWORK_ERROR
+
+
+def test_bundle_url_invalid_snappy_is_verification_failed(tmp_path: Path) -> None:
+    result = _run_update(
+        _make_zip({"a.txt": b"x"}),
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [{"bundle": None, "bundle_url": BUNDLE_URL}]
+        ),
+        bundle_responses={BUNDLE_URL: b"\xff\xff\xff\xff"},
+    )
+    assert result.status is SelfUpdateStatus.VERIFICATION_FAILED
+
+
+def test_bundle_url_snappy_of_invalid_json_is_verification_failed(
+    tmp_path: Path,
+) -> None:
+    result = _run_update(
+        _make_zip({"a.txt": b"x"}),
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [{"bundle": None, "bundle_url": BUNDLE_URL}]
+        ),
+        bundle_responses={BUNDLE_URL: _snappy_literal(b"this is not json")},
+    )
+    assert result.status is SelfUpdateStatus.VERIFICATION_FAILED
+
+
+def test_mixed_attestations_succeed_via_valid_entry(tmp_path: Path) -> None:
+    # bundle_url の取得失敗があっても、他の attestation（埋め込み）で成功できる。
+    zip_data = _make_zip({"a.txt": b"x"})
+    result = _run_update(
+        zip_data,
+        tmp_path,
+        attestations=_attestation_entries_payload(
+            [
+                {"bundle": None, "bundle_url": BUNDLE_URL},
+                {"bundle": {"idx": 1}},
+            ]
+        ),
+        bundle_responses={BUNDLE_URL: OSError("blob unreachable")},
+    )
+    assert result.status is SelfUpdateStatus.SUCCESS
+
+
+# --- snappy デコーダ（raw block format・#262） ---
+
+
+def test_snappy_decodes_literal_only() -> None:
+    assert _decode_raw_snappy(b"\x05\x10hello") == b"hello"
+
+
+def test_snappy_decodes_copy_with_one_byte_offset() -> None:
+    # literal "abc" + copy(len=6, offset=3)。offset < len の重なり複製も含む。
+    assert _decode_raw_snappy(b"\x09\x08abc\x09\x03") == b"abcabcabc"
+
+
+def test_snappy_decodes_copy_with_two_byte_offset() -> None:
+    assert _decode_raw_snappy(b"\x09\x08abc\x16\x03\x00") == b"abcabcabc"
+
+
+def test_snappy_decodes_copy_with_four_byte_offset() -> None:
+    assert _decode_raw_snappy(b"\x09\x08abc\x17\x03\x00\x00\x00") == b"abcabcabc"
+
+
+def test_snappy_decodes_multibyte_literal_length() -> None:
+    # literal 長 61 以上は追加バイトで長さを表す（tag 0xF0 = 1 バイト長）。
+    data = b"\x64\xf0\x63" + b"x" * 100
+    assert _decode_raw_snappy(data) == b"x" * 100
+
+
+def test_snappy_decodes_multibyte_varint_header() -> None:
+    # 非圧縮長 300 は 2 バイト varint（0xAC 0x02）になる。
+    data = b"\xac\x02" + (b"\xec" + b"a" * 60) * 5
+    assert _decode_raw_snappy(data) == b"a" * 300
+
+
+def test_snappy_roundtrips_test_helper_output() -> None:
+    payload = json.dumps({"mediaType": "test", "n": list(range(50))}).encode("utf-8")
+    assert _decode_raw_snappy(_snappy_literal(payload)) == payload
+
+
+def test_snappy_decodes_real_attestation_fixture() -> None:
+    # 実 v0.6.1 の bundle_url 応答（2026-07-18 取得）を展開できること。
+    raw = (FIXTURE_DIR / "attestation_bundle_v061.snappy").read_bytes()
+    bundle = json.loads(_decode_raw_snappy(raw))
+    assert "mediaType" in bundle
+
+
+def test_snappy_rejects_truncated_varint() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x80")
+
+
+def test_snappy_rejects_length_over_limit() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x05\x10hello", max_size=4)
+
+
+def test_snappy_rejects_copy_offset_out_of_range() -> None:
+    # 出力 3 バイト時点で offset=16 の copy は参照先が存在しない。
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x09\x08abc\x09\x10")
+
+
+def test_snappy_rejects_zero_copy_offset() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x04\x08abc\x02\x00\x00")
+
+
+def test_snappy_rejects_output_shorter_than_declared() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x0a\x10hello")
+
+
+def test_snappy_rejects_output_longer_than_declared() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x03\x10hello")
+
+
+def test_snappy_rejects_truncated_literal() -> None:
+    with pytest.raises(ValueError):
+        _decode_raw_snappy(b"\x05\x10hel")
 
 
 # --- 安全展開（zip slip / 絶対パス対策） ---

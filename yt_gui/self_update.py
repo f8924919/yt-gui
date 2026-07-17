@@ -55,6 +55,10 @@ _WINDOWS_ASSET_TEMPLATE = "yt-gui-{version}-windows-x64.zip"
 
 _DOWNLOAD_CHUNK_SIZE = 256 * 1024
 
+# bundle_url 応答（snappy 圧縮バンドル）の非圧縮長上限。実測 約 11 KB のため
+# 十分な余裕を持たせつつ、展開爆弾を封じる（#262）。
+_MAX_BUNDLE_SIZE = 10 * 1024 * 1024
+
 
 class SelfUpdateStatus(Enum):
     """実体更新（ダウンロード〜展開）の結果種別。"""
@@ -177,6 +181,89 @@ def _default_verify_bundle(
     return statement
 
 
+def _decode_raw_snappy(data: bytes, max_size: int = _MAX_BUNDLE_SIZE) -> bytes:
+    """raw snappy block format（framing なし）を展開する。
+
+    attestations API の bundle_url 応答（`Content-Type: application/x-snappy`）
+    の展開に必要な最小の純 Python 実装（展開のみ・依存追加なし。#262）。
+    外部から届くデータを扱うため fail-closed: 不正 varint・copy オフセット
+    範囲外・宣言長との不一致・`max_size` 超過はすべて `ValueError`。
+    """
+    # 非圧縮長ヘッダー（little-endian の 7 bit varint）。
+    pos = 0
+    length = 0
+    shift = 0
+    while True:
+        if pos >= len(data):
+            raise ValueError("snappy: 長さヘッダーが途中で終わっています")
+        byte = data[pos]
+        pos += 1
+        length |= (byte & 0x7F) << shift
+        shift += 7
+        if not byte & 0x80:
+            break
+        if shift >= 35:
+            raise ValueError("snappy: 長さヘッダーが長すぎます")
+    if length > max_size:
+        raise ValueError(f"snappy: 非圧縮長 {length} が上限 {max_size} を超えています")
+
+    out = bytearray()
+    while pos < len(data):
+        tag = data[pos]
+        pos += 1
+        kind = tag & 0x03
+        if kind == 0:  # literal
+            size = (tag >> 2) + 1
+            if size > 60:  # 長さは追加バイト（1〜4）で表される
+                extra = size - 60
+                if pos + extra > len(data):
+                    raise ValueError("snappy: literal 長のバイトが不足しています")
+                size = int.from_bytes(data[pos : pos + extra], "little") + 1
+                pos += extra
+            if pos + size > len(data):
+                raise ValueError("snappy: literal 本体が不足しています")
+            out += data[pos : pos + size]
+            pos += size
+        else:  # copy（既出力からの後方参照。offset < size の重なり複製あり）
+            if kind == 1:
+                size = ((tag >> 2) & 0x07) + 4
+                if pos >= len(data):
+                    raise ValueError("snappy: copy オフセットが不足しています")
+                offset = ((tag & 0xE0) << 3) | data[pos]
+                pos += 1
+            else:
+                width = 2 if kind == 2 else 4
+                size = (tag >> 2) + 1
+                if pos + width > len(data):
+                    raise ValueError("snappy: copy オフセットが不足しています")
+                offset = int.from_bytes(data[pos : pos + width], "little")
+                pos += width
+            if offset == 0 or offset > len(out):
+                raise ValueError("snappy: copy オフセットが出力範囲外です")
+            for _ in range(size):
+                out.append(out[-offset])
+        if len(out) > length:
+            raise ValueError("snappy: 出力が宣言された非圧縮長を超えています")
+    if len(out) != length:
+        raise ValueError("snappy: 出力長が宣言された非圧縮長と一致しません")
+    return bytes(out)
+
+
+def _parse_bundle_bytes(raw: bytes) -> dict[str, Any]:
+    """bundle_url 応答をバンドル dict へ変換する（#262）。
+
+    現行の snappy 圧縮（raw block format）と、素の JSON（将来の仕様変更への
+    耐性）の両方を受け付ける。判別は先頭バイト: JSON オブジェクトは必ず
+    `{` で始まり、実バンドルの snappy は多バイト varint（先頭バイトの
+    継続ビットが立つ）で始まるため衝突しない。
+    """
+    text = raw if raw.lstrip()[:1] == b"{" else _decode_raw_snappy(raw)
+    bundle = json.loads(text)
+    if not isinstance(bundle, dict):
+        raise ValueError("bundle が JSON オブジェクトではありません")
+    return bundle
+
+
 def _statement_matches_digest(statement: dict[str, Any], digest: str) -> bool:
     """in-toto Statement の subject digest が DL 実バイトの digest と一致するか。"""
     try:
@@ -268,11 +355,11 @@ def download_and_verify_update(
         _remove_quietly(zip_path)
         return SelfUpdateResult(SelfUpdateStatus.NETWORK_ERROR, version=latest)
 
-    # 3. DL 実バイトの digest で attestation バンドルを取得する。
+    # 3. DL 実バイトの digest で attestation の一覧を取得する。
     digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
     try:
         att_payload = fetch(ATTESTATIONS_URL_TEMPLATE.format(digest=digest))
-        bundles = [att["bundle"] for att in json.loads(att_payload)["attestations"]]
+        attestations = json.loads(att_payload)["attestations"]
     except urllib.error.HTTPError as exc:
         _remove_quietly(zip_path)
         status = (
@@ -284,9 +371,35 @@ def download_and_verify_update(
     except Exception:
         _remove_quietly(zip_path)
         return SelfUpdateResult(SelfUpdateStatus.NETWORK_ERROR, version=latest)
-    if not bundles:
+    if not attestations:
         _remove_quietly(zip_path)
         return SelfUpdateResult(SelfUpdateStatus.NO_ATTESTATION, version=latest)
+
+    # 3.5. バンドル解決（#262）: API version 2026-03-10 で `bundle` 埋め込みが
+    # 廃止され `bundle_url` 参照になったため、attestation 1 件ごとに
+    # 埋め込み → bundle_url の順で解決する。解決できないものはスキップし、
+    # bundle_url の取得失敗だけはネットワーク起因として全滅時に区別する。
+    bundles: list[dict[str, Any]] = []
+    network_skip = False
+    for att in attestations:
+        if not isinstance(att, dict):
+            continue
+        bundle = att.get("bundle")
+        if isinstance(bundle, dict):
+            bundles.append(bundle)
+            continue
+        bundle_url = att.get("bundle_url")
+        if not bundle_url:
+            continue
+        try:
+            raw = fetch(bundle_url)
+        except Exception:
+            network_skip = True
+            continue
+        try:
+            bundles.append(_parse_bundle_bytes(raw))
+        except Exception:
+            continue
 
     # 4. 検証: ポリシー通過＋subject digest 一致の attestation が 1 件あれば成功。
     verified = False
@@ -300,7 +413,12 @@ def download_and_verify_update(
             break
     if not verified:
         _remove_quietly(zip_path)
-        return SelfUpdateResult(SelfUpdateStatus.VERIFICATION_FAILED, version=latest)
+        status = (
+            SelfUpdateStatus.NETWORK_ERROR
+            if network_skip
+            else SelfUpdateStatus.VERIFICATION_FAILED
+        )
+        return SelfUpdateResult(status, version=latest)
 
     # 5. 検証済み zip を安全に展開する（差し替えは Phase B-2 のスクリプト）。
     extract_dir = work_dir / f"yt-gui-{latest}-new"

@@ -162,8 +162,10 @@ design-review（[git-workflow.md](../git-workflow.md) §5.5 発火: 新モジュ
 - 検証が通るまで一切 実行/展開/差し替えしない。検証失敗・attestation 取得
   失敗はすべて「更新失敗」に落とし、手動ダウンロード（リリースページ）へ誘導。
 - 検証は必ず**ダウンロードした実バイト**に対して行う: DL した zip の
-  sha256 を算出 → その digest で attestations API を照会（レスポンスの
-  `attestations[].bundle` にバンドル JSON が埋め込み・複数返り得る）→
+  sha256 を算出 → その digest で attestations API を照会（複数返り得る。
+  当初は `attestations[].bundle` にバンドル JSON が埋め込みだったが、
+  2026-07 の API 破壊的変更で `bundle_url` 参照へ移行。後述の
+  「GitHub attestations API の破壊的変更（2026-07-18）」参照）→
   **`Verifier.verify_dsse(bundle, policy)`** で署名・証明書チェーン・
   透明性ログを検証する（attest-build-provenance は DSSE / in-toto 形式の
   ため。`verify_artifact` は hashedrekord 用で使えない。
@@ -228,6 +230,28 @@ design-review（[git-workflow.md](../git-workflow.md) §5.5 発火: 新モジュ
 差し替え・UI）として起票済み（調査タスクの経緯は
 [task/archive/app-update-phase-b.md](../task/archive/app-update-phase-b.md)）。
 spec への Phase B 節追加・arch 新設は実装タスク側の docs 先行で行う。
+
+## GitHub attestations API の破壊的変更（2026-07-18）
+
+v0.6.1 リリース直後の実地 E2E（0.6.0 → 0.6.1）で attestation 検証が
+`VERIFICATION_FAILED` となり、自己更新の不能を確認した（Issue
+[#262](https://github.com/f8924919/yt-gui/issues/262)）。
+
+- GitHub REST API の破壊的変更（[API version 2026-03-10](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes?apiVersion=2026-03-10)）
+  により、attestation 照会レスポンスの `attestations[].bundle` 埋め込みが
+  廃止され、`attestations[].bundle_url`（Azure blob URL）参照へ移行した。
+- 実測（2026-07-18）: `bundle` は null。`bundle_url` は無認証 GET 可・
+  `Content-Type: application/x-snappy`・**raw snappy block format**（framing
+  なし）で圧縮されたバンドル JSON（約 11 KB）。`X-GitHub-Api-Version:
+  2022-11-28` を指定しても旧動作には戻らない（バージョン指定での回避不可）。
+- #253 の E2E（2026-07-17・実 API）は成功していたため、デフォルト挙動の
+  切り替えはその直後に行われた。**過去リリース（v0.6.0 等）の attestation も
+  同形式で返るため、既存インストールは修正版を一度手動導入するまで自己更新
+  不能**。
+- 対応方針（#262）: `bundle` 埋め込みがあれば従来どおり、null なら
+  `bundle_url` を GET → 純 Python の snappy デコーダ（展開のみ・依存追加
+  なし・非圧縮長 10 MB 上限）で展開 → 従来の検証へ。設計の正本は
+  [arch/self_update.md](../arch/self_update.md) の検証モデル。
 
 ## 参考リンク
 
