@@ -19,9 +19,9 @@
 - [x] docs 先行（arch/self_update.md・research/app-update.md）
 - [x] テスト先行（test_self_update.py: バンドル解決 7 系・snappy デコーダ 16 件。実 v0.6.1 応答のフィクスチャ `tests/data/attestation_bundle_v061.snappy` を追加）
 - [x] 実装 → green（79 passed）
-- [ ] verify-gate
+- [x] verify-gate（verify green 594 passed / docs-check pass / evaluator PASS）
 - [x] 手動確認（実 v0.6.1 アセットへのヘッドレス駆動）と結果記録
-- [ ] PR
+- [x] PR（#263）
 
 ## 手動確認の結果（2026-07-18 実施）
 
