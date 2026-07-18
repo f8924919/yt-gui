@@ -58,6 +58,158 @@ def test_verify_sha256_rejects_missing_expected(tmp_path):
         download_binaries._verify_sha256(str(f), None, "test")
 
 
+# --- 取得リトライ・診断情報（#265） ----------------------------------------
+
+
+def _digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+class _FakeDownload:
+    """`_download` の差し替え。要素が bytes なら書き込み、Exception なら送出する。"""
+
+    def __init__(self, results: list[bytes | Exception]) -> None:
+        self._results = results
+        self.calls: list[str] = []
+
+    def __call__(self, url: str, dest: str) -> int:
+        result = self._results[len(self.calls)]
+        self.calls.append(url)
+        if isinstance(result, Exception):
+            raise result
+        with open(dest, "wb") as fh:
+            fh.write(result)
+        return len(result)
+
+
+def test_download_verified_retries_then_succeeds(tmp_path, monkeypatch):
+    """1 回目の sha256 不一致は再取得し、2 回目の成功で正常続行する。"""
+    good = b"good content"
+    fake = _FakeDownload([b"corrupted", good])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    sleeps: list[float] = []
+    dest = tmp_path / "blob.bin"
+    download_binaries._download_verified(
+        "https://example.invalid/blob",
+        str(dest),
+        _digest(good),
+        "test",
+        retries=3,
+        backoff_initial_sec=2.0,
+        sleep=sleeps.append,
+    )
+    assert dest.read_bytes() == good
+    assert len(fake.calls) == 2
+    assert sleeps == [2.0]
+
+
+def test_download_verified_exhausts_retries_and_raises(tmp_path, monkeypatch):
+    """全滅時は従来どおり RuntimeError で中断し、最終試行後には待機しない。"""
+    fake = _FakeDownload([b"bad1", b"bad2", b"bad3"])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    sleeps: list[float] = []
+    dest = tmp_path / "blob.bin"
+    with pytest.raises(RuntimeError, match="sha256"):
+        download_binaries._download_verified(
+            "https://example.invalid/blob",
+            str(dest),
+            "0" * 64,
+            "test",
+            retries=3,
+            backoff_initial_sec=2.0,
+            sleep=sleeps.append,
+        )
+    assert len(fake.calls) == 3
+    assert sleeps == [2.0, 4.0]  # 指数バックオフ・最終試行後は sleep しない
+    assert not dest.exists()  # _verify_sha256 の削除（fail-closed）は維持
+
+
+def test_download_verified_retries_on_download_error(tmp_path, monkeypatch):
+    """取得時の例外（接続断・タイムアウト等）もリトライ対象。"""
+    good = b"payload"
+    fake = _FakeDownload([OSError("reset"), TimeoutError("stall"), good])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    sleeps: list[float] = []
+    dest = tmp_path / "blob.bin"
+    download_binaries._download_verified(
+        "https://example.invalid/blob",
+        str(dest),
+        _digest(good),
+        "test",
+        retries=3,
+        backoff_initial_sec=2.0,
+        sleep=sleeps.append,
+    )
+    assert dest.read_bytes() == good
+    assert len(fake.calls) == 3
+    assert sleeps == [2.0, 4.0]
+
+
+def test_download_verified_missing_expected_does_not_retry(tmp_path, monkeypatch):
+    """sha256 未設定は台帳の設定エラーであり、リトライせず即時中断する。"""
+    fake = _FakeDownload([b"data", b"data", b"data"])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    sleeps: list[float] = []
+    dest = tmp_path / "blob.bin"
+    with pytest.raises(RuntimeError, match=r"pins\.json"):
+        download_binaries._download_verified(
+            "https://example.invalid/blob",
+            str(dest),
+            None,
+            "test",
+            retries=3,
+            backoff_initial_sec=2.0,
+            sleep=sleeps.append,
+        )
+    assert len(fake.calls) == 1
+    assert sleeps == []
+
+
+def test_download_verified_prints_diagnostics_on_mismatch(
+    tmp_path, monkeypatch, capsys
+):
+    """不一致の失敗時にサイズ・Content-Length・先頭 16 バイト hex を出力する。"""
+    data = b"BAD CONTENT 0123456789"
+    fake = _FakeDownload([data])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    dest = tmp_path / "blob.bin"
+    with pytest.raises(RuntimeError):
+        download_binaries._download_verified(
+            "https://example.invalid/blob",
+            str(dest),
+            "0" * 64,
+            "test",
+            retries=1,
+            backoff_initial_sec=0.0,
+            sleep=lambda _s: None,
+        )
+    out = capsys.readouterr().out
+    assert f"サイズ={len(data)}" in out
+    assert f"Content-Length={len(data)}" in out
+    assert data[:16].hex() in out
+
+
+def test_download_verified_prints_diagnostics_when_file_missing(
+    tmp_path, monkeypatch, capsys
+):
+    """取得自体の失敗（ファイル不存在）でもその旨を診断出力する。"""
+    fake = _FakeDownload([OSError("boom")])
+    monkeypatch.setattr(download_binaries, "_download", fake)
+    dest = tmp_path / "blob.bin"
+    with pytest.raises(OSError):
+        download_binaries._download_verified(
+            "https://example.invalid/blob",
+            str(dest),
+            "0" * 64,
+            "test",
+            retries=1,
+            backoff_initial_sec=0.0,
+            sleep=lambda _s: None,
+        )
+    out = capsys.readouterr().out
+    assert "サイズ=なし" in out
+
+
 # --- ピン留め台帳 ----------------------------------------------------------
 
 
