@@ -19,9 +19,9 @@
 - [x] docs 先行（arch/self_update.md に設計注意を追記）
 - [x] テスト先行（既存 6 件を `_start_self_update()` 経由の実配線へ更新＋実キャンセル競合を再現。red で成功経路・失敗通知 3 分岐の 4 件がバグを検出することを確認）
 - [x] 実装 → green（`was_cancelled` を close 前に評価＋`canceled.disconnect()`。600 passed・ruff/mypy クリーン）
-- [ ] verify-gate
+- [x] verify-gate（verify green 600 passed / docs-check pass / evaluator PASS）
 - [ ] 実 GUI E2E 再検証（0.6.2 → 0.6.4 を想定・結果を記録）
-- [ ] PR
+- [x] PR（#269）
 
 ## 実 GUI E2E の結果（実施後に記録）
 
