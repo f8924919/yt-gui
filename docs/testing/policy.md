@@ -163,3 +163,13 @@ Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6
 | Downloader（yt-dlp ラッパー） | `pytest-mock` 等 | 一部導入済み（`tests/test_downloader.py`） | 実ネットワークは使わず `YoutubeDL` をモックし `ydl_opts` / `format spec` の構築を検証 |
 
 拡張時は本ポリシーの 1 章と `pyproject.toml` の `omit` を更新してください。
+
+---
+
+## 7. 実行環境差の検証（権限・昇格）
+
+自動テスト（pytest）では再現できない**実行環境の権限差**に起因する不具合への取り決めです。
+
+- **背景（#275）**: python-tuf の `os.symlink` が Windows の非昇格ユーザーで `WinError 1314`（特権不足）となり、自己更新の検証が一般ユーザーでは必ず失敗した。開発時の E2E は**昇格（管理者）セッションで実行されていたため全て偽陰性**となり、リリース後にユーザー環境で初めて露見した（経緯は [docs/research/app-update.md](../research/app-update.md) の Phase B 撤去節）。
+- **ルール**: **権限・環境差に敏感な操作**（symlink / junction 作成・ACL 変更・保護フォルダやレジストリへの書き込み・特権 API 等）を含む機能は、リリース前検証に**非昇格コンテキストでの E2E**を必ず含める。昇格セッションでの成功をもって完了と判定しない。
+- **手段**: 昇格済みシェルからでも `runas /trustlevel:0x20000 <script.cmd>` で**制限トークン**（Administrators が deny-only・`IsUserAnAdmin()=False`）のプロセスを対話なしで起動でき、#275 の `WinError 1314` はこの方法で再現できることを確認済み（2026-07-18）。実行内容は `.cmd` に書き出し、結果はファイル経由で受け取る（引数の引用符入れ子は壊れやすい）。それでも再現できない環境要因が疑われる場合のみ、ユーザー本人の実環境での確認を依頼する。
