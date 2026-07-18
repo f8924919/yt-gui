@@ -1399,49 +1399,76 @@ def _wire_apply_recorders(app, monkeypatch, *, launch_ok: bool = True) -> dict:
     return calls
 
 
-def test_self_update_success_launches_script_and_closes(app, monkeypatch, tmp_path):
-    import threading
+def _drive_self_update(
+    app, qtbot, monkeypatch, result, *, cancel_before_finish: bool = False
+) -> None:
+    """`_start_self_update()` の実配線で完了ハンドラまで駆動する（#268）。
 
+    実 `QProgressDialog`・実 `canceled` 接続を通す（`dialog.close()` は
+    差し替えない）。`cancel_before_finish` は「検証完了直前にユーザー
+    キャンセルが立った」競合を再現する。
+    """
+
+    def fake_download(current, work_dir, *, progress=None, cancel=None, **kw):
+        if cancel_before_finish and cancel is not None:
+            cancel.set()
+        # _start_self_update() 冒頭の cleanup_leftovers がステージングを消す
+        # ため、展開結果は callable で渡してこの時点（掃除後）に生成する。
+        return result() if callable(result) else result
+
+    monkeypatch.setattr(
+        app_module.self_update, "download_and_verify_update", fake_download
+    )
+    with qtbot.waitSignal(app._signals.self_update_finished, timeout=5000):
+        app._start_self_update()
+    qtbot.waitUntil(lambda: app._self_update_dialog is None, timeout=2000)
+
+
+def test_self_update_success_launches_script_and_closes(
+    app, qtbot, monkeypatch, tmp_path
+):
+    """成功時は実ダイアログ配線でもスクリプト起動 → アプリ終了へ進む（#268）。"""
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch)
-    app._self_update_cancel = threading.Event()
 
-    app._on_self_update_finished(_success_result(tmp_path))
+    _drive_self_update(app, qtbot, monkeypatch, lambda: _success_result(tmp_path))
 
     assert calls.get("launch") == "SCRIPT"
     assert calls.get("close") is True
     assert "failed" not in calls
 
 
-def test_self_update_success_respects_late_cancel(app, monkeypatch, tmp_path):
+def test_self_update_success_respects_late_cancel(app, qtbot, monkeypatch, tmp_path):
     """検証完了とキャンセルの競合: 適用直前にキャンセル状態を再確認する。"""
-    import threading
-
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch)
-    app._self_update_cancel = threading.Event()
-    app._self_update_cancel.set()
 
-    app._on_self_update_finished(_success_result(tmp_path))
+    _drive_self_update(
+        app,
+        qtbot,
+        monkeypatch,
+        lambda: _success_result(tmp_path),
+        cancel_before_finish=True,
+    )
 
     assert "launch" not in calls
     assert "close" not in calls
 
 
 def test_self_update_failure_shows_failed_dialog_and_keeps_app(
-    app, monkeypatch, tmp_path
+    app, qtbot, monkeypatch, tmp_path
 ):
     """fail-closed: 検証失敗はアプリを終了せず穏当に通知する。"""
-    import threading
-
     from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
 
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch)
-    app._self_update_cancel = threading.Event()
 
-    app._on_self_update_finished(
-        SelfUpdateResult(SelfUpdateStatus.VERIFICATION_FAILED, version="9.9.9")
+    _drive_self_update(
+        app,
+        qtbot,
+        monkeypatch,
+        SelfUpdateResult(SelfUpdateStatus.VERIFICATION_FAILED, version="9.9.9"),
     )
 
     assert calls.get("failed") is True
@@ -1449,17 +1476,18 @@ def test_self_update_failure_shows_failed_dialog_and_keeps_app(
     assert "close" not in calls
 
 
-def test_self_update_cancelled_is_silent(app, monkeypatch, tmp_path):
-    import threading
-
+def test_self_update_cancelled_is_silent(app, qtbot, monkeypatch, tmp_path):
+    """ワーカー起点の CANCELLED は通知なしで閉じ、適用しない。"""
     from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
 
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch)
-    app._self_update_cancel = threading.Event()
 
-    app._on_self_update_finished(
-        SelfUpdateResult(SelfUpdateStatus.CANCELLED, version="9.9.9")
+    _drive_self_update(
+        app,
+        qtbot,
+        monkeypatch,
+        SelfUpdateResult(SelfUpdateStatus.CANCELLED, version="9.9.9"),
     )
 
     assert "failed" not in calls
@@ -1467,32 +1495,29 @@ def test_self_update_cancelled_is_silent(app, monkeypatch, tmp_path):
     assert "close" not in calls
 
 
-def test_self_update_launch_failure_keeps_app_open(app, monkeypatch, tmp_path):
+def test_self_update_launch_failure_keeps_app_open(app, qtbot, monkeypatch, tmp_path):
     """スクリプト起動失敗時はアプリを終了せず「更新失敗」へ戻す。"""
-    import threading
-
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch, launch_ok=False)
-    app._self_update_cancel = threading.Event()
 
-    app._on_self_update_finished(_success_result(tmp_path))
+    _drive_self_update(app, qtbot, monkeypatch, lambda: _success_result(tmp_path))
 
     assert calls.get("failed") is True
     assert "close" not in calls
 
 
-def test_self_update_rejects_extracted_dir_without_exe(app, monkeypatch, tmp_path):
+def test_self_update_rejects_extracted_dir_without_exe(
+    app, qtbot, monkeypatch, tmp_path
+):
     """展開結果に exe が無ければ差し替えに進まない（健全性確認）。"""
     import shutil
-    import threading
 
     _frozen_install(monkeypatch, tmp_path)
     calls = _wire_apply_recorders(app, monkeypatch)
-    app._self_update_cancel = threading.Event()
     result = _success_result(tmp_path)
     shutil.rmtree(result.extracted_dir)
 
-    app._on_self_update_finished(result)
+    _drive_self_update(app, qtbot, monkeypatch, result)
 
     assert calls.get("failed") is True
     assert "launch" not in calls

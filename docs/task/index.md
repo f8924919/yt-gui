@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （現在、進行中・未着手のタスクはありません） | — | — | — |
+| [268-progress-dialog-cancel](268-progress-dialog-cancel.md) | 進行中 | self-update: 進捗ダイアログ close() の canceled 発火で適用がサイレント放棄されるバグの修正（[#268](https://github.com/f8924919/yt-gui/issues/268)）。完了後 v0.6.4 で実 GUI E2E 再検証 | 2026-07-18 |
 
 ## 完了タスク
 
