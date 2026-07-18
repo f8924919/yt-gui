@@ -1279,23 +1279,8 @@ def test_check_update_failure_notifies_and_does_not_crash(app, qtbot, monkeypatc
     assert "offline" in seen["msg"]
 
 
-# ── アプリ実体更新（Phase B-2・#253）─────────────────────────────────────────
-# 対応 spec: docs/spec/features/app-update.md「Phase B」節。
-# 対応 arch: docs/arch/self_update.md「適用（Phase B-2）」/ docs/arch/app.md。
-
-
-def _frozen_install(monkeypatch, tmp_path) -> Any:
-    """PyInstaller バンドル実行相当（frozen・書き込み可能な親）を構成する。"""
-    import sys
-
-    exe = tmp_path / "apps" / "yt-gui" / "yt-gui.exe"
-    exe.parent.mkdir(parents=True)
-    exe.write_bytes(b"")
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "executable", str(exe))
-    monkeypatch.setattr(sys, "platform", "win32")
-    monkeypatch.setattr(app_module, "get_version", lambda: "0.5.0")
-    return exe.parent
+# ── アプリ更新の新版検出ダイアログ（Phase A・#276 で実体更新は撤去済み）──────
+# 対応 spec: docs/spec/features/app-update.md（通知＋「リリースページを開く」のみ）。
 
 
 def _available_result() -> UpdateCheckResult:
@@ -1304,322 +1289,56 @@ def _available_result() -> UpdateCheckResult:
     )
 
 
-def test_app_update_box_shows_update_button_when_available(app, monkeypatch, tmp_path):
-    _frozen_install(monkeypatch, tmp_path)
-    _box, update_btn, open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is not None
-    assert update_btn.isEnabled()
-    assert open_btn is not None
-    assert update_btn.text() == t("btn_update_and_restart")
-
-
-def test_app_update_box_hides_update_button_on_non_windows(app, monkeypatch, tmp_path):
-    import sys
-
-    _frozen_install(monkeypatch, tmp_path)
-    monkeypatch.setattr(sys, "platform", "darwin")
-    _box, update_btn, open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is None
-    assert open_btn is not None  # 手動 DL 導線は常に残す
-
-
-def test_app_update_box_hides_update_button_when_not_frozen(app, monkeypatch, tmp_path):
-    import sys
-
-    _frozen_install(monkeypatch, tmp_path)
-    monkeypatch.delattr(sys, "frozen", raising=False)
-    _box, update_btn, _open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is None
-
-
-def test_app_update_box_hides_update_button_when_version_unknown(
-    app, monkeypatch, tmp_path
-):
-    _frozen_install(monkeypatch, tmp_path)
-    monkeypatch.setattr(app_module, "get_version", lambda: "unknown")
-    _box, update_btn, _open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is None
-
-
-def test_app_update_box_hides_update_button_when_parent_not_writable(
-    app, monkeypatch, tmp_path
-):
-    import sys
-
-    _frozen_install(monkeypatch, tmp_path)
-    # 親ディレクトリが存在しない = 書き込み判定 False（プリフライト不可）。
-    monkeypatch.setattr(
-        sys, "executable", str(tmp_path / "gone" / "yt-gui" / "yt-gui.exe")
-    )
-    _box, update_btn, _open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is None
-
-
-def test_app_update_box_disables_update_button_while_queue_running(
-    app, monkeypatch, tmp_path
-):
-    _frozen_install(monkeypatch, tmp_path)
-    monkeypatch.setattr(type(app.queue), "is_running", property(lambda self: True))
-    box, update_btn, _open_btn = app._create_app_update_box(_available_result())
-    assert update_btn is not None
-    assert not update_btn.isEnabled()
-    # キュー完了後の実行を案内する文言を本文に添える。
-    assert t("app_update_queue_running_hint") in box.text()
-
-
-def _success_result(tmp_path) -> Any:
-    from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
-
-    new_dir = tmp_path / "apps" / "yt-gui.update-staging" / "yt-gui-9.9.9-new"
-    new_dir.mkdir(parents=True, exist_ok=True)
-    (new_dir / "yt-gui.exe").write_bytes(b"")
-    return SelfUpdateResult(
-        SelfUpdateStatus.SUCCESS, version="9.9.9", extracted_dir=new_dir
-    )
-
-
-def _wire_apply_recorders(app, monkeypatch, *, launch_ok: bool = True) -> dict:
-    """スクリプト生成・起動・close・失敗ダイアログの呼び出しを記録する。"""
-    calls: dict[str, Any] = {}
-
-    def _fake_build(**kw: Any) -> str:
-        calls["build"] = kw
-        return "SCRIPT"
-
-    def _fake_launch(text: str, **kw: Any) -> bool:
-        calls["launch"] = text
-        return launch_ok
-
-    monkeypatch.setattr(app_module.self_update, "build_replace_script", _fake_build)
-    monkeypatch.setattr(app_module.self_update, "launch_replace_script", _fake_launch)
-    monkeypatch.setattr(app, "close", lambda: calls.setdefault("close", True))
-    monkeypatch.setattr(
-        app, "_show_self_update_failed", lambda: calls.setdefault("failed", True)
-    )
-    return calls
-
-
-def _drive_self_update(
-    app, qtbot, monkeypatch, result, *, cancel_before_finish: bool = False
-) -> None:
-    """`_start_self_update()` の実配線で完了ハンドラまで駆動する（#268）。
-
-    実 `QProgressDialog`・実 `canceled` 接続を通す（`dialog.close()` は
-    差し替えない）。`cancel_before_finish` は「検証完了直前にユーザー
-    キャンセルが立った」競合を再現する。
-    """
-
-    def fake_download(current, work_dir, *, progress=None, cancel=None, **kw):
-        if cancel_before_finish and cancel is not None:
-            cancel.set()
-        # _start_self_update() 冒頭の cleanup_leftovers がステージングを消す
-        # ため、展開結果は callable で渡してこの時点（掃除後）に生成する。
-        return result() if callable(result) else result
-
-    monkeypatch.setattr(
-        app_module.self_update, "download_and_verify_update", fake_download
-    )
-    with qtbot.waitSignal(app._signals.self_update_finished, timeout=5000):
-        app._start_self_update()
-    qtbot.waitUntil(lambda: app._self_update_dialog is None, timeout=2000)
-
-
-def test_self_update_success_launches_script_and_closes(
-    app, qtbot, monkeypatch, tmp_path
-):
-    """成功時は実ダイアログ配線でもスクリプト起動 → アプリ終了へ進む（#268）。"""
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch)
-
-    _drive_self_update(app, qtbot, monkeypatch, lambda: _success_result(tmp_path))
-
-    assert calls.get("launch") == "SCRIPT"
-    assert calls.get("close") is True
-    assert "failed" not in calls
-
-
-def test_self_update_success_respects_late_cancel(app, qtbot, monkeypatch, tmp_path):
-    """検証完了とキャンセルの競合: 適用直前にキャンセル状態を再確認する。"""
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch)
-
-    _drive_self_update(
-        app,
-        qtbot,
-        monkeypatch,
-        lambda: _success_result(tmp_path),
-        cancel_before_finish=True,
-    )
-
-    assert "launch" not in calls
-    assert "close" not in calls
-
-
-def test_self_update_failure_shows_failed_dialog_and_keeps_app(
-    app, qtbot, monkeypatch, tmp_path
-):
-    """fail-closed: 検証失敗はアプリを終了せず穏当に通知する。"""
-    from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
-
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch)
-
-    _drive_self_update(
-        app,
-        qtbot,
-        monkeypatch,
-        SelfUpdateResult(SelfUpdateStatus.VERIFICATION_FAILED, version="9.9.9"),
-    )
-
-    assert calls.get("failed") is True
-    assert "launch" not in calls
-    assert "close" not in calls
-
-
-def test_self_update_cancelled_is_silent(app, qtbot, monkeypatch, tmp_path):
-    """ワーカー起点の CANCELLED は通知なしで閉じ、適用しない。"""
-    from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
-
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch)
-
-    _drive_self_update(
-        app,
-        qtbot,
-        monkeypatch,
-        SelfUpdateResult(SelfUpdateStatus.CANCELLED, version="9.9.9"),
-    )
-
-    assert "failed" not in calls
-    assert "launch" not in calls
-    assert "close" not in calls
-
-
-def test_self_update_launch_failure_keeps_app_open(app, qtbot, monkeypatch, tmp_path):
-    """スクリプト起動失敗時はアプリを終了せず「更新失敗」へ戻す。"""
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch, launch_ok=False)
-
-    _drive_self_update(app, qtbot, monkeypatch, lambda: _success_result(tmp_path))
-
-    assert calls.get("failed") is True
-    assert "close" not in calls
-
-
-def test_self_update_rejects_extracted_dir_without_exe(
-    app, qtbot, monkeypatch, tmp_path
-):
-    """展開結果に exe が無ければ差し替えに進まない（健全性確認）。"""
-    import shutil
-
-    _frozen_install(monkeypatch, tmp_path)
-    calls = _wire_apply_recorders(app, monkeypatch)
-    result = _success_result(tmp_path)
-    shutil.rmtree(result.extracted_dir)
-
-    _drive_self_update(app, qtbot, monkeypatch, result)
-
-    assert calls.get("failed") is True
-    assert "launch" not in calls
-    assert "close" not in calls
-
-
-def test_self_update_dialog_is_application_modal(app):
-    """進捗ダイアログはモーダル（表示中のキュー開始等をブロックする）。"""
-    from PySide6.QtCore import Qt
-
-    dialog = app._create_self_update_dialog()
+def test_app_update_box_offers_release_page_and_close_only(app):
+    """新版検出ダイアログは「リリースページを開く」と Close のみを提示する。"""
+    box, open_btn = app._create_app_update_box(_available_result())
     try:
-        assert dialog.windowModality() == Qt.WindowModality.ApplicationModal
+        buttons = box.buttons()
+        assert open_btn in buttons
+        assert open_btn.text() == t("btn_open_releases")
+        assert len(buttons) == 2  # 「リリースページを開く」+ Close のみ
+        assert box.text() == t("app_update_available").format(latest="9.9.9")
     finally:
-        dialog.deleteLater()
+        box.deleteLater()
 
 
-def test_self_update_progress_slot_updates_dialog(app, monkeypatch, tmp_path):
-    _frozen_install(monkeypatch, tmp_path)
-    dialog = app._create_self_update_dialog()
-    app._self_update_dialog = dialog
-    try:
-        app._on_self_update_progress(50, 100)
-        assert dialog.maximum() == 100
-        assert dialog.value() == 50
-        # Content-Length 欠落（total=None）は不定進捗（busy）表示へ切り替える。
-        app._on_self_update_progress(10, None)
-        assert dialog.maximum() == 0
-    finally:
-        dialog.deleteLater()
-        app._self_update_dialog = None
-
-
-def test_self_update_worker_reports_via_signals(app, qtbot, monkeypatch, tmp_path):
-    """ワーカースレッドからの進捗・完了が Signal/Slot 経由でメインスレッドへ届く。"""
-    from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
-
-    _frozen_install(monkeypatch, tmp_path)
-
-    def fake_download(current, work_dir, *, progress=None, cancel=None, **kw):
-        progress(50, 100)
-        return SelfUpdateResult(SelfUpdateStatus.CANCELLED, version="9.9.9")
-
+def test_app_update_available_open_button_opens_release_page(app, monkeypatch):
+    """「リリースページを開く」押下でリリースページを既定ブラウザで開く。"""
+    opened: list[str] = []
     monkeypatch.setattr(
-        app_module.self_update, "download_and_verify_update", fake_download
+        app_module.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
     )
-    with qtbot.waitSignals(
-        [app._signals.self_update_progress, app._signals.self_update_finished],
-        timeout=5000,
-    ):
-        app._start_self_update()
-    # CANCELLED はサイレント（ダイアログは閉じられ、アプリは開いたまま）。
-    qtbot.waitUntil(lambda: app._self_update_dialog is None, timeout=2000)
+    orig_create = app._create_app_update_box
+
+    def fake_create(result):
+        box, open_btn = orig_create(result)
+        monkeypatch.setattr(box, "exec", lambda: None)
+        monkeypatch.setattr(box, "clickedButton", lambda: open_btn)
+        return box, open_btn
+
+    monkeypatch.setattr(app, "_create_app_update_box", fake_create)
+    app._show_app_update_available(_available_result())
+    assert opened == [app_module.APP_RELEASES_URL]
 
 
-def test_start_self_update_clears_stale_leftovers(app, qtbot, monkeypatch, tmp_path):
-    """更新開始時に前回の .bak / ステージング残骸を掃除してから DL する。"""
-    from yt_gui.self_update import SelfUpdateResult, SelfUpdateStatus
-
-    install = _frozen_install(monkeypatch, tmp_path)
-    stale_staging = install.parent / "yt-gui.update-staging"
-    stale_staging.mkdir()
-    (stale_staging / "junk.txt").write_bytes(b"junk")
-
+def test_app_update_available_close_does_not_open_release_page(app, monkeypatch):
+    """Close で閉じた場合はリリースページを開かない。"""
+    opened: list[str] = []
     monkeypatch.setattr(
-        app_module.self_update,
-        "download_and_verify_update",
-        lambda *a, **kw: SelfUpdateResult(SelfUpdateStatus.CANCELLED),
+        app_module.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
     )
-    with qtbot.waitSignal(app._signals.self_update_finished, timeout=5000):
-        app._start_self_update()
-    assert not (stale_staging / "junk.txt").exists()
+    orig_create = app._create_app_update_box
 
+    def fake_create(result):
+        box, open_btn = orig_create(result)
+        monkeypatch.setattr(box, "exec", lambda: None)
+        monkeypatch.setattr(box, "clickedButton", lambda: None)
+        return box, open_btn
 
-def test_cleanup_update_leftovers_on_startup(app, monkeypatch, tmp_path):
-    """起動時（メインウィンドウ表示後）に .bak とステージング残骸を削除する。"""
-    install = _frozen_install(monkeypatch, tmp_path)
-    bak = install.parent / "yt-gui.bak"
-    staging = install.parent / "yt-gui.update-staging"
-    for d in (bak, staging):
-        d.mkdir()
-        (d / "f.txt").write_bytes(b"x")
-
-    # run_in_thread を同期実行に差し替え（既存テストと同じ注入点）。
-    def sync_run_in_thread(fn, on_done=None, on_failed=None, **kw):
-        try:
-            result = fn()
-        except Exception as exc:
-            if on_failed is not None:
-                on_failed(exc)
-            return
-        if on_done is not None:
-            on_done(result)
-
-    monkeypatch.setattr(app_module, "run_in_thread", sync_run_in_thread)
-    app._cleanup_update_leftovers()
-    assert not bak.exists()
-    assert not staging.exists()
-
-
-def test_cleanup_update_leftovers_noop_when_not_frozen(app, monkeypatch):
-    import sys
-
-    monkeypatch.delattr(sys, "frozen", raising=False)
-    app._cleanup_update_leftovers()  # 例外を出さない（何もしない）
+    monkeypatch.setattr(app, "_create_app_update_box", fake_create)
+    app._show_app_update_available(_available_result())
+    assert opened == []

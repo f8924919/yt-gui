@@ -35,7 +35,6 @@
 | [utils.md](utils.md) | `utils.py` — 共通ユーティリティ | — |
 | [yt_dlp_update.md](yt_dlp_update.md) | `yt_dlp_update.py` — yt-dlp バージョン照会・更新チェック（Phase A）／ side-load 実体更新（Phase B）の設計 | [yt-dlp 本体の更新](../spec/features/yt-dlp-update.md) |
 | [app_update.md](app_update.md) | `app_update.py` — アプリ本体の最新版照会・更新チェック | [アプリ本体の更新](../spec/features/app-update.md) |
-| [self_update.md](self_update.md) | `self_update.py` — アプリ本体の実体更新（DL・attestation 検証・安全展開＋Windows 差し替え適用） | [アプリ本体の更新](../spec/features/app-update.md) |
 
 ---
 
