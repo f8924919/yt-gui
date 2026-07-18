@@ -5,7 +5,7 @@ import struct
 import subprocess
 import tomllib
 
-from PyInstaller.utils.hooks import collect_all, copy_metadata
+from PyInstaller.utils.hooks import copy_metadata
 
 # バージョンは pyproject.toml を唯一のソースとして読み取る
 with open(os.path.join(SPECPATH, 'pyproject.toml'), 'rb') as _f:
@@ -87,17 +87,7 @@ _extra_datas = [(_png_path, 'assets')] if os.path.isfile(_png_path) else []
 # パッケージのメタデータ（dist-info）を同梱する
 _extra_datas += copy_metadata('yt-gui')
 
-# 実体更新（self_update.py）の attestation 検証に使う sigstore とその
-# データ依存を同梱する。sigstore は埋め込みトラストルート（data files）と
-# 自身のメタデータ、tuf はルートメタデータ、rfc3161_client は Rust 拡張を
-# 持ち、いずれも自動収集から漏れやすい（#252）。
 _hidden_imports = []
-for _pkg in ('sigstore', 'tuf', 'rfc3161_client'):
-    _datas, _bins, _hidden = collect_all(_pkg)
-    _extra_datas += _datas
-    _extra_binaries += _bins
-    _hidden_imports += _hidden
-_extra_datas += copy_metadata('sigstore')
 
 # GPL/MIT 同梱バイナリのライセンス・著作権・対応ソース告知をバンドルに含める。
 # download_binaries.py が bin/licenses/ に抽出・生成済み（上の subprocess 実行で更新される）。

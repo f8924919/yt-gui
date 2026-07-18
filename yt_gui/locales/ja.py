@@ -15,16 +15,6 @@ STRINGS: dict[str, str] = {
     "app_update_up_to_date": "yt-gui は最新です。",
     "app_update_available": "より新しい yt-gui ({latest}) があります。",
     "update_check_failed": "更新の確認に失敗しました:\n{error}",
-    "btn_update_and_restart": "更新して再起動",
-    "app_update_queue_running_hint": (
-        "ダウンロードの実行中は更新できません。完了後にもう一度お試しください。"
-    ),
-    "self_update_progress_title": "yt-gui の更新",
-    "self_update_downloading": "更新をダウンロードしています...",
-    "self_update_failed": (
-        "更新に失敗しました。既存のインストールは変更されていません。\n"
-        "リリースページから手動でダウンロードしてください。"
-    ),
     "label_url": "動画URL:",
     "label_format": "形式選択:",
     "status_ready": "URLと形式を選択してください",
