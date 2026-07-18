@@ -21,8 +21,8 @@
 - [x] テスト先行（box 2 値化＋openUrl 回帰＋Close 非遷移の 3 件・red 確認済み）
 - [x] 実装 → green（506 passed・ruff/mypy クリーン・生きた参照ゼロを grep 確認）
 - [x] ローカル PyInstaller ビルド確認（sigstore/tuf/rfc3161 の混入 0 件・exe 正常・dist 617MB）
-- [ ] verify-gate
-- [ ] PR
+- [x] verify-gate（verify green 506 passed / docs-check pass / evaluator PASS）
+- [x] PR（#277）
 
 ## マージ後の後処理
 
