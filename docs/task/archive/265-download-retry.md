@@ -22,8 +22,8 @@
 - [x] design-review（指摘反映: timeout 必須・UA/実装イディオムを refresh_pins に整合・分岐は `expected` 真偽＋相互参照コメント・バックオフは最終試行後に sleep しない）
 - [x] テスト先行（リトライ成功/全滅/取得エラー/未設定即中断/診断出力×2 の 6 件・red 確認済み）
 - [x] 実装 → green（600 passed・ruff/mypy クリーン。実ネットワークで `_download` の動作も確認）
-- [ ] verify-gate
-- [ ] PR
+- [x] verify-gate（verify green 600 passed / docs-check pass / evaluator PASS）
+- [x] PR（#266）
 
 ## リリース・検証（タスク完了後の続き）
 
