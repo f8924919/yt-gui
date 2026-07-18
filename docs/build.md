@@ -166,6 +166,13 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 - **provenance はコード署名ではない**: 上記の来歴署名は `gh attestation verify` による帯域外検証であり、OS の SmartScreen / Gatekeeper 警告は**解消しない**。起動時警告の解消には Authenticode / Apple Developer ID 署名・公証が別途必要（[#39](https://github.com/f8924919/yt-gui/issues/39)）。
 - **検証はオプトイン**: 主な受益者は監査者・再配布者・自動化・インシデント対応。`release.yml` 自体（write 権限）が侵害された場合は防げないが、Rekor に証跡が残る。
 
+### リリース後の実資産スモーク
+
+**外部サービスの本番 API・実リリース資産に依存する機能**（更新チェック・attestation 検証のような GitHub Releases / API 連携等）を含むリリースでは、公開直後に**実リリース資産・本番 API に対する E2E スモーク**を行い、pass を確認してからリリース完了（アナウンス・タスク完了）とする。
+
+- 例: 更新チェック系の変更なら、旧バージョンを偽装した実バイナリで新リリースを検知・処理できることを確認する。
+- 背景（#262）: attestations API の破壊的変更は開発時の PoC 成功後に GitHub 側で発生し、リリース資産と本番 API の組み合わせでしか検出できなかった。外部契約の変更は**防止できない**ため、この種の機能は「リリースのたびに実資産で検出する」運用で補う（経緯は [docs/research/app-update.md](research/app-update.md) の Phase B 撤去節）。
+
 ## 同梱バイナリのピン自動更新（GitHub Actions）
 
 `.github/workflows/update-binaries.yml` が週次（毎週月曜 06:00 UTC）と手動実行で `scripts/refresh_pins.py` を走らせ、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する。「ピン留めと sha256 検証」の更新運用を担う。
