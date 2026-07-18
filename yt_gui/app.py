@@ -872,17 +872,22 @@ class App(QMainWindow):
 
     def _on_self_update_finished(self, result: object) -> None:
         assert isinstance(result, self_update.SelfUpdateResult)
+        cancel = self._self_update_cancel
+        self._self_update_cancel = None
+        # キャンセル状態はダイアログを閉じる前に読む。QProgressDialog.close() は
+        # closeEvent で canceled を発火するため、後で読むと自分の close() が
+        # 「キャンセル扱い」になり適用・失敗通知を必ず放棄してしまう（#268）。
+        was_cancelled = cancel is not None and cancel.is_set()
         dialog = self._self_update_dialog
         self._self_update_dialog = None
         if dialog is not None:
+            dialog.canceled.disconnect()  # close() の canceled 発火を無害化
             dialog.close()
             dialog.deleteLater()
-        cancel = self._self_update_cancel
-        self._self_update_cancel = None
 
         if result.status is self_update.SelfUpdateStatus.CANCELLED:
             return  # ユーザー起点のキャンセルは通知なしで閉じる
-        if cancel is not None and cancel.is_set():
+        if was_cancelled:
             # 検証完了とキャンセルの競合: 適用直前に再確認し、適用しない。
             return
         if result.status is not self_update.SelfUpdateStatus.SUCCESS:
