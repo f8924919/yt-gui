@@ -41,8 +41,28 @@
 4. **attestation 検証**:
    - DL した zip の**実バイト**から sha256 を算出し、GitHub attestations API
      （`GET /repos/f8924919/yt-gui/attestations/sha256:{digest}`、無認証可・
-     `attestations[].bundle` にバンドル JSON 埋め込み・複数返り得る）で
-     バンドルを取得する。
+     複数返り得る）でバンドルを取得する。
+   - **バンドルの解決は attestation 1 件ごとに 2 経路**（#262。API version
+     2026-03-10 の破壊的変更で `attestations[].bundle` の埋め込みが廃止され、
+     `attestations[].bundle_url` 参照へ移行したため。旧 API バージョン指定でも
+     旧動作には戻らない）:
+     1. `bundle` が dict ならそのまま使う（後方互換）。
+     2. `bundle` が null/欠落で `bundle_url` があれば GET する。応答は
+        `Content-Type: application/x-snappy` の **raw snappy block format**
+        （framing なし）で圧縮されたバンドル JSON（実測 約 11 KB）。先頭
+        バイトが JSON でなければ snappy 展開してから `json.loads` し、素の
+        JSON ならそのままパースする（将来の仕様変更への耐性）。
+   - snappy 展開は**純 Python の private デコーダ**（`self_update.py` 内・
+     展開のみ・新規依存なし）で行う。非圧縮長の上限（10 MB）を設け、超過・
+     不正 varint・copy オフセット範囲外・宣言長と実出力の不一致はすべて
+     不正入力として失敗させる（fail-closed）。
+   - バンドル解決の失敗種別マッピング: `bundle` / `bundle_url` 両方 null、
+     snappy 展開失敗、JSON パース失敗は当該 attestation をスキップし、全滅
+     なら `VERIFICATION_FAILED`。`bundle_url` GET の HTTP エラー・タイム
+     アウトも当該 attestation をスキップするが、1 件も検証成功せず
+     ネットワーク起因のスキップがあった場合は `NETWORK_ERROR` を返す
+     （attestations API 一覧取得自体の 404 → `NO_ATTESTATION` / その他 →
+     `NETWORK_ERROR` は従来どおり）。
    - sigstore-python の **`Verifier.verify_dsse(bundle, policy)`** で検証する
      （attest-build-provenance は DSSE / in-toto 形式のため。
      `verify_artifact` は hashedrekord 用で使えない）。
@@ -136,6 +156,14 @@
   対策）スクリプト起動 → `close()` でアプリ終了（スクリプト側が PID 消滅を
   待つため、起動→終了の順で競合しない）。スクリプトの起動自体に失敗した
   場合はアプリを終了せず「更新失敗」通知へ戻す。
+- **設計注意（#268）**: Qt の `QProgressDialog.close()` は `closeEvent` で
+  **`canceled` シグナルを発火**する。完了ハンドラでは、キャンセル状態
+  （`cancel.is_set()`）を**ダイアログを閉じる前に読み取り**、かつ
+  `dialog.canceled` を **`disconnect` してから** `close()` する（防御の重複）。
+  この順序を誤ると、成功・失敗を問わず自分の `close()` で「キャンセル扱い」
+  になり適用・失敗通知がサイレントに放棄される（v0.6.2→0.6.3 の実 GUI E2E で
+  検出）。完了ハンドラのテストは `_start_self_update()` 経由の実ダイアログ
+  配線で行い、`dialog.close()` は差し替えない（バグ再現性の担保）。
 - 差し替えは**アプリプロセスの完全終了**（実行中 exe のロック解放）が前提。
   非デーモンスレッドの残存はスクリプトの PID 待機タイムアウト（サイレント
   失敗）に直結するため、実体更新ワーカーは daemon スレッドとし、終了経路に
@@ -146,8 +174,14 @@
 
 ## テストの注入点
 
-- HTTP（Releases API・attestations API・アセット DL）は `fetch` 相当の
-  引数差し替え（[app_update.md](app_update.md) と同方針）。
+- HTTP（Releases API・attestations API・bundle_url・アセット DL）は `fetch`
+  相当の引数差し替え（[app_update.md](app_update.md) と同方針）。バンドル解決
+  の各系（埋め込み / bundle_url + snappy / bundle_url + 素 JSON / 両方 null /
+  GET 失敗 / 展開・パース失敗 / 複数 attestation 混在）をオフラインで検証する。
+- snappy デコーダは既知ベクタ（literal のみ・copy 含む・複数バイト長
+  エンコード）と実 attestation レスポンスを録ったフィクスチャ、および不正
+  入力（不正 varint・copy オフセット範囲外・宣言長不一致・長さ上限超過）で
+  単体テストする（#262）。
 - sigstore 検証は Verifier / 検証関数を差し替え可能な引数として設計する
   （「有効な署名だが identity 不一致」等の失敗系は fetch 差し替えだけでは
   構成できないため）。

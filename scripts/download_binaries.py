@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 import zipfile
 
@@ -46,9 +47,23 @@ def _make_executable(path):
         os.chmod(path, st.st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
+# CI ランナーで urlretrieve（既定 UA・timeout なし）のみ取得破損が観測された
+# ため、refresh_pins.py と同イディオム（urlopen チャンク書き込み・timeout・
+# UA ヘッダー）に揃える（#265）。
+_DOWNLOAD_TIMEOUT_SEC = 300
+_DOWNLOAD_UA = "yt-gui-build (+https://github.com/f8924919/yt-gui)"
+
+
 def _download(url, dest):
+    """URL を dest へ取得し、応答の Content-Length（不明なら None）を返す。"""
     print(f"  -> {url}")
-    urllib.request.urlretrieve(url, dest)
+    req = urllib.request.Request(url, headers={"User-Agent": _DOWNLOAD_UA})
+    with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT_SEC) as resp:
+        length = resp.headers.get("Content-Length")
+        with open(dest, "wb") as f:
+            for chunk in iter(lambda: resp.read(1 << 20), b""):
+                f.write(chunk)
+    return int(length) if length else None
 
 
 def _load_pins() -> dict:
@@ -87,10 +102,52 @@ def _verify_sha256(path: str, expected: str, label: str) -> None:
         )
 
 
-def _download_verified(url: str, dest: str, expected: str, label: str) -> None:
-    """ダウンロード後に sha256 を検証する。不一致なら例外を送出して中断する。"""
-    _download(url, dest)
-    _verify_sha256(dest, expected, label)
+def _download_verified(
+    url: str,
+    dest: str,
+    expected: str,
+    label: str,
+    *,
+    retries: int = 3,
+    backoff_initial_sec: float = 2.0,
+    sleep=time.sleep,
+) -> None:
+    """ダウンロード後に sha256 を検証する。一時的な失敗はリトライする（#265）。
+
+    リトライ対象は取得時の例外全般と sha256 不一致。sha256 未設定（台帳の
+    設定エラー。`_verify_sha256` の `if not expected` 判定と一致させること）は
+    恒久エラーのためリトライせず即時中断する。全滅時は最後の例外を送出して
+    従来どおりビルドを中断する（fail-closed は `_verify_sha256` 側で維持）。
+    毎試行の失敗時に、取得破損の切り分け用診断（取得バイト数・応答の
+    Content-Length・ファイル先頭 16 バイト hex）を出力する。
+    """
+    for attempt in range(1, retries + 1):
+        # 前試行の部分ファイルを掃除してから再取得する。
+        if os.path.exists(dest):
+            os.remove(dest)
+        content_length = None
+        size: object = "なし"
+        head = "なし"
+        try:
+            content_length = _download(url, dest)
+            # 診断情報は照合前に取得する（_verify_sha256 は不一致時に削除する）。
+            if os.path.exists(dest):
+                size = os.path.getsize(dest)
+                with open(dest, "rb") as f:
+                    head = f.read(16).hex()
+            _verify_sha256(dest, expected, label)
+            return
+        except Exception as exc:
+            if isinstance(exc, RuntimeError) and not expected:
+                raise  # sha256 未設定は設定エラー: リトライ無意味
+            print(
+                f"  [{label}] 試行 {attempt}/{retries} 失敗"
+                f" ({type(exc).__name__}): サイズ={size}"
+                f" Content-Length={content_length} 先頭={head}"
+            )
+            if attempt >= retries:
+                raise
+            sleep(backoff_initial_sec * 2 ** (attempt - 1))
 
 
 def _is_license_name(name: str) -> bool:

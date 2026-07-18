@@ -48,6 +48,8 @@
 | [201-extension-port-exclusive-bind.md](201-extension-port-exclusive-bind.md) | Windows で拡張連携サーバーのポートフォールバックが発動しない不具合を修正。Windows の SO_REUSEADDR 仕様差（LISTEN 中ポートへの bind が成功）が原因。`resolve_allow_reuse_address` 純関数＋`_ExclusiveBindHTTPServer` サブクラスで win32 のみ排他 bind 化、POSIX は TIME_WAIT 再バインドのため維持（Issue #201 / PR #202） | 2026-07-05 |
 | [238-section-ui-retranslate.md](238-section-ui-retranslate.md) | 区間ダウンロード UI の言語切替即時反映漏れを修正。`_retranslate_ui()`（手動列挙方式）に区間 UI 7 ウィジェットを登録、匿名 QLabel 3 つをインスタンス属性へ昇格（Issue #238 / PR #239） | 2026-07-11 |
 | [240-hook-cross-repo.md](240-hook-cross-repo.md) | main 保護 hook のクロスリポジトリ誤ブロックを修正。複合コマンドの `cd` 追跡＋実効ディレクトリでのブランチ判定・`-C <path>` の累積解決（検出漏れも解消）・`--git-dir`/`--work-tree` 等はフェイルオープン。hook を mypy 対象化し policy.md スコープ表へ追記（Issue #240 / PR #241） | 2026-07-12 |
+| [262-attestation-bundle-url.md](262-attestation-bundle-url.md) | GitHub attestations API の破壊的変更（`bundle` 埋め込み廃止 → `bundle_url` + snappy）で自己更新の attestation 検証が常に失敗する問題を修正。バンドル解決を 2 経路化し、純 Python の snappy デコーダ（依存追加なし・10 MB 上限・fail-closed）を追加（Issue #262 / PR #263） | 2026-07-18 |
+| [268-progress-dialog-cancel.md](268-progress-dialog-cancel.md) | 進捗ダイアログ `close()` の `canceled` 発火で自己更新の適用・失敗通知がサイレント放棄されるバグを修正（close 前にキャンセル判定＋`disconnect` の二重防御）。完了ハンドラ系テスト 6 件を実ダイアログ配線へ更新し、v0.6.4 バイナリ起点の実 GUI E2E で差し替え〜自動再起動の成立を確認（Issue #268 / PR #269） | 2026-07-18 |
 | [243-retranslate-registry.md](243-retranslate-registry.md) | 再翻訳の手動列挙方式を生成時登録のバインディングレジストリへ置き換え（#238 の恒久対策）。`_TranslationBinding`＋`_bind_text` 系ヘルパで static 26 箇所を生成時バインド化、レジストリ全件検証＋ja 残留セーフティネットの 2 段テストを新設。調査で発見した複数選択編集時 `edit_multiple_selected` の再翻訳漏れも解消（Issue #243 / PR #245） | 2026-07-12 |
 | [246-flaky-qt-teardown.md](246-flaky-qt-teardown.md) | CI の非決定的 SIGABRT（先行テストのウィジェット遅延破棄が後続テストのイベントループ中に実行される テスト間リーク）対策。conftest の autouse フィクスチャ（qt マーカー限定）が teardown で `sendPostedEvents(None, DeferredDelete)` を呼び遅延破棄をテスト境界内で消化、flush 機構の決定論的テストを新設。補助として `_bind_header_column` のヘッダー項目参照を都度取得化（Issue #246 / PR #247） | 2026-07-12 |
 | [244-btn-adding-state.md](244-btn-adding-state.md) | URL タイトル取得中の add_button 状態消失を修正。`_fetching` フラグ＋テキスト解決の `_refresh_add_button_text()` 集約（優先順位 fetching > edit_mode > 通常）で、言語切替・編集モードの出入りの 3 経路すべてで「取得中...」表示が維持されるようにした。`add_button.setText` の直接呼び出しは同メソッド 1 箇所のみの規約に（Issue #244） | 2026-07-12 |
@@ -86,6 +88,7 @@
 | [actions-node24.md](actions-node24.md) | GitHub Actions を Node24 メジャーへ更新（checkout v6・setup-uv v7・upload v7・download v8）。`test.yml` / `release.yml`（Issue #24 / PR #28） | 2026-05-30 |
 | [intel-mac-build.md](intel-mac-build.md) | リリース CI に `macos-15-intel` を追加し x86_64 成果物を配布・macOS パッケージ名の arch 動的化（Issue #41 / PR #43） | 2026-05-30 |
 | [macos-arm64-ffmpeg.md](macos-arm64-ffmpeg.md) | arm64 リリースの ffmpeg を osxexperts.net 由来の Apple Silicon ネイティブ版に変更し Rosetta 依存を解消（Issue #42 / PR #44） | 2026-05-30 |
+| [265-download-retry.md](265-download-retry.md) | 同梱バイナリ取得にリトライ（指数バックオフ・sha256 未設定は即時中断）と診断情報を追加。`_download` を urlopen＋timeout＋UA へ堅牢化し、リリース CI の一時的な取得破損（v0.6.1/v0.6.2 で計 3 回失敗）へ対策（Issue #265 / PR #266） | 2026-07-18 |
 
 ## テスト基盤
 
