@@ -59,6 +59,8 @@ python scripts/download_binaries.py --update
 
 各バイナリの **バージョン・取得 URL・sha256** をまとめた台帳。`bin/` は `.gitignore` 対象だが、`pins.json` のみ追跡する（`.gitignore` で `bin/*` 除外 + `!bin/pins.json`）。`download_binaries.py` はこの台帳だけを見て取得し、ダウンロード後に sha256 を照合する。**不一致または sha256 未設定のときは取得物を削除して例外送出しビルドを中断する**（`_verify_sha256`、サイレント続行はしない）。
 
+取得は一時的な破損への耐性として**リトライ付き**（`_download_verified`、既定 3 回・指数バックオフ。#265）。リトライ対象は取得時の例外全般（`urllib.error` / `OSError`。ストール対策の timeout 含む）と sha256 **不一致**のみで、**sha256 未設定（台帳の設定エラー）は即時中断しリトライしない**。毎試行の失敗時には切り分け用の診断情報（取得バイト数・応答 Content-Length・ファイル先頭 16 バイト hex）を出力する。ダウンロード実装は `refresh_pins.py` と同イディオム（`urlopen` チャンク書き込み・timeout・UA ヘッダー）に揃える — 同一ランナー環境で `refresh_pins.py` は成功し `urlretrieve`（既定 UA・timeout なし）の本スクリプトのみ失敗した観測に基づく。背景: GitHub ランナー ↔ 上流 CDN 間で取得内容が毎回異なる破損を観測（v0.6.1 / v0.6.2 リリース時・ffmpeg-linux）。なお `ffmpeg-mac.arm64`（`verify: binary` 経路）は `_download_verified` を経由しないためリトライ対象外。
+
 | コンポーネント | 台帳キー | 固定対象 | 備考 |
 |---|---|---|---|
 | deno | `deno` | バージョン付きリリースタグ + プラットフォーム別アセット | 上流 `<asset>.zip.sha256sum`（authoritative）と照合 |

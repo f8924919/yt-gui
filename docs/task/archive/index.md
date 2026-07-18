@@ -87,6 +87,7 @@
 | [actions-node24.md](actions-node24.md) | GitHub Actions を Node24 メジャーへ更新（checkout v6・setup-uv v7・upload v7・download v8）。`test.yml` / `release.yml`（Issue #24 / PR #28） | 2026-05-30 |
 | [intel-mac-build.md](intel-mac-build.md) | リリース CI に `macos-15-intel` を追加し x86_64 成果物を配布・macOS パッケージ名の arch 動的化（Issue #41 / PR #43） | 2026-05-30 |
 | [macos-arm64-ffmpeg.md](macos-arm64-ffmpeg.md) | arm64 リリースの ffmpeg を osxexperts.net 由来の Apple Silicon ネイティブ版に変更し Rosetta 依存を解消（Issue #42 / PR #44） | 2026-05-30 |
+| [265-download-retry.md](265-download-retry.md) | 同梱バイナリ取得にリトライ（指数バックオフ・sha256 未設定は即時中断）と診断情報を追加。`_download` を urlopen＋timeout＋UA へ堅牢化し、リリース CI の一時的な取得破損（v0.6.1/v0.6.2 で計 3 回失敗）へ対策（Issue #265 / PR #266） | 2026-07-18 |
 
 ## テスト基盤
 

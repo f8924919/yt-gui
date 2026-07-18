@@ -33,6 +33,7 @@
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
 | 開発ツール（Claude Code hook） | `.claude/hooks/block_main_commit.py`（コマンド解析・実効ディレクトリ解決のロジック。パッケージ外のため `importlib` で読み込み、ブランチ判定は一時 git リポジトリで検証。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#240） | ◯ |
+| ビルドスクリプト | `scripts/download_binaries.py`（pins 検証・リトライ/診断・notices 生成のロジック。HTTP は `_download` の monkeypatch ＋ `retries`/`sleep` 注入でオフライン検証・#265。`importlib` で読み込み、`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。実ダウンロードは対象外） | ◯ |
 
 Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。モーダルダイアログ（`QMessageBox.question` / `QFileDialog` / `QDialog.exec()`）を経由する経路は **手段B**（§2.5・`QTimer.singleShot` で能動的に閉じる、または静的メソッドを固定値へ差し替える）で「開く→操作→状態反映」までを通しますが、フル画面操作の E2E は引き続き対象外です。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイント・手段A〜Dの整理は [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) §5・§8 を参照）。
 
