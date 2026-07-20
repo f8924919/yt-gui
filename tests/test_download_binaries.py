@@ -5,7 +5,10 @@
 
 import hashlib
 import importlib.util
+import io
 import os
+import shutil
+import tarfile
 
 import pytest
 
@@ -232,6 +235,12 @@ def test_pins_json_is_valid_and_complete():
     for entry in pins["ffmpeg-linux"]["assets"].values():
         assert len(entry["sha256"]) == 64
 
+    # BtbN（win / linux）は不変 autobuild-* タグ配下の URL であること
+    # （ローリングの latest 参照は sha256 ドリフトを起こすため不可。#72 / #272）
+    assert "/releases/download/autobuild-" in pins["ffmpeg-win"]["url"]
+    for entry in pins["ffmpeg-linux"]["assets"].values():
+        assert "/releases/download/autobuild-" in entry["url"]
+
     # danmaku2ass は git の SHA 固定（sha256 検証対象外）
     assert len(pins["danmaku2ass"]["ref"]) == 40
 
@@ -241,6 +250,88 @@ def test_danmaku2ass_constants_come_from_pins():
     pins = download_binaries._load_pins()
     assert pins["danmaku2ass"]["ref"] == download_binaries.DANMAKU2ASS_REF
     assert pins["danmaku2ass"]["repo"] == download_binaries.DANMAKU2ASS_REPO
+
+
+# --- ffmpeg-linux（BtbN tar.xz）の展開 -------------------------------------
+# フィクスチャは BtbN 実アーカイブ（autobuild-2026-07-19-13-12 の linux64-gpl）で
+# 確認した構成を再現する: `ffmpeg-<version>/` 直下に LICENSE.txt、`bin/` 配下に
+# ffmpeg / ffprobe / ffplay（#272 で実物を取得して裏取り）。
+
+_BTBN_ROOT = "ffmpeg-n8.1.2-22-g94138f6973-linux64-gpl-8.1"
+
+
+def _make_btbn_linux_tarball(path: str, with_binaries: bool = True) -> None:
+    """BtbN linux64-gpl 構成を模した tar.xz を生成する。"""
+    with tarfile.open(path, "w:xz") as t:
+
+        def add(name: str, data: bytes, mode: int = 0o644) -> None:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = mode
+            t.addfile(info, io.BytesIO(data))
+
+        add(f"{_BTBN_ROOT}/LICENSE.txt", b"GNU GENERAL PUBLIC LICENSE")
+        add(f"{_BTBN_ROOT}/doc/ffmpeg.html", b"<html></html>")
+        if with_binaries:
+            add(f"{_BTBN_ROOT}/bin/ffmpeg", b"\x7fELF ffmpeg", 0o755)
+            add(f"{_BTBN_ROOT}/bin/ffprobe", b"\x7fELF ffprobe", 0o755)
+            add(f"{_BTBN_ROOT}/bin/ffplay", b"\x7fELF ffplay", 0o755)
+
+
+@pytest.fixture
+def _linux_env(tmp_path, monkeypatch):
+    """BIN_DIR / LICENSES_DIR / 台帳 / ダウンロードを tmp_path 内に閉じ込める。"""
+    bin_dir = tmp_path / "bin"
+    ffmpeg_dir = bin_dir / "ffmpeg"
+    ffmpeg_dir.mkdir(parents=True)
+    monkeypatch.setattr(download_binaries, "BIN_DIR", str(bin_dir))
+    monkeypatch.setattr(download_binaries, "LICENSES_DIR", str(bin_dir / "licenses"))
+    archive = tmp_path / "src.tar.xz"
+    pins = {
+        "ffmpeg-linux": {
+            "version": "n8.1.2-22-g94138f6973",
+            "assets": {
+                "amd64": {"url": "https://example.invalid/x.tar.xz", "sha256": "0" * 64}
+            },
+        }
+    }
+    monkeypatch.setattr(download_binaries, "_load_pins", lambda: pins)
+
+    def fake_download_verified(url, dest, expected, label, **kwargs):
+        shutil.copyfile(str(archive), dest)
+
+    monkeypatch.setattr(download_binaries, "_download_verified", fake_download_verified)
+    return archive, ffmpeg_dir
+
+
+def test_download_ffmpeg_linux_extracts_btbn_nested_layout(_linux_env):
+    """BtbN の `ffmpeg-*/bin/` ネスト構成から ffmpeg / ffprobe を配置し、
+    ライセンス本文を抽出する。ffplay は同梱しない。"""
+    archive, ffmpeg_dir = _linux_env
+    _make_btbn_linux_tarball(str(archive))
+    ffmpeg_path = ffmpeg_dir / "ffmpeg"
+    ffprobe_path = ffmpeg_dir / "ffprobe"
+    download_binaries._download_ffmpeg_linux(
+        "x86_64", str(ffmpeg_dir), str(ffmpeg_path), str(ffprobe_path)
+    )
+    assert ffmpeg_path.read_bytes() == b"\x7fELF ffmpeg"
+    assert ffprobe_path.read_bytes() == b"\x7fELF ffprobe"
+    assert not (ffmpeg_dir / "ffplay").exists()
+    license_path = ffmpeg_dir.parent / "licenses" / "ffmpeg" / "LICENSE.txt"
+    assert license_path.read_bytes() == b"GNU GENERAL PUBLIC LICENSE"
+
+
+def test_download_ffmpeg_linux_raises_when_binaries_missing(_linux_env):
+    """想定外レイアウト（bin/ 配下に ffmpeg が無い）では silent skip せず中断する。"""
+    archive, ffmpeg_dir = _linux_env
+    _make_btbn_linux_tarball(str(archive), with_binaries=False)
+    with pytest.raises(RuntimeError, match="ffmpeg"):
+        download_binaries._download_ffmpeg_linux(
+            "x86_64",
+            str(ffmpeg_dir),
+            str(ffmpeg_dir / "ffmpeg"),
+            str(ffmpeg_dir / "ffprobe"),
+        )
 
 
 # --- THIRD-PARTY-NOTICES 生成 ---------------------------------------------
@@ -259,6 +350,15 @@ def test_write_third_party_notices_lists_all_components(tmp_path):
         assert component["source"].split(" ")[0] in text
     # GPL / MIT の主要コンポーネントを網羅している
     assert "FFmpeg" in text and "danmaku2ass" in text and "Deno" in text
+
+
+def test_third_party_notices_ffmpeg_linux_points_to_btbn(tmp_path):
+    """ffmpeg (Linux) の配布元が BtbN であり、旧取得元が残っていない（#272）。"""
+    out = download_binaries.write_third_party_notices(str(tmp_path))
+    with open(out, encoding="utf-8") as fh:
+        text = fh.read()
+    assert "Linux: https://github.com/BtbN/FFmpeg-Builds" in text
+    assert "johnvansickle" not in text
 
 
 def test_is_license_name_matches_common_filenames():

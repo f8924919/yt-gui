@@ -6,8 +6,9 @@ version / url / sha256 を更新する（docs/research/binary-supply-chain.md §
 
 - 検証に失敗した場合は例外で停止する（pins.json は書き換えない）。
 - danmaku2ass は git の SHA 固定（内容アドレス性）のため対象外。
-- ローリング配布（BtbN / johnvansickle）はバージョン表記が変わらなくても content の
-  変化を sha256 で検知するため毎回ダウンロードして照合する。
+- BtbN（ffmpeg の win / linux）は最新の不変 `autobuild-*` タグへ再ピンする。
+  リリース一覧の解決は `refresh_pins()` が 1 回だけ行い、win / linux の両
+  refresher へ同一リリースを注入して同一タグ・同一バージョンに揃える（#272）。
 
 `scripts/` はパッケージではないため download_binaries を同ディレクトリから import する。
 """
@@ -20,6 +21,7 @@ import re
 import sys
 import tempfile
 import urllib.request
+from collections.abc import Callable
 from typing import Any
 
 import download_binaries as db
@@ -58,17 +60,24 @@ def _select_latest_autobuild(releases: list[dict]) -> dict:
     return max(autobuilds, key=lambda r: r["tag_name"])
 
 
-def _select_btbn_versioned_asset(assets: list[dict]) -> tuple[str, str]:
-    """autobuild リリースのアセット一覧から最新の安定版 win64-gpl を選ぶ。
+def _select_btbn_versioned_asset(
+    assets: list[dict], variant: str, ext: str
+) -> tuple[str, str]:
+    """autobuild リリースのアセット一覧から最新の安定版 `<variant>` を選ぶ。
 
-    autobuild タグのアセットは `ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip`
+    autobuild タグのアセットは `ffmpeg-nX.Y.Z-<N>-g<hash>-<variant>-X.Y.<ext>`
     形式（正確なバージョン+commit 入り。`latest` タグの `-latest-` 名とは異なる）。
-    末尾のリリースブランチ `X.Y` が最大のものを採用し、`(version, url)` を返す。
-    version はアセット名のバージョントークン（例 `n8.1.1-9-g58d4114d36`）。
+    variant は `win64-gpl` / `linux64-gpl` / `linuxarm64-gpl`、ext は `zip` /
+    `tar.xz`。末尾のリリースブランチ `X.Y` が最大のものを採用し、`(version, url)`
+    を返す。version はアセット名のバージョントークン（例 `n8.1.1-9-g58d4114d36`）。
     master ローリング・shared 版・lgpl は除外する。
     """
     pattern = re.compile(
-        r"^ffmpeg-(n\d+\.\d+(?:\.\d+)?(?:-\d+-g[0-9a-f]+)?)-win64-gpl-(\d+)\.(\d+)\.zip$"
+        r"^ffmpeg-(n\d+\.\d+(?:\.\d+)?(?:-\d+-g[0-9a-f]+)?)-"
+        + re.escape(variant)
+        + r"-(\d+)\.(\d+)\."
+        + re.escape(ext)
+        + r"$"
     )
     best: tuple[tuple[int, int], str, str] | None = None
     for asset in assets:
@@ -80,14 +89,8 @@ def _select_btbn_versioned_asset(assets: list[dict]) -> tuple[str, str]:
         if best is None or branch > best[0]:
             best = (branch, m.group(1), asset["browser_download_url"])
     if best is None:
-        raise RuntimeError("autobuild に安定版 win64-gpl アセットが見つかりません")
+        raise RuntimeError(f"autobuild に安定版 {variant} アセットが見つかりません")
     return best[1], best[2]
-
-
-def _parse_jvs_version(readme: str) -> str:
-    """johnvansickle の git-readme.txt から `git-YYYYMMDD` 形式の版表記を作る。"""
-    build = re.search(r"build:\s*ffmpeg-(git-\d{8})", readme)
-    return build.group(1) if build else "git"
 
 
 # --- ネットワーク（実機検証） ---------------------------------------------
@@ -106,8 +109,8 @@ def _http_json(url: str, headers: dict | None = None) -> Any:
     return json.loads(_http_text(url, {**_GH_HEADERS, **(headers or {})}))
 
 
-def _hashes_of_url(url: str) -> tuple[str, str, int]:
-    """URL をダウンロードして (sha256, md5, size) を返す。"""
+def _hashes_of_url(url: str) -> tuple[str, int]:
+    """URL をダウンロードして (sha256, size) を返す。"""
     fd, tmp = tempfile.mkstemp(prefix="pin-refresh-")
     os.close(fd)
     try:
@@ -116,12 +119,10 @@ def _hashes_of_url(url: str) -> tuple[str, str, int]:
             while chunk := resp.read(1 << 20):
                 f.write(chunk)
         sha = hashlib.sha256()
-        md5 = hashlib.md5(usedforsecurity=False)  # 上流 .md5 との整合確認用
         with open(tmp, "rb") as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 sha.update(chunk)
-                md5.update(chunk)
-        return sha.hexdigest(), md5.hexdigest(), os.path.getsize(tmp)
+        return sha.hexdigest(), os.path.getsize(tmp)
     finally:
         os.remove(tmp)
 
@@ -148,16 +149,14 @@ def refresh_deno(old: dict) -> tuple[dict, str]:
     return new, f"deno: {old['version']} → {tag}（上流 .sha256sum と照合）"
 
 
-def refresh_ffmpeg_win(old: dict) -> tuple[dict, str]:
+def refresh_ffmpeg_win(old: dict, release: dict) -> tuple[dict, str]:
     # `releases/latest`（ローリング）ではなく、不変な `autobuild-*` タグの最新
-    # リリースを解決する。これにより取得 URL が日付固定タグ配下＝不変アセットを
-    # 指し、上流の再ビルドによる sha256 ドリフトでリリース CI が失敗しない（#72）。
-    releases = _http_json(
-        "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases?per_page=20"
+    # リリースへ再ピンする（#72）。release は refresh_pins() が 1 回だけ解決した
+    # 共有リリース（linux と同一タグ・同一バージョンに揃えるため。#272）。
+    version, url = _select_btbn_versioned_asset(
+        release.get("assets", []), "win64-gpl", "zip"
     )
-    release = _select_latest_autobuild(releases)
-    version, url = _select_btbn_versioned_asset(release.get("assets", []))
-    sha, _md5, _size = _hashes_of_url(url)
+    sha, _size = _hashes_of_url(url)
     new = dict(old)
     new["version"] = version
     new["url"] = url
@@ -187,7 +186,7 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
         x86[tool] = dict(old_x86[tool])
         x86[tool]["url"] = url
         if version != old_x86["version"] or old_x86[tool].get("sha256") is None:
-            sha, _md5, size = _hashes_of_url(url)
+            sha, size = _hashes_of_url(url)
             x86[tool]["sha256"] = sha
             ok = size == entry.get("size")
             detail.append(
@@ -205,48 +204,72 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
     )
 
 
-def refresh_ffmpeg_linux(old: dict) -> tuple[dict, str]:
-    readme = _http_text("https://johnvansickle.com/ffmpeg/git-readme.txt")
-    version = _parse_jvs_version(readme)
+# pins.json の arch キーと BtbN アセットの variant の対応
+_BTBN_LINUX_VARIANTS = {"amd64": "linux64-gpl", "arm64": "linuxarm64-gpl"}
+
+
+def refresh_ffmpeg_linux(old: dict, release: dict) -> tuple[dict, str]:
+    # win と同じ不変 `autobuild-*` タグへの再ピン方式（#272）。release は
+    # refresh_pins() が 1 回だけ解決した共有リリース（win と同一タグ保証）。
+    # 旧 johnvansickle の `.md5` 照合は取得元廃止に伴い撤去。
+    assets = release.get("assets", [])
+    selected = {
+        arch: _select_btbn_versioned_asset(assets, variant, "tar.xz")
+        for arch, variant in _BTBN_LINUX_VARIANTS.items()
+    }
+    versions = {arch: version for arch, (version, _url) in selected.items()}
+    if len(set(versions.values())) != 1:
+        raise RuntimeError(
+            f"ffmpeg-linux: amd64 / arm64 のバージョンが不一致です（{versions}）。"
+            f"タグ {release.get('tag_name')} のアセットを確認してください。"
+        )
+    version = versions["amd64"]
     new = dict(old)
     new["version"] = version
     new["assets"] = {}
     changed = False
-    detail = []
-    for arch, entry in old["assets"].items():
-        url = entry["url"]
-        sha, md5, _size = _hashes_of_url(url)
-        pub_md5 = _http_text(f"{url}.md5").split()[0]
-        if md5 != pub_md5:
-            raise RuntimeError(
-                f"ffmpeg-linux {arch}: 公開 .md5 と不一致（取得物が改ざんの可能性）"
-            )
+    for arch, (_version, url) in selected.items():
+        sha, _size = _hashes_of_url(url)
         new["assets"][arch] = {"url": url, "sha256": sha}
-        detail.append(f"{arch}（公開 .md5 一致）")
-        changed = changed or sha != entry.get("sha256")
-    if not changed:
+        old_entry = old.get("assets", {}).get(arch, {})
+        changed = changed or sha != old_entry.get("sha256")
+    note = f"（不変タグ {release['tag_name']} のアセットを取得し sha256 算出）"
+    if version == old.get("version") and not changed:
         return new, f"ffmpeg-linux: {version}（変更なし）"
-    return new, (
-        f"ffmpeg-linux: {old['version']} → {version}（TOFU: 別経路確認推奨） "
-        + " / ".join(detail)
-    )
+    return new, f"ffmpeg-linux: {old.get('version')} → {version} {note}"
 
 
-_REFRESHERS = {
+# 値のシグネチャは fn(old) または fn(old, release)（BtbN 系のみ）の 2 種のため
+# Callable[..., ...] で受ける。呼び分けは refresh_pins() が _BTBN_KEYS で行う。
+_REFRESHERS: dict[str, Callable[..., tuple[dict, str]]] = {
     "deno": refresh_deno,
     "ffmpeg-win": refresh_ffmpeg_win,
     "ffmpeg-mac": refresh_ffmpeg_mac,
     "ffmpeg-linux": refresh_ffmpeg_linux,
 }
 
+# BtbN 共有リリースを注入する refresher（win / linux の同一タグ保証。#272）
+_BTBN_KEYS = frozenset({"ffmpeg-win", "ffmpeg-linux"})
+_BTBN_RELEASES_URL = (
+    "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases?per_page=20"
+)
+
 
 def refresh_pins(pins: dict) -> tuple[dict, list[str], list[str]]:
-    """pins を更新した新 dict と、(変更サマリ, 全コンポーネントの状況) を返す。"""
+    """pins を更新した新 dict と、(変更サマリ, 全コンポーネントの状況) を返す。
+
+    BtbN の autobuild リリースはここで 1 回だけ解決し、win / linux の refresher へ
+    同一リリースを注入する（同一タグ・同一バージョンの構造的保証。#272）。
+    """
+    btbn_release = _select_latest_autobuild(_http_json(_BTBN_RELEASES_URL))
     new_pins = dict(pins)
     changes = []
     statuses = []
     for key, fn in _REFRESHERS.items():
-        new_component, summary = fn(pins[key])
+        if key in _BTBN_KEYS:
+            new_component, summary = fn(pins[key], btbn_release)
+        else:
+            new_component, summary = fn(pins[key])
         statuses.append(summary)
         if new_component != pins[key]:
             changes.append(summary)
@@ -269,7 +292,7 @@ def _build_summary(changes: list[str], statuses: list[str]) -> str:
     lines += ["", "</details>", ""]
     lines.append(
         "検証根拠は docs/research/binary-supply-chain.md §5 を参照。"
-        "evermeet / johnvansickle は TOFU のため、別経路での再確認を推奨します。"
+        "evermeet / osxexperts は TOFU のため、別経路での再確認を推奨します。"
     )
     return "\n".join(lines) + "\n"
 

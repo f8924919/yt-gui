@@ -35,6 +35,8 @@ HTTPS は通信経路（中間者攻撃）は守るが、**上流アカウント
 danmaku2ass のみ SHA 固定で実質的な完全性がある（理論上 SHA-1 衝突の懸念は残るが現実的脅威は低い）。
 **残り 4 つは可変参照かつ無検証**で、特に evermeet.cx / johnvansickle.com は個人運営の第三者ビルドである。
 
+> **追記（2026-07-20・#272）**: 上表は本メモ執筆時点の記録。その後 ffmpeg (Win) は不変 `autobuild-*` タグへのピンに移行し（#72）、ffmpeg (Linux) は johnvansickle.com が GitHub ランナーからの取得をブロックする問題（#265 で特定）と上流の更新停止を受け、取得元自体を BtbN/FFmpeg-Builds（win と同一の不変 `autobuild-*` タグ・`linux64-gpl` / `linuxarm64-gpl`）へ切り替えた（#272）。現行の供給元・検証方式は [docs/build.md](../build.md) の台帳表を正とする。
+
 ---
 
 ## 3. 方針: ピン留め + ハッシュ検証
@@ -96,6 +98,7 @@ GitHub package ではないため Dependabot は直接使えない。現実解�
 2. **上流公開のチェックサムと照合** — BtbN は各 zip の隣に `.sha256`、Deno は `*.sha256sum` を同梱。
 3. **チェックサムが無い場合**（evermeet.cx / johnvansickle.com）— TOFU（Trust On First Use）を運用で補完する。
    別ネットワーク／別時刻での再取得一致確認、`ffmpeg -version` のビルド情報突き合わせなど複数経路で確認する。
+   - **追記（2026-07-20・#272）**: johnvansickle.com は Linux ffmpeg の取得元としては廃止した（BtbN の不変 `autobuild-*` タグへ移行）。本項の TOFU 運用が現在も該当するのは evermeet.cx / osxexperts.net（macOS）のみ。
    - macOS arm64 の ffmpeg は後日 osxexperts.net（evermeet と同一作者の Apple Silicon 静的ビルド）を追加した（[#42](https://github.com/f8924919/yt-gui/issues/42)）。同サイトは**展開後バイナリ**の sha256 をページ上で公開するため、台帳には zip ではなく展開後バイナリのハッシュを登録し（`ffmpeg-mac.arm64.verify = "binary"`）、展開後に照合する。API・署名サイドカーが無いため週次自動追従の対象外とし、更新はページの公開値を人手で確認する。
 
 つまり **「更新時だけは人＋上流チェックサムで真正性を担保し、以後は台帳のピンで固定」** という二段構えとする。

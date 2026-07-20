@@ -239,7 +239,12 @@ def _download_ffmpeg_windows(ffmpeg_path, ffprobe_path):
 
     with zipfile.ZipFile(tmp) as z:
         for name, out in (("ffmpeg.exe", ffmpeg_path), ("ffprobe.exe", ffprobe_path)):
-            entry = next(n for n in z.namelist() if n.endswith(f"/bin/{name}"))
+            entry = next((n for n in z.namelist() if n.endswith(f"/bin/{name}")), None)
+            if entry is None:
+                raise RuntimeError(
+                    f"[ffmpeg-win] アーカイブ内に bin/{name} が見つかりません"
+                    "（上流レイアウト変更の可能性）"
+                )
             with open(out, "wb") as f:
                 f.write(z.read(entry))
         # BtbN ビルドはアーカイブ直下に LICENSE / COPYING 等を同梱する
@@ -295,24 +300,28 @@ def _download_ffmpeg_linux(machine, ffmpeg_dir, ffmpeg_path, ffprobe_path):
     print(f"[ffmpeg] Downloading (Linux {arch} {pins['version']})...")
     _download_verified(entry["url"], tmp, entry["sha256"], f"ffmpeg-linux {arch}")
 
-    # johnvansickle.com tarball contains both ffmpeg and ffprobe
+    # BtbN の tar.xz は win の zip と同じく ffmpeg-*/bin/ 配下に両バイナリを持つ
     with tarfile.open(tmp, "r:xz") as t:
         for binary, out_path in (("ffmpeg", ffmpeg_path), ("ffprobe", ffprobe_path)):
             member = next(
                 (
                     m
                     for m in t.getmembers()
-                    if os.path.basename(m.name) == binary and m.isfile()
+                    if m.isfile() and m.name.endswith(f"/bin/{binary}")
                 ),
                 None,
             )
-            if member:
-                src = t.extractfile(member)
-                assert src is not None  # isfile() 済みメンバーなので None にならない
-                with open(out_path, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
-                _make_executable(out_path)
-        # johnvansickle の tarball は LICENSE.txt / GPLv3.txt 等を同梱する
+            if member is None:
+                raise RuntimeError(
+                    f"[ffmpeg-linux] アーカイブ内に bin/{binary} が見つかりません"
+                    "（上流レイアウト変更の可能性）"
+                )
+            src = t.extractfile(member)
+            assert src is not None  # isfile() 済みメンバーなので None にならない
+            with open(out_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            _make_executable(out_path)
+        # BtbN の tarball はアーカイブ直下に LICENSE.txt を同梱する
         for member in t.getmembers():
             if member.isfile() and _is_license_name(member.name):
                 src = t.extractfile(member)
@@ -408,7 +417,8 @@ COMPONENTS = [
             "Windows: https://github.com/BtbN/FFmpeg-Builds (win64-gpl) / "
             "macOS x86_64: https://evermeet.cx/ffmpeg/ / "
             "macOS arm64: https://www.osxexperts.net/ / "
-            "Linux: https://johnvansickle.com/ffmpeg/"
+            "Linux: https://github.com/BtbN/FFmpeg-Builds "
+            "(linux64-gpl / linuxarm64-gpl)"
         ),
         "note": (
             "同梱バイナリの正確なライセンス・ビルド構成は "

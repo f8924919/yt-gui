@@ -50,16 +50,16 @@
     }
   },
   "ffmpeg-linux": {
-    "version": "git-20240629",
-    "comment": "johnvansickle.com の static git ビルド（commit d5e603d）。公開 .md5 と照合のうえ sha256 を算出。",
+    "version": "n8.1.2-22-g94138f6973",
+    "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド（n8.1 系）。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
-        "url": "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz",
-        "sha256": "af2c62a95255b2f97f9092a5e86c6356119dba8d7c7e2ee0fe55672dbd71f68f"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-19-13-12/ffmpeg-n8.1.2-22-g94138f6973-linux64-gpl-8.1.tar.xz",
+        "sha256": "166375e7f8b1f6963949a61a83ffffe858eba742f6326180b8ff3bc58b205c72"
       },
       "arm64": {
-        "url": "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz",
-        "sha256": "e8641bea818fcbb9ced155a0f194cd2ea3738c08736b4f38abff1591948e348e"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-19-13-12/ffmpeg-n8.1.2-22-g94138f6973-linuxarm64-gpl-8.1.tar.xz",
+        "sha256": "371203e43ab3aaa703c9904b40f6a6065dcc08fd3260f441f3bbe040e1afe8bf"
       }
     }
   },
