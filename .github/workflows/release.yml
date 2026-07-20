@@ -87,17 +87,29 @@ jobs:
       - run: uv sync
       - name: Download bundled binaries (auto-accept GPL)
         run: uv run python scripts/download_binaries.py --yes   # spec 内の再呼び出しは既存ファイルありでスキップ
-      # 同梱 ffmpeg のスモーク（#272）: BtbN linux ビルドが完全静的リンクであること
-      # （ldd が "not a dynamic executable"。静的バイナリで ldd は非ゼロ終了するため
-      # 出力テキストで判定する）と、実行・実変換 1 本を確認する。AppImage には
-      # 同一バイトが同梱されるため、これで配布物内の ffmpeg の動作を担保する。
+      # 同梱 ffmpeg のスモーク（#272）: BtbN linux ビルドはコーデック等を静的に
+      # 組み込み glibc コアのみ動的リンクする。動的依存が glibc コア（whitelist）
+      # の範囲内であることを ldd で確認し（範囲外の .so 依存＝配布物が壊れる構成は
+      # fail。完全静的なら "not a dynamic executable" で即 pass）、実行・実変換
+      # 1 本を確認する。アプリ本体（PyInstaller）も同等の glibc 依存を持つため、
+      # glibc コア依存は AppImage の動作要件を追加しない。AppImage には同一バイト
+      # が同梱されるため、これで配布物内の ffmpeg の動作を担保する。
       - name: Smoke test bundled ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: |
           ls -l bin/ffmpeg/
           out=$(ldd bin/ffmpeg/ffmpeg 2>&1 || true)
           echo "$out"
-          echo "$out" | grep -q "not a dynamic executable"
+          allowed='linux-vdso|ld-linux|libc\.so|libm\.so|libdl\.so|librt\.so|libpthread\.so|libmvec\.so|libgcc_s\.so'
+          if echo "$out" | grep -q "not a dynamic executable"; then
+            echo "ffmpeg: fully static"
+          else
+            bad=$(echo "$out" | awk '{print $1}' | grep -vE "$allowed" || true)
+            if [ -n "$bad" ]; then
+              echo "::error::glibc コア以外の動的依存を検出: $bad"
+              exit 1
+            fi
+          fi
           bin/ffmpeg/ffmpeg -version
           bin/ffmpeg/ffprobe -version
           bin/ffmpeg/ffmpeg -f lavfi -i sine=frequency=440:duration=1 -c:a libmp3lame /tmp/smoke.mp3

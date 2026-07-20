@@ -147,7 +147,7 @@ OS 非依存の成果物として、ブラウザ拡張の zip を Linux ラン�
 - `ubuntu-22.04` を採用するのは glibc 互換性のため（新しい glibc でビルドした AppImage は古い環境で起動しない）。
 - ビルド前に `scripts/download_binaries.py --yes` を実行して GPL 同意プロンプトを自動承認する（spec 内の再呼び出しは既存ファイルありでスキップ）。
 - Linux ランナーでは `binutils`（objdump）・`file`（appimagetool）を apt で導入する。
-- Linux ビルドでは取得直後の ffmpeg / ffprobe に対し**スモークステップ**を実行する: `ldd` で完全静的リンクであること（"not a dynamic executable"）を確認し、`-version` 実行と lavfi 入力での実変換 1 本で動作を検証する。AppImage には同一バイトが同梱されるため、これで配布物内の ffmpeg の動作を担保する（#272）。
+- Linux ビルドでは取得直後の ffmpeg / ffprobe に対し**スモークステップ**を実行する: BtbN linux ビルドはコーデック等を静的に組み込み **glibc コアのみ動的リンク**するため、`ldd` の動的依存が glibc コアの whitelist（libc / libm / libdl / librt / libpthread / libmvec / libgcc_s / ld-linux / linux-vdso）に収まることを確認し（範囲外の `.so` 依存は fail、完全静的なら即 pass）、`-version` 実行と lavfi 入力での実変換 1 本で動作を検証する。アプリ本体（PyInstaller ビルド）も同等の glibc 依存を持つため、glibc コア依存は AppImage の動作要件を追加しない（BtbN の要求 glibc 2.28+ は本体要件より緩い）。AppImage には同一バイトが同梱されるため、これで配布物内の ffmpeg の動作を担保する（#272）。
 
 ### 成果物の来歴署名（SLSA provenance / artifact attestation）
 

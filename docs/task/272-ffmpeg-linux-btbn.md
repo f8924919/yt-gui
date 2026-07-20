@@ -55,7 +55,8 @@ johnvansickle.com は GitHub ランナーからの取得がブロックされリ
   - `release`: `if: github.event_name == 'push' && needs.version-gate.outputs.should_release == 'true'`（`needs` の build 成功要件は維持）
   - `build` の checkout ref: `${{ github.event_name == 'workflow_dispatch' && github.sha || format('v{0}', needs.version-gate.outputs.version) }}`
   - `concurrency.group` は `release-${{ github.event_name }}` に分離（ドライランが本番リリースをブロックしない。dispatch はタグ・リリースを作らないため並走しても競合しない）
-- Linux ビルドに **ffmpeg スモークステップを恒久追加**（`download_binaries.py` 直後）: 静的リンク確認は `ldd` が静的バイナリで非ゼロ終了する点を吸収する形（`out=$(ldd bin/ffmpeg/ffmpeg 2>&1 || true); echo "$out" | grep -q "not a dynamic executable"`）で判定し、`ffmpeg -version` / `ffprobe -version`・lavfi 入力での実変換 1 本を実行する。AppImage に入るのは同一バイトのため、これで「AppImage 内の ffmpeg が動作する」ことを担保する（AppImage 生成自体は build の既存ステップで検証される）。合否条件は承認済み方針どおり**純静的のみ合格**（動的リンクだった場合はスモークが fail → 中断してユーザー相談）。
+- Linux ビルドに **ffmpeg スモークステップを恒久追加**（`download_binaries.py` 直後）: `ldd` の動的依存が **glibc コアの whitelist**（libc / libm / libdl / librt / libpthread / libmvec / libgcc_s / ld-linux / linux-vdso）に収まることを判定し（範囲外の `.so` 依存は fail、完全静的なら "not a dynamic executable" で即 pass）、`ffmpeg -version` / `ffprobe -version`・lavfi 入力での実変換 1 本を実行する。AppImage に入るのは同一バイトのため、これで「AppImage 内の ffmpeg が動作する」ことを担保する（AppImage 生成自体は build の既存ステップで検証される）。
+  - **判定基準の経緯**: 当初は「純静的のみ合格」で実装したが、初回 CI 実行（run 29745460999）で BtbN linux64-gpl が **glibc コアのみ動的リンク**（コーデック等は静的同梱）と判明し、承認済み方針どおり中断してユーザーに相談。アプリ本体（PyInstaller ビルド）が既に同等の glibc 依存を持ち動作要件が追加されないこと（BtbN の要求 glibc 2.28+ は本体要件より緩い）を根拠に、**glibc コア限定の whitelist 許容**へ緩和することをユーザーが承認（2026-07-20）。
 
 ### docs / THIRD-PARTY-NOTICES
 
@@ -73,12 +74,24 @@ johnvansickle.com は GitHub ランナーからの取得がブロックされリ
   - win/linux の共有解決テスト: 同一実行内で `refresh_ffmpeg_win` / `refresh_ffmpeg_linux` が同一タグ・同一バージョンを返すこと（releases API モックの呼び出しが 1 回に共有されること）。
   - `_parse_jvs_version` のテストを削除。
 
-## 検証記録（CI）
+## 検証記録
 
-（workflow_dispatch 実行後にここへ記録する）
+### refresh_pins.py 実走（2026-07-20・Windows ローカル）
+
+- `uv run python scripts/refresh_pins.py` を実走。ffmpeg-linux が autobuild 再ピン方式で解決され、win と同一タグ・同一バージョン（`n8.1.2-22-g94138f6973`）で「変更なし」を報告。
+- 再ダウンロードで算出した sha256 がピン値と一致＝別時刻・別経路の再取得一致確認（TOFU 補完）を兼ねる。
+- サマリ定型文から johnvansickle が除去されていることも確認。
+
+### CI 1 回目（release.yml workflow_dispatch・run 29745460999・2026-07-20）
+
+- [x] ドライラン設計の動作確認: `version-gate` 成功・`tag` / `release` スキップ・`build` 4 OS 実行
+- [x] windows / macos arm64 / macos x86_64 の build 成功（変更の影響なしを確認）
+- [x] `build (ubuntu-22.04)` は **ffmpeg スモークの静的判定で設計どおり fail-closed**: `ldd` の結果、BtbN linux64-gpl は glibc コア（libc / libm / libdl / librt / libpthread / libmvec / libgcc_s / ld-linux / linux-vdso）のみ動的リンク、範囲外の `.so` 依存なし。ユーザー相談のうえ whitelist 許容へ緩和（上記「判定基準の経緯」）。
+
+### CI 2 回目（whitelist 緩和後の再実行）
 
 - [ ] `build (ubuntu-22.04)` 成功
-- [ ] ffmpeg スモーク: `ldd` 静的確認 / `-version` / 実変換 1 本
+- [ ] ffmpeg スモーク: glibc コア whitelist 判定 / `-version` / 実変換 1 本
 - [ ] AppImage 生成・配布物サイズの実測
 
 ## 進捗
