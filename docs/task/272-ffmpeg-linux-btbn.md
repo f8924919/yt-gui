@@ -88,11 +88,11 @@ johnvansickle.com は GitHub ランナーからの取得がブロックされリ
 - [x] windows / macos arm64 / macos x86_64 の build 成功（変更の影響なしを確認）
 - [x] `build (ubuntu-22.04)` は **ffmpeg スモークの静的判定で設計どおり fail-closed**: `ldd` の結果、BtbN linux64-gpl は glibc コア（libc / libm / libdl / librt / libpthread / libmvec / libgcc_s / ld-linux / linux-vdso）のみ動的リンク、範囲外の `.so` 依存なし。ユーザー相談のうえ whitelist 許容へ緩和（上記「判定基準の経緯」）。
 
-### CI 2 回目（whitelist 緩和後の再実行）
+### CI 2 回目（whitelist 緩和後の再実行・run 29746529269・2026-07-20）
 
-- [ ] `build (ubuntu-22.04)` 成功
-- [ ] ffmpeg スモーク: glibc コア whitelist 判定 / `-version` / 実変換 1 本
-- [ ] AppImage 生成・配布物サイズの実測
+- [x] 全ジョブ success（build 4 OS。`tag` / `release` はスキップ＝ドライラン設計どおり）
+- [x] ffmpeg スモーク pass: glibc コア whitelist 判定 OK（範囲外依存なし）・`ffmpeg -version` / `ffprobe -version` = `n8.1.2-22-g94138f6973-20260719`・lavfi → mp3 実変換 1 本成功
+- [x] AppImage 生成成功（`yt-gui-0.7.0-x86_64.AppImage`）。配布物サイズ: ubuntu artifact 約 235.5MB（AppImage＋拡張 zip）。v0.7.0 実リリースの AppImage（johnvansickle 同梱）は約 186.7MB で、**約 +49MB（+26%）の増**（BtbN の ffmpeg/ffprobe が展開後 各約 145MB と大きいため。squashfs 圧縮後の増分としては想定内と判断）
 
 ## 進捗
 
@@ -100,7 +100,7 @@ johnvansickle.com は GitHub ランナーからの取得がブロックされリ
 - [x] 事前確認（アセット存在・sha256・レイアウト・ライセンス名）
 - [x] docs 先行反映
 - [x] design-review 実施・指摘反映（release.yml 条件式の確定・引数注入方式・ldd 判定式・md5 デッドコード除去）
-- [ ] テスト先行
-- [ ] 実装 → green
-- [ ] CI 検証（workflow_dispatch）
+- [x] テスト先行（red 15 件を確認してから実装）
+- [x] 実装 → green（ruff / mypy / 全 515 テスト pass）
+- [x] CI 検証（workflow_dispatch 2 回。1 回目は静的判定で設計どおり fail → 方針確認 → 2 回目 all green）
 - [ ] verify-gate → PR
