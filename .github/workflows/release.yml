@@ -3,12 +3,18 @@ name: Release
 on:
   push:
     branches: [main]
+  # ビルド検証専用のドライラン（#272）: タグ・リリースは作成せず、選択した
+  # ブランチの HEAD で build マトリクスだけを実行する（tag / release ジョブは
+  # push イベント限定）。同梱バイナリ差し替え等のリリース前検証に使う。
+  workflow_dispatch:
 
 permissions:
   contents: write          # タグ・リリース作成に必要
 
 concurrency:
-  group: release
+  # イベント種別で分離し、ドライランが本番リリースをブロックしないようにする。
+  # dispatch はタグ・リリースを作らないため並走しても競合しない（#272）。
+  group: release-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -32,10 +38,11 @@ jobs:
             echo "::notice::New version v$version detected; will tag and release."
           fi
 
-  # ② 新バージョンなら v{version} タグを作成・push
+  # ② 新バージョンなら v{version} タグを作成・push（push イベント限定。
+  #    workflow_dispatch では version が未リリース値でもタグを作らない）
   tag:
     needs: version-gate
-    if: needs.version-gate.outputs.should_release == 'true'
+    if: github.event_name == 'push' && needs.version-gate.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,8 +52,14 @@ jobs:
           git push origin "$v"
 
   # ③ OS マトリックスでビルド（クロスビルド非対応のため各 OS ランナーで実行）
+  #    push では tag 成功時のみ（version 据え置き push の no-op 冪等性を維持）、
+  #    workflow_dispatch では tag スキップのまま実行する（ドライラン。#272）
   build:
     needs: [version-gate, tag]
+    if: >-
+      always() && needs.version-gate.result == 'success' &&
+      (needs.tag.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && needs.tag.result == 'skipped'))
     strategy:
       fail-fast: false
       matrix:
@@ -61,7 +74,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: v${{ needs.version-gate.outputs.version }}   # タグ付けしたソースを正確にビルド
+          # リリース時はタグ付けしたソースを正確にビルド。ドライラン時は実行対象
+          # ブランチの HEAD（github.sha）をビルドする（#272）
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || format('v{0}', needs.version-gate.outputs.version) }}
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true   # 依存キャッシュ（キーは OS・uv.lock から自動生成。#213）
@@ -72,6 +87,20 @@ jobs:
       - run: uv sync
       - name: Download bundled binaries (auto-accept GPL)
         run: uv run python scripts/download_binaries.py --yes   # spec 内の再呼び出しは既存ファイルありでスキップ
+      # 同梱 ffmpeg のスモーク（#272）: BtbN linux ビルドが完全静的リンクであること
+      # （ldd が "not a dynamic executable"。静的バイナリで ldd は非ゼロ終了するため
+      # 出力テキストで判定する）と、実行・実変換 1 本を確認する。AppImage には
+      # 同一バイトが同梱されるため、これで配布物内の ffmpeg の動作を担保する。
+      - name: Smoke test bundled ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ls -l bin/ffmpeg/
+          out=$(ldd bin/ffmpeg/ffmpeg 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "not a dynamic executable"
+          bin/ffmpeg/ffmpeg -version
+          bin/ffmpeg/ffprobe -version
+          bin/ffmpeg/ffmpeg -f lavfi -i sine=frequency=440:duration=1 -c:a libmp3lame /tmp/smoke.mp3
       - run: uv run pyinstaller yt-gui.spec
       # --- OS ごとに成果物を 1 ファイルへ ---
       - name: Package (Windows)
@@ -101,8 +130,10 @@ jobs:
           retention-days: 1
 
   # ④ 成果物を集約し、来歴署名（SLSA provenance）を付与して GitHub Release を作成
+  #    push イベント限定（workflow_dispatch のドライランでは Release を作らない）
   release:
     needs: [version-gate, build]
+    if: github.event_name == 'push' && needs.version-gate.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     # 既定の contents:write に加え、Sigstore キーレス署名（OIDC）と attestation 書き込みを許可
     permissions:

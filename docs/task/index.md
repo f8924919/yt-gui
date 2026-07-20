@@ -12,7 +12,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （現在、進行中・未着手のタスクはありません） | — | — | — |
+| [272-ffmpeg-linux-btbn](272-ffmpeg-linux-btbn.md) | 進行中 | ffmpeg-linux の取得元を johnvansickle から BtbN（不変 autobuild タグ）へ切替（[#272](https://github.com/f8924919/yt-gui/issues/272)） | 2026-07-20 |
 
 ## 完了タスク
 
