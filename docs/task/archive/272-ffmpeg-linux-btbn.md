@@ -2,7 +2,7 @@
 
 - Issue: [#272](https://github.com/f8924919/yt-gui/issues/272)
 - ブランチ: `feature/272-ffmpeg-linux-btbn`
-- ステータス: 進行中（2026-07-20 着手）
+- ステータス: 完了（2026-07-20）
 
 ## 背景（要約）
 
@@ -103,4 +103,4 @@ johnvansickle.com は GitHub ランナーからの取得がブロックされリ
 - [x] テスト先行（red 15 件を確認してから実装）
 - [x] 実装 → green（ruff / mypy / 全 515 テスト pass）
 - [x] CI 検証（workflow_dispatch 2 回。1 回目は静的判定で設計どおり fail → 方針確認 → 2 回目 all green）
-- [ ] verify-gate → PR
+- [x] verify-gate（verify green・docs-check 指摘なし・evaluator 全 6 条件 PASS）→ PR
