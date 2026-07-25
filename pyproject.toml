@@ -32,7 +32,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=6.0.0",
     "pytest-qt>=4.5.0",
-    "ruff>=0.15.22",
+    "ruff>=0.16.0",
 ]
 
 [tool.pytest.ini_options]
@@ -57,6 +57,9 @@ skip_covered = false
 [tool.ruff]
 target-version = "py314"
 line-length = 88
+# docs 内のコード片は外部ソース（yt-dlp 等）の引用を含むため、
+# ruff 0.16 でデフォルト有効になった Markdown 内コードのフォーマット対象から除外する
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
