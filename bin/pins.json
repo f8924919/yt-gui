@@ -1,22 +1,22 @@
 {
   "_comment": "同梱バイナリのピン留め台帳。各バイナリのバージョン・取得 URL・sha256 を固定し、scripts/download_binaries.py が取得後に sha256 を検証する（不一致なら中断）。更新方針・信頼の確立は docs/research/binary-supply-chain.md / docs/build.md を参照。sha256 が null の項目は未確定で、ビルド時に検証エラーとなる。",
   "deno": {
-    "version": "v2.9.3",
-    "base_url": "https://github.com/denoland/deno/releases/download/v2.9.3",
+    "version": "v2.9.4",
+    "base_url": "https://github.com/denoland/deno/releases/download/v2.9.4",
     "comment": "上流の <asset>.zip.sha256sum（authoritative）と照合済み。",
     "assets": {
-      "deno-x86_64-pc-windows-msvc.zip": "60343461ac5fe3a31f4ef12667f2946bb852e20655c8610aeb7e751e87f7df3a",
-      "deno-aarch64-apple-darwin.zip": "1b2972f7ceb6df28d9600eab18d423bebb9aa18db02f01d7eb37a5b501482203",
-      "deno-x86_64-apple-darwin.zip": "cff2bce236fde0952aac62a5699464c46901b4eb1e61d0caffbb33d556e098c1",
-      "deno-x86_64-unknown-linux-gnu.zip": "8101865641cbede56f08ad19c0a67a87df84bce127fee0d3e3e1f7467717ffa6",
-      "deno-aarch64-unknown-linux-gnu.zip": "753937db98a4b56cbbbd26e8f00eb4b789191a229afec93f74bcfa4e79bc2c8b"
+      "deno-x86_64-pc-windows-msvc.zip": "68ed08b05c56cf887e9aa509947dc3f468f7e12f47a13e5c1abd51d46d1453ef",
+      "deno-aarch64-apple-darwin.zip": "6d17647fdbf9c587a581dba205054c4ccf732dae0a196cc1e9b44c07589db412",
+      "deno-x86_64-apple-darwin.zip": "f757df6d3991e37601c69fad56c22b37c4ea77b5dcfad3636a642c2ba4c9b19f",
+      "deno-x86_64-unknown-linux-gnu.zip": "c24f955d9fbfe0ea5ae2b501c8e71ae76e31e4c9782390a54a284b3364fda725",
+      "deno-aarch64-unknown-linux-gnu.zip": "111da5c05c240cfdc4340f234a0e3539d39dbcb6755221f19dcd60bacc8be5aa"
     }
   },
   "ffmpeg-win": {
-    "version": "n8.1.2-22-g94138f6973",
+    "version": "n8.1.2-31-g8c9502e9b0",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-19-13-12/ffmpeg-n8.1.2-22-g94138f6973-win64-gpl-8.1.zip",
-    "sha256": "9db2860af5d1c536ed7fcb7ed84fa4ef80d188d1396d1cdf8cad180137510f3f"
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-26-13-28/ffmpeg-n8.1.2-31-g8c9502e9b0-win64-gpl-8.1.zip",
+    "sha256": "2b6a26a3943892dc61ea62545253efc1495580f67346285a6b12713d70c1a2ff"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
@@ -50,16 +50,16 @@
     }
   },
   "ffmpeg-linux": {
-    "version": "n8.1.2-22-g94138f6973",
+    "version": "n8.1.2-31-g8c9502e9b0",
     "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド（n8.1 系）。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-19-13-12/ffmpeg-n8.1.2-22-g94138f6973-linux64-gpl-8.1.tar.xz",
-        "sha256": "166375e7f8b1f6963949a61a83ffffe858eba742f6326180b8ff3bc58b205c72"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-26-13-28/ffmpeg-n8.1.2-31-g8c9502e9b0-linux64-gpl-8.1.tar.xz",
+        "sha256": "00a4cce5118f477da5d6758630ecd70f71ac7601dca377d819b619613cb577a0"
       },
       "arm64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-19-13-12/ffmpeg-n8.1.2-22-g94138f6973-linuxarm64-gpl-8.1.tar.xz",
-        "sha256": "371203e43ab3aaa703c9904b40f6a6065dcc08fd3260f441f3bbe040e1afe8bf"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-26-13-28/ffmpeg-n8.1.2-31-g8c9502e9b0-linuxarm64-gpl-8.1.tar.xz",
+        "sha256": "0af5a359197e84f0e5d74bd416ef3672bc52a13a58717151e8bfc0cf1da4dc33"
       }
     }
   },
