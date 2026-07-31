@@ -9,6 +9,11 @@
 - 検出は「`&&` / `;` / `|` / 改行で分割した各セグメントのサブコマンド位置」での
   git commit / git push 一致のみ。`git -c k=v commit` のようなオプション挟み込みや
   文字列内の擦り抜けは追わない（誤ブロック回避を優先。docs/git-workflow.md §1）。
+- ただし**リモートブランチの削除**（`git push --delete` / `-d`、または `:branch`
+  形の refspec）は `main` 上でも通す（#285）。マージ後のブランチ削除は `main` へ
+  戻ってから行う正規の手順（docs/git-workflow.md §5 step 9・/finish-task）であり、
+  これを塞ぐと運用が回らない。削除は `main` の履歴を変更しないため、本 hook の
+  目的（main への直接の変更を防ぐ）から外れる。
 
 ブランチ判定は cwd を起点にした実効ディレクトリに対して行う（#240）:
 
@@ -57,9 +62,10 @@ def _resolve_dir(base: str | None, path: str) -> str | None:
     return os.path.normpath(os.path.join(base, path))
 
 
-def _git_subcommand(tokens: list[str]) -> tuple[str, list[str]] | None:
-    """git セグメントのサブコマンドと `-C` パス列を返す。判定不能なら None。
+def _git_subcommand(tokens: list[str]) -> tuple[str, list[str], list[str]] | None:
+    """git セグメントのサブコマンド・`-C` パス列・サブコマンド以降の引数を返す。
 
+    判定不能なら None。
     `-C <path>` は引数を取るグローバルオプションとして読み飛ばしつつ収集する。
     `--git-dir` / `--work-tree`（空白形・`=` 形とも）はスコープ外のため None
     （フェイルオープン）。その他のオプションは従来どおり引数なしとして読み飛ばす。
@@ -79,8 +85,24 @@ def _git_subcommand(tokens: list[str]) -> tuple[str, list[str]] | None:
         if token.startswith("-"):
             i += 1
             continue
-        return token, c_paths
+        return token, c_paths, tokens[i + 1 :]
     return None
+
+
+def _is_branch_deletion(args: list[str]) -> bool:
+    """`git push` の引数がリモートブランチの削除かを判定する（#285）。
+
+    `--delete` / `-d`、または refspec が**すべて** `:branch` 形（削除 refspec）
+    のものを削除とみなす。`git push origin main :old` のように通常の push と
+    混在する形は削除扱いにしない（従来どおりブロックする）。
+    削除は main の履歴を変更しないため、main 上でもブロックしない
+    （docs/git-workflow.md §1・§5 step 9）。
+    """
+    if any(arg in ("--delete", "-d") for arg in args):
+        return True
+    # 位置引数の先頭はリモート名、以降が refspec
+    refspecs = [arg for arg in args if not arg.startswith("-")][1:]
+    return bool(refspecs) and all(arg.startswith(":") for arg in refspecs)
 
 
 def _blocked_violation(command: str, base_cwd: str | None) -> str | None:
@@ -112,9 +134,11 @@ def _blocked_violation(command: str, base_cwd: str | None) -> str | None:
         parsed = _git_subcommand(tokens)
         if parsed is None:
             continue
-        subcommand, c_paths = parsed
+        subcommand, c_paths, args = parsed
         if subcommand not in BLOCKED_SUBCOMMANDS:
             continue
+        if subcommand == "push" and _is_branch_deletion(args):
+            continue  # マージ済みブランチの削除は main 上でも通す（#285）
         target = None if unknown else cwd
         resolvable = True
         for path in c_paths:
@@ -134,8 +158,13 @@ def main() -> None:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError, ValueError:
         return
+    if not isinstance(hook_input, dict):
+        return
 
-    command = hook_input.get("tool_input", {}).get("command", "")
+    tool_input = hook_input.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        return
+    command = tool_input.get("command", "")
     if not isinstance(command, str) or not command:
         return
 
