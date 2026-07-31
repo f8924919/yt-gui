@@ -1,6 +1,7 @@
 ---
 name: finish-task
 description: PR マージ後の後処理を実行する。main を最新化し、マージ済みブランチを削除（local/remote）する。完了タスクメモの archive 移動は原則実装 PR に同梱済みの前提で、同梱できなかった場合のみ補完として docs ブランチ＋PR（複数タスクまとめ可）で行う。PR がマージされた直後に使う。
+argument-hint: "[merged-branch-name]"
 ---
 
 # finish-task — タスク完了・マージ後処理
