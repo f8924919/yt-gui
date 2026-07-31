@@ -411,6 +411,21 @@ def test_still_denies_push_with_delete_like_message(main_repo):
     assert _is_denied(out)
 
 
+def test_denies_mixed_refspec_push_on_main(main_repo):
+    """削除 refspec と通常 push の混在は削除扱いにせずブロックする。"""
+    code, out = _hook_decision("git push origin main :old", main_repo)
+    assert code == 0
+    assert _is_denied(out)
+
+
+def test_fails_open_on_non_object_json(main_repo):
+    """dict 以外の JSON でも例外を出さず通す（exit 0・無出力）。"""
+    for payload in ("[1, 2]", "42", '"a string"'):
+        result = _run_hook(payload)
+        assert result.returncode == 0, payload
+        assert not _is_denied(result.stdout), payload
+
+
 def test_deletion_exemption_does_not_apply_to_commit(main_repo):
     """`--delete` は push 固有の判定で、commit には適用しない。"""
     code, out = _hook_decision("git commit -m x --delete", main_repo)

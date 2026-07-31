@@ -53,8 +53,13 @@ def main() -> None:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError, ValueError:
         return
+    if not isinstance(hook_input, dict):
+        return
 
-    raw_path = hook_input.get("tool_input", {}).get("file_path", "")
+    tool_input = hook_input.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        return
+    raw_path = tool_input.get("file_path", "")
     if not isinstance(raw_path, str) or not raw_path:
         return
 

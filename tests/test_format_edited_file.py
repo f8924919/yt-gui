@@ -110,6 +110,18 @@ def test_main_is_silent_on_missing_file_path(monkeypatch, capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_main_is_silent_on_non_object_json(monkeypatch, capsys):
+    """dict 以外の JSON（配列等）でも例外を出さず通す。"""
+    for payload in ([1, 2], 42):
+        _run_main(monkeypatch, payload)
+    assert capsys.readouterr().out == ""
+
+
+def test_main_is_silent_on_non_object_tool_input(monkeypatch, capsys):
+    _run_main(monkeypatch, {"tool_input": "oops"})
+    assert capsys.readouterr().out == ""
+
+
 def test_main_skips_non_target_file(monkeypatch, capsys, fake_repo):
     path = _touch(fake_repo / "docs" / "conf.py", "x=1\n")
     _run_main(monkeypatch, {"tool_input": {"file_path": str(path)}}, fake_repo)

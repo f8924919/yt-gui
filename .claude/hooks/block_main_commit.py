@@ -92,11 +92,17 @@ def _git_subcommand(tokens: list[str]) -> tuple[str, list[str], list[str]] | Non
 def _is_branch_deletion(args: list[str]) -> bool:
     """`git push` の引数がリモートブランチの削除かを判定する（#285）。
 
-    `--delete` / `-d`、または `:branch` 形（削除 refspec）を削除とみなす。
+    `--delete` / `-d`、または refspec が**すべて** `:branch` 形（削除 refspec）
+    のものを削除とみなす。`git push origin main :old` のように通常の push と
+    混在する形は削除扱いにしない（従来どおりブロックする）。
     削除は main の履歴を変更しないため、main 上でもブロックしない
     （docs/git-workflow.md §1・§5 step 9）。
     """
-    return any(arg in ("--delete", "-d") or arg.startswith(":") for arg in args)
+    if any(arg in ("--delete", "-d") for arg in args):
+        return True
+    # 位置引数の先頭はリモート名、以降が refspec
+    refspecs = [arg for arg in args if not arg.startswith("-")][1:]
+    return bool(refspecs) and all(arg.startswith(":") for arg in refspecs)
 
 
 def _blocked_violation(command: str, base_cwd: str | None) -> str | None:
@@ -152,8 +158,13 @@ def main() -> None:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError, ValueError:
         return
+    if not isinstance(hook_input, dict):
+        return
 
-    command = hook_input.get("tool_input", {}).get("command", "")
+    tool_input = hook_input.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        return
+    command = tool_input.get("command", "")
     if not isinstance(command, str) or not command:
         return
 

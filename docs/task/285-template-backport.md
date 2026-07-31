@@ -29,6 +29,13 @@
 - **hook のテスト方式**: ブランチ判定・リポジトリ所属判定は `repo_root` を引数に取るヘルパへ切り出し、一時 git リポジトリで直接検証する。`main()` 全体は `REPO_ROOT` / `TASK_INDEX` を差し替えて確認する（hook が対象とするリポジトリはファイル位置で固定のため、subprocess 実行だけでは deny 経路を再現できない）。
 - **`docs/task/index.md` の再編**: SessionStart hook は `## タスク` / `## 起票済み・未着手の Issue` を抽出キーにする。完了タスクの経緯・申し送りは [archive/index.md](archive/index.md) の「完了タスクの経緯・申し送り」へ移した。
 
+## PR1 のレビュー反映（evaluator）
+
+- **NotebookEdit がブロックされていなかった**（決定打）: `NotebookEdit` の入力キーは `file_path` ではなく `notebook_path`。matcher に登録済みでも hook が対象パスを取れず素通りしていた。`_edited_path()` で両キーを見るよう修正し、テストを追加。
+- **混在 refspec の擦り抜け**: `git push origin main :old` が削除扱いで通っていた。refspec が**すべて** `:` 形のときだけ削除とみなすよう厳密化。
+- **非 dict の JSON 入力**でトレースバック＋exit 1 になっていた（Claude Code は非ブロッキング扱いだが stderr が汚れる）。4 hook すべてに `isinstance(..., dict)` ガードを追加。
+- **docs 不整合**: `finish-task` skill が旧テーブル名「進行中・未着手」を参照、`rules/docs-upkeep.md` の凡例に「完了」が残存。いずれも修正。
+
 ## 検証メモ
 
 - PowerShell のパイプ（`'...' | uv run python hook.py`）は stdin に UTF-8 BOM を付けるため、hook が JSON パースに失敗して**フェイルオープンする**（＝何も起きないので成功と見分けがつかない）。手動スモーク時は BOM なしのファイルを `cmd /c "... < payload.json"` でリダイレクトすること。Claude Code 本体は BOM を付けないため実運用には影響しない。

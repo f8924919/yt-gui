@@ -134,6 +134,25 @@ def test_deny_reason_mentions_main(monkeypatch, capsys, main_repo):
     assert "main" in reason
 
 
+def test_denies_notebook_edit_on_main(monkeypatch, capsys, main_repo):
+    """NotebookEdit の入力キーは `notebook_path`（`file_path` ではない）。"""
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "NotebookEdit",
+        "tool_input": {"notebook_path": str(main_repo / "a.ipynb")},
+    }
+    assert _run_main(monkeypatch, capsys, main_repo, payload)
+
+
+def test_allows_notebook_edit_on_feature_branch(monkeypatch, capsys, feature_repo):
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "NotebookEdit",
+        "tool_input": {"notebook_path": str(feature_repo / "a.ipynb")},
+    }
+    assert not _run_main(monkeypatch, capsys, feature_repo, payload)
+
+
 def test_allows_edit_on_feature_branch(monkeypatch, capsys, feature_repo):
     payload = _edit_payload(feature_repo / "a.py")
     assert not _run_main(monkeypatch, capsys, feature_repo, payload)
@@ -162,6 +181,17 @@ def test_fails_open_on_non_string_file_path(monkeypatch, capsys, main_repo):
 
 def test_fails_open_on_invalid_stdin(monkeypatch, capsys, main_repo):
     assert not _run_main(monkeypatch, capsys, main_repo, "this is not json")
+
+
+def test_fails_open_on_non_object_json(monkeypatch, capsys, main_repo):
+    """dict 以外の JSON（配列・文字列）でも例外を出さず通す。"""
+    for payload in ([1, 2], 42, json.dumps("just a string")):
+        assert not _run_main(monkeypatch, capsys, main_repo, payload)
+
+
+def test_fails_open_on_non_object_tool_input(monkeypatch, capsys, main_repo):
+    payload = {"hook_event_name": "PreToolUse", "tool_input": "oops"}
+    assert not _run_main(monkeypatch, capsys, main_repo, payload)
 
 
 def _run_hook_subprocess(stdin_text: str) -> subprocess.CompletedProcess:

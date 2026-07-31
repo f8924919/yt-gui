@@ -7,7 +7,7 @@ block_main_commit.py は commit / push を止めるが、そこに至るまで�
 
 判定に迷うケースはすべてフェイルオープン（通す）に倒す:
 
-- stdin の JSON パース失敗・`file_path` 欠落 / 非文字列・パス解決失敗 → 通す
+- stdin の JSON パース失敗・対象パス欠落 / 非文字列・パス解決失敗 → 通す
 - git コマンド失敗（リポジトリ外・detached HEAD 等）→ 通す
 - **リポジトリ外のファイルは対象外**（Claude Code のメモリなど、リポジトリと
   無関係の書き込みを巻き込まないため）
@@ -51,14 +51,29 @@ def _inside_repo(raw_path: str, repo_root: Path) -> bool:
     return True
 
 
+def _edited_path(tool_input: dict) -> str:
+    """編集対象のパスを返す。Edit / Write は `file_path`、NotebookEdit は
+    `notebook_path` を使うため両方を見る。見つからなければ空文字（通す）。"""
+    for key in ("file_path", "notebook_path"):
+        value = tool_input.get(key, "")
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def main() -> None:
     try:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError, ValueError:
         return
+    if not isinstance(hook_input, dict):
+        return
 
-    raw_path = hook_input.get("tool_input", {}).get("file_path", "")
-    if not isinstance(raw_path, str) or not raw_path:
+    tool_input = hook_input.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        return
+    raw_path = _edited_path(tool_input)
+    if not raw_path:
         return
 
     if not _inside_repo(raw_path, REPO_ROOT) or not _on_main(REPO_ROOT):
