@@ -187,7 +187,8 @@ CLAUDE.md にも記載のとおり、**コードまたは仕様を変更・拡�
 | テスト対象モジュール追加 | `tests/test_{module}.py` 新規 + `docs/testing/policy.md` のスコープ表更新 |
 | リファクタリング（振る舞い不変） | 該当 `arch/{module}.md` のみ（必要に応じて） |
 | エージェント / スキルの追加・変更 (`.claude/agents/` `.claude/skills/`) | 該当 `.claude/` 定義 + `docs/git-workflow.md` §5.2（エージェント表）/ §5.3（スキル表）を更新 |
-| hooks の追加・変更 (`.claude/hooks/` `.claude/settings.json`) | 該当 hook 実装 + `docs/git-workflow.md` §5.6（hook 一覧）と該当ルール節（例: main 直コミット禁止は §1）を更新 + `tests/test_{hook 名}.py` + `docs/testing/policy.md` のスコープ表 |
+| hooks の追加・変更 (`.claude/hooks/` `.claude/settings.json` の `hooks`) | 該当 hook 実装 + `docs/git-workflow.md` §5.6（hook 一覧）と該当ルール節（例: main 直コミット禁止は §1）を更新 + `tests/test_{hook 名}.py` + `docs/testing/policy.md` のスコープ表 |
+| 権限ルールの変更 (`.claude/settings.json` の `permissions`) | `docs/git-workflow.md` §5.7（allow / 都度確認の分類表）を更新 |
 
 ### 4.2 タスク完了時の手順
 

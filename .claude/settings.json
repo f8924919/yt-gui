@@ -1,6 +1,37 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "enabledPlugins": {
     "context7@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check *)",
+      "Bash(uv run ruff format *)",
+      "Bash(uv run mypy *)",
+      "Bash(uv run pytest *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "PowerShell(uv run ruff check *)",
+      "PowerShell(uv run ruff format *)",
+      "PowerShell(uv run mypy *)",
+      "PowerShell(uv run pytest *)",
+      "PowerShell(gh issue view *)",
+      "PowerShell(gh issue list *)",
+      "PowerShell(gh pr view *)",
+      "PowerShell(gh pr list *)",
+      "PowerShell(gh pr checks *)",
+      "PowerShell(gh pr diff *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "PowerShell(git push --force *)",
+      "PowerShell(git push -f *)"
+    ]
   },
   "hooks": {
     "SessionStart": [

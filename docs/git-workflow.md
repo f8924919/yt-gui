@@ -101,14 +101,18 @@ main ──┬──────────────────┬──→
 
 機械的・探索的な作業、および独立評価は専用のサブエージェントへ委譲し、主エージェントの文脈を温存する。定義は `.claude/agents/` 配下。調査・検証・docs 整合・受け入れ条件レビューは Sonnet、独立評価（`evaluator`）と設計レビュー（`design-review`）は Opus を使う（理由は後述）。**設計・仕様の判断、テスト内容の決定、設計外の問題への対応は委譲せず、主エージェントとユーザーが行う**（§5.1）。
 
-| エージェント | モデル | 委譲する作業 | 対応するフロー | 主エージェントが受け取るもの |
+| エージェント | モデル / effort | 委譲する作業 | 対応するフロー | 主エージェントが受け取るもの |
 |---|---|---|---|---|
-| [`investigate`](../.claude/agents/investigate.md) | Sonnet | docs 先・コード裏取りの調査 | step 3 | 結論・関連 `path:line`・裏取りメモ |
-| [`criteria-review`](../.claude/agents/criteria-review.md) | Sonnet | 受け入れ条件・spec の妥当性を実装前に点検（助言） | step 3.5 | 受け入れ条件の指摘・改善案（採否は委譲しない） |
-| [`verify`](../.claude/agents/verify.md) | Sonnet | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・要判断項目 |
-| [`docs-check`](../.claude/agents/docs-check.md) | Sonnet | docs 整合性の点検と機械的修正 | step 7 | 点検結果・修正点・要対応項目 |
-| [`design-review`](../.claude/agents/design-review.md) | Opus | 設計案の妥当性を実装前に点検（助言・§5.5 発火時） | step 4.5 | 設計の指摘・改善案（設計方針の決定は委譲しない） |
-| [`evaluator`](../.claude/agents/evaluator.md) | Opus | 受け入れ条件・spec の充足を独立評価 | step 7 | 総合判定・受け入れ条件ごとの合否・要対応項目 |
+| [`investigate`](../.claude/agents/investigate.md) | Sonnet / `medium` | docs 先・コード裏取りの調査 | step 3 | 結論・関連 `path:line`・裏取りメモ |
+| [`criteria-review`](../.claude/agents/criteria-review.md) | Sonnet / `medium` | 受け入れ条件・spec の妥当性を実装前に点検（助言） | step 3.5 | 受け入れ条件の指摘・改善案（採否は委譲しない） |
+| [`verify`](../.claude/agents/verify.md) | Sonnet / `low` | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・要判断項目 |
+| [`docs-check`](../.claude/agents/docs-check.md) | Sonnet / `low` | docs 整合性の点検と機械的修正 | step 7 | 点検結果・修正点・要対応項目 |
+| [`design-review`](../.claude/agents/design-review.md) | Opus / `high` | 設計案の妥当性を実装前に点検（助言・§5.5 発火時） | step 4.5 | 設計の指摘・改善案（設計方針の決定は委譲しない） |
+| [`evaluator`](../.claude/agents/evaluator.md) | Opus / `high` | 受け入れ条件・spec の充足を独立評価 | step 7 | 総合判定・受け入れ条件ごとの合否・要対応項目 |
+
+**effort をエージェント側で固定する理由**: 指定しないとセッションの effort をそのまま継承するため、**同じエージェントの判定力がその日の設定で変わる**。特に `evaluator` / `design-review` は「レビュアーが生成者より弱いと追認してしまう」という理由で Opus を割り当てているのに、effort がセッション任せだとその前提が崩れる。逆に `verify` / `docs-check` は結果を客観的に検証できる機械的作業なので、最も頻度が高いにもかかわらず高い effort を継承するのは無駄。**モデル（能力の器）と effort（考える深さ）を別々に固定**し、どちらもセッション設定に依存させない。より厳しく見たい回はユーザーが起動時にオーバーライドしてよい（`design-review` / `evaluator` を `xhigh` に上げる等）。
+
+読み取り専任のエージェント（`investigate` / `criteria-review` / `design-review` / `evaluator`）は、`tools` から `Edit` / `Write` を外すだけでは `Bash` 経由の書き込み・commit を防げない。そこで frontmatter に **`permissionMode: plan`（読み取り専用モード）** を指定し、本文の約束ではなく機構で担保する。特に `evaluator` の独立性は本ワークフローの中核であり、口約束に委ねない。ただし親セッションが `bypassPermissions` / `acceptEdits` / auto モードの場合は親の権限モードが優先されエージェント側の指定は無視されるため、各エージェント本文の「読み取り専用」の記述も残す（二段構え）。`verify` / `docs-check` は修正を行うため対象外。
 
 委譲の判断は費用対効果で行う。検証が一発で通る見込みなら `verify` を介さず主エージェントが直接回す、軽い確認は `investigate` を介さず直接読む、といった使い分けでよい。
 
@@ -131,6 +135,8 @@ main ──┬──────────────────┬──→
 | [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・（実装 PR に同梱できなかった場合の補完として）完了タスクの archive 移動（複数タスクまとめ可・docs ブランチ＋PR） | step 9 |
 
 skill が呼ぶサブエージェントの**合否・設計判断は委譲しない**点は §5.1 / §5.2 と同じ。skill は正しい順序・条件での起動と結果集約に徹する。
+
+**frontmatter の注意**: skill に指定できる `argument-hint` は引数の書式ヒントで、付けてよい。一方 **`allowed-tools` は「その skill の実行中に使えるツールの絞り込み」であって、コマンドの事前承認ではない**（公式リファレンスの例も `allowed-tools: Read, Grep, Glob # Restrict tool access`）。事前承認のつもりで git コマンドだけを並べると、skill が `Read` / `Write` / サブエージェント起動を失って手順の中核が実行できなくなる。**コマンドの事前承認は §5.7 の `permissions.allow`（settings.json）で行う**こと。
 
 ### 5.4 ルール層（path-scoped、`.claude/rules/`）
 
@@ -195,3 +201,25 @@ skill が呼ぶサブエージェントの**合否・設計判断は委譲しな
 - **標準ライブラリのみ**: hook は Claude Code から直接起動されるため、プロジェクトの依存解決に頼らない。起動子は `uv run --no-sync --project ${CLAUDE_PROJECT_DIR} python` に統一する（§1）。
 - **反映タイミング**: hooks の登録（settings.json）はセッション開始時に読み込まれるため、変更後の実効確認は新しいセッションで行う。hook スクリプト本体は実行のたびに読まれるため即座に効く。
 - **テスト**: hook のロジックは `tests/test_{hook 名}.py` で検証する（[testing/policy.md](testing/policy.md) §1）。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。
+
+### 5.7 権限ルール（`.claude/settings.json` の `permissions`）
+
+検証ゲート（§5 step 7）で毎回走る品質コマンドは `permissions.allow` に列挙し、都度確認を省く。`verify` が lint / 型 / テストの往復のたびに承認待ちで止まると、委譲の利点（主エージェントの文脈温存）が失われるため。
+
+**allow に入れる**: [CLAUDE.md](../CLAUDE.md) の「Lint / Format / 型チェック」「テスト」節に載っている**検証系のコマンド**（`ruff check --fix` / `ruff format` のように**ソースを自動整形するものも含む**。ルールはプレフィックス一致でフラグを解釈しないため、`ruff check *` を許可した時点で `--fix` も通る。整形結果は diff で確認でき、失うものが無いため許容する）と、`gh` の**参照系**（`issue view` / `issue list` / `pr view` / `pr list` / `pr checks` / `pr diff`）。Claude Code の Bash / PowerShell **両ツール分**を登録する（サブエージェントは Bash を使う一方、主エージェントは Windows では PowerShell を使うため）。
+
+**allow に入れない**（都度確認させる）:
+
+| 対象 | 理由 |
+|---|---|
+| 依存のインストール・更新（`uv sync` / `uv add` / `uv remove`） | 依存ツリー・ロックファイルを書き換える |
+| アプリの起動・ビルド（`python -m yt_gui` / `pyinstaller`） | 重い副作用（GUI プロセス起動・成果物生成）を伴う。実行は主エージェントが明示的に行う（[testing/policy.md](testing/policy.md)） |
+| 同梱バイナリの取得（`scripts/download_binaries.py` 等） | ネットワーク取得とファイル配置を伴う |
+| `git commit` / `git push` | main 判定 hook（§1）とサーバー側 branch protection の判断を素通りさせない |
+| `gh issue create` / `gh pr create` / `gh api -X`（参照系以外） | 外部に影響する操作。起票・PR 作成はユーザー確認を経る |
+
+**deny**: `git push --force` / `-f`（両ツール分）。deny は allow より先に評価され例外を作れないため、広い deny（`git push *` 等）は置かない。
+
+> **deny の限界**: ルールはプレフィックス一致でフラグを解釈しないため、`git push origin main --force` のようにフラグを**後置**した形や `git push origin +main`（`+` による強制更新）は deny をすり抜ける。deny は事故の第一線であって最後の砦ではなく、`main` については §1 の hook とサーバー側 branch protection が担保する。
+
+ルールの書式は Bash / PowerShell とも glob で、末尾 ` *` は語境界付きの前方一致（引数なしの実行にもマッチする）。追加・変更時は**上の表の分類（検証系は allow、副作用のあるものは都度確認）に沿っているか**を判断基準にする。個人的な例外を足したい場合は、コミットされない `.claude/settings.local.json` に置く。
