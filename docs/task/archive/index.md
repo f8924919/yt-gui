@@ -4,6 +4,8 @@
 
 > 各タスクの正式な仕様・実装説明は完了時に `docs/spec/` / `docs/arch/` へ転記済みです。ここに残るのは作業中の設計・進捗メモです。
 
+完了タスクの経緯・分割の理由・**着手が保留されている項目への申し送り**は、末尾の[完了タスクの経緯・申し送り](#完了タスクの経緯申し送り)にまとめています。
+
 ## 機能追加・改善
 
 | タスク | 概要 | 更新日 |
@@ -118,3 +120,36 @@
 | [191-criteria-review-agent.md](191-criteria-review-agent.md) | 実装前に受け入れ条件・spec そのものの妥当性（テスト可能・網羅的・非曖昧・Issue 意図整合）を点検する助言エージェント `criteria-review`（Sonnet・read-only）を新設し、start-task の step 3.5 に組み込む。evaluator（実装後・適合性・ゲート）と対象が逆で補完関係、ゲート化せず助言に留める。step 番号は renumber せず 3.5 挿入。docs-guide §4.1 にエージェント/スキル変更行も追記（Issue #191 / PR #192） | 2026-07-04 |
 | [194-design-review-agent.md](194-design-review-agent.md) | 設計案の妥当性（アーキ整合・代替案・結合/スコープ・リスク・docs 整合）を実装前に点検する助言エージェント `design-review`（Opus・read-only）を新設し、start-task の step 4.5 に組み込む。発火は主観でなく §5.5 の客観トリガで機械的判定（investigate が推奨 yes/no を出力）、推奨 yes の主観スキップは禁止しユーザー承認必須。criteria-review（step 3.5）の初運用で受け入れ条件を強化（Issue #194 / PR #195） | 2026-07-04 |
 | [workflow-improvement-survey.md](workflow-improvement-survey.md) | 開発ワークフロー改善調査（効率・品質観点の棚卸し）。A-1〜A-5（CI カバレッジ #210 / lint 範囲 #211 / lint 厳格化 #212 / uv キャッシュ #213 / docs-check 観点 #214）、B-1 archive 同梱運用 #222、C-3 omit 解除 #224、C-2 Windows CI #227、C-4 CodeQL #229、C-1 残 main 保護強制 #232 を実施。B-2 は保留・D 群は見送りで完了 | 2026-07-11 |
+| [285-template-backport.md](285-template-backport.md) | 雛形 claude-templates の改良を逆輸入。PR1 hooks 層（SessionStart のタスク注入・main 編集ブロック・編集後整形・ブランチ削除の除外・§5.6 新設 / PR #287）、PR2 権限ルールと effort / permissionMode の固定（§5.7 新設 / PR #288）、PR3 評価ゲート・設計レビューのモード制（evaluator=always / design-review=auto）。evaluator が上流由来の不具合 2 件（NotebookEdit 未ブロック・`allowed-tools` の意味論誤り）を検出し、発生源の qemu-gui#124・雛形の claude-templates#12 へ横展開を起票（Issue #285） | 2026-07-31 |
+
+## 完了タスクの経緯・申し送り
+
+複数タスクにまたがる経緯・分割の理由・**着手が保留されている項目への申し送り**をテーマ別にまとめます。個々のタスクの詳細は上の表と各タスクメモにあります。
+
+> ここは [../index.md](../index.md) から溢れた記述の置き場です。`docs/task/index.md` はセッション開始時に毎回読み込まれる（[SessionStart hook](../../../.claude/hooks/session_task_status.py) が表を注入する。[git-workflow.md](../../git-workflow.md) §5.6）ため「今なにが残っているか」だけに絞り、完了した経緯はこちらへ置きます。
+
+**ここに書くこと**
+
+- なぜそのタスクを複数に分割したか / 順序に依存があったか
+- 一度決めた方針を覆した場合の理由（旧決定は取り消し線で残す）
+- 保留・先送りにした項目と**その判断根拠**、着手時に最初に読み直すべきもの
+- `../index.md` の「起票済み・未着手の Issue」から参照される申し送り（各行の「着手時に読むもの」列からリンクする）
+
+### アプリ自己更新
+
+自己更新は Phase A（更新通知）と Phase B（アプリ本体の自動更新）に分けて進めたが、**Phase B は不具合 3 連発（#262 / #268 / #275）を受けて v0.7.0 で撤去**した。現在の更新導線は「通知 + 手動ダウンロード」のみ。再検討する場合は winget / Scoop などのパッケージマネージャ配布を優先候補とする（自前更新経路は失敗時に自己修復できず、要求信頼性が桁違いに高い）。経緯と判断根拠は [../../research/app-update.md](../../research/app-update.md) の Phase B 撤去節、そこから一般化した再発防止ルールは [git-workflow.md](../../git-workflow.md) §5.5 の下 3 トリガと [testing/policy.md](../../testing/policy.md) §7。
+
+### ハーネス（`.claude/` + `docs/`）の逆輸入
+
+[285-template-backport.md](285-template-backport.md) で雛形 `claude-templates` の改良を取り込んだ。伝播経路は **qemu-gui → claude-templates → yt-gui** で、**バグも同じ経路で伝播していた**。yt-gui 側で hooks のテストを整備したことで、上流由来の不具合 2 件（`NotebookEdit` が実際にはブロックされない・skill の `allowed-tools` を事前承認と取り違えていた）を検出している。
+
+**上流の修正は未着手**で、着手時は次の順（発生源 → 雛形）で回すこと。yt-gui 側の修正は実物として参照できる（PR #287 / #288）。
+
+- 発生源: [f8924919/qemu-gui#124](https://github.com/f8924919/qemu-gui/issues/124)
+- 雛形: [f8924919/claude-templates#12](https://github.com/f8924919/claude-templates/issues/12)
+
+**教訓**: 雛形から輸入したものをそのまま信用しない。hook のように「効いていないことが観測できない」機構は、輸入時にテストを書いて実挙動を確認する。実際、2 件とも「設定を写しただけ」に見える PR で見つかっている。
+
+### 区間ダウンロード
+
+[81-download-sections.md](81-download-sections.md) は ffmpeg による後処理切り出しで完了した。**ネイティブ `download_ranges` 経路はハングするため見送っており**、通信量を節約できる版の実現可否は [#84](https://github.com/f8924919/yt-gui/issues/84) に分離済み。着手時はまず当該タスクメモのハング再現条件から読み直すこと。

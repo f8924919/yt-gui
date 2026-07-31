@@ -1,11 +1,12 @@
 ---
 name: finish-task
 description: PR マージ後の後処理を実行する。main を最新化し、マージ済みブランチを削除（local/remote）する。完了タスクメモの archive 移動は原則実装 PR に同梱済みの前提で、同梱できなかった場合のみ補完として docs ブランチ＋PR（複数タスクまとめ可）で行う。PR がマージされた直後に使う。
+argument-hint: "[merged-branch-name]"
 ---
 
 # finish-task — タスク完了・マージ後処理
 
-[docs/git-workflow.md](../../../docs/git-workflow.md) §5 step 9 と [docs/task/index.md](../../../docs/task/index.md) の運用注記に沿った、マージ後の定型後処理を実行するオーケストレーション skill。
+[docs/git-workflow.md](../../../docs/git-workflow.md) §5 step 9 と [docs/docs-guide.md](../../../docs/docs-guide.md) §4.2 に沿った、マージ後の定型後処理を実行するオーケストレーション skill。
 
 ## 前提
 
@@ -28,8 +29,8 @@ description: PR マージ後の後処理を実行する。main を最新化し�
 
 1. `git checkout -b docs/archive-<slug>`（まとめる場合は内容が分かる別名でよい）
 2. `git mv docs/task/<slug>.md docs/task/archive/<slug>.md`
-3. `docs/task/index.md` の「進行中・未着手」テーブルから該当行を削除する（他に進行中が無ければプレースホルダ行に戻す）。
-4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。
+3. `docs/task/index.md` の「タスク」テーブルから該当行を削除する（他に残っていなければプレースホルダ行「（進行中・未着手のタスクはありません）」に戻す）。
+4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
 5. 変更が docs のみなので、必要に応じて `docs-check` サブエージェントで index・リンクの整合を点検する。
 6. コミット（日本語）→ `git push -u origin docs/archive-<slug>` → `gh pr create`（ベース `main`、本文日本語、関連 Issue/PR を記載）。
 7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行）。

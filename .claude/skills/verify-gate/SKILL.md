@@ -1,6 +1,6 @@
 ---
 name: verify-gate
-description: PR 前の検証ゲートを一括実行する。ブランチ種別を判定し、verify（lint/型/テスト）→ docs-check（docs 変更時）→ evaluator（feature/bugfix/hotfix 時・省略不可）のサブエージェントを順に起動して結果を集約する。実装が一段落し PR を出す前に使う。
+description: PR 前の検証ゲートを一括実行する。ブランチ種別を判定し、verify（lint/型/テスト）→ docs-check（docs 変更時）→ evaluator（feature/bugfix/hotfix 時・モードに従う）のサブエージェントを順に起動して結果を集約する。実装が一段落し PR を出す前に使う。
 ---
 
 # verify-gate — PR 前検証ゲート
@@ -12,12 +12,15 @@ description: PR 前の検証ゲートを一括実行する。ブランチ種別�
 
 - 実装が一段落し、ローカルに変更がある状態で実行する。
 - これは委譲の入口なので、各ゲートの**合否判断・設計判断はサブエージェントと主エージェント／ユーザーが行う**（§5.1）。skill はサブエージェントを正しい順序・条件で起動することだけを担う。
+- **直列化**: `docs-check` と `evaluator` を同時並行で起動しない。`evaluator` の `git` 参照が `docs-check` の作業ツリー修正と干渉しうるため、必ず順に回す。
 
 ## 手順
 
 1. **対象の把握**
    - `git branch --show-current` でブランチ名を取得し、接頭辞からブランチ種別を判定する。
    - `git status --short` / `git diff --name-only main...HEAD`（無ければ `git diff --name-only`）で変更ファイル一覧を取得する。
+   - [CLAUDE.md](../../../CLAUDE.md) の「評価ゲート（evaluator）モード」の値を読む（step 4 で使う。定義は §5.2）。
+   - モードが `auto` の場合のみ、§5.2 の閾値表にある判定手段（`git diff --shortstat` と `git diff --name-status` の `A` 行）で変更規模を取得する。
 
 2. **verify（常時）**
    - `verify` サブエージェントを起動し、lint / フォーマット / 型 / テストを green にする。
@@ -27,10 +30,9 @@ description: PR 前の検証ゲートを一括実行する。ブランチ種別�
    - 変更ファイルに `docs/` 配下または `CLAUDE.md` が含まれるなら `docs-check` サブエージェントを起動し、index 更新漏れ・リンク切れ・命名・関連仕様リンクを点検する。
    - 含まれないならスキップしてよい。
 
-4. **evaluator（`feature` / `bugfix` / `hotfix` ブランチのみ・省略不可）**
-   - ブランチ種別が `feature` / `bugfix` / `hotfix` なら、**必ず** `evaluator` サブエージェントを起動する（受け入れ条件・spec の充足を独立評価。§5.2）。
-   - **「単純だから」という理由でスキップしない**。スキップ判断自体が evaluator で排除したい自己評価バイアスに当たる。
-   - `refactor` / `docs` / `chore` ブランチ（受け入れ条件を持たない作業）は対象外。スキップしてよい。
+4. **evaluator（受け入れ条件を持つブランチのみ・モードに従う）**
+   - 対象は `feature` / `bugfix` / `hotfix` ブランチのみ。`refactor` / `docs` / `chore` は常に対象外（スキップ）。
+   - step 1 で読んだ「**評価ゲート（evaluator）モード**」の値に対して、**§5.2 の定義どおりに**起動可否を決める（モード表・`auto` の閾値・フォールバックはすべて §5.2 が正本。ここでは再定義しない）。
    - 必ず **`verify` を green にした後**に実行する。
 
 5. **集約報告**

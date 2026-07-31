@@ -1,21 +1,33 @@
 # タスク一覧
 
-`docs/task/` 配下のタスクの進捗を管理します。タスク追加・完了時にはこのファイルを更新してください。
+**進行中・未着手**のタスクを管理します。タスク追加・状態変更時にこのファイルを更新してください。
+完了したタスクは [docs-guide.md](../docs-guide.md) §4.2 の手順で [archive/](archive/index.md) へ移動します（下の表からは削除）。
+
+> **このファイルは短く保つ。** セッション開始時に毎回読み込まれる（[SessionStart hook](../../.claude/hooks/session_task_status.py) が下記 2 つの表を自動で注入する。[git-workflow.md](../git-workflow.md) §5.6）ため、**「今なにが残っているか」だけ**を置きます。完了タスクの経緯・判断の理由・着手時の申し送りは [archive/index.md](archive/index.md) の「完了タスクの経緯・申し送り」へ書きます。
 
 ## ステータス凡例
 
 - **未着手** : 着手前
 - **進行中** : 作業中（中断含む）
-- **完了** : 対応済み
 
-## 進行中・未着手のタスク
+## タスク
+
+タスクメモ（`docs/task/{slug}.md`）を持つ進行中・未着手のタスク。
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （現在、進行中・未着手のタスクはありません） | — | — | — |
+| （進行中・未着手のタスクはありません） | — | — | — |
 
-## 完了タスク
+<!-- タスク追加時の記入例:
+| [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
+-->
 
-完了したタスクは [archive/index.md](archive/index.md) にテーマ別で記録しています。
+## 起票済み・未着手の Issue
 
-> **運用**: タスク完了時は `docs/task/{slug}.md` を `docs/task/archive/` へ移動し、上記「進行中・未着手」テーブルから該当行を削除して `archive/index.md` の該当テーマ表に追記してください。この移動は**原則タスクを完結させる実装 PR に同梱**します（[docs-guide.md](../docs-guide.md) §4.2）。
+タスクメモをまだ作っていない（着手時に作る）未着手の Issue。
+
+| Issue | 概要 | 着手時に読むもの |
+|---|---|---|
+| [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
+| [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
+| [#284](https://github.com/f8924919/yt-gui/issues/284) | `update-binaries.yml` が作成する PR で必須 CI が発火せずマージできない | [build.md](../build.md)「同梱バイナリのピン自動更新」 |

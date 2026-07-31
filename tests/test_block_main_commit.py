@@ -361,3 +361,73 @@ def test_denies_missing_cwd_with_absolute_cd(other_main_repo):
     code, out = _hook_decision_no_cwd(f"cd {other_main_repo}; git commit -m x")
     assert code == 0
     assert _is_denied(out)
+
+
+# ── リモートブランチ削除の除外（#285） ───────────────────────────────────────
+#
+# マージ済みブランチの削除は main へ戻ってから行う正規の手順（git-workflow §5
+# step 9・/finish-task）。main の履歴を変更しないため main 上でも通す。
+
+
+def test_allows_branch_deletion_on_main(main_repo):
+    code, out = _hook_decision("git push origin --delete feature/1-test", main_repo)
+    assert code == 0
+    assert not _is_denied(out)
+
+
+def test_allows_short_branch_deletion_on_main(main_repo):
+    code, out = _hook_decision("git push origin -d feature/1-test", main_repo)
+    assert code == 0
+    assert not _is_denied(out)
+
+
+def test_allows_colon_refspec_deletion_on_main(main_repo):
+    """`git push origin :branch` も削除 refspec として通す。"""
+    code, out = _hook_decision("git push origin :feature/1-test", main_repo)
+    assert code == 0
+    assert not _is_denied(out)
+
+
+def test_allows_deletion_in_compound_command_on_main(main_repo):
+    """/finish-task が出す形（local 削除 → remote 削除）を通す。"""
+    command = "git branch -d feature/1-test && git push origin --delete feature/1-test"
+    code, out = _hook_decision(command, main_repo)
+    assert code == 0
+    assert not _is_denied(out)
+
+
+def test_still_denies_normal_push_on_main(main_repo):
+    """削除除外を入れても通常の push は従来どおりブロックする。"""
+    for command in ("git push", "git push origin main", "git push -u origin main"):
+        code, out = _hook_decision(command, main_repo)
+        assert code == 0
+        assert _is_denied(out), command
+
+
+def test_still_denies_push_with_delete_like_message(main_repo):
+    """引数に `-d` を含まない通常 push は削除と誤認しない。"""
+    code, out = _hook_decision("git push origin main --force-with-lease", main_repo)
+    assert code == 0
+    assert _is_denied(out)
+
+
+def test_denies_mixed_refspec_push_on_main(main_repo):
+    """削除 refspec と通常 push の混在は削除扱いにせずブロックする。"""
+    code, out = _hook_decision("git push origin main :old", main_repo)
+    assert code == 0
+    assert _is_denied(out)
+
+
+def test_fails_open_on_non_object_json(main_repo):
+    """dict 以外の JSON でも例外を出さず通す（exit 0・無出力）。"""
+    for payload in ("[1, 2]", "42", '"a string"'):
+        result = _run_hook(payload)
+        assert result.returncode == 0, payload
+        assert not _is_denied(result.stdout), payload
+
+
+def test_deletion_exemption_does_not_apply_to_commit(main_repo):
+    """`--delete` は push 固有の判定で、commit には適用しない。"""
+    code, out = _hook_decision("git commit -m x --delete", main_repo)
+    assert code == 0
+    assert _is_denied(out)

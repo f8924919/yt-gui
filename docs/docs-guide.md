@@ -133,6 +133,15 @@ CLAUDE.md には概要 1〜2 行と詳細ファイルへのリンクのみを残
 
 `docs/task/index.md` のステータス（未着手 / 進行中 / 完了）と更新日は **タスク状態が変わるたびに必ず更新** してください。
 
+**`docs/task/index.md` は短く保つこと。** このファイルはセッション開始時に毎回読み込まれ（[git-workflow.md](git-workflow.md) §5.6 の SessionStart hook が 2 つの表を注入する）、内容がそのまま文脈コストになります。置いてよいのは次の 2 つの表だけです。
+
+| 表 | 内容 |
+|---|---|
+| `## タスク` | タスクメモ（`docs/task/{slug}.md`）を持つ進行中・未着手のタスク |
+| `## 起票済み・未着手の Issue` | メモをまだ作っていない（着手時に作る）未着手の Issue |
+
+**完了したタスクの経緯・分割の理由・着手時の申し送りは [`docs/task/archive/index.md`](task/archive/index.md) の「完了タスクの経緯・申し送り」へ書きます**（`docs/task/index.md` には書かない）。未着手 Issue の行からその節へリンクして導線を保ってください。表の見出し（`## タスク` / `## 起票済み・未着手の Issue`）は hook が抽出のキーにしているため、改名する場合は [`session_task_status.py`](../.claude/hooks/session_task_status.py) も合わせて直します（見出しが見つからない場合は何も注入しないフェイルオープン）。
+
 #### `docs/research/` — 調査メモ
 
 **書くべきこと**
@@ -178,7 +187,9 @@ CLAUDE.md にも記載のとおり、**コードまたは仕様を変更・拡�
 | テスト対象モジュール追加 | `tests/test_{module}.py` 新規 + `docs/testing/policy.md` のスコープ表更新 |
 | リファクタリング（振る舞い不変） | 該当 `arch/{module}.md` のみ（必要に応じて） |
 | エージェント / スキルの追加・変更 (`.claude/agents/` `.claude/skills/`) | 該当 `.claude/` 定義 + `docs/git-workflow.md` §5.2（エージェント表）/ §5.3（スキル表）を更新 |
-| hooks の追加・変更 (`.claude/hooks/` `.claude/settings.json`) | 該当 hook 実装 + `docs/git-workflow.md` の該当ルール節（例: main 直コミット禁止は §1）を更新 |
+| hooks の追加・変更 (`.claude/hooks/` `.claude/settings.json` の `hooks`) | 該当 hook 実装 + `docs/git-workflow.md` §5.6（hook 一覧）と該当ルール節（例: main 直コミット禁止は §1）を更新 + `tests/test_{hook 名}.py` + `docs/testing/policy.md` のスコープ表 |
+| 権限ルールの変更 (`.claude/settings.json` の `permissions`) | `docs/git-workflow.md` §5.7（allow / 都度確認の分類表）を更新 |
+| レビューゲートのモード変更（evaluator / design-review） | `CLAUDE.md` の該当行**のみ**（値の正本。`docs/git-workflow.md` §5.2 は定義であって値ではないので変更不要。skill も参照側なので触らない） |
 
 ### 4.2 タスク完了時の手順
 
