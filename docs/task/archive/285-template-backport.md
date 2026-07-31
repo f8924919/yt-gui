@@ -9,8 +9,8 @@
 **輸入しないと判断したもの**（確認済み）:
 
 - `.claude/kickoff.md`・各種プレースホルダ・GitHub 以外のホストへの読み替え注記 → 雛形専用
-- `docs/ci-guide.md`・`docs/research/README.md` → yt-gui は [build.md](../build.md)・[research/index.md](../research/index.md) に同等以上の記述あり（「リリース後の実資産スモーク」も既存）
-- 失敗クラスの知見（外部 API 契約・自己修復不能・権限差、investigate の WebSearch 付与、[testing/policy.md](../testing/policy.md) §7）→ **yt-gui が起源**で反映済み
+- `docs/ci-guide.md`・`docs/research/README.md` → yt-gui は [build.md](../../build.md)・[research/index.md](../../research/index.md) に同等以上の記述あり（「リリース後の実資産スモーク」も既存）
+- 失敗クラスの知見（外部 API 契約・自己修復不能・権限差、investigate の WebSearch 付与、[testing/policy.md](../../testing/policy.md) §7）→ **yt-gui が起源**で反映済み
 - `except (A, B)` の括弧化 → yt-gui は Python 3.14 固定で PEP 758 により現行表記のまま有効。移植性目的の変更なので不要
 
 ## PR 分割
@@ -18,8 +18,8 @@
 | PR | ブランチ | 内容 | 状態 |
 |---|---|---|---|
 | PR1 | `feature/285-hooks-layer` | hooks 層（SessionStart 注入・main 編集ブロック・編集後整形）＋ブランチ削除の除外＋git-workflow §5.6 | 完了（PR #287） |
-| PR2 | `feature/285-permissions-and-effort` | `permissions` の allow/deny・エージェントの `effort` / `permissionMode` 固定・skill frontmatter＋§5.2 拡充・§5.7 新設 | 進行中 |
-| PR3 | `feature/285-review-modes` | evaluator / design-review のモード制（現状維持の値で明示） | 未着手 |
+| PR2 | `feature/285-permissions-and-effort` | `permissions` の allow/deny・エージェントの `effort` / `permissionMode` 固定・skill frontmatter＋§5.2 拡充・§5.7 新設 | 完了（PR #288） |
+| PR3 | `feature/285-review-modes` | evaluator / design-review のモード制（現状維持の値で明示） | 完了（本 PR） |
 
 > **ブランチ種別**: 当初 PR2 を `chore/`・PR3 を `docs/` にする案だったが、§4 の命名規則では `chore` / `docs` は **Issue を伴わない作業**が対象。本タスクは 3 本とも Issue #285 の受け入れ条件に紐づくため `feature/<issue>-<desc>` に統一した（結果として `evaluator` ゲートも 3 本すべてで回る）。
 
@@ -36,7 +36,7 @@
 - **`block_main_edit.py` を別 hook にする理由**: commit をブロックしても編集は素通りするため、ブランチ切り忘れに気付くのが commit 直前になる。編集時点で止めれば `git stash` 等の巻き戻しが不要になる。
 - **`format_edited_file.py` の対象範囲**: 雛形は 1 ディレクトリ限定だが、yt-gui は ruff の対象がリポジトリ全体のため `TARGET_DIRS = ("yt_gui", "tests")` の複数対応に小改造した。`scripts/` や `docs/` 配下は verify ゲートに委ねる。
 - **hook のテスト方式**: ブランチ判定・リポジトリ所属判定は `repo_root` を引数に取るヘルパへ切り出し、一時 git リポジトリで直接検証する。`main()` 全体は `REPO_ROOT` / `TASK_INDEX` を差し替えて確認する（hook が対象とするリポジトリはファイル位置で固定のため、subprocess 実行だけでは deny 経路を再現できない）。
-- **`docs/task/index.md` の再編**: SessionStart hook は `## タスク` / `## 起票済み・未着手の Issue` を抽出キーにする。完了タスクの経緯・申し送りは [archive/index.md](archive/index.md) の「完了タスクの経緯・申し送り」へ移した。
+- **`docs/task/index.md` の再編**: SessionStart hook は `## タスク` / `## 起票済み・未着手の Issue` を抽出キーにする。完了タスクの経緯・申し送りは [archive/index.md](index.md) の「完了タスクの経緯・申し送り」へ移した。
 
 ## PR1 のレビュー反映（evaluator）
 
@@ -47,10 +47,24 @@
 
 ## PR2 のレビュー反映（evaluator）
 
-- **`allowed-tools` の意味論の取り違え**（決定打）: 雛形が「起動ターン限定の事前承認」として skill に足していたが、skills の `allowed-tools` は**実行中に使えるツールの絞り込み**。git コマンドだけを列挙すると `/start-task` が `Read` / `Write` / サブエージェント起動を失い、docs 先行・テスト先行・investigate 起動が実行不能になる。**撤去**し、判断根拠を [git-workflow.md](../git-workflow.md) §5.3 に記録。Issue #285 の受け入れ条件も訂正し、上流 2 リポジトリへも報告済み。
+- **`allowed-tools` の意味論の取り違え**（決定打）: 雛形が「起動ターン限定の事前承認」として skill に足していたが、skills の `allowed-tools` は**実行中に使えるツールの絞り込み**。git コマンドだけを列挙すると `/start-task` が `Read` / `Write` / サブエージェント起動を失い、docs 先行・テスト先行・investigate 起動が実行不能になる。**撤去**し、判断根拠を [git-workflow.md](../../git-workflow.md) §5.3 に記録。Issue #285 の受け入れ条件も訂正し、上流 2 リポジトリへも報告済み。
 - **§5.7 の文言と実効の乖離**: 「読み取り・検証系」と書いていたが、`ruff check *` を許可した時点で `--fix` も通る（ルールはフラグを解釈しない）。実態に合わせて「自動整形を含む」と明記。
 - **deny の限界**: `git push origin main --force`（フラグ後置）や `+main` は deny をすり抜ける。deny は第一線であって最後の砦ではない旨を §5.7 に追記。
 - **docs-guide §4.1 の導線漏れ**: `settings.json` の `permissions` を変更したとき §5.7 に辿れなかったため、行を分割。
+
+## PR3 のモード値と根拠
+
+現行運用をそのまま明示した値を採る（実挙動は変わらない）。
+
+| モード | 値 | 根拠 |
+|---|---|---|
+| 評価ゲート（evaluator） | `always` | 思想的に `always` が正統（バイアス排除）。加えて本タスク自身の PR1 / PR2 で、evaluator が「単純な設定変更」に見えた回に決定打の不具合（NotebookEdit 未ブロック・`allowed-tools` の意味論誤り）を検出しており、規模による省略は割に合わない |
+| 設計レビュー（design-review） | `auto` | 実装前・助言・高コスト（Opus）。設計の複雑さは diff の大きさと相関しないため、規模ではなく §5.5 の構造トリガで発火させる |
+| 受け入れ条件レビュー（criteria-review） | モードなし | 安価（Sonnet）で常時価値があるため |
+
+雛形は初期値を evaluator=`auto` としているが、これは立ち上げ初期の負荷を下げる割り切り。本リポジトリは成熟しているため `always` を採る。
+
+**PR3 のレビュー反映（evaluator）**: 初稿は「値の正本は CLAUDE.md」と宣言しながら、git-workflow §5.2 / §5 step 7 / §5.5 と 2 つの skill に現行値とモード挙動を再掲しており、**CLAUDE.md の 1 行を変えても 6 箇所が旧値を主張し続ける**状態だった（モード制の目的が実効的に成立していない）。値は CLAUDE.md のみ・定義は §5.2 のみ・skill は参照のみ、に整理した。あわせて design-review 側のフォールバック（モード行欠落時は従来挙動 `auto` へ倒す）と、`auto` 閾値の 3 つ目「新規 spec を含む」の判定手段（`git diff --name-status` の `A` 行。`--name-only` では新規かどうか分からない）を追加した。
 
 ## 検証メモ
 
