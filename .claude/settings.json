@@ -3,6 +3,24 @@
     "context7@claude-plugins-official": true
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-sync",
+              "--project",
+              "${CLAUDE_PROJECT_DIR}",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_task_status.py"
+            ]
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
@@ -17,6 +35,42 @@
               "${CLAUDE_PROJECT_DIR}",
               "python",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/block_main_commit.py"
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-sync",
+              "--project",
+              "${CLAUDE_PROJECT_DIR}",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/block_main_edit.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-sync",
+              "--project",
+              "${CLAUDE_PROJECT_DIR}",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/format_edited_file.py"
             ]
           }
         ]

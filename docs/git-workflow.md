@@ -16,10 +16,12 @@
 
 このルールは二段構えで機械的に強制されている（#232）。
 
-- **クライアント側（早期警告）**: Claude Code の PreToolUse hook（[.claude/hooks/block_main_commit.py](../.claude/hooks/block_main_commit.py)・[.claude/settings.json](../.claude/settings.json)）が、カレントブランチが `main` のときの `git commit` / `git push` をコミット前にブロックする。対象は Claude Code の Bash / PowerShell ツール経由のコマンドのみ（matcher `Bash|PowerShell`）。判定はカレントブランチのみで、git コマンド失敗時等は**フェイルオープン**（誤って全コマンドをブロックしない）。起動子は `uv run --no-sync python`（本リポジトリの必須ツールである uv を使う。素の `python` は Windows で Microsoft Store スタブに化けることがあるため不採用）。settings.json の hook 定義は **exec form**（`command` + `args` 配列・`${CLAUDE_PROJECT_DIR}` プレースホルダは Claude Code が置換）とする（shell form はシェル展開・PATH 解決依存で Windows にて不発火だったため。#235）。hooks はセッション開始時に読み込まれるため、変更後の実効確認は新しいセッションで行う。uv 不在等で hook 自体が起動できない場合も Claude Code は非ブロッキング扱いでコマンドを通す（フェイルオープン）が、その状態では hook が無効なので注意。
+- **クライアント側（早期警告）**: Claude Code の PreToolUse hook（[.claude/hooks/block_main_commit.py](../.claude/hooks/block_main_commit.py)・[.claude/hooks/block_main_edit.py](../.claude/hooks/block_main_edit.py)・[.claude/settings.json](../.claude/settings.json)）が、カレントブランチが `main` のときの `git commit` / `git push` と、**リポジトリ内ファイルの編集**（`Edit` / `Write` / `NotebookEdit`）をブロックする。対象は Claude Code のツール経由の操作のみ（matcher `Bash|PowerShell` / `Edit|Write|NotebookEdit`）。判定はカレントブランチのみで、git コマンド失敗時等は**フェイルオープン**（誤って全コマンドをブロックしない）。起動子は `uv run --no-sync python`（本リポジトリの必須ツールである uv を使う。素の `python` は Windows で Microsoft Store スタブに化けることがあるため不採用）。settings.json の hook 定義は **exec form**（`command` + `args` 配列・`${CLAUDE_PROJECT_DIR}` プレースホルダは Claude Code が置換）とする（shell form はシェル展開・PATH 解決依存で Windows にて不発火だったため。#235）。hooks はセッション開始時に読み込まれるため、変更後の実効確認は新しいセッションで行う。uv 不在等で hook 自体が起動できない場合も Claude Code は非ブロッキング扱いでコマンドを通す（フェイルオープン）が、その状態では hook が無効なので注意。hook 層全体の設計方針は §5.6 を参照。
 - **サーバー側（最後の砦）**: branch protection の `enforce_admins` が有効で、feature ブランチからの `git push origin main` を含む main への直 push は管理者であっても GitHub 側で拒否される。PR 経由のマージには影響しない。緊急時にどうしても直 push が必要な場合は `gh api -X DELETE repos/f8924919/yt-gui/branches/main/protection/enforce_admins` で一時解除し、対応後に `-X POST` で必ず再有効化する。
 
 hook の検出は「単発・複合コマンド（`&&` / `;` / `|` 区切り）のサブコマンド位置での `git commit` / `git push` 一致」に留める（`git -c k=v commit` のようなオプション挟み込みや文字列内の擦り抜けは追わず、サーバー側の enforce_admins に委ねる。誤ブロック回避を優先する設計）。
+
+ただし**リモートブランチの削除**（`git push --delete` / `-d`、`:branch` 形の refspec）は `main` 上でも通す。マージ済みブランチの削除は `main` へ戻ってから行う正規の手順（§5 step 9・[`/finish-task`](../.claude/skills/finish-task/SKILL.md)）であり、これを塞ぐと運用が回らない。削除は `main` の履歴を変更しないため、本 hook の目的（main への直接の変更を防ぐ）から外れる。
 
 ブランチ判定は hook 入力の `cwd` を起点にした**実効ディレクトリ**に対して行う（#240）。複合コマンド内の `cd <path>` セグメントを追跡し、git のグローバルオプション `-C <path>`（空白区切り・複数指定の累積）も解決したうえで、対象リポジトリのカレントブランチを判定する。これにより別リポジトリの feature ブランチへの commit/push は誤ブロックせず、別リポジトリの `main` 上なら従来どおりブロックする。`--git-dir` / `--work-tree` によるリポジトリ指定・クォート付きパス（スペースを含むパス）は追わず、パス解決に失敗するケースは一律フェイルオープン（通す）。
 
@@ -170,3 +172,26 @@ skill が呼ぶサブエージェントの**合否・設計判断は委譲しな
 - 1 つでも該当（推奨 yes）→ **実施を既定**とする。主エージェントは主観でスキップせず、省略する場合は**理由をユーザーに提示して承認を得る**（提示のみの自己判断スキップは禁止）。
 - ユーザーはオン / オフ両方向でオーバーライドできる（推奨 no でも設計に不安があれば起動を要求してよい。最終判断はユーザー）。
 - `design-review` は助言でありゲートではない。指摘の採否・設計方針の最終決定は主エージェント＋ユーザーが行う（§5.1）。
+
+### 5.6 hooks 層（`.claude/hooks/`）
+
+**プロンプトの指示に頼らず機構で効かせたいもの**は hook にする。CLAUDE.md や本ファイルに書いた約束はモデルが読み飛ばしうるが、hook は必ず走る。§5.3 の skill・§5.4 の rule が「思い出させる」層なのに対し、hooks は「守らせる / 手当てする」層に当たる。
+
+| hook | イベント / matcher | 役割 | 正本 |
+|---|---|---|---|
+| [`session_task_status.py`](../.claude/hooks/session_task_status.py) | `SessionStart` | [task/index.md](task/index.md) の 2 つの表を `additionalContext` として注入する | [CLAUDE.md](../CLAUDE.md) タスク管理ルール |
+| [`block_main_commit.py`](../.claude/hooks/block_main_commit.py) | `PreToolUse` / `Bash\|PowerShell` | `main` 上の `git commit` / `git push` をブロック（リモートブランチ削除は除く） | §1 |
+| [`block_main_edit.py`](../.claude/hooks/block_main_edit.py) | `PreToolUse` / `Edit\|Write\|NotebookEdit` | `main` 上のリポジトリ内ファイルの編集をブロック | §1 |
+| [`format_edited_file.py`](../.claude/hooks/format_edited_file.py) | `PostToolUse` / `Edit\|Write` | 編集した `yt_gui/` `tests/` 配下の `.py` を `ruff format` で整形する | [CLAUDE.md](../CLAUDE.md) の「Lint / Format / 型チェック」 |
+
+`block_main_edit.py` が `block_main_commit.py` と別に必要なのは、commit をブロックしても**そこに至るまでの編集は素通り**するため。ブランチを切り忘れたことに気付くのが commit 直前になり、`git stash` などの巻き戻しが要る。編集の時点で止めればその手戻りが消える。
+
+`format_edited_file.py` は、検証ゲート（§5 step 7）の `ruff format` で最後にまとめて整形すると整形だけの差分が実装コミットに混ざる問題への手当て。編集直後に同じ整形を掛けておけばその往復が消える。整形は verify ゲートでも走るため、ここでの失敗は「早めに整形できなかった」以上の意味を持たない。
+
+共通の設計方針:
+
+- **フェイルオープン**: 判定に迷うケース（stdin のパース失敗・パス解決不能・git やツールの実行失敗）は必ず「通す」に倒す。hook の不調で作業が止まる方が損失が大きい。ブロック系はサーバー側 branch protection（§1）が最後の砦。
+- **正本を再定義しない**: hook は判定と注入に徹し、ルール本文は docs 側に置く（§5.3 の skill・§5.4 の rule と同じ drift 回避方針）。
+- **標準ライブラリのみ**: hook は Claude Code から直接起動されるため、プロジェクトの依存解決に頼らない。起動子は `uv run --no-sync --project ${CLAUDE_PROJECT_DIR} python` に統一する（§1）。
+- **反映タイミング**: hooks の登録（settings.json）はセッション開始時に読み込まれるため、変更後の実効確認は新しいセッションで行う。hook スクリプト本体は実行のたびに読まれるため即座に効く。
+- **テスト**: hook のロジックは `tests/test_{hook 名}.py` で検証する（[testing/policy.md](testing/policy.md) §1）。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。
