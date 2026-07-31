@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [285-template-backport.md](285-template-backport.md) | 進行中 | claude-templates の改良を逆輸入（hooks 層 / 権限・effort 固定 / レビューモード制） | 2026-07-31 |
+| （進行中・未着手のタスクはありません） | — | — | — |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
