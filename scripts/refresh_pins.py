@@ -9,6 +9,11 @@ version / url / sha256 を更新する（docs/research/binary-supply-chain.md §
 - BtbN（ffmpeg の win / linux）は最新の不変 `autobuild-*` タグへ再ピンする。
   リリース一覧の解決は `refresh_pins()` が 1 回だけ行い、win / linux の両
   refresher へ同一リリースを注入して同一タグ・同一バージョンに揃える（#272）。
+  再ピンは **ffmpeg のバージョンが変わっていなくても毎回行う**。BtbN は古い
+  `autobuild-*` タグを削除する（保持は直近約 2 週間の日次＋以前は月 1 本）ため、
+  週次で再ピンし続けないとピン URL が 404 になる。「バージョン不変なら再ピンしない」
+  最適化は入れてはならない（詳細は docs/build.md「再ピンは『ffmpeg のバージョンが
+  変わったとき』だけではない」）。
 
 `scripts/` はパッケージではないため download_binaries を同ディレクトリから import する。
 """
@@ -51,6 +56,10 @@ def _select_latest_autobuild(releases: list[dict]) -> dict:
     ローリングの `latest` タグは除外し、`autobuild-YYYY-MM-DD-HH-MM` のうち
     タグ名（ゼロ埋め日時のため辞書順 = 時系列順）が最大のものを返す。これにより
     取得 URL が日付固定タグ配下＝不変アセットを指すようになる（#72）。
+
+    タグは不変（中身がすり替わらない）だが**永続ではなく**、古いものは上流が
+    削除する。常に最新を選び直すことでピンを保持期間内に保つ（モジュール
+    docstring 参照）。
     """
     autobuilds = [
         r for r in releases if str(r.get("tag_name", "")).startswith("autobuild-")
@@ -153,6 +162,7 @@ def refresh_ffmpeg_win(old: dict, release: dict) -> tuple[dict, str]:
     # `releases/latest`（ローリング）ではなく、不変な `autobuild-*` タグの最新
     # リリースへ再ピンする（#72）。release は refresh_pins() が 1 回だけ解決した
     # 共有リリース（linux と同一タグ・同一バージョンに揃えるため。#272）。
+    # version が old と同じでも再ピンする（上流が古いタグを消すため。冒頭 docstring）。
     version, url = _select_btbn_versioned_asset(
         release.get("assets", []), "win64-gpl", "zip"
     )
@@ -209,7 +219,8 @@ _BTBN_LINUX_VARIANTS = {"amd64": "linux64-gpl", "arm64": "linuxarm64-gpl"}
 
 
 def refresh_ffmpeg_linux(old: dict, release: dict) -> tuple[dict, str]:
-    # win と同じ不変 `autobuild-*` タグへの再ピン方式（#272）。release は
+    # win と同じ不変 `autobuild-*` タグへの再ピン方式（#272。バージョン不変でも
+    # 再ピンする理由は冒頭 docstring）。release は
     # refresh_pins() が 1 回だけ解決した共有リリース（win と同一タグ保証）。
     # 旧 johnvansickle の `.md5` 照合は取得元廃止に伴い撤去。
     assets = release.get("assets", [])
