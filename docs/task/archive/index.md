@@ -93,6 +93,7 @@
 | [macos-arm64-ffmpeg.md](macos-arm64-ffmpeg.md) | arm64 リリースの ffmpeg を osxexperts.net 由来の Apple Silicon ネイティブ版に変更し Rosetta 依存を解消（Issue #42 / PR #44） | 2026-05-30 |
 | [265-download-retry.md](265-download-retry.md) | 同梱バイナリ取得にリトライ（指数バックオフ・sha256 未設定は即時中断）と診断情報を追加。`_download` を urlopen＋timeout＋UA へ堅牢化し、リリース CI の一時的な取得破損（v0.6.1/v0.6.2 で計 3 回失敗）へ対策（Issue #265 / PR #266） | 2026-07-18 |
 | [272-ffmpeg-linux-btbn.md](272-ffmpeg-linux-btbn.md) | ffmpeg-linux の取得元を johnvansickle（CI ブロック・更新停止）から BtbN の不変 `autobuild-*` タグへ切替。win と同一タグ・同一バージョンを構造的に保証（共有リリース注入）、release.yml に workflow_dispatch ドライラン＋ffmpeg スモーク（glibc コア whitelist）を恒久追加（Issue #272） | 2026-07-20 |
+| [284-pin-update-pr-ci.md](284-pin-update-pr-ci.md) | ピン更新 PR で必須 CI が発火せずマージできない問題を fine-grained PAT（secret `PIN_UPDATE_TOKEN`）で解消。未設定・失効時は `GITHUB_TOKEN` へフォールバックしつつ `::warning::` と PR 本文注記で可視化（静かな再発防止）。workflow yml を検証する回帰テストを新設し 9 変異で検証力を実測（Issue #284 / PR #291） | 2026-08-04 |
 
 ## テスト基盤
 
@@ -153,3 +154,11 @@
 ### 区間ダウンロード
 
 [81-download-sections.md](81-download-sections.md) は ffmpeg による後処理切り出しで完了した。**ネイティブ `download_ranges` 経路はハングするため見送っており**、通信量を節約できる版の実現可否は [#84](https://github.com/f8924919/yt-gui/issues/84) に分離済み。着手時はまず当該タスクメモのハング再現条件から読み直すこと。
+
+### 同梱バイナリのピン自動更新
+
+[284-pin-update-pr-ci.md](284-pin-update-pr-ci.md) で、自動起票された PR に必須 CI が発火しない問題を fine-grained PAT（secret `PIN_UPDATE_TOKEN`）で解消した。PAT 発行はオーナーの手作業で AI が代行できないため、**実装 PR のマージ（#291）と Issue のクローズ（PAT 登録＋実地確認）を二段階に分けて**進めている。同種の「人間の作業に依存する受け入れ条件」を持つタスクでは同じ切り分けが使える。
+
+**申し送り**: PAT には有効期限がある。失効すると `GITHUB_TOKEN` にフォールバックし、**PR 本文の冒頭に警告注記が入った状態**でピン更新 PR が作られる。この注記を見たら PAT を再発行して secret を更新すること（手順は [build.md](../../build.md)「PR 作成トークン」）。期限管理が負担になったら GitHub App トークン（`actions/create-github-app-token`）への移行を検討する。
+
+**未解決**: `scripts/refresh_pins.py` の `_select_latest_autobuild` は BtbN の**最新 autobuild タグへ無条件に再ピン**する。このため ffmpeg のバージョンが変わっていなくても、上流が日次リビルドするたびに sha256 だけが変わる更新 PR が生成される（実例: #290 の翌日に #292 が同一バージョン `n8.1.2-34-g9b6c8969e0` のまま別タグへ再ピン）。`pins.json` のコメントが述べる #72 の意図（「新バージョン追従時に再ピン」）とも食い違う。毎回サプライチェーン確認のコストがかかるため、バージョン不変時は再ピンしない条件を入れるか、意図を docs 側に合わせるかの判断が要る。
