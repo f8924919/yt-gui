@@ -2,7 +2,7 @@
 
 - Issue: [#284](https://github.com/f8924919/yt-gui/issues/284)
 - ブランチ: `bugfix/284-pin-update-pr-ci`
-- 関連 docs: [build.md](../build.md)「同梱バイナリのピン自動更新」
+- 関連 docs: [build.md](../../build.md)「同梱バイナリのピン自動更新」
 
 ## 背景
 
@@ -32,7 +32,7 @@ PAT 発行はリポジトリオーナーの手作業で Claude が代行でき�
 
 ## テスト
 
-workflow yml を検証する pytest は既存になかったため新規に追加した（`tests/test_update_binaries_workflow.py`・dev 依存に `pyyaml` を追加。[testing/policy.md](../testing/policy.md) §1 のスコープ表にも記載）。`update-binaries.yml` をパースし、`token:` の PAT 参照とフォールバック・警告ステップの `if` 条件・PR 本文への注記を検証する。
+workflow yml を検証する pytest は既存になかったため新規に追加した（`tests/test_update_binaries_workflow.py`・dev 依存に `pyyaml` を追加。[testing/policy.md](../../testing/policy.md) §1 のスコープ表にも記載）。`update-binaries.yml` をパースし、`token:` の PAT 参照とフォールバック・警告ステップの `if` 条件・PR 本文への注記を検証する。
 
 検証力はミューテーションで実測した（`token:` 行削除・`||` 削除・警告ステップ削除・注記ブロックのみ削除・`if` 削除・`if` 反転・job `env` 削除・`env` を PAT の値に変更・警告ステップを PR 作成の後ろへ移動、の 9 変異すべてを検出）。
 
