@@ -187,8 +187,31 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
 | 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg（osxexperts.net・API/署名無しのため手動更新） |
 | 権限 | `contents: write` / `pull-requests: write` |
+| PR 作成トークン | secret `PIN_UPDATE_TOKEN`（fine-grained PAT）。未設定時は `GITHUB_TOKEN` にフォールバックし、警告を出す（後述） |
 
-> **前提設定**: GITHUB_TOKEN で PR を作成するため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
+> **前提設定 1**: GITHUB_TOKEN で PR を作成する経路が残るため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
+
+### PR 作成トークン（secret `PIN_UPDATE_TOKEN`）
+
+既定の `GITHUB_TOKEN` による push / PR 作成は**他のワークフローを起動しない**（GitHub Actions の再帰実行防止の仕様）。このため既定トークンのままでは、自動起票された PR に対して `test.yml`（`on: pull_request`）と `codeql.yml` が発火せず、`main` のブランチ保護が要求する必須チェック（`test` / `test-windows`）が永久に満たされずマージできない（#284）。
+
+これを避けるため、`peter-evans/create-pull-request` には既定トークンではなく **fine-grained PAT** を渡す。
+
+> **前提設定 2**: 以下の手順で PAT を発行し、リポジトリ secret に登録しておくこと。
+
+| 項目 | 値 |
+|---|---|
+| 発行場所 | Settings > Developer settings > Personal access tokens > **Fine-grained tokens** |
+| Repository access | **Only select repositories** → `f8924919/yt-gui` のみ |
+| Repository permissions | **Contents: Read and write** / **Pull requests: Read and write** の 2 つのみ（他は No access） |
+| 登録先 | リポジトリ secret **`PIN_UPDATE_TOKEN`**（`gh secret set PIN_UPDATE_TOKEN`） |
+
+**未設定・失効時の挙動**: secret が空のときはワークフローを失敗させず `GITHUB_TOKEN` にフォールバックする。上流バイナリの更新検知・sha256 検証まで止めてしまうと、サプライチェーン検証の恩恵ごと失われるため。ただしフォールバックしたことが分からないと #284 の症状（CI 未発火）へ静かに戻るので、次の 2 つで可視化する。
+
+- ジョブログとサマリに `::warning::` を出力する
+- **作成される PR 本文の冒頭に注記を差し込む**（「PAT 未設定のため必須 CI が発火しない」）
+
+**失効時の対応**: fine-grained PAT には有効期限がある。期限切れ後は上記の警告付きで PR が作られるので、注記入りの PR を見たら PAT を再発行して `PIN_UPDATE_TOKEN` を更新する。期限管理が負担になった場合は GitHub App トークン（`actions/create-github-app-token`）への移行を検討する。
 
 ## ワークフロー権限とリポジトリのセキュリティ設定
 
@@ -198,7 +221,7 @@ public リポジトリでは GITHUB_TOKEN の既定権限が外部 PR にも及�
 |---|---|---|
 | `test.yml` | `contents: read` | checkout・依存取得・テストのみで書き込み不要 |
 | `release.yml`（ジョブ単位） | `contents: write` / `release` のみ `id-token: write` `attestations: write` | タグ・リリース作成と来歴署名（provenance）に必要 |
-| `update-binaries.yml` | `contents: write` `pull-requests: write` | `bin/pins.json` 更新 PR の作成に必要 |
+| `update-binaries.yml` | `contents: write` `pull-requests: write` | `bin/pins.json` 更新 PR の作成に必要（PAT 未設定時のフォールバック経路で `GITHUB_TOKEN` が使うため残す） |
 | `codeql.yml` | `contents: read` `security-events: write` | 解析結果（SARIF）の Security タブへのアップロードに必要 |
 
 ### 静的解析（CodeQL / SAST）

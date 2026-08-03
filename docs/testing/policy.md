@@ -34,6 +34,7 @@
 | 開発ツール（Claude Code hook） | `.claude/hooks/block_main_commit.py`（コマンド解析・実効ディレクトリ解決のロジック。パッケージ外のため `importlib` で読み込み、ブランチ判定は一時 git リポジトリで検証。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#240） | ◯ |
 | 開発ツール（Claude Code hook） | `.claude/hooks/block_main_edit.py`・`.claude/hooks/session_task_status.py`・`.claude/hooks/format_edited_file.py`（ブロック判定・表の抽出/整形・整形対象の判定。hook はスクリプトとして起動されるため、stdin へ JSON を流す subprocess 実行で検証する。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#285） | ◯ |
 | ビルドスクリプト | `scripts/download_binaries.py`（pins 検証・リトライ/診断・notices 生成のロジック。HTTP は `_download` の monkeypatch ＋ `retries`/`sleep` 注入でオフライン検証・#265。`importlib` で読み込み、`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。実ダウンロードは対象外） | ◯ |
+| CI ワークフロー定義 | `.github/workflows/update-binaries.yml`（PR 作成トークンの設定＝`PIN_UPDATE_TOKEN` の指定・`GITHUB_TOKEN` へのフォールバック・未設定時の警告と PR 本文注記。設定が失われても既存テストは素通りし CI 未発火の症状へ静かに戻るため、yml をパースして構造を検証する・#284。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。ワークフローの実行そのものは対象外） | ◯ |
 
 Qt UI（状態機械・ロジック）/ スレッドヘルパ行の `△` は、**UI に閉じた振る舞い**（編集モードの状態遷移とシグナル、トラック選択の排他ロジック、`run_in_thread` のコールバック順序など）に限定し、ウィンドウ全体を巻き取る E2E は対象外とします。モーダルダイアログ（`QMessageBox.question` / `QFileDialog` / `QDialog.exec()`）を経由する経路は **手段B**（§2.5・`QTimer.singleShot` で能動的に閉じる、または静的メソッドを固定値へ差し替える）で「開く→操作→状態反映」までを通しますが、フル画面操作の E2E は引き続き対象外です。実行には `pytest-qt` と `QT_QPA_PLATFORM=offscreen` が必要です（要件・つまずきポイント・手段A〜Dの整理は [docs/research/qt-ui-testing-feasibility.md](../research/qt-ui-testing-feasibility.md) §5・§8 を参照）。
 
@@ -111,6 +112,11 @@ tests/
 ├── test_yt_dlp_update.py          ← 純粋ロジック（yt-dlp 更新チェック）
 ├── test_app_update.py             ← 純粋ロジック（アプリ本体更新チェック）
 ├── test_extension.py              ← scripts/sync_extension_version.py・extension/ 整合性
+├── test_update_binaries_workflow.py ← .github/workflows/update-binaries.yml の PR 作成トークン設定
+├── test_block_main_commit.py      ← .claude/hooks/block_main_commit.py
+├── test_block_main_edit.py        ← .claude/hooks/block_main_edit.py
+├── test_session_task_status.py    ← .claude/hooks/session_task_status.py
+├── test_format_edited_file.py     ← .claude/hooks/format_edited_file.py
 ├── test_threading_utils.py        ← Qt（@pytest.mark.qt）
 ├── test_queue_controller.py       ← Qt（@pytest.mark.qt）
 ├── test_original_format_panel.py  ← Qt（@pytest.mark.qt）

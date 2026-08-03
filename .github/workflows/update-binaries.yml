@@ -4,9 +4,13 @@ name: Update binary pins
 # 真正性を検証したうえで bin/pins.json を更新する PR を自動起票する。
 # 方針: docs/research/binary-supply-chain.md §4・§5 / 実装: scripts/refresh_pins.py
 #
-# 前提: リポジトリ設定 Settings > Actions > General >
+# 前提 1: リポジトリ設定 Settings > Actions > General >
 #   "Allow GitHub Actions to create and approve pull requests" を有効化しておくこと
-#   （GITHUB_TOKEN で PR を作成するため）。
+#   （PAT 未設定時に GITHUB_TOKEN で PR を作成するフォールバック経路のため）。
+# 前提 2: secret PIN_UPDATE_TOKEN に fine-grained PAT を登録しておくこと
+#   （対象リポジトリのみ / Contents・Pull requests の write のみ）。既定の GITHUB_TOKEN が
+#   作成した PR では他のワークフローが起動せず必須 CI が発火しないため（#284）。
+#   発行手順・失効時の対応は docs/build.md「PR 作成トークン」を参照。
 
 on:
   schedule:
@@ -25,6 +29,11 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # secrets コンテキストはステップの if で参照できないため、job の env を経由して
+    # 未設定判定に使う。PAT の値そのものを env に置くと全ステップ（uv sync や外部 HTTP を
+    # 行う refresh_pins.py を含む）の環境に載るため、真偽値だけを渡す。
+    env:
+      HAS_PIN_UPDATE_TOKEN: ${{ secrets.PIN_UPDATE_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -40,10 +49,28 @@ jobs:
       - name: Refresh pins
         run: uv run python scripts/refresh_pins.py --summary-out "${RUNNER_TEMP}/pin-update-body.md"
 
+      # PAT 未設定・失効時は GITHUB_TOKEN にフォールバックするが、そのままだと必須 CI が
+      # 発火しない状態（#284 の症状）へ静かに戻る。ログと PR 本文の両方で可視化する。
+      - name: Warn if PAT is missing
+        if: ${{ env.HAS_PIN_UPDATE_TOKEN == 'false' }}
+        run: |
+          echo "::warning::secret PIN_UPDATE_TOKEN が未設定のため GITHUB_TOKEN で PR を作成します。この PR では必須 CI（test / test-windows）が発火しません（#284）。docs/build.md「PR 作成トークン」を参照してください。"
+          {
+            echo "> [!WARNING]"
+            echo "> secret \`PIN_UPDATE_TOKEN\` が未設定または失効しているため、この PR は \`GITHUB_TOKEN\` で作成されました。"
+            echo "> **必須 CI（\`test\` / \`test-windows\`）が発火しません**（#284）。PAT を再発行して secret を更新してください（docs/build.md「PR 作成トークン」）。"
+            echo ""
+            cat "${RUNNER_TEMP}/pin-update-body.md"
+          } > "${RUNNER_TEMP}/pin-update-body.annotated.md"
+          mv "${RUNNER_TEMP}/pin-update-body.annotated.md" "${RUNNER_TEMP}/pin-update-body.md"
+
       # pins.json に差分があるときだけ PR を作成する（差分なしなら no-op）。
       - name: Create pull request
         uses: peter-evans/create-pull-request@v8
         with:
+          # 既定の GITHUB_TOKEN が作成した PR では pull_request ワークフローが起動しないため
+          # fine-grained PAT を使う。未設定時は GITHUB_TOKEN（= action の既定値）へ落とす（#284）。
+          token: ${{ secrets.PIN_UPDATE_TOKEN || github.token }}
           add-paths: bin/pins.json
           branch: chore/update-binary-pins
           base: main

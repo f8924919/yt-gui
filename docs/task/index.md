@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （進行中・未着手のタスクはありません） | — | — | — |
+| [284-pin-update-pr-ci.md](284-pin-update-pr-ci.md) | 進行中 | ピン更新 PR で必須 CI が発火しない問題を fine-grained PAT で解消（#284） | 2026-08-04 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
@@ -30,4 +30,3 @@
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
-| [#284](https://github.com/f8924919/yt-gui/issues/284) | `update-binaries.yml` が作成する PR で必須 CI が発火せずマージできない | [build.md](../build.md)「同梱バイナリのピン自動更新」 |
