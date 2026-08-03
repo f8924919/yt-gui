@@ -14,7 +14,7 @@
   },
   "ffmpeg-win": {
     "version": "n8.1.2-34-g9b6c8969e0",
-    "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。zip 取得後に sha256 を算出して照合。",
+    "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。zip 取得後に sha256 を算出して照合。",
     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-03-14-02/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-gpl-8.1.zip",
     "sha256": "20b16a056785b232f35363eba81c3fd6113d76ff39e46d98acfaf8440250467f"
   },
@@ -51,7 +51,7 @@
   },
   "ffmpeg-linux": {
     "version": "n8.1.2-34-g9b6c8969e0",
-    "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド（n8.1 系）。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が新バージョン追従時に最新 autobuild タグへ再ピンする。tar.xz 取得後に sha256 を算出して照合。",
+    "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド（n8.1 系）。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
         "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-03-14-02/ffmpeg-n8.1.2-34-g9b6c8969e0-linux64-gpl-8.1.tar.xz",

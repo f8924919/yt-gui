@@ -81,6 +81,12 @@ python scripts/download_binaries.py --update
 - **手動での差し替え手順**: ①`scripts/refresh_pins.py` を実行（または手動で上流バージョン URL を確認）→ ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。重大 CVE 時は週次を待たず手動で実施する。
 - **ffmpeg-win / ffmpeg-linux の不変ピン（ドリフト対策）**: BtbN の `latest` はローリングタグで、同一バージョン（例 `n8.1`）でも上流が再ビルドするたびに同名アセットの中身＝ sha256 が変わる。これを `pins.json` に固定するとリリース CI が sha256 不一致で失敗するため、**日付固定の不変 `autobuild-YYYY-MM-DD-HH-MM` タグ配下のアセット URL にピンする**。`refresh_pins.py` は `releases/latest` ではなく最新の `autobuild-*` リリースを解決し（`_select_latest_autobuild`）、その中の最新ブランチの gpl アセット（win: `ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip`、linux: 同形式の `linux64-gpl` / `linuxarm64-gpl` tar.xz）を選んで不変 URL を書き込む（`_select_btbn_versioned_asset`）。**win と linux はリリース一覧の取得・タグ解決を `refresh_pins()` で 1 回だけ行い、解決済みリリースを両 refresher へ引数で渡すことで、同一実行内で必ず同一タグ・同一バージョンへ揃える**。linux の amd64 / arm64 もバージョントークンの一致を検証し、不一致・アセット欠落時は例外で中断する（fail-closed。その週の週次 refresh は PR 不作成で止まる）。新バージョン追従時もこの仕組みで自動的に新しい不変タグへ再ピンされる。johnvansickle.com（旧・Linux 取得元）は GitHub ランナーからの取得ブロックと上流更新停止のため #272 で廃止した。
 
+- **再ピンは「ffmpeg のバージョンが変わったとき」だけではない（週次で必ず行う）**: `refresh_pins.py` はバージョンの変化に関係なく、実行のたびに最新の `autobuild-*` タグへ再ピンする。これは意図的で、**BtbN が古い `autobuild-*` タグを削除するため**である。タグ自体は不変（＝中身がすり替わらない）だが**永続ではない**。観測した保持ポリシー（2026-08-04 時点）は「直近およそ 2 週間の日次ビルド＋それ以前は月 1 本」で、3 週間前の日次タグは実際に 404 になる。週次 cron で再ピンし続けることでピンが常に 7 日以内に保たれ、この保持期間を下回らない。
+
+  したがって **「バージョンが変わらない限り再ピンしない」という最適化を入れてはならない**。ffmpeg のバージョンは数週間〜数ヶ月変わらないため、そうするとピン URL が約 2 週間後に 404 になり、`download_binaries.py` が取得に失敗してリリースビルドが壊れる。同一バージョンのまま sha256 だけが変わる更新 PR（例: #290 の翌日の #292）は無駄な差分ではなく、**ピン先を生存させるための正常な動作**である。
+
+  裏を返すと、週次 cron が 2 週間以上止まるとピンが失効しうる。長期間ワークフローを止めた後は、リリース前に `update-binaries.yml` を手動実行してピンを更新すること。
+
 ## バージョン管理（単一ソース）
 
 アプリのバージョンは **`pyproject.toml` の `[project] version` を唯一のソース** とする。更新時はこの 1 箇所だけを書き換える。
