@@ -87,7 +87,7 @@ main ──┬──────────────────┬──→
 6. 実装してテストを green にする。
 7. **検証ゲート**（PR 前。いずれもサブエージェントへ委譲、§5.2。`/verify-gate` skill でブランチ種別に応じて一括起動できる、§5.3）:
    - lint / フォーマット / 型チェック / テストを `verify` サブエージェント（Sonnet）で green にする（[CLAUDE.md](../CLAUDE.md) のコマンド参照）。
-   - docs / CLAUDE.md を変更した場合は `docs-check` サブエージェント（Sonnet）で整合性（index 更新漏れ・リンク切れ・命名・関連仕様リンク）を点検する。
+   - docs / CLAUDE.md を変更した場合は `docs-check` サブエージェント（Sonnet）で整合性（index 更新漏れ・リンク切れ・**旧語彙の残存**・命名・関連仕様リンク）を点検する。
    - **`feature` / `bugfix` / `hotfix` ブランチでは `evaluator` サブエージェント（Opus）で評価ゲートを通す**（受け入れ条件・spec の充足を独立判定。`verify` で green にした後に実行する）。起動可否は [CLAUDE.md](../CLAUDE.md) の評価ゲート（evaluator）モードに従う（§5.2）。
 8. `gh` で PR を作成（ベース `main`、本文は原則日本語＝対応する Issue スレッドが日本語以外ならその言語に合わせる、関連 Issue を `Closes #<issue>` で紐付け）。
 9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。完了タスクの archive 移動は**原則 step 6〜8 の実装 PR に同梱**する（[docs-guide.md](docs-guide.md) §4.2。#222）。マージ後の後処理（main 最新化・ブランチ削除、同梱できなかった場合のまとめ archive 移動）は `/finish-task` skill で実行できる（§5.3）。
