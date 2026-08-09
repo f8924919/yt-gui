@@ -1,6 +1,6 @@
 ---
 name: docs-check
-description: docs-guide.md のルールに沿ってドキュメントの整合性（index 更新漏れ・リンク切れ・命名規則・関連仕様リンク）を点検し、機械的な不整合を修正する。タスクの PR 前に使う。
+description: docs-guide.md のルールに沿ってドキュメントの整合性（index 更新漏れ・リンク切れ・旧語彙の残存・命名規則・関連仕様リンク）を点検し、機械的な不整合を修正する。タスクの PR 前に使う。
 model: sonnet
 effort: low
 tools: Read, Edit, Grep, Glob, Bash
@@ -18,11 +18,14 @@ tools: Read, Edit, Grep, Glob, Bash
 
 1. **index.md の更新漏れ**: 各サブフォルダ（`docs/spec/`・`docs/spec/features/`・`docs/spec/screens/`・`docs/arch/`・`docs/task/`・`docs/task/archive/` 等）でファイルを追加・削除・改名したら、同フォルダの `index.md` の表に反映されているか（docs-guide §3.4）。
 2. **リンク切れ**: docs 内・CLAUDE.md の相対リンク先が実在するか。ファイル改名・移動時に被リンク元が追従しているか（grep で裏取り。docs-guide §3.3）。
-3. **`arch/` の関連仕様リンク**: `docs/arch/*.md` の先頭に `> 関連仕様: [...](../spec/...)` があるか（docs-guide §3.3）。
-4. **命名規則**: `docs/spec/` 配下は kebab-case、`docs/arch/` は対応モジュール名と一致する snake_case（docs-guide §2.1）。
-5. **ドキュメントマップ / 構成表**: フォルダ・ファイル種別を追加したら CLAUDE.md のドキュメントマップと docs-guide §2.1 の表が追従しているか（docs-guide §2.3 / §5）。
-6. **タスク連動**: コード変更があるなら docs-guide §4.1 の「変更箇所別の更新先」に沿った docs 更新が伴っているか。タスク完了なら §4.2 の移動手順（`docs/task/` → `archive/`、両 index 更新）が踏まれているか。
-7. **テスト設定の同期**: `docs/testing/policy.md` と `pyproject.toml` が**双方向に**整合しているか（docs-guide §4.1「テスト方針・スコープ変更」行）。具体的には、(a) `[tool.coverage.run] omit` の各モジュールが policy.md §1 の対象表（◯/△/×）・§5 の「omit から解除済み」記述と矛盾しないか（docs 先行・pyproject 先行のどちらのドリフトも対象）、(b) `[tool.pytest.ini_options] markers` の各マーカーが policy.md §2.5 で説明されているか。
+3. **旧語彙の残存**: 名前・概念を変える変更で、**その語を使って書かれた説明文**が古いまま残っていないか（grep で洗う。docs-guide §3.3）。**`docs/` だけでなく、実装・テストのコメント、テスト名、ログ・UI の文言も対象**。**「以前は〜だった」という経緯の記述は正しい**ので、残っているものが「現在の説明」か「経緯の記録」かを読んで判断する（機械的に禁止語を弾かない）。
+4. **`arch/` の関連仕様リンク**: `docs/arch/*.md` の先頭に `> 関連仕様: [...](../spec/...)` があるか（docs-guide §3.3）。
+5. **命名規則**: `docs/spec/` 配下は kebab-case、`docs/arch/` は対応モジュール名と一致する snake_case（docs-guide §2.1）。
+6. **ドキュメントマップ / 構成表**: フォルダ・ファイル種別を追加したら CLAUDE.md のドキュメントマップと docs-guide §2.1 の表が追従しているか（docs-guide §2.3 / §5）。
+7. **タスク連動**: コード変更があるなら docs-guide §4.1 の「変更箇所別の更新先」に沿った docs 更新が伴っているか。タスク完了なら §4.2 の移動手順（`docs/task/` → `archive/`、両 index 更新）が踏まれているか。
+8. **テスト設定の同期**: `docs/testing/policy.md` と `pyproject.toml` が**双方向に**整合しているか（docs-guide §4.1「テスト方針・スコープ変更」行）。具体的には、(a) `[tool.coverage.run] omit` の各モジュールが policy.md §1 の対象表（◯/△/×）・§5 の「omit から解除済み」記述と矛盾しないか（docs 先行・pyproject 先行のどちらのドリフトも対象）、(b) `[tool.pytest.ini_options] markers` の各マーカーが policy.md §2.5 で説明されているか。
+
+> **観点は安易に増やさない。** リストは「見るもの」の列挙なので、**「見ないもの」や 1 回きりの事情を足すと肥大して読まれなくなります**。足す条件は**繰り返し起きたこと**です。
 
 ## 進め方
 
