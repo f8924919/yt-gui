@@ -13,25 +13,25 @@
     }
   },
   "ffmpeg-win": {
-    "version": "n8.1.2-34-g9b6c8969e0",
+    "version": "n8.1.2-44-g7c533d0f86",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド（n8.1 系）。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-09-13-03/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-gpl-8.1.zip",
-    "sha256": "dee1b458ad8fa8556d0cc7287a1ec66664d0c2d6a1098d19cf0c465d9d8430bf"
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-16-13-00/ffmpeg-n8.1.2-44-g7c533d0f86-win64-gpl-8.1.zip",
+    "sha256": "d2425b12dc746a2b044148c6100440d4065876ac4ed6e3eb13a68437b7719796"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
     "x86_64": {
-      "version": "9.0",
+      "version": "9.0.1",
       "source": "evermeet.cx",
       "verify": "zip",
       "comment": "evermeet.cx の versioned zip。GPG .sig が evermeet 鍵 70202E8ED17B372A6D04467B4E7BEC998E920EE1 で署名され、zip サイズも info API の公開値と一致することを確認のうえ登録（完全な鍵検証はキーサーバ到達環境で実施推奨）。sha256 は zip のハッシュ。",
       "ffmpeg": {
-        "url": "https://evermeet.cx/ffmpeg/ffmpeg-9.0.zip",
-        "sha256": "b1bd0cbaa0c889a08589dc1d14e4a08eebf425b8726c31a7e270e08552d0f271"
+        "url": "https://evermeet.cx/ffmpeg/ffmpeg-9.0.1.zip",
+        "sha256": "8a8c9e549983409fe6604b9aa665648b7a5def9407fe814c39c8b2ea7f64a48f"
       },
       "ffprobe": {
-        "url": "https://evermeet.cx/ffmpeg/ffprobe-9.0.zip",
-        "sha256": "66a5102de63ce1c6a203d05a463ac836100eba9403d16968674366de17452da6"
+        "url": "https://evermeet.cx/ffmpeg/ffprobe-9.0.1.zip",
+        "sha256": "d13f35db03456b7f65b7edb6437c86e23810fbfe91795e571f5b77211343b4f1"
       }
     },
     "arm64": {
@@ -50,16 +50,16 @@
     }
   },
   "ffmpeg-linux": {
-    "version": "n8.1.2-34-g9b6c8969e0",
+    "version": "n8.1.2-44-g7c533d0f86",
     "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド（n8.1 系）。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-09-13-03/ffmpeg-n8.1.2-34-g9b6c8969e0-linux64-gpl-8.1.tar.xz",
-        "sha256": "c7f279081aa3dd837ba23c05e4d02f5f3874c428d2f134e1bbbea9726f8d2e7e"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-16-13-00/ffmpeg-n8.1.2-44-g7c533d0f86-linux64-gpl-8.1.tar.xz",
+        "sha256": "17780994c4679806fb227676f66a0af30c6379afc770324829f48f2a379be558"
       },
       "arm64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-09-13-03/ffmpeg-n8.1.2-34-g9b6c8969e0-linuxarm64-gpl-8.1.tar.xz",
-        "sha256": "bde27b02e0067a45e1d942d8b455f6668bb6ac08e2da680a1a8d7c8465a38cc0"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-16-13-00/ffmpeg-n8.1.2-44-g7c533d0f86-linuxarm64-gpl-8.1.tar.xz",
+        "sha256": "e970a7dd450b440a21126a8bac3a1c95178b6ba05bee2465a4d2a586345c81ac"
       }
     }
   },
