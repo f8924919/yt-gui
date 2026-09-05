@@ -1,22 +1,22 @@
 {
   "_comment": "同梱バイナリのピン留め台帳。各バイナリのバージョン・取得 URL・sha256 を固定し、scripts/download_binaries.py が取得後に sha256 を検証する（不一致なら中断）。更新方針・信頼の確立は docs/research/binary-supply-chain.md / docs/build.md を参照。sha256 が null の項目は未確定で、ビルド時に検証エラーとなる。",
   "deno": {
-    "version": "v2.9.5",
-    "base_url": "https://github.com/denoland/deno/releases/download/v2.9.5",
+    "version": "v2.9.6",
+    "base_url": "https://github.com/denoland/deno/releases/download/v2.9.6",
     "comment": "上流の <asset>.zip.sha256sum（authoritative）と照合済み。",
     "assets": {
-      "deno-x86_64-pc-windows-msvc.zip": "171efab55ac6b9881fd53ee4c20f8bf3bb1340ffc618483746909014db12216a",
-      "deno-aarch64-apple-darwin.zip": "b796aadd131f6930560c1ee040cf0d6f53933fbb987464e9ff46bd7ea4830615",
-      "deno-x86_64-apple-darwin.zip": "c1b8b89a81e91b2a8b3f96def3195d08cfe3a105651da7908d53061f7140510d",
-      "deno-x86_64-unknown-linux-gnu.zip": "8b010a3b1a4a0188a67cdb8a7a27348b2a501af78aec7fc74f2ace167368d530",
-      "deno-aarch64-unknown-linux-gnu.zip": "6b7cae3a8fc4385a59dea3146fcb8bad7fea4230e0ad36a8c692afacbc254be0"
+      "deno-x86_64-pc-windows-msvc.zip": "15e5300b0ba3c3695a7621d90160a746ec9e710228cee639afa9d580f6e3cd11",
+      "deno-aarch64-apple-darwin.zip": "213a2f304f04d3c9cb5220669afad138f60a5aab1fe80962abdeb8f35807a472",
+      "deno-x86_64-apple-darwin.zip": "7d4524b82bcc557fe020a1a5b56956ed42b992ae5b28026e8ad5d17329533f5f",
+      "deno-x86_64-unknown-linux-gnu.zip": "394f07f4da2bebe6ce6f1e7ce0fa16429b29b08c35e3fac3fe25972676dff4b2",
+      "deno-aarch64-unknown-linux-gnu.zip": "9a46afc6c392c7cd2ff71a31558935545b46408d0e87f7a86908c712721c046e"
     }
   },
   "ffmpeg-win": {
-    "version": "n9.0.1-6-g9d4ca21220",
+    "version": "n9.0.1-11-ge47273f4d9",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-23-13-03/ffmpeg-n9.0.1-6-g9d4ca21220-win64-gpl-9.0.zip",
-    "sha256": "2f388916565c44f6edcdddd7b01ccc73a2bbc7f107bd615b7247e9c9773f4a09"
+    "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n9.0.1-11-ge47273f4d9-win64-gpl-9.0.zip",
+    "sha256": "3c93cabd6aa5bcabd9f8f5e1a4711edbcb1f233c8cf78a672c286063009c5f6d"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
@@ -50,16 +50,16 @@
     }
   },
   "ffmpeg-linux": {
-    "version": "n9.0.1-6-g9d4ca21220",
+    "version": "n9.0.1-11-ge47273f4d9",
     "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-23-13-03/ffmpeg-n9.0.1-6-g9d4ca21220-linux64-gpl-9.0.tar.xz",
-        "sha256": "6e62cd93342d7582d1e406ae6dd38f6176777cfbbb2068b7ff2c7c5a4c1cc225"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n9.0.1-11-ge47273f4d9-linux64-gpl-9.0.tar.xz",
+        "sha256": "000356099709f2f2b7f92195f689648aa4b8906632f194eecce5d7686596674c"
       },
       "arm64": {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-23-13-03/ffmpeg-n9.0.1-6-g9d4ca21220-linuxarm64-gpl-9.0.tar.xz",
-        "sha256": "5b776c2d23482022b32958a0422129ebf70913404cac203c925e1749dc998c26"
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n9.0.1-11-ge47273f4d9-linuxarm64-gpl-9.0.tar.xz",
+        "sha256": "19bb036e8bf4161f7d1945805909e8b473709be6570b2af72e55cf385e43842c"
       }
     }
   },
