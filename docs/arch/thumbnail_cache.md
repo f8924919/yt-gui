@@ -1,5 +1,7 @@
 # `thumbnail_cache.py`
 
+> 関連仕様: [ダウンロード動作 — キュー表示用サムネイル（ツールチップ）](../spec/features/download-behavior.md#キュー表示用サムネイルツールチップ)
+
 動画サムネイル画像の非同期取得と base64 data URI キャッシュを担う `QObject`。
 
 リファクタ前は `App` 内に `dict` + `threading.Lock` + 取得スレッド + 3 つのメソッドが散在していたが、独立クラスに切り出して `App` から汚染を除いた。

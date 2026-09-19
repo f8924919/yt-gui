@@ -19,7 +19,7 @@ tools: Read, Edit, Grep, Glob, Bash
 1. **index.md の更新漏れ**: 各サブフォルダ（`docs/spec/`・`docs/spec/features/`・`docs/spec/screens/`・`docs/arch/`・`docs/task/`・`docs/task/archive/` 等）でファイルを追加・削除・改名したら、同フォルダの `index.md` の表に反映されているか（docs-guide §3.4）。
 2. **リンク切れ**: docs 内・CLAUDE.md の相対リンク先が実在するか。ファイル改名・移動時に被リンク元が追従しているか（grep で裏取り。docs-guide §3.3）。
 3. **旧語彙の残存**: 名前・概念を変える変更で、**その語を使って書かれた説明文**が古いまま残っていないか（grep で洗う。docs-guide §3.3）。**`docs/` だけでなく、実装・テストのコメント、テスト名、ログ・UI の文言も対象**。**「以前は〜だった」という経緯の記述は正しい**ので、残っているものが「現在の説明」か「経緯の記録」かを読んで判断する（機械的に禁止語を弾かない）。
-4. **`arch/` の関連仕様リンク**: `docs/arch/*.md` の先頭に `> 関連仕様: [...](../spec/...)` があるか（docs-guide §3.3）。
+4. **`arch/` の関連仕様リンク**: `docs/arch/*.md`（`index.md` を除く）の先頭に `> 関連仕様: [...](../spec/...)` があるか。対応する spec が無い内部モジュールは `> 関連仕様: なし（<理由>）` の形でよい（docs-guide §3.3）。
 5. **命名規則**: `docs/spec/` 配下は kebab-case、`docs/arch/` は対応モジュール名と一致する snake_case（docs-guide §2.1）。
 6. **ドキュメントマップ / 構成表**: フォルダ・ファイル種別を追加したら CLAUDE.md のドキュメントマップと docs-guide §2.1 の表が追従しているか（docs-guide §2.3 / §5）。
 7. **タスク連動**: コード変更があるなら docs-guide §4.1 の「変更箇所別の更新先」に沿った docs 更新が伴っているか。タスク完了なら §4.2 の移動手順（`docs/task/` → `archive/`、両 index 更新）が踏まれているか。

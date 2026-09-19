@@ -1,5 +1,7 @@
 # yt_gui/__main__.py / yt_gui/__init__.py
 
+> 関連仕様: なし（起動処理とリソースパスの解決だけを担い、利用者から見える振る舞いを持たない）
+
 ## `__main__.py` — エントリーポイント
 
 `QApplication` を起動し `App`（QMainWindow）を表示する。致命的エラーは `QMessageBox.critical()` で表示。
