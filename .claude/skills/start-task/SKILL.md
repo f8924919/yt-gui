@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: タスクの立ち上げを定型化する。Issue 確認/起票 → main 最新化＋ブランチ作成 → investigate 起動 → 受け入れ条件レビュー（criteria-review・助言）→ docs 先行ゲート →（§5.5 発火時）設計レビュー（design-review・助言）→ テスト先行ゲート → 実装、の順に進める。特に「docs 先・テストファースト」の順序を強制し、実装先行（順序逆転）を防ぐ。新しいタスクに着手するときに使う。
+description: タスクの立ち上げを定型化する。Issue 確認/起票（本文の鮮度チェック）→ main 最新化＋ブランチ作成 → investigate 起動 → 受け入れ条件レビュー（criteria-review・助言）→ docs 先行ゲート（タスクメモをここで作る）→（§5.5 発火時）設計レビュー（design-review・助言）→ テスト先行ゲート → 実装、の順に進める。特に「docs 先・テストファースト」の順序を強制し、実装先行（順序逆転）を防ぐ。新しいタスクに着手するときに使う。
 argument-hint: "[issue-number or task-description]"
 ---
 
@@ -17,6 +17,13 @@ argument-hint: "[issue-number or task-description]"
 
 1. **Issue 確認 / 起票**（§3）
    - 対象 Issue があれば内容（背景・受け入れ条件・対象範囲）を確認する。
+   - **本文の鮮度（二値）**: 本文の編集時刻（GraphQL の `lastEditedAt`、null なら `createdAt`）と、本文が**前提**にしている Issue の `closedAt` を時刻で比べる。**本文の方が古ければ、着手前に本文を現状（前提タスクの archive メモ・現在の docs とコード）と突き合わせて直し、直した旨と旧本文からの変更点をコメントに残してから進む**（起票時の本文が前提タスクより前の実装を書いていて、着手時に全面書き直しになる事故を、着手前の 1 コマンドで見つける）。**前提が open のままならユーザーに確認する**（**【通知】** [git-workflow.md](../../../docs/git-workflow.md) §5.8）。
+     - **前提** = 本文**またはコメント**で依存として引かれている Issue（「#n → 本 Issue の順で着手」「#n で追加した〜を使う」など）。背景に経緯として出てくる Issue は含めない。前提が無ければこの確認は不要。
+     - `updatedAt` は使わない（コメントの追加でも進む）。前提ごとに 1 回、次を Bash ツールで実行する（`<n>` = 本 Issue、`<p>` = 前提）:
+
+       ```bash
+       gh api graphql -F owner='{owner}' -F repo='{repo}' -F n=<n> -F p=<p> -f query='query($owner:String!,$repo:String!,$n:Int!,$p:Int!){repository(owner:$owner,name:$repo){a:issue(number:$n){number createdAt lastEditedAt} b:issue(number:$p){number state closedAt}}}' --jq '.data.repository | (.a.lastEditedAt // .a.createdAt) as $t | if .b.state == "OPEN" then "#\(.a.number): 前提 #\(.b.number) が open → ユーザーに確認" elif $t < .b.closedAt then "#\(.a.number): 本文 \($t) < #\(.b.number) の close \(.b.closedAt) → 本文を直してから進む" else "#\(.a.number): 本文 \($t) >= #\(.b.number) の close \(.b.closedAt) → 進む" end'
+       ```
    - 無ければ §3 テンプレ（背景/目的・受け入れ条件・対象ファイル・関連 docs リンク）で起票する。受け入れ条件の中身はユーザーと確認しながら決める（勝手に確定しない）。**【通知】** ここで止まるので通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。
 
 2. **`main` 最新化＋ブランチ作成**（§4）
@@ -36,6 +43,7 @@ argument-hint: "[issue-number or task-description]"
 
 4. **【確認ゲート】docs 先行**（step 4）
    - 設計を `docs/spec/` / `docs/arch/` に**先に**反映する（[docs-guide.md](../../../docs/docs-guide.md) §4 の更新先に従う）。
+   - **タスクメモ `docs/task/<slug>.md` をここで作る**（[docs-guide.md](../../../docs/docs-guide.md) §3.2「タスクメモの見出し規約」「進捗欄と訂正ログ」の形）: 冒頭の引用ブロック（Issue・ステータス・ブランチ・基点。空行を挟まず連続させる）、`## 進捗` は**受け入れ条件ごとに `- [ ] Cn … — 証跡: 未`** の 1 行（段階を項目にしない）、空の `## 訂正ログ`（見出しと表ヘッダ）、`## 次にやること`（末尾に `訂正ログ: 0 件`）。同時に `docs/task/index.md` の `## タスク` 表へ `進行中` で載せ、「起票済み・未着手の Issue」表に同じ Issue の行があれば外す。以後 SessionStart hook がこのメモの申し送り・未完了項目を毎セッション注入する（git-workflow §5.6）。1 PR で完結する小タスクは archive に直接作ってよい（docs-guide §4.2 の特例）。
    - **これは判断であり skill は自動化しない**。設計内容は主エージェントが立案し、設計上の選択・トレードオフはユーザーに確認する（§5.1）。**【通知】** 設計の分岐を仰ぐときは通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。skill の役割は「実装より先に docs を固める」順序を守らせること。
 
 4.5. **設計レビュー（`design-review` 起動・条件付き）**（step 4.5）
@@ -49,6 +57,8 @@ argument-hint: "[issue-number or task-description]"
 
 6. **実装 → green**（step 6）
    - 実装してテストを green にする。red 単独ではコミットせず、green にしてから 1 コミットにまとめる（§5.1）。
+
+> **セッションの分割点**（git-workflow §5 の分割点 A / B）: 手順 4.5 の後（設計確定後）と手順 6 の後（`/verify-gate` の前）は新セッションに分けてよい。分ける前にタスクメモの「次にやること」を更新し、再開は SessionStart hook が注入した申し送りに従う。
 
 > ここから先（PR 前の検証ゲート）は `/verify-gate`、マージ後は `/finish-task` に引き継ぐ。
 

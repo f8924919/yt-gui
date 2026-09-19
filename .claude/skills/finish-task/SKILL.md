@@ -79,7 +79,11 @@ argument-hint: "[merged-branch-name]"
 1. `git checkout -b docs/archive-<slug>`（まとめる場合は内容が分かる別名でよい）
 2. `git mv docs/task/<slug>.md docs/task/archive/<slug>.md`
 3. `docs/task/index.md` の「タスク」テーブルから該当行を削除する（他に残っていなければプレースホルダ行「（進行中・未着手のタスクはありません）」に戻す）。
-4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
+4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。**C-4**: その行の概要セルの**末尾**に**メトリクス 1 句**を書く（費用の見える化。archive 移動を実装 PR に同梱する場合も同じ — 全タスクに必ず行があり、[docs-guide.md](../../../docs/docs-guide.md) §4.2 step 4 と同じ 1 か所で済む）:
+   - 形: `メトリクス: コミット N（PR #M）・訂正ログ K 件・evaluator J 巡`
+   - コミット数 N = `git rev-list --count main..HEAD`（**実装 PR のブランチ上・執筆時点**の値。本手順 C の補完経路では docs ブランチではなく実装 PR の数 — `git rev-list --count <基点>..<PR の最終コミット>` で取り、基点はタスクメモ冒頭の引用ブロックの「基点」。archive 移動コミット自身とその後の修正は含まない。複数 PR なら PR ごとに並べる）
+   - 訂正ログ件数 K = タスクメモ `## 訂正ログ` 表のデータ行数（ヘッダと区切り行を除く）
+   - evaluator 巡数 J = タスクメモの verify-gate 行から**手で数える**（機械取得はしない。起動しなかったなら `0 巡`）完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
 5. 変更が docs のみなので、必要に応じて `docs-check` サブエージェントで index・リンクの整合を点検する。
 6. コミット（日本語）→ `git push -u origin docs/archive-<slug>` → `gh pr create`（ベース `main`、本文日本語、関連 Issue/PR を記載）。
 7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行。B は対象 Issue が close 済みなら何もしない）。**【通知】** PR を出した直後はマージ待ちで止まるので通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。

@@ -1,8 +1,39 @@
 # claude-templates の更新（上流 #20〜#79）を逆輸入
 
-対応 Issue: [#326](https://github.com/f8924919/yt-gui/issues/326)
-
+> Issue: [#326](https://github.com/f8924919/yt-gui/issues/326)
+> **ステータス: 進行中**（2026-09-19 着手。PR1 #327・PR2 #328 マージ済み、PR3 作業中）
+> ブランチ: `feature/326-task-memo-lifecycle`（PR3）
+> 基点: `main` の `48cb3d9`（PR2 マージ後）
 > **PR を 4 本に分割して進める。** PR1〜PR3 の本文は `Refs #326` とし、Issue を閉じるのは最後の PR4 の `Closes #326` だけにする。途中の PR をマージしたあと `/finish-task` の B-2 に来ても、ここに書いた分割を理由に close しない。
+
+## 進捗（受け入れ条件 = Issue #326 の PR1〜PR4 節）
+
+- [x] C1 PR1 安全網（SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close） — 証跡: PR #327・下の「検出器の有効性確認」M1〜M6
+- [x] C2 PR2 評価ゲートの規律（policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8・harness.md） — 証跡: PR #328・下の「PR2 の評価ゲートの巡回」
+- [ ] C3 PR3 進行中メモの注入（hook・pytest・変異） — 証跡: `tests/test_session_task_status.py`・下の「検出器の有効性確認」PR3 の変異 19 件（`91f6dfe`）
+- [ ] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: 未
+- [ ] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: 未
+- [ ] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: 未
+- [ ] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: 未
+- [ ] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 未
+- [ ] C9 PR4 長いジョブの起こし方の規則 — 証跡: 未
+- [ ] verify-gate（PR3） — 証跡: 未
+
+## 訂正ログ
+
+| 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
+|---|---|---|---|
+| 2026-09-19 | PR1 の git-workflow §5 step 8 に、上流どおり `gh pr view --json body \| grep -c 'Closes #'` で `Closes #` の有無を機械確認できると書いた | 本文の説明に `Closes #` という語があるだけで当たる（#327 自身で 1 と数えた）。`closingIssuesReferences` を見る | 書いた確認コマンドを、書いた PR 自身に当てること（advisor の指摘で実施） |
+| 2026-09-19 | PR2 の設計メモに「yt-gui の `scripts/` はビルド道具で、測定器ではない」と書いた | `scripts/download_binaries.py` の sha256 検証は、偽 PASS の害が最も大きい測定器 | design-review（M4） |
+
+## 次にやること（申し送り・2026-09-19 時点）
+
+1. PR3 の design-review の指摘を反映する（届いていなければ待つ）。
+2. PR3 の docs（docs-guide・git-workflow・skill・harness-retro）を仕上げ、`/verify-gate` を回して PR を出す（`Refs #326`）。
+3. PR3 マージ後の新しいセッションで、SessionStart hook がこのメモの引用ブロック・本節・進捗の未チェック項目を注入するかを確かめる。
+4. PR4（implementer・長いジョブの規則）へ。PR4 で implementer を足したら policy §8.3 C6 の注記「investigate だけ」を直す。
+
+訂正ログ: 2 件（いずれも訂正ログの導入前に起き、その場で直した遡及記載。止め規則の扱いはユーザーに確認する）
 
 ## 背景
 
@@ -90,6 +121,34 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 | M4 両方欠落のとき空文字を返す | `session_task_status.py` | `test_reports_when_no_heading_matches` / `test_build_context_reports_no_h2_at_all`（2 failed） |
 | M5 片方欠落の通知を出さない | `session_task_status.py` | `test_build_context_reports_missing_issue_heading` / `_task_heading`（2 failed） |
 | M6 実際の見出しの一覧を空にする | `session_task_status.py` | `test_reports_when_no_heading_matches` / `test_build_context_reports_missing_issue_heading`（2 failed） |
+
+### PR3（進行中メモの注入）
+
+- **テストファーストの red**: 実装前の HEAD `a2230f9` で、追加したテストを流して 18 failed / 12 passed（`build_context()` の新しい引数と注入が無いため。既存の見出し欠落のテスト 4 件も新しい呼び出し形で落ちた）。
+- **変異**: green をコミット（`91f6dfe`）した後、hook・テスト・`docs/task/` を一時ディレクトリへ複写し、複写側の hook を 1 か所ずつ壊して pytest を流した（policy §2.6「自動化するならコピーを変異させる」。ランナーは scratchpad の使い捨て）。対照（無変異の複写）は 30 passed。**撃墜 19 / 19**、原本は無傷（`git status --porcelain` が空）。
+- **ランナー自身の不具合**: 最初の実行は pytest に `-rN`（要約なし）を渡していたため FAILED 行を拾えず、「死因なし・0 / 19」と出た。件数（`12 failed` 等）は出ていたので、死因の表を件数と突き合わせて気づいた（policy §8.1 A1 の「件数だけで満足しない」がそのまま効いた）。`-rf` に直して再実行したのが下の表。
+
+| 変異 | 落ちたテスト（死因） |
+|---|---|
+| 進行中の判定を潰す | C1-in-progress-one ほか進行中メモを使う 11 件と main() の経路（12 failed） |
+| 未着手も開く | C1-not-started-is-not-opened |
+| 「申し送り」を語から外す | C3-no-checkbox-table-form |
+| 「進捗」を前方一致から完全一致へ | C1-in-progress-two-heading-variants |
+| 未チェックの印を [x] に | C1-in-progress-one ほか 6 件（7 failed） |
+| 入れ子の未チェックを見ない | C1-in-progress-one |
+| 引用ブロックを出さない | C1-in-progress-one・C1-in-progress-two-heading-variants |
+| メモごとの上限を外す | C2-per-memo-limit |
+| 合計の上限を外す | C2-total-limit |
+| 合計上限の後のメモを黙って落とす | C2-total-limit |
+| メモ欠落を黙って飛ばす | C3-memo-missing |
+| 「チェック項目が無い」と「未チェック項目なし」を同じ文にする | C3-no-checkbox-table-form |
+| 節が無いときの 1 行を出さない | C3-old-format-no-sections |
+| 「訂正ログ」を申し送りの語に足す | C1-in-progress-one |
+| 片方の見出しの欠落を知らせない | H1・H2 と PR1 の片方欠落のテスト 2 件（4 failed） |
+| 両方あっても欠落を知らせる | C1-in-progress-one・H1・H2 ほか 3 件（6 failed） |
+| `## タスク` が無いときに進行中メモに触れない | H1-no-task-heading |
+| 実際の見出しを出さない | H1・H2・PR1 の片方欠落のテスト 1 件（3 failed） |
+| メモを index の親ではなくリポジトリルート基準で解決する | test_main_injects_in_progress_memo_next_to_index |
 
 ## 検証ゲート
 
