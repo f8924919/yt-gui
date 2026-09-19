@@ -1,7 +1,7 @@
 # claude-templates の更新（上流 #20〜#79）を逆輸入
 
 > Issue: [#326](https://github.com/f8924919/yt-gui/issues/326)
-> **ステータス: 進行中**（2026-09-19 着手。PR1 #327・PR2 #328・PR3 #329 マージ済み、PR4 作業中）
+> **ステータス: 完了**（2026-09-19 着手・完了。PR1 #327・PR2 #328・PR3 #329・PR4 で完結）
 > ブランチ: `feature/326-implementer`（PR4）
 > 基点: `main` の `7ffb256`（PR3 マージ後）
 > **PR を 4 本に分割して進める。** PR1〜PR3 の本文は `Refs #326` とし、Issue を閉じるのは最後の PR4 の `Closes #326` だけにする。途中の PR をマージしたあと `/finish-task` の B-2 に来ても、ここに書いた分割を理由に close しない。
@@ -29,7 +29,7 @@
 
 ## 次にやること（申し送り・2026-09-19 時点）
 
-1. PR4 の evaluator 3 巡目（2 巡目の [欠陥]「implementer の報告に起こし方の欄」を閉じた後の再評価）を回し、PASS なら本メモを archive へ移して PR を出す（`Closes #326`）。
+1. 本メモを archive へ移して PR4 を出す（`Closes #326`）。マージ後は `/finish-task`（B で #326 が自動 close されているかを確かめる）。
 2. 新しいセッションで SessionStart hook がこのメモを注入するかを確かめる（PR3 マージ後の main で hook を直接実行し、引用ブロック・次にやること・未チェック項目が出ることは確認済み。新セッションでの実地確認は未）。
 
 訂正ログ: 3 件（止まった: 2026-09-19 — 2 件目で止まり、ユーザー判断で遡及記載のまま続行。3 件目でも止まり、ユーザー判断で**以後は止めずに続ける**。理由: 3 件とも書いた直後にレビューで捕まった小さな転記・前提の誤りで、方針の見直しを要する型ではないため）
@@ -104,7 +104,7 @@
 - **CLAUDE.md**: 上流と同じく「実装の委譲（implementer）」の 1 行を Git / GitHub 運用ルールの節に置く（モードなし）
 - **列挙の追従（上流 D'）**: エージェント名を 3 つ以上並べている行を木全体から拾い（`docs/task/archive/` を除く）、1 行ずつ読んで implementer を足すか・足さない理由が文面から読めるかを判定する。件数は数えたコマンドと出力をこのメモに貼る（policy §8.3 C6）。docs-check に観点 10「エージェント / hook / skill を列挙している散文」を足す
 - **policy §8.3 C6 の注記**: 「出所を添える」項目を持つ agent を investigate と implementer の 2 本にし、§5.2「実装の委譲」の義務 2・4 との違いの注記を足す（上流 #67 / #77）
-- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。verify.md・implementer は §5.1 を指す
+- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す（verify.md。PR4 の evaluator 2 巡目のユーザー判断で implementer.md にも足した）。verify.md・implementer は §5.1 を指す
 - **permissions**: 上流は「implementer へ委譲するならテストの入口も allow に」と書く。yt-gui は `uv run pytest *` が既に allow にある（§5.7）ので追加なし — 着手時に settings.json で確かめる
 
 ### PR4 の列挙の追従（policy §8.3 C6 の数え方つき）
@@ -164,11 +164,14 @@ git grep -n -E 'investigate|criteria-review|design-review|evaluator|verify|docs-
 | 1 | [証跡・文言] | git-workflow の方向語 2 件（「上の費用対効果」「下記『実装の委譲』」）が逆 | 文言修正 | `8d446ab` |
 | 1 | [証跡・文言] | タスクメモが diff より古い（C7〜C9 が未チェック・次にやることが済んだ項目・「implementer は verify.md の節を指す」） | 文言修正 | `8d446ab` |
 | 1 | [証跡・文言] | 義務の要約が CLAUDE.md と start-task で食い違う・委譲表の「受け取るもの」に数の出所が無い | 文言修正（両方に「変異 → red は自分で」、表に「数の出所」） | `8d446ab` |
+| 2 | [欠陥] | §5.1 の「サブエージェントの報告に起こし方を 1 行」に implementer の報告フォーマットが従っていない（4176ca5 で §5.1 へ移して主語が一般化された時に取り残された）。要判断つき | **ユーザー判断**: implementer に欄を足す。報告フォーマット・委譲表の「受け取るもの」・§5.1 の文に implementer を入れた | `2172d1d` |
+| 2 | [証跡・文言] | タスクメモの PR4 設計の implementer 行に「長いジョブは verify.md の節を指すだけ」が残っていた・巡回表の証跡欄が「本コミット」のまま | 文言修正・証跡欄を `8d446ab` に | `2172d1d` |
 
-| 2 | [欠陥] | §5.1 の「サブエージェントの報告に起こし方を 1 行」に implementer の報告フォーマットが従っていない（4176ca5 で §5.1 へ移して主語が一般化された時に取り残された）。要判断つき | **ユーザー判断**: implementer に欄を足す。報告フォーマット・委譲表の「受け取るもの」・§5.1 の文に implementer を入れた | 本コミット |
-| 2 | [証跡・文言] | タスクメモの PR4 設計の implementer 行に「長いジョブは verify.md の節を指すだけ」が残っていた・巡回表の証跡欄が「本コミット」のまま | 文言修正・証跡欄を `8d446ab` に | 本コミット |
+| 3 | [証跡・文言] | 巡回表の 1 巡目と 2 巡目の間の空行で表が切れていた・2 巡目の証跡欄が「本コミット」のまま・委譲表の verify 行に「起こし方」が無い | 空行を消す・証跡欄を `2172d1d` に・verify 行に「起こし方」を足し、§5.1 の主語を「コマンドを走らせるサブエージェント（verify・implementer）」に絞った | 本コミット |
 
-参考指摘（`--yes` が無いときは止まり続けるとは限らず、stdin が閉じていれば黙って終わる）も §5.1 の文言に反映した。
+3 巡目の総合判定は **PASS（follow-up あり）**（[欠陥] 0 件 / [証跡・文言] 3 件）。3 件はこの PR で直したので follow-up Issue は作らない。§5.2 規則 2 により再評価は行わない。
+
+1 巡目の参考指摘（`--yes` が無いときは止まり続けるとは限らず、stdin が閉じていれば黙って終わる）も §5.1 の文言に反映した。
 
 ## 検出器の有効性確認（policy §2.6）
 
@@ -223,3 +226,4 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 | PR1 | green（ruff check / format --check / mypy / pytest 584 passed。E501 の折り返しのみ修正） | 指摘なし | 1 巡目 PASS（要対応 0 件。参考の文言 2 点は反映済み。evaluator 自身も hook の複製へ 4 変異を入れて red を確認） |
 | PR2 | green（コード変更なし。巡ごとに回し直し、pytest 584 passed） | 自動修正 1 件は重複のため戻した。§8.3 C6 の出典の限定句を追加 | 4 巡で PASS（follow-up あり）。1〜3 巡目は FAIL（各 [欠陥] 1 件）。経緯は「PR2 の評価ゲートの巡回」 |
 | PR3 | green（ruff check / format --check / mypy 59 files / pytest 600 passed） | 不整合なし（CLAUDE.md のドキュメントマップに記録ファイルは載せない判断。arch の関連仕様行の欠落は既存で範囲外） | 1 巡目 PASS（follow-up あり）: [欠陥] 0 件 / [証跡・文言] 5 件（死因表が古い・上流の変異 1 件の移し漏れ・finish-task C-4 の文の吸い込み・§5.3 の start-task 行・次にやることが古い）をこの PR で直した。規則 2 により再評価なし |
+| PR4 | green（コード変更なし。巡ごとに回し直し、pytest 600 passed） | 列挙の追従（観点 10）で漏れなし。タスクメモの「義務 5 点」を補った | 3 巡で PASS（follow-up あり）。1・2 巡目は FAIL（各 [欠陥] 1 件: ブリーフの戻す条件・implementer の起こし方の欄。2 巡目は要判断つきでユーザー判断）。経緯は「PR4 の評価ゲートの巡回」 |

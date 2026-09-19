@@ -105,7 +105,7 @@ main ──┬──────────────────┬──→
   - **完了は通知で戻ってくるので、コマンドの中で `sleep` のループや `kill -0` で待たない**（呼び出しはタイムアウトで切れる。待つ必要があるなら Monitor ツールを使う）。
   - **タイムアウトで切れても、走っているジョブを再起動しない。** 結果はログに残っている（Bash なら `tail`、PowerShell なら `Get-Content -Tail` で読む）。切れるたびに十数分のスイートを起動し直して 1 時間以上を失った実例がある（雛形 claude-templates の採用プロジェクトでの事例）。
   - **待機・停止に `pgrep -f` / `pkill -f` を使わない**（パターンを含む自分のシェルにマッチする）。
-  - サブエージェントの報告には「30 秒超のコマンドをどう起こしたか」を 1 行書かせる（[verify.md](../.claude/agents/verify.md)・[implementer.md](../.claude/agents/implementer.md) の報告フォーマットの「起こし方」）。
+  - コマンドを走らせるサブエージェント（`verify`・`implementer`）の報告には「30 秒超のコマンドをどう起こしたか」を 1 行書かせる（[verify.md](../.claude/agents/verify.md)・[implementer.md](../.claude/agents/implementer.md) の報告フォーマットの「起こし方」）。
 
 ### 5.2 サブエージェントへの委譲
 
@@ -116,7 +116,7 @@ main ──┬──────────────────┬──→
 | [`investigate`](../.claude/agents/investigate.md) | Sonnet / `medium` | docs 先・コード裏取りの調査 | step 3 | 結論・関連 `path:line`・裏取りメモ |
 | [`criteria-review`](../.claude/agents/criteria-review.md) | Sonnet / `medium` | 受け入れ条件・spec の妥当性を実装前に点検（助言） | step 3.5 | 受け入れ条件の指摘・改善案（採否は委譲しない） |
 | [`implementer`](../.claude/agents/implementer.md) | Sonnet / `high` | **設計と受け入れ条件が固まった実装**をブリーフ（ファイル）に従って行い green にする。設計・仕様の判断とテスト内容の決定は委譲しない（下記「実装の委譲」）。commit / push はしない | step 6 | やったこと（`path:line`）・実行したコマンドと exit コード・**実装前のテストの実際の例外 / 出力**・起こし方（30 秒超のコマンド）・触ったファイルの一覧・数の出所・判断に迷って戻す点 |
-| [`verify`](../.claude/agents/verify.md) | Sonnet / `low` | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・要判断項目 |
+| [`verify`](../.claude/agents/verify.md) | Sonnet / `low` | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・起こし方（30 秒超のコマンド）・要判断項目 |
 | [`docs-check`](../.claude/agents/docs-check.md) | Sonnet / `low` | docs 整合性の点検と機械的修正 | step 7 | 点検結果・修正点・要対応項目 |
 | [`design-review`](../.claude/agents/design-review.md) | Opus / `high` | 設計案の妥当性を実装前に点検（助言・§5.5 発火時） | step 4.5 | 設計の指摘・改善案（設計方針の決定は委譲しない） |
 | [`evaluator`](../.claude/agents/evaluator.md) | Opus / `high` | 受け入れ条件・spec の充足を独立評価。検出器を足す変更では変異 → red の証跡（評価軸 5）、限定つきの主張では**伝播の一貫性**（同じ事実を書いた全箇所に限定句があるか。評価軸 6）も判定する | step 7 | 総合判定（PASS / PASS（follow-up あり）/ FAIL）・区分付きの要対応項目（下記「評価ゲートの指摘区分と止め時」） |
