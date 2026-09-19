@@ -101,7 +101,7 @@ main ──┬──────────────────┬──→
 - **設計外の問題への対応**: 実装中に設計段階で考慮していなかった問題が出た場合は、勝手に判断せず**対応案をユーザーに提示して確認を取る**（設計の変更はユーザーの判断事項として扱う）。
 - **コミット粒度**: テストを先に書いても、失敗（red）のテスト単独ではコミットしない。実装まで進めて green にしてから 1 コミットにまとめる。
 - **長いジョブの起こし方**（**正本はここ**。[verify.md](../.claude/agents/verify.md)・[implementer.md](../.claude/agents/implementer.md) はここを指す）: yt-gui で長いジョブを起こすのは主に主エージェントである（ビルド・同梱バイナリの取得は §5.7 で allow に入れず主エージェントが明示的に実行する。CI の待ちは step 8 の後）。この規則を機械で止める hook は入れていない（雛形 claude-templates の hook は Bash ツール専用で、主エージェントが使う PowerShell には効かないため）。
-  - **30 秒を超える見込み、または所要が事前に分からないコマンドは、ツールの `run_in_background` で起こす**（Bash / PowerShell どちらのツールにもある引数。2026-09-19 にツール定義で確認）。yt-gui で当たるのは、PyInstaller のビルド（`uv run pyinstaller yt-gui.spec`）・同梱バイナリの取得（`uv run python scripts/download_binaries.py --yes` — `--yes` が無いと GPL への同意の入力待ちで止まり続ける。`yt-gui.spec` 経由のビルドも、`bin/` が空なら同じ入力待ちになるので先に取得しておく）・CI の待ち（`gh pr checks <pr> --watch`）。`uv run pytest` 全体は 10 秒前後（2026-09-19 実測、600 件）なので前景でよい。
+  - **30 秒を超える見込み、または所要が事前に分からないコマンドは、ツールの `run_in_background` で起こす**（Bash / PowerShell どちらのツールにもある引数。2026-09-19 にツール定義で確認）。yt-gui で当たるのは、PyInstaller のビルド（`uv run pyinstaller yt-gui.spec`）・同梱バイナリの取得（`uv run python scripts/download_binaries.py --yes` — `--yes` が無いとバイナリが足りないときに GPL への同意を入力で求める。バックグラウンドでは応答できず、標準入力の状態によって入力待ちで止まるか、同意なしとして黙って終わる。`yt-gui.spec` 経由のビルドも `bin/` が空なら同じ確認に当たるので、先に `--yes` で取得しておく）・CI の待ち（`gh pr checks <pr> --watch`）。`uv run pytest` 全体は 10 秒前後（2026-09-19 実測、600 件）なので前景でよい。
   - **完了は通知で戻ってくるので、コマンドの中で `sleep` のループや `kill -0` で待たない**（呼び出しはタイムアウトで切れる。待つ必要があるなら Monitor ツールを使う）。
   - **タイムアウトで切れても、走っているジョブを再起動しない。** 結果はログに残っている（Bash なら `tail`、PowerShell なら `Get-Content -Tail` で読む）。切れるたびに十数分のスイートを起動し直して 1 時間以上を失った実例がある（雛形 claude-templates の採用プロジェクトでの事例）。
   - **待機・停止に `pgrep -f` / `pkill -f` を使わない**（パターンを含む自分のシェルにマッチする）。
@@ -115,7 +115,7 @@ main ──┬──────────────────┬──→
 |---|---|---|---|---|
 | [`investigate`](../.claude/agents/investigate.md) | Sonnet / `medium` | docs 先・コード裏取りの調査 | step 3 | 結論・関連 `path:line`・裏取りメモ |
 | [`criteria-review`](../.claude/agents/criteria-review.md) | Sonnet / `medium` | 受け入れ条件・spec の妥当性を実装前に点検（助言） | step 3.5 | 受け入れ条件の指摘・改善案（採否は委譲しない） |
-| [`implementer`](../.claude/agents/implementer.md) | Sonnet / `high` | **設計と受け入れ条件が固まった実装**をブリーフ（ファイル）に従って行い green にする。設計・仕様の判断とテスト内容の決定は委譲しない（下記「実装の委譲」）。commit / push はしない | step 6 | やったこと（`path:line`）・実行したコマンドと exit コード・**実装前のテストの実際の例外 / 出力**・触ったファイルの一覧・判断に迷って戻す点 |
+| [`implementer`](../.claude/agents/implementer.md) | Sonnet / `high` | **設計と受け入れ条件が固まった実装**をブリーフ（ファイル）に従って行い green にする。設計・仕様の判断とテスト内容の決定は委譲しない（下記「実装の委譲」）。commit / push はしない | step 6 | やったこと（`path:line`）・実行したコマンドと exit コード・**実装前のテストの実際の例外 / 出力**・触ったファイルの一覧・数の出所・判断に迷って戻す点 |
 | [`verify`](../.claude/agents/verify.md) | Sonnet / `low` | lint / フォーマット / 型 / テストを green にする | step 7 | 検証結果・修正点・要判断項目 |
 | [`docs-check`](../.claude/agents/docs-check.md) | Sonnet / `low` | docs 整合性の点検と機械的修正 | step 7 | 点検結果・修正点・要対応項目 |
 | [`design-review`](../.claude/agents/design-review.md) | Opus / `high` | 設計案の妥当性を実装前に点検（助言・§5.5 発火時） | step 4.5 | 設計の指摘・改善案（設計方針の決定は委譲しない） |
@@ -136,13 +136,14 @@ main ──┬──────────────────┬──→
 
 - **ブリーフは `.brief/` のファイルで渡し、起動プロンプトにはパスと「このファイルを読め・文脈を失ったと感じたら読み直せ」だけを書く。** prompt に書いた禁止事項は auto-compact で消えるが、ファイルは読み直せる（前例では実装担当が 1 セッションで 1M コンテキストに達した。膨張の主因は tool 出力なので、prompt を短くするだけでは効かない — 雛形 claude-templates の採用プロジェクトでの事例）。雛形は [`implementer-brief-template.md`](../.claude/skills/start-task/implementer-brief-template.md)。
 - **`.brief/` は `.gitignore` 済みで、追跡もされない。** **scratchpad には置かない** — セッション固有なので分割点 A / B（§5）で `/clear` した瞬間に消える。
+- **手を止めて戻す条件をブリーフに書く**（雛形の「手を止めて戻す条件」節。既定は、期待値が決まらない・設計外の問題・ブリーフと現物の食い違い）。
 - **差し戻し・追加指示はブリーフ末尾の追記節へ書く。** サブエージェントへのメッセージ本文だけで送ると、同じ理由で消える。
 - **触ってよいファイルを明示する**（ビルドなど長いジョブが読んでいるファイルを含めない）。並行させるときは「**相手が同じ木で作業している**」の 1 行を各ブリーフに入れる。
 - **implementer は同じ木で動かす**（`isolation: "worktree"` では起動しない）。`.brief/` は gitignore 済みなので worktree には複写されず、コミットしない約束のもとでは成果物を本体に戻す経路も無い。
 
 **主エージェントの義務**（実装担当の報告を信用して省略しない）
 
-1. **検証は自分で回し直す。** 実装担当の報告を検証の証跡にしない。**境界**: `/verify-gate` の `verify` は最後の変更の後に走るゲートなので、その報告は証跡として採ってよいが、`implementer` の green はその代わりにならない（主エージェントが自分で回してもよい。上の費用対効果の段落）。
+1. **検証は自分で回し直す。** 実装担当の報告を検証の証跡にしない。**境界**: `/verify-gate` の `verify` は最後の変更の後に走るゲートなので、その報告は証跡として採ってよいが、`implementer` の green はその代わりにならない（主エージェントが自分で回してもよい。下の費用対効果の段落）。
    - **変異 → red の確認は主エージェントが行う**（[testing/policy.md](testing/policy.md) §2.6 の「壊す前にコミット」は implementer にはできない。コミットの後に主エージェントが壊して確かめる。ユーザー判断）。
 2. **対応表は件数ではなく行単位で突き合わせる**（件数の一致の裏に偽 green を生む欠陥が隠れる）。
 3. **「実装前のテストの結果」は実際の例外・出力で読む。** assert の文面で読まない（前例では 5 件とも別の例外で落ちていたのを「狙った検査で red」と読み違えた — 雛形 claude-templates の採用プロジェクトでの事例）。実装担当の報告フォーマットの当該欄を見る。
@@ -152,7 +153,7 @@ main ──┬──────────────────┬──→
 
 **effort をエージェント側で固定する理由**: 指定しないとセッションの effort をそのまま継承するため、**同じエージェントの判定力がその日の設定で変わる**。特に `evaluator` / `design-review` は「レビュアーが生成者より弱いと追認してしまう」という理由で Opus を割り当てているのに、effort がセッション任せだとその前提が崩れる。逆に `verify` / `docs-check` は結果を客観的に検証できる機械的作業なので、最も頻度が高いにもかかわらず高い effort を継承するのは無駄。**モデル（能力の器）と effort（考える深さ）を別々に固定**し、どちらもセッション設定に依存させない。より厳しく見たい回はユーザーが起動時にオーバーライドしてよい（`design-review` / `evaluator` を `xhigh` に上げる等）。
 
-読み取り専任のエージェント（`investigate` / `criteria-review` / `design-review` / `evaluator`）は、`tools` から `Edit` / `Write` を外すだけでは `Bash` 経由の書き込み・commit を防げない。そこで frontmatter に **`permissionMode: plan`（読み取り専用モード）** を指定し、本文の約束ではなく機構で担保する。特に `evaluator` の独立性は本ワークフローの中核であり、口約束に委ねない。ただし親セッションが `bypassPermissions` / `acceptEdits` / auto モードの場合は親の権限モードが優先されエージェント側の指定は無視されるため、各エージェント本文の「読み取り専用」の記述も残す（二段構え）。`verify` / `docs-check` / `implementer` は書き込みを行うため対象外で、`implementer` が commit / push をしない約束は本文だけで担保する（下記「実装の委譲」）。
+読み取り専任のエージェント（`investigate` / `criteria-review` / `design-review` / `evaluator`）は、`tools` から `Edit` / `Write` を外すだけでは `Bash` 経由の書き込み・commit を防げない。そこで frontmatter に **`permissionMode: plan`（読み取り専用モード）** を指定し、本文の約束ではなく機構で担保する。特に `evaluator` の独立性は本ワークフローの中核であり、口約束に委ねない。ただし親セッションが `bypassPermissions` / `acceptEdits` / auto モードの場合は親の権限モードが優先されエージェント側の指定は無視されるため、各エージェント本文の「読み取り専用」の記述も残す（二段構え）。`verify` / `docs-check` / `implementer` は書き込みを行うため対象外で、`implementer` が commit / push をしない約束は本文だけで担保する（上記「実装の委譲」）。
 
 委譲の判断は費用対効果で行う。検証が一発で通る見込みなら `verify` を介さず主エージェントが直接回す、軽い確認は `investigate` を介さず直接読む、小さい実装は `implementer` を介さず自分で書く、といった使い分けでよい。
 

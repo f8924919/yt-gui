@@ -14,9 +14,9 @@
 - [x] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: `docs/docs-guide.md` §3.2・§4.2、CLAUDE.md タスク管理ルール（evaluator PR3 条件 2 ✅）
 - [x] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: `docs/git-workflow.md` §5・§5.2・§5.6・§5.8、start-task・finish-task・docs-upkeep（evaluator PR3 条件 3・4 ✅）
 - [x] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: `.claude/skills/harness-retro/SKILL.md`・`docs/git-workflow.md` §5.9・`docs/harness-retro-log.md`（evaluator PR3 条件 6 ✅）
-- [ ] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: 未
-- [ ] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 未
-- [ ] C9 PR4 長いジョブの起こし方の規則 — 証跡: 未
+- [x] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: `.claude/agents/implementer.md`・`.claude/skills/start-task/implementer-brief-template.md`・`docs/git-workflow.md` §5.2「実装の委譲」（evaluator PR4 1 巡目の [欠陥]「戻す条件」を閉じた）
+- [x] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 下の「PR4 の列挙の追従」表・`.claude/agents/docs-check.md` 観点 10（evaluator PR4 条件 2 ✅）
+- [x] C9 PR4 長いジョブの起こし方の規則 — 証跡: `docs/git-workflow.md` §5.1（evaluator PR4 条件 3 ✅）
 - [x] verify-gate（PR3） — 証跡: 下の「検証ゲート」表の PR3 行
 
 ## 訂正ログ
@@ -29,9 +29,8 @@
 
 ## 次にやること（申し送り・2026-09-19 時点）
 
-1. PR4 の設計（下の「PR4 の設計」）を design-review に回し、指摘を反映する。
-2. implementer・ブリーフの雛形・§5.2「実装の委譲」・列挙の追従・長いジョブの規則を書き、`/verify-gate` → PR（`Closes #326`。最後の PR なのでタスクメモの archive 移動を同梱する）。
-3. 新しいセッションで SessionStart hook がこのメモを注入するかを確かめる（PR3 マージ後の main で hook を直接実行し、引用ブロック・次にやること・未チェック項目が出ることは確認済み。新セッションでの実地確認は未）。
+1. PR4 の evaluator 2 巡目（1 巡目の [欠陥]「ブリーフの戻す条件」を閉じた後の再評価）を回し、PASS なら本メモを archive へ移して PR を出す（`Closes #326`）。
+2. 新しいセッションで SessionStart hook がこのメモを注入するかを確かめる（PR3 マージ後の main で hook を直接実行し、引用ブロック・次にやること・未チェック項目が出ることは確認済み。新セッションでの実地確認は未）。
 
 訂正ログ: 3 件（止まった: 2026-09-19 — 2 件目で止まり、ユーザー判断で遡及記載のまま続行。3 件目でも止まり、ユーザー判断で**以後は止めずに続ける**。理由: 3 件とも書いた直後にレビューで捕まった小さな転記・前提の誤りで、方針の見直しを要する型ではないため）
 - 2 件目で読み直した結果: どちらも「書いた指示・前提を実物に当てていなかった」型で、設計の方針は変えない。書いた確認コマンドは書いた PR 自身に当て、前提の分類（測定器か否か）は design-review に回す。
@@ -105,7 +104,7 @@
 - **CLAUDE.md**: 上流と同じく「実装の委譲（implementer）」の 1 行を Git / GitHub 運用ルールの節に置く（モードなし）
 - **列挙の追従（上流 D'）**: エージェント名を 3 つ以上並べている行を木全体から拾い（`docs/task/archive/` を除く）、1 行ずつ読んで implementer を足すか・足さない理由が文面から読めるかを判定する。件数は数えたコマンドと出力をこのメモに貼る（policy §8.3 C6）。docs-check に観点 10「エージェント / hook / skill を列挙している散文」を足す
 - **policy §8.3 C6 の注記**: 「出所を添える」項目を持つ agent を investigate と implementer の 2 本にし、§5.2「実装の委譲」の義務 2・4 との違いの注記を足す（上流 #67 / #77）
-- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。implementer は verify.md の節を指す
+- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。verify.md・implementer は §5.1 を指す
 - **permissions**: 上流は「implementer へ委譲するならテストの入口も allow に」と書く。yt-gui は `uv run pytest *` が既に allow にある（§5.7）ので追加なし — 着手時に settings.json で確かめる
 
 ### PR4 の列挙の追従（policy §8.3 C6 の数え方つき）
@@ -156,6 +155,17 @@ git grep -n -E 'investigate|criteria-review|design-review|evaluator|verify|docs-
 | 4 | [証跡・文言] | 巡回表が 2 巡目と 3 巡目の行の間の空行で途切れ、3 巡目の行が表として表示されない | 空行を消し、3 巡目の証跡欄を `46df91b` に替えた（あわせて参考指摘の軸 5 (b) の適用範囲を明確化） | 本コミット |
 
 4 巡目の総合判定は **PASS（follow-up あり）**（[欠陥] 0 件 / [証跡・文言] 1 件）。残った 1 件はこの PR で直したので follow-up Issue は作らない。§5.2 規則 2 により再評価は行わない。
+
+## PR4 の評価ゲートの巡回
+
+| 巡 | 区分 | 指摘 | 閉じ方の種別 | 証跡 |
+|---|---|---|---|---|
+| 1 | [欠陥] | Issue が挙げるブリーフの書式のうち「戻す条件」の節が雛形に無い | コード（雛形）修正: 「手を止めて戻す条件」節を足し、§5.2 のブリーフの渡し方にも 1 行 | 本コミット |
+| 1 | [証跡・文言] | git-workflow の方向語 2 件（「上の費用対効果」「下記『実装の委譲』」）が逆 | 文言修正 | 本コミット |
+| 1 | [証跡・文言] | タスクメモが diff より古い（C7〜C9 が未チェック・次にやることが済んだ項目・「implementer は verify.md の節を指す」） | 文言修正 | 本コミット |
+| 1 | [証跡・文言] | 義務の要約が CLAUDE.md と start-task で食い違う・委譲表の「受け取るもの」に数の出所が無い | 文言修正（両方に「変異 → red は自分で」、表に「数の出所」） | 本コミット |
+
+参考指摘（`--yes` が無いときは止まり続けるとは限らず、stdin が閉じていれば黙って終わる）も §5.1 の文言に反映した。
 
 ## 検出器の有効性確認（policy §2.6）
 
