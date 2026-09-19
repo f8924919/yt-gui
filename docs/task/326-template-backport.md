@@ -12,8 +12,8 @@
 
 | PR | ブランチ | 内容 | 状態 |
 |---|---|---|---|
-| PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 進行中 |
-| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 未着手 |
+| PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 完了（#327） |
+| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 進行中 |
 | PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 未着手 |
 | PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則 | 未着手 |
 
@@ -26,6 +26,22 @@
 - **finish-task B-2 の分割 PR 条項**: 上流の B-2 は「親 Issue として残す」の明示だけを見る。yt-gui は #285・本 Issue のように 1 Issue を複数 PR に分けるので、「PR を分割して進める旨の明示があり、残りの PR がある」も close しない理由に足した（本メモの冒頭の引用ブロックがその明示）。
 - **step 8 の `Closes #` 確認は `closingIssuesReferences` で見る**: 上流は `gh pr view --json body | grep -c 'Closes #'` だが、PR1（#327）の本文は機能説明に `Closes #` という語を含むため 1 件と数えた（実際の紐付けは 0 件）。GitHub が紐付けた番号を直接出す形に替えた。
 - **B-1 のコマンドは Bash ツールで実行する**: `${PRS%% *}` や `$(...)` は PowerShell では通らない。実在する PR で試走して確かめた（`feature/285-review-modes` → PR 289・#285、`chore/update-binary-pins` → 同名ブランチのマージ済み PR が 18 本あるため警告が出て、最新の PR 322 を採る）。
+
+## PR2 の設計（上流からの読み替え）
+
+- **policy §8 の項目番号は上流と揃える**（A1〜A10 / B1〜B4 / C1〜C6）。雛形との突き合わせを次回以降も楽にするため。中身は yt-gui の実態へ読み替える:
+  - A1: 死因マッピングは「変異ごとに落ちたテスト名を表にする」（PR1 の表の形）。`selftest_all.py` の機械検査・`COVERAGE_EXEMPT` は持ち込まない
+  - A6: 上流は「一括ランナーの登録簿に足す」。yt-gui では同じ失敗（足した検査が一度も走らない）が **pytest の収集規則から外れた名前**で起きるので、「`tests/test_*.py`・`test_` 関数の名前にし、足したテストが実行件数に出ていることを確かめる」に置き換える
+  - A7: 無変異の状態で green を確かめてから壊す（PR1 で実施済みの手順）
+  - A9: `mutation_engine.py` の例は落とし、原則だけ残す
+  - A10: `pgrep` / `pkill` の注記は Windows 主体の yt-gui では外し、成果物（PyInstaller のビルド出力など）のハッシュ記録という原則だけ残す
+  - shell の既知の罠の注記: yt-gui の検査は Python（pytest）で、shell は CI の YAML 内に限られるので持ち込まない
+  - C6 の注記: 「出所を添える」項目を持つ agent は、PR2 時点では investigate だけ。implementer は PR4 で足し、そのとき注記も直す。§5.2「実装の委譲」の義務との対比も PR4
+- **§2.6**: 「追跡下のファイルを変異させない」は、yt-gui の既存の手順（green をコミットしてから手で壊し、`git checkout` で戻す）を否定しない。手で壊すのは今のまま、**自動化するならコピーを変異させる**、と書き分ける。red のログをタスクメモか PR に貼る規則は、そのまま足す
+- **evaluator**: 軸 1・4 は yt-gui 固有の文言（yt-dlp 連携・Signal/Slot）のまま残し、軸 5・6、「指摘の区分」節、3 値の総合判定、件数行を足す。進め方の `change_set.py snapshot` は、yt-gui の `git diff main...HEAD` のまま
+- **§5.2**: 「評価ゲートの指摘区分と止め時」を evaluator のモード節の後に足す。**CLAUDE.md の evaluator モード（`always`）は変えない**。止め時の規則は巡回の終わり方を決めるもので、起動可否とは別
+- **§5.8 通知**: yt-gui の §5.6=hooks・§5.7=権限の次なので、番号は上流と同じ §5.8。該当箇所の表には start-task / verify-gate / finish-task の行と、共通行の「§5 step 8」だけを置く。harness-retro の行と「訂正ログの止め規則」は PR3 で足す
+- **`rules/harness.md`**: yt-gui の `scripts/` はビルド用の道具で、測定器ではない。測定器は `tests/` のテストと `.claude/hooks/` の hook なので、`paths` はこの 2 つにする。`tests/**` は既存の `testing.md` と重なるが、testing.md はテストファーストと red の単独コミット禁止、harness.md は検出器の検出力と役目が違うので分けて置く
 
 ## 検出器の有効性確認（policy §2.6）
 
