@@ -11,9 +11,14 @@ CLAUDE.md の「セッション開始時に docs/task/index.md を確認する�
 - `## タスク` — タスクメモ (`docs/task/{slug}.md`) を持つ進行中・未着手のタスク
 - `## 起票済み・未着手の Issue` — メモをまだ作っていない未着手の Issue
 
-判定に迷うケース（ファイル欠落・見出しの改名・パース失敗）は**何も注入せず通す**
+判定に迷うケース（ファイル欠落・パース失敗）は**何も注入せず通す**
 （フェイルオープン）。注入が無くても CLAUDE.md の指示で従来どおり index.md を
-読めばよく、hook の不調でセッションを止めない。
+読めばよく、hook の不調でセッションを止めない。**ただし見出しが 1 つも見つからない
+ときは、その旨だけを 1 行注入する**。黙って諦めると、見出しの改名で自動注入が
+静かに止まり、「注入が無い = hook が動いていない」という CLAUDE.md の判断を誤らせる。
+**片方の見出しだけが見つからないときは、見つかった表を注入したうえで、見つからなかった
+見出しと実際の H2 見出しを 1 行で知らせる**。注入自体は出ているので、欠けた表は
+黙っていると気づけない（#326。docs/git-workflow.md §5.6 の共通方針）。
 
 標準ライブラリのみに依存し、Windows / macOS / Linux で動作する。
 """
@@ -32,6 +37,7 @@ SECTIONS = {
     "## 起票済み・未着手の Issue": "起票済み・未着手の Issue",
 }
 EMPTY_MARKER = "ありません"
+HEADER = "## 未完了タスク（docs/task/index.md からの自動注入）"
 
 
 def _table_rows(lines: list[str]) -> list[list[str]]:
@@ -80,15 +86,10 @@ def _format(rows: list[list[str]]) -> list[str]:
     ]
 
 
-def main() -> None:
-    # 入力は使わないが、読み切ってから処理する
-    with contextlib.suppress(json.JSONDecodeError, ValueError):
-        json.load(sys.stdin)
-
-    try:
-        grouped = _sections(TASK_INDEX.read_text(encoding="utf-8"))
-    except OSError:
-        return  # index.md が無い → 何も注入しない
+def build_context(index_text: str) -> str:
+    """index.md の本文から注入文を組み立てる（テストが直接呼ぶ入口）。"""
+    grouped = _sections(index_text)
+    found = [h for h in grouped if h.startswith("## ")]
 
     blocks: list[str] = []
     for heading, label in SECTIONS.items():
@@ -99,11 +100,33 @@ def main() -> None:
         blocks.append("")
 
     if not blocks:
-        return  # 見出しが変わった等 → 何も注入しない
+        # 見出しが 1 つも一致しない（改名された等）。黙って諦めず、その旨を注入する。
+        return "\n".join(
+            [
+                HEADER,
+                "",
+                "**期待する見出しが見つからないため表を注入できなかった。**"
+                f" 期待: {' / '.join(SECTIONS)}。"
+                f"実際: {' / '.join(found) or '（H2 見出しなし）'}。"
+                " docs/task/index.md を直接読み、見出しを直すか"
+                " .claude/hooks/session_task_status.py の SECTIONS を合わせること。",
+            ]
+        )
 
-    context = "\n".join(
+    missing = [h for h in SECTIONS if h not in grouped]
+    if missing:
+        # 片方だけ改名された等。残った表は出しつつ、欠けた表が黙って消えないようにする
+        # （注入自体は出ているので、「注入が無い = hook が動いていない」の判断が働かない）。
+        blocks.append(
+            f"**見つからなかった見出し**: {' / '.join(missing)}"
+            f"（実際: {' / '.join(found)}）。"
+            " この表は注入できていないので docs/task/index.md を直接読むこと。"
+        )
+        blocks.append("")
+
+    return "\n".join(
         [
-            "## 未完了タスク（docs/task/index.md からの自動注入）",
+            HEADER,
             "",
             *blocks,
             "CLAUDE.md のタスク管理ルールに従い、未着手 / 進行中のものがあれば"
@@ -111,6 +134,19 @@ def main() -> None:
             "docs/task/index.md と docs/task/archive/index.md を参照。",
         ]
     )
+
+
+def main() -> None:
+    # 入力は使わないが、読み切ってから処理する
+    with contextlib.suppress(json.JSONDecodeError, ValueError):
+        json.load(sys.stdin)
+
+    try:
+        index_text = TASK_INDEX.read_text(encoding="utf-8")
+    except OSError:
+        return  # index.md が無い → 何も注入しない
+
+    context = build_context(index_text)
 
     print(
         json.dumps(

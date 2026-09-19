@@ -90,7 +90,8 @@ main ──┬──────────────────┬──→
    - docs / CLAUDE.md を変更した場合は `docs-check` サブエージェント（Sonnet）で整合性（index 更新漏れ・リンク切れ・**旧語彙の残存**・命名・関連仕様リンク）を点検する。
    - **`feature` / `bugfix` / `hotfix` ブランチでは `evaluator` サブエージェント（Opus）で評価ゲートを通す**（受け入れ条件・spec の充足を独立判定。`verify` で green にした後に実行する）。起動可否は [CLAUDE.md](../CLAUDE.md) の評価ゲート（evaluator）モードに従う（§5.2）。
 8. `gh` で PR を作成（ベース `main`、本文は原則日本語＝対応する Issue スレッドが日本語以外ならその言語に合わせる、関連 Issue を `Closes #<issue>` で紐付け）。
-9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。完了タスクの archive 移動は**原則 step 6〜8 の実装 PR に同梱**する（[docs-guide.md](docs-guide.md) §4.2。#222）。マージ後の後処理（main 最新化・ブランチ削除、同梱できなかった場合のまとめ archive 移動）は `/finish-task` skill で実行できる（§5.3）。
+   - **`Closes #<issue>` の有無は作成直後に機械的に確認する**（`gh pr view <pr> --json body -q .body | grep -c 'Closes #'`）。書き漏らすと Issue が open のまま残り、気づくのは後日になる。
+9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。**対応 Issue が open のままなら、受け入れ条件の充足を現在の `main` で裏取りしたうえで close する**（`Closes #` の書き漏らしを拾う安全網。親 Issue・部分完了は close しない）。完了タスクの archive 移動は**原則 step 6〜8 の実装 PR に同梱**する（[docs-guide.md](docs-guide.md) §4.2。#222）。マージ後の後処理（main 最新化・ブランチ削除・対応 Issue の close、同梱できなかった場合のまとめ archive 移動）は `/finish-task` skill で実行できる（§5.3）。
 
 ### 5.1 補足ルール
 
@@ -169,7 +170,7 @@ evaluator の `auto` が「変更規模のしきい値」で発火するのに�
 |---|---|---|
 | [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・`criteria-review`（受け入れ条件レビュー・助言）・（§5.5 発火時）`design-review`（設計レビュー・助言）・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
 | [`verify-gate`](../.claude/skills/verify-gate/SKILL.md) | ブランチ種別を判定し `verify` →（docs 変更時）`docs-check` →（feature/bugfix/hotfix のみ）`evaluator` を順に起動・集約 | step 7 |
-| [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・（実装 PR に同梱できなかった場合の補完として）完了タスクの archive 移動（複数タスクまとめ可・docs ブランチ＋PR） | step 9 |
+| [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・**対応 Issue の close**（`Closes #` の書き漏らしを拾う安全網）・（実装 PR に同梱できなかった場合の補完として）完了タスクの archive 移動（複数タスクまとめ可・docs ブランチ＋PR） | step 9 |
 
 skill が呼ぶサブエージェントの**合否・設計判断は委譲しない**点は §5.1 / §5.2 と同じ。skill は正しい順序・条件での起動と結果集約に徹する。
 
@@ -223,9 +224,9 @@ skill が呼ぶサブエージェントの**合否・設計判断は委譲しな
 
 | hook | イベント / matcher | 役割 | 正本 |
 |---|---|---|---|
-| [`session_task_status.py`](../.claude/hooks/session_task_status.py) | `SessionStart` | [task/index.md](task/index.md) の 2 つの表を `additionalContext` として注入する | [CLAUDE.md](../CLAUDE.md) タスク管理ルール |
+| [`session_task_status.py`](../.claude/hooks/session_task_status.py) | `SessionStart` | [task/index.md](task/index.md) の 2 つの表を `additionalContext` として注入する。見出しが両方とも見つからなければ注入できなかった旨を、片方だけなら見つからなかった見出しを 1 行で知らせる（下の共通方針） | [CLAUDE.md](../CLAUDE.md) タスク管理ルール |
 | [`block_main_commit.py`](../.claude/hooks/block_main_commit.py) | `PreToolUse` / `Bash\|PowerShell` | `main` 上の `git commit` / `git push` をブロック（リモートブランチ削除は除く） | §1 |
-| [`block_main_edit.py`](../.claude/hooks/block_main_edit.py) | `PreToolUse` / `Edit\|Write\|NotebookEdit` | `main` 上のリポジトリ内ファイルの編集をブロック | §1 |
+| [`block_main_edit.py`](../.claude/hooks/block_main_edit.py) | `PreToolUse` / `Edit\|Write\|NotebookEdit` | `main` 上のリポジトリ内ファイルの編集をブロック（リポジトリ外と、ネストした別 git リポジトリ内のファイルは対象外） | §1 |
 | [`format_edited_file.py`](../.claude/hooks/format_edited_file.py) | `PostToolUse` / `Edit\|Write` | 編集した `yt_gui/` `tests/` 配下の `.py` を `ruff format` で整形する | [CLAUDE.md](../CLAUDE.md) の「Lint / Format / 型チェック」 |
 
 `block_main_edit.py` が `block_main_commit.py` と別に必要なのは、commit をブロックしても**そこに至るまでの編集は素通り**するため。ブランチを切り忘れたことに気付くのが commit 直前になり、`git stash` などの巻き戻しが要る。編集の時点で止めればその手戻りが消える。
@@ -235,6 +236,8 @@ skill が呼ぶサブエージェントの**合否・設計判断は委譲しな
 共通の設計方針:
 
 - **フェイルオープン**: 判定に迷うケース（stdin のパース失敗・パス解決不能・git やツールの実行失敗）は必ず「通す」に倒す。hook の不調で作業が止まる方が損失が大きい。ブロック系はサーバー側 branch protection（§1）が最後の砦。
+- **フェイルオープンでも「黙って」は避ける**: `session_task_status.py` は [task/index.md](task/index.md) の見出しが期待と違うとき、注入を諦める代わりに**その旨を 1 行注入する**。見出しの改名で自動注入が静かに止まると、[CLAUDE.md](../CLAUDE.md) の「注入が見当たらないなら hook が動いていない」の判断を誤らせる。**片方の見出しだけが見つからないときも同じ**で、見つかった表を注入したうえで、見つからなかった見出しと実際の H2 見出しを 1 行で知らせる（注入自体は出ているので、欠けた表は知らせないと誰も気づけない）。判定できないから通す（フェイルオープン）のと、通したことを知らせないのは別である。
+- **ネストした git リポジトリは別物として扱う**: `block_main_edit.py` は、リポジトリ配下にある別の git リポジトリ（`.git` をファイルまたはディレクトリで持つ。サブエージェントの worktree 隔離で作られる worktree を含む）のファイルを対象外にする。そちらのブランチは本リポジトリの `main` 判定と無関係で、止めると別ブランチでの正規の作業を塞ぐ。
 - **正本を再定義しない**: hook は判定と注入に徹し、ルール本文は docs 側に置く（§5.3 の skill・§5.4 の rule と同じ drift 回避方針）。
 - **標準ライブラリのみ**: hook は Claude Code から直接起動されるため、プロジェクトの依存解決に頼らない。起動子は `uv run --no-sync --project ${CLAUDE_PROJECT_DIR} python` に統一する（§1）。
 - **反映タイミング**: hooks の登録（settings.json）はセッション開始時に読み込まれるため、変更後の実効確認は新しいセッションで行う。hook スクリプト本体は実行のたびに読まれるため即座に効く。
