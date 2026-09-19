@@ -38,3 +38,9 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 | M4 両方欠落のとき空文字を返す | `session_task_status.py` | `test_reports_when_no_heading_matches` / `test_build_context_reports_no_h2_at_all`（2 failed） |
 | M5 片方欠落の通知を出さない | `session_task_status.py` | `test_build_context_reports_missing_issue_heading` / `_task_heading`（2 failed） |
 | M6 実際の見出しの一覧を空にする | `session_task_status.py` | `test_reports_when_no_heading_matches` / `test_build_context_reports_missing_issue_heading`（2 failed） |
+
+## 検証ゲート
+
+| PR | verify | docs-check | evaluator |
+|---|---|---|---|
+| PR1 | green（ruff check / format --check / mypy / pytest 584 passed。E501 の折り返しのみ修正） | 指摘なし | 1 巡目 PASS（要対応 0 件。参考の文言 2 点は反映済み。evaluator 自身も hook の複製へ 4 変異を入れて red を確認） |

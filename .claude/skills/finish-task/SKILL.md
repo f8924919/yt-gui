@@ -82,7 +82,7 @@ argument-hint: "[merged-branch-name]"
 4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
 5. 変更が docs のみなので、必要に応じて `docs-check` サブエージェントで index・リンクの整合を点検する。
 6. コミット（日本語）→ `git push -u origin docs/archive-<slug>` → `gh pr create`（ベース `main`、本文日本語、関連 Issue/PR を記載）。
-7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行。docs ブランチなので B は空振りする）。
+7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行。B は対象 Issue が close 済みなら何もしない）。
 
 ### 対応する task メモが無い場合・実装 PR に同梱済みの場合
 
