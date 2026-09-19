@@ -122,6 +122,7 @@
 | [194-design-review-agent.md](194-design-review-agent.md) | 設計案の妥当性（アーキ整合・代替案・結合/スコープ・リスク・docs 整合）を実装前に点検する助言エージェント `design-review`（Opus・read-only）を新設し、start-task の step 4.5 に組み込む。発火は主観でなく §5.5 の客観トリガで機械的判定（investigate が推奨 yes/no を出力）、推奨 yes の主観スキップは禁止しユーザー承認必須。criteria-review（step 3.5）の初運用で受け入れ条件を強化（Issue #194 / PR #195） | 2026-07-04 |
 | [workflow-improvement-survey.md](workflow-improvement-survey.md) | 開発ワークフロー改善調査（効率・品質観点の棚卸し）。A-1〜A-5（CI カバレッジ #210 / lint 範囲 #211 / lint 厳格化 #212 / uv キャッシュ #213 / docs-check 観点 #214）、B-1 archive 同梱運用 #222、C-3 omit 解除 #224、C-2 Windows CI #227、C-4 CodeQL #229、C-1 残 main 保護強制 #232 を実施。B-2 は保留・D 群は見送りで完了 | 2026-07-11 |
 | [285-template-backport.md](285-template-backport.md) | 雛形 claude-templates の改良を逆輸入。PR1 hooks 層（SessionStart のタスク注入・main 編集ブロック・編集後整形・ブランチ削除の除外・§5.6 新設 / PR #287）、PR2 権限ルールと effort / permissionMode の固定（§5.7 新設 / PR #288）、PR3 評価ゲート・設計レビューのモード制（evaluator=always / design-review=auto）。evaluator が上流由来の不具合 2 件（NotebookEdit 未ブロック・`allowed-tools` の意味論誤り）を検出し、発生源の qemu-gui#124・雛形の claude-templates#12 へ横展開を起票（Issue #285） | 2026-07-31 |
+| [326-template-backport.md](326-template-backport.md) | 雛形 claude-templates の更新（上流 #20〜#79）を 4 本の PR で逆輸入。PR1 安全網（SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close / PR #327）、PR2 評価ゲートの規律（policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・rules/harness.md / PR #328）、PR3 タスクメモのライフサイクル（進行中メモの注入・見出し規約・訂正ログ・分割点）と harness-retro（§5.9 / PR #329）、PR4 実装の委譲（implementer・ブリーフ・§5.2）と長いジョブの起こし方（§5.1 / PR #330）。scripts 群・代表操作ゲート・長いジョブの hook 本体は取り込まない（Issue #326）。メトリクス: コミット 5・7・8・7（PR #327・#328・#329・#330）・訂正ログ 3 件・evaluator 1・4・1・3 巡 | 2026-09-19 |
 
 ## 完了タスクの経緯・申し送り
 
@@ -150,6 +151,12 @@
 - 雛形: [f8924919/claude-templates#12](https://github.com/f8924919/claude-templates/issues/12)
 
 **教訓**: 雛形から輸入したものをそのまま信用しない。hook のように「効いていないことが観測できない」機構は、輸入時にテストを書いて実挙動を確認する。実際、2 件とも「設定を写しただけ」に見える PR で見つかっている。
+
+[326-template-backport.md](326-template-backport.md) で、前回の取り込み（#285・#297）以降の雛形の更新（上流 #20〜#79）を取り込んだ。取り込まなかったもの（scripts 群・代表操作ゲート・長いジョブの hook 本体・#49 ほか）とその理由は Issue #326 の本文が正本。申し送り:
+
+- **SessionStart hook が進行中メモを注入するかの、新しいセッションでの実地確認は未**（PR3 マージ後の `main` で hook を直接実行して注入を確かめたところまで）。次に `進行中` のタスクメモを持つタスクで、新しいセッション（または `/clear`）の冒頭に「進行中タスクメモ」の節が出るかを見る。
+- **follow-up 候補**（起票していない）: mypy の対象に `block_main_edit.py`・`format_edited_file.py` を足す／`docs/arch/` のうち `entry.md`・`index.md`・`threading_utils.md`・`thumbnail_cache.md`・`utils.md` に「関連仕様」の行が無い（docs-check が PR3 で報告。本 Issue の範囲外の既存差分）。
+- **雛形との差分**（次回の取り込みで突き合わせるとき用）: policy §8 の項目番号は雛形と揃え、読み替えた項目（A1・A6・A7・A10）は §8.1 の「雛形との違い」注記にある。yt-gui で足したもの — finish-task B-2 の分割 PR 条項、§5.2 止め時の規則 3〜5、hook のリンクの無い進行中の行・UTF-8 でない index の扱い、実装の委譲の義務 6、長いジョブの正本を §5.1 に。
 
 ### 区間ダウンロード
 
