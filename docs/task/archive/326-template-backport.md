@@ -37,7 +37,7 @@
 
 ## 背景
 
-前回の取り込み（[#285](archive/285-template-backport.md)・#297、上流 `43374c0` = PR #19 まで）以降に、雛形 `claude-templates` へ PR #20〜#79 が入った。3 テーマ（hook・skill のコード／運用・docs・エージェント定義／scripts 群）を `investigate` で並列に突き合わせ、ユーザーと取り込み範囲を決めた。取り込まないものとその理由は Issue 本文の「取り込まないもの」節が正本。
+前回の取り込み（[#285](285-template-backport.md)・#297、上流 `43374c0` = PR #19 まで）以降に、雛形 `claude-templates` へ PR #20〜#79 が入った。3 テーマ（hook・skill のコード／運用・docs・エージェント定義／scripts 群）を `investigate` で並列に突き合わせ、ユーザーと取り込み範囲を決めた。取り込まないものとその理由は Issue 本文の「取り込まないもの」節が正本。
 
 ## PR 分割
 
