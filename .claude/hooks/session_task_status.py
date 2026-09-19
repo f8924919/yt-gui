@@ -115,8 +115,9 @@ def build_context(index_text: str) -> str:
 
     missing = [h for h in SECTIONS if h not in grouped]
     if missing:
-        # 片方だけ改名された等。残った表は出しつつ、欠けた表が黙って消えないようにする
-        # （注入自体は出ているので、「注入が無い = hook が動いていない」の判断が働かない）。
+        # 片方だけ改名された等。残った表は出しつつ、欠けた表が黙って
+        # 消えないようにする（注入自体は出ているので、「注入が無い
+        # = hook が動いていない」の判断が働かない）。
         blocks.append(
             f"**見つからなかった見出し**: {' / '.join(missing)}"
             f"（実際: {' / '.join(found)}）。"

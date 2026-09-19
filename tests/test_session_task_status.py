@@ -193,7 +193,7 @@ def test_build_context_reports_no_h2_at_all():
 
 
 def test_build_context_reports_missing_issue_heading():
-    """片方（Issue 表）だけ欠けたら、残った表を出しつつ欠けた見出しを知らせる（#326）。"""
+    """片方（Issue 表）だけ欠けたら、残った表を出しつつ欠けた見出しを知らせる（#326）"""
     context = session_task_status.build_context(ONLY_TASK)
     assert "概要 A" in context  # 残った表は注入される
     assert "**見つからなかった見出し**: ## 起票済み・未着手の Issue" in context
