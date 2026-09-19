@@ -57,7 +57,7 @@ argument-hint: "[merged-branch-name]"
 
 2. **`OPEN` の理由を確認する。** タスクメモ（`docs/task/archive/<slug>.md` または `docs/task/<slug>.md`）の記述を読む。
    - **「親 Issue として open のまま残す」「PR を分割して進める」等の明示があり、残りの PR がある** → close しない（ロードマップの親 Issue や、複数 PR に分けたタスクの途中の PR など）。
-   - **タスクが未完（PR が Issue の一部だけを片付けた）** → close しない。Issue 本文の残りの受け入れ条件を確認し、必要ならユーザーに次の一手を確認する。
+   - **タスクが未完（PR が Issue の一部だけを片付けた）** → close しない。Issue 本文の残りの受け入れ条件を確認し、必要ならユーザーに次の一手を確認する。**【通知】** [git-workflow.md](../../../docs/git-workflow.md) §5.8。
    - 上記に当たらない＝**単なる閉じ忘れ** → 3 へ。
 
 3. **受け入れ条件の充足を現在の `main` で裏取りしてから** close する。マージ済みという事実は「条件を満たした」の証明ではないので、Issue のチェックボックスを 1 件ずつ現物（`path:line`・テストの実行結果）で確かめる。
@@ -82,7 +82,7 @@ argument-hint: "[merged-branch-name]"
 4. `docs/task/archive/index.md` の**適切なテーマ表**に 1 行追加する（タスク名・概要・更新日。Issue/PR 番号を概要に添える）。完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
 5. 変更が docs のみなので、必要に応じて `docs-check` サブエージェントで index・リンクの整合を点検する。
 6. コミット（日本語）→ `git push -u origin docs/archive-<slug>` → `gh pr create`（ベース `main`、本文日本語、関連 Issue/PR を記載）。
-7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行。B は対象 Issue が close 済みなら何もしない）。
+7. この docs PR がマージされたら、`git checkout main && git pull` 後に `docs/archive-<slug>` を local/remote とも削除する（= 本 skill の A を再実行。B は対象 Issue が close 済みなら何もしない）。**【通知】** PR を出した直後はマージ待ちで止まるので通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。
 
 ### 対応する task メモが無い場合・実装 PR に同梱済みの場合
 
@@ -92,4 +92,4 @@ argument-hint: "[merged-branch-name]"
 
 - 未マージ PR の後処理（マージは必ずユーザー承認後。先走らない）。
 - **受け入れ条件を確かめずに Issue を close すること。** マージ済みは充足の証明ではない（B-3）。親 Issue・部分完了の close も判断を要するので B-2 でユーザーに確認する。
-- タスクのテーマ分類の新設など判断を要する変更は主エージェント／ユーザーに委ねる。archive テーマ表に当てはまる区分が無い場合は確認を取る。
+- タスクのテーマ分類の新設など判断を要する変更は主エージェント／ユーザーに委ねる。archive テーマ表に当てはまる区分が無い場合は確認を取る。**【通知】** [git-workflow.md](../../../docs/git-workflow.md) §5.8。

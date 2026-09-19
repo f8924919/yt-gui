@@ -12,10 +12,10 @@
 
 | PR | ブランチ | 内容 | 状態 |
 |---|---|---|---|
-| PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 進行中 |
-| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 未着手 |
+| PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 完了（#327） |
+| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 進行中 |
 | PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 未着手 |
-| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則 | 未着手 |
+| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則（policy §8.3 C6 の注記「investigate だけ」も直す） | 未着手 |
 
 **順序の理由**: PR3 の「訂正ログの止め規則」と harness-retro は PR2 の §5.2 止め時・§5.8 通知を前提にする。#27（限定句）は当初 PR1 の予定だったが、evaluator 軸 5 と「指摘の区分」節を前提にしているため PR2 へ移した。
 
@@ -26,6 +26,46 @@
 - **finish-task B-2 の分割 PR 条項**: 上流の B-2 は「親 Issue として残す」の明示だけを見る。yt-gui は #285・本 Issue のように 1 Issue を複数 PR に分けるので、「PR を分割して進める旨の明示があり、残りの PR がある」も close しない理由に足した（本メモの冒頭の引用ブロックがその明示）。
 - **step 8 の `Closes #` 確認は `closingIssuesReferences` で見る**: 上流は `gh pr view --json body | grep -c 'Closes #'` だが、PR1（#327）の本文は機能説明に `Closes #` という語を含むため 1 件と数えた（実際の紐付けは 0 件）。GitHub が紐付けた番号を直接出す形に替えた。
 - **B-1 のコマンドは Bash ツールで実行する**: `${PRS%% *}` や `$(...)` は PowerShell では通らない。実在する PR で試走して確かめた（`feature/285-review-modes` → PR 289・#285、`chore/update-binary-pins` → 同名ブランチのマージ済み PR が 18 本あるため警告が出て、最新の PR 322 を採る）。
+
+## PR2 の設計（上流からの読み替え）
+
+- **policy §8 の項目番号は上流と揃える**（A1〜A10 / B1〜B4 / C1〜C6）。雛形との突き合わせを次回以降も楽にするため。中身は yt-gui の実態へ読み替える:
+  - A1: 死因マッピングは「変異ごとに落ちたテスト名を表にする」（PR1 の表の形）。`selftest_all.py` の機械検査・`COVERAGE_EXEMPT` は持ち込まない
+  - A6: 上流は「一括ランナーの登録簿に足す」。yt-gui では同じ失敗（足した検査が一度も走らない）が **pytest の収集規則から外れた名前**で起きるので、「`tests/test_*.py`・`test_` 関数の名前にし、足したテストが実行件数に出ていることを確かめる」に置き換える
+  - A7: 無変異の状態で green を確かめてから壊す（PR1 で実施済みの手順）
+  - A9: `mutation_engine.py` の例は落とし、原則だけ残す
+  - A10: 成果物のハッシュ記録は yt-gui では誰も実行しない（pytest は成果物を読まない）ので、評価・測定の前後で `HEAD` と作業ツリーが同じかを見る形に置き換える（design-review M1）。`pgrep` / `pkill` の注記は外す
+  - shell の既知の罠の注記: yt-gui の検査は Python（pytest）で、shell は CI の YAML 内に限られるので持ち込まない
+  - C6 の注記: 「出所を添える」項目を持つ agent は、PR2 時点では investigate だけ。**PR4 で implementer を足したら、この注記（「investigate だけ」）は偽になるので必ず直す**。§5.2「実装の委譲」の義務との対比も PR4
+- **§2.6**: 「追跡下のファイルを変異させない」は、yt-gui の既存の手順（green をコミットしてから手で壊し、`git checkout` で戻す）を否定しない。手で壊すのは今のまま、**自動化するならコピーを変異させる**、と書き分ける。red のログをタスクメモか PR に貼る規則は、そのまま足す
+- **evaluator**: 軸 1・4 は yt-gui 固有の文言（yt-dlp 連携・Signal/Slot）のまま残し、軸 5・6、「指摘の区分」節、3 値の総合判定、件数行を足す。進め方の `change_set.py snapshot` は、yt-gui の `git diff main...HEAD` のまま
+- **§5.2**: 「評価ゲートの指摘区分と止め時」を evaluator のモード節の後に足す。**CLAUDE.md の evaluator モード（`always`）は変えない**。止め時の規則は巡回の終わり方を決めるもので、起動可否とは別
+- **§5.8 通知**: yt-gui の §5.6=hooks・§5.7=権限の次なので、番号は上流と同じ §5.8。該当箇所の表には start-task / verify-gate / finish-task の行と、共通行の「§5 step 8」だけを置く。harness-retro の行と「訂正ログの止め規則」は PR3 で足す
+- **`rules/harness.md`**: 当初は `tests/**` と `.claude/hooks/**` だけの予定だったが、design-review（M4）の指摘を受け、ユーザー判断で**広く取る**ことにした。`scripts/download_binaries.py` の sha256 検証・`.github/workflows/` の CI ゲート・hook を登録する `.claude/settings.json` も、偽 PASS を出しうる測定器である。`tests/**` は既存の `testing.md` と重なるが、testing.md はテストファーストと red の単独コミット禁止、harness.md は検出器の検出力と役目が違うので、重なりは許す（差は「読み込まれる瞬間」だけ）
+- **評価軸 5 の範囲**（ユーザー判断・design-review H2）: evaluator は `always` で、ほぼ全 feature / bugfix がテストを足すため、上流のままだと「変異 → red の証跡が無い」で毎回 `[欠陥]` になりうる。**テストファーストで実装前に red だった実行ログ（FAILED 行と実装前の HEAD）も証跡として認める**（policy §2.6・§8.1 A1）。回帰テスト・hook・判定ロジックは従来どおり「直してから戻して red を見る」
+- **証跡の鮮度**（design-review M2）: 上流は `change_set.py` の fingerprint で「古い」を判定するが、yt-gui には無い。A1 の出すものに**壊す前（または実装前）のコミット hash** を必須にし、evaluator は `git log <hash>..HEAD -- <検出器のファイル>` で鮮度を判定する
+- **止め時の規則の追加**（design-review H1・L4）: yt-gui には「変更集合と検証記録」の節が無いので、規則 3 に「`[欠陥]` を直したら verify を回し直してから再評価」、規則 4 に「`[証跡・文言]` の修正がコード・テストに及んだら verify を回し直す」、規則 5 に「要判断が残る巡はユーザーの決定待ちで止まる」を足した（当初の言い回し。2 巡目の指摘を受け、「要判断は区分の代わりではなく `[欠陥]` に添える論点で、要判断つきの `[欠陥]` が残る巡は止まる」に改めた）
+- **`Follow-up: #` の確認**（design-review M3）: 上流の `grep -c 'Follow-up: #'` は、PR1 で直した `Closes #` と同じ誤検出の形。行頭に固定して抜き出し、起票した番号と突き合わせる形にした
+- **§5.8 の後ろ盾**（design-review M5）: `PushNotification` が使えない・エラーの環境ではチャットの先頭行に同じ 1 行を書く。送るのは主エージェントだけ、`AskUserQuestion` の直前、権限の確認プロンプトは対象外
+- **§5.8 の実送信の確認**: PR2 の evaluator 2 巡目で要判断が出て止まったとき、`AskUserQuestion` の直前に `PushNotification` を送った。結果は「Terminal notification sent. Mobile push requested.」（Remote Control 接続中のメインセッションで送れることを確認。2026-09-19）
+
+## PR2 の評価ゲートの巡回
+
+| 巡 | 区分 | 指摘 | 閉じ方の種別 | 証跡 |
+|---|---|---|---|---|
+| 1 | [欠陥] | 受け入れ条件 1 が挙げる fail-closed が policy §8 から理由の記録なしに落ちていた（`policy.md` A1・`harness.md` 規則 1） | 条件どおり読み替えて追加（変異の適用・テストの起動・収集の失敗を死亡と数えない）。「雛形との違い」注記にも記録 | `3f8e18d` |
+| 1 | [証跡・文言] | 上流の事例 3 か所（`policy.md` §8.3 冒頭・`evaluator.md` 軸 6・`docs-check.md` 観点 9）に出典の限定句が無い | 「雛形 claude-templates の採用プロジェクトでの事例」を付けた | `3f8e18d` |
+| 1 | [証跡・文言] | verify-gate 手順 5 と §5.8 の表に「要判断が残るとき止まる」（§5.2 規則 5）が無い | 両方に追加 | `3f8e18d` |
+| 1 | 要判断（当時の報告の区分。現行の規則 5 では要判断は区分ではなく `[欠陥]` に添える論点） | hash が記録されていない証跡の区分（evaluator.md は [欠陥]、§5.2 の所在の原則では証跡・文言相当） | §5.2 の所在の原則に揃えた: ログがあり hash だけ無いなら同じ変異の再実行で閉じるので [証跡・文言]、ログ自体が無ければ [欠陥]。§5.2 の「古い」の定義にも追記。**当初は主エージェントが独断で決めていたが、2 巡目の指摘を受けてユーザーが承認した**（2026-09-19） | `3f8e18d` |
+| 2 | [欠陥] | spec とコードの食い違いの扱いが §5.2 の欠陥の定義（欠陥）・規則 5（区分の外の要判断）・evaluator.md（要対応）で 3 通りに割れていた | **ユーザー判断**: 食い違いは常に [欠陥]。どちらを正とするかが決まらなければ要判断を論点として添え、決定待ちで止まる。§5.2 規則 5・evaluator.md 軸 3 / 制約 / 要判断・verify-gate 手順 5・§5.8 の表を揃えた | `88dd7e1` |
+| 2 | [証跡・文言] | 1 巡目の要判断がユーザーの決定の記録なしに閉じられていた | ユーザーの承認を記録し、証跡欄を `3f8e18d` に替えた | `88dd7e1` |
+| 2 | [証跡・文言] | hash の無い証跡の扱いが evaluator.md の区分の要約・軸 5 (b) のメタ行・§5.2 の表の鮮度の定義に届いていなかった | 3 か所を同じ所在の原則（ログがあり記録が欠けるなら再実行で閉じる = 証跡・文言）に揃えた | `88dd7e1` |
+| 3 | [欠陥] | evaluator.md 軸 5 の区分の書き出し（「証跡やメタ行が無いは [欠陥]」）が、同じ段の hash・メタ行の扱い（証跡・文言）と §5.2 に矛盾していた | 書き出しを「ログ自体が無いは [欠陥]、あるが古い（hash・メタ行が無い場合を含む）は [証跡・文言]」に替えた | `46df91b` |
+| 3 | [証跡・文言] | タスクメモに、要判断を区分として扱う古い用法（巡回表の区分列・設計メモの規則 5 の言い回し）が残っていた | 当時の用法である旨を注記した | `46df91b` |
+| 3 | [証跡・文言] | evaluator.md の制約だけ、要判断を書く条件（どちらを正とするかが決まらないとき）が無条件になっていた | 条件を入れて軸 3・§5.2 規則 5 と揃えた | `46df91b` |
+| 4 | [証跡・文言] | 巡回表が 2 巡目と 3 巡目の行の間の空行で途切れ、3 巡目の行が表として表示されない | 空行を消し、3 巡目の証跡欄を `46df91b` に替えた（あわせて参考指摘の軸 5 (b) の適用範囲を明確化） | 本コミット |
+
+4 巡目の総合判定は **PASS（follow-up あり）**（[欠陥] 0 件 / [証跡・文言] 1 件）。残った 1 件はこの PR で直したので follow-up Issue は作らない。§5.2 規則 2 により再評価は行わない。
 
 ## 検出器の有効性確認（policy §2.6）
 
@@ -45,3 +85,4 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 | PR | verify | docs-check | evaluator |
 |---|---|---|---|
 | PR1 | green（ruff check / format --check / mypy / pytest 584 passed。E501 の折り返しのみ修正） | 指摘なし | 1 巡目 PASS（要対応 0 件。参考の文言 2 点は反映済み。evaluator 自身も hook の複製へ 4 変異を入れて red を確認） |
+| PR2 | green（コード変更なし。巡ごとに回し直し、pytest 584 passed） | 自動修正 1 件は重複のため戻した。§8.3 C6 の出典の限定句を追加 | 4 巡で PASS（follow-up あり）。1〜3 巡目は FAIL（各 [欠陥] 1 件）。経緯は「PR2 の評価ゲートの巡回」 |
