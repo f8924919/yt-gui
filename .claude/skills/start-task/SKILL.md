@@ -57,7 +57,7 @@ argument-hint: "[issue-number or task-description]"
 
 6. **実装 → green**（step 6）
    - 実装してテストを green にする。red 単独ではコミットせず、green にしてから 1 コミットにまとめる（§5.1）。
-   - **自分で書くか `implementer` へ委譲するかを決める。** 委譲してよいのは**対象ファイルが列挙でき、判定・期待値が固まっている**場合だけ。委譲するなら [`implementer-brief-template.md`](implementer-brief-template.md) を `.brief/<slug>.md` へ複写して埋め、起動プロンプトにはパスと「読め・読み直せ」だけを書く。**取り決めと主エージェント側の義務（検証を自分で回し直す・行単位の突合・実際の例外で読む・境界をまたぐ引用を洗う・発火順序まで確かめる・commit は自分で）の正本は [git-workflow.md](../../../docs/git-workflow.md) §5.2「実装の委譲」**（ここには再掲しない）。
+   - **自分で書くか `implementer` へ委譲するかを決める。** 委譲してよいのは**対象ファイルが列挙でき、判定・期待値が固まっている**場合だけ。委譲するなら [`implementer-brief-template.md`](implementer-brief-template.md) を `.brief/<slug>.md` へ複写して埋め、起動プロンプトにはパスと「読め・読み直せ」だけを書く。**取り決めと主エージェント側の義務（検証を自分で回し直す・行単位の突合・実際の例外で読む・境界をまたぐ引用を洗う・発火順序まで確かめる・commit は自分で行い委譲後に HEAD を確かめる・変異 → red は自分で）の正本は [git-workflow.md](../../../docs/git-workflow.md) §5.2「実装の委譲」**（ここには再掲しない）。
 
 > **セッションの分割点**（git-workflow §5 の分割点 A / B）: 手順 4.5 の後（設計確定後）と手順 6 の後（`/verify-gate` の前）は新セッションに分けてよい。分ける前にタスクメモの「次にやること」を更新し、再開は SessionStart hook が注入した申し送りに従う。
 

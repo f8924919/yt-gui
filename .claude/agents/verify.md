@@ -27,12 +27,7 @@ uv run pytest                      # テスト
 
 ## 長いジョブの起こし方
 
-**正本はここ**（[implementer.md](implementer.md) と [git-workflow.md](../../docs/git-workflow.md) §5.2「実装の委譲」はここへリンクする）。yt-gui はこの規則を機械で止める hook を入れていない（雛形の hook は Bash ツール専用で、Windows の PowerShell には効かないため）。守るのはこの節の約束だけである。
-
-- **30 秒を超える見込み、または所要が事前に分からないコマンドは、ツールの `run_in_background` で起こす**（Bash / PowerShell どちらのツールでも使える）。yt-gui で当たるのは、PyInstaller のビルド（`uv run pyinstaller yt-gui.spec`）・同梱バイナリの取得（`scripts/download_binaries.py`）・CI の待ち（`gh pr checks --watch` 等）。`uv run pytest` 全体は 10 秒前後（2026-09-19 実測、600 件）なので前景でよい。完了は通知で戻ってくるので、**コマンドの中で `sleep` のループや `kill -0` で待たない**（呼び出しはタイムアウトで切れる）。
-- **タイムアウトで切れても、走っているジョブを再起動しない。** 結果はログに残っている（`tail` で読む）。切れるたびに十数分のスイートを起動し直して 1 時間以上を失った実例がある（雛形 claude-templates の採用プロジェクトでの事例）。
-- **待機・停止に `pgrep -f` / `pkill -f` を使わない**（パターンを含む自分のシェルにマッチする）。
-- **報告に「30 秒超のコマンドをどう起こしたか」を 1 行書く**（例: `pyinstaller を run_in_background で 1 回`。無ければ「30 秒超のコマンドなし」）。呼び出し元はこれで規則が守られたかを見る。
+**正本は [git-workflow.md](../../docs/git-workflow.md) §5.1「長いジョブの起こし方」**（ここには再掲しない）。要点: 30 秒超または所要が分からないコマンドは `run_in_background` で起こし、待ちループやタイムアウト後の再起動をしない。verify の検証コマンド（ruff / mypy / pytest）は通常 30 秒に届かない。**報告に「起こし方」の 1 行を必ず書く**（下の報告フォーマット）。
 
 ## 進め方
 

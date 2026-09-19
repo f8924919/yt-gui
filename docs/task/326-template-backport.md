@@ -105,7 +105,7 @@
 - **CLAUDE.md**: 上流と同じく「実装の委譲（implementer）」の 1 行を Git / GitHub 運用ルールの節に置く（モードなし）
 - **列挙の追従（上流 D'）**: エージェント名を 3 つ以上並べている行を木全体から拾い（`docs/task/archive/` を除く）、1 行ずつ読んで implementer を足すか・足さない理由が文面から読めるかを判定する。件数は数えたコマンドと出力をこのメモに貼る（policy §8.3 C6）。docs-check に観点 10「エージェント / hook / skill を列挙している散文」を足す
 - **policy §8.3 C6 の注記**: 「出所を添える」項目を持つ agent を investigate と implementer の 2 本にし、§5.2「実装の委譲」の義務 2・4 との違いの注記を足す（上流 #67 / #77）
-- **長いジョブの起こし方（verify.md）**: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。implementer は verify.md の節を指す
+- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。implementer は verify.md の節を指す
 - **permissions**: 上流は「implementer へ委譲するならテストの入口も allow に」と書く。yt-gui は `uv run pytest *` が既に allow にある（§5.7）ので追加なし — 着手時に settings.json で確かめる
 
 ### PR4 の列挙の追従（policy §8.3 C6 の数え方つき）
@@ -136,7 +136,8 @@ git grep -n -E 'investigate|criteria-review|design-review|evaluator|verify|docs-
 
 表のほかに、委譲表（§5.2）に implementer の行を足し、「費用対効果」の段落に「小さい実装は implementer を介さず自分で書く」を足した（どちらも 3 つ以上並べる行ではないので上の 14 行には入らない）。
 
-- **雛形からの意図的な差分**: 主エージェントの義務に 6「commit / push は主エージェントが行い、委譲の後は `git log` で implementer がコミットしていないことも確かめる」を足した。yt-gui では main 保護 hook が単一の `git commit` に発火しないことがあり（ハーネス本体の既知の不具合）、機構の担保がさらに弱いため。
+- **雛形からの意図的な差分**: 主エージェントの義務に 6「commit / push は主エージェントが行い、委譲時の HEAD と委譲後の HEAD・`origin/<branch>` を比べる」を足した。implementer の「commit しない」は本文の約束だけで、implementer は feature ブランチで動くので main 保護 hook の対象でもない（当初「main 保護 hook の不発火があるから」と書いたが、feature ブランチには無関係で根拠がずれていた — design-review H2 の指摘）。実際の歯止めは §5.7 の都度確認だけで、親の権限モードによっては効かない。
+- **design-review（PR4）の反映とユーザー判断**: 長いジョブの規則の正本を git-workflow §5.1 に移した（長いジョブを起こすのは主に主エージェントで、verify は起こさない。ユーザー判断）。変異 → red の確認は主エージェントに固定し、implementer には作業ツリーを戻す git 操作を禁じた（ユーザー判断）。メトリクス句の evaluator 巡数は PR ごとに並べる（ユーザー判断）。「Sonnet 勢」への implementer の追加は維持し、役割語で書かれた git-workflow の同じ主張（「…受け入れ条件レビュー・実装が結果を客観的に検証できる」）も揃えた（ユーザー判断）。ほか: `download_binaries.py --yes`（GPL 同意の入力待ちを避ける）、implementer に「テストを弱めない」と「同じ木で動かす（worktree 隔離では起動しない）」、義務 1 の理由を「verify-gate の verify は最後の変更の後に走るゲート」に、C6 の注記を implementer の実際の報告項目に合わせた、docs-check 観点 10 に役割語・数の言い方の列挙を足した。PowerShell ツールにも `run_in_background` があることはツール定義で確かめた
 
 ## PR2 の評価ゲートの巡回
 
