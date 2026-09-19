@@ -24,6 +24,7 @@
 - **ネストしたリポジトリの除外が yt-gui で効く場面**: 上流の動機は「リポジトリ直下に上流の clone を置く構成」だが、yt-gui では、サブエージェントを worktree 隔離（`isolation: "worktree"`）で動かしたときにリポジトリ配下へ作られる worktree（`.git` がファイル）が該当する。本体が `main` のままでも、worktree 側の別ブランチでの編集を止めない。
 - **`build_context()` の引数**: 上流は `build_context(index_text, base_dir)` だが、`base_dir` は進行中メモの読み込み（PR3）でだけ使う。PR1 では `build_context(index_text)` とし、PR3 で引数を足す。
 - **finish-task B-2 の分割 PR 条項**: 上流の B-2 は「親 Issue として残す」の明示だけを見る。yt-gui は #285・本 Issue のように 1 Issue を複数 PR に分けるので、「PR を分割して進める旨の明示があり、残りの PR がある」も close しない理由に足した（本メモの冒頭の引用ブロックがその明示）。
+- **step 8 の `Closes #` 確認は `closingIssuesReferences` で見る**: 上流は `gh pr view --json body | grep -c 'Closes #'` だが、PR1（#327）の本文は機能説明に `Closes #` という語を含むため 1 件と数えた（実際の紐付けは 0 件）。GitHub が紐付けた番号を直接出す形に替えた。
 - **B-1 のコマンドは Bash ツールで実行する**: `${PRS%% *}` や `$(...)` は PowerShell では通らない。実在する PR で試走して確かめた（`feature/285-review-modes` → PR 289・#285、`chore/update-binary-pins` → 同名ブランチのマージ済み PR が 18 本あるため警告が出て、最新の PR 322 を採る）。
 
 ## 検出器の有効性確認（policy §2.6）
