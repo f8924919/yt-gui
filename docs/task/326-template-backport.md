@@ -13,8 +13,8 @@
 | PR | ブランチ | 内容 | 状態 |
 |---|---|---|---|
 | PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 完了（#327） |
-| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 進行中 |
-| PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 未着手 |
+| PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 完了（#328） |
+| PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 進行中 |
 | PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則（policy §8.3 C6 の注記「investigate だけ」も直す） | 未着手 |
 
 **順序の理由**: PR3 の「訂正ログの止め規則」と harness-retro は PR2 の §5.2 止め時・§5.8 通知を前提にする。#27（限定句）は当初 PR1 の予定だったが、evaluator 軸 5 と「指摘の区分」節を前提にしているため PR2 へ移した。
@@ -48,6 +48,17 @@
 - **`Follow-up: #` の確認**（design-review M3）: 上流の `grep -c 'Follow-up: #'` は、PR1 で直した `Closes #` と同じ誤検出の形。行頭に固定して抜き出し、起票した番号と突き合わせる形にした
 - **§5.8 の後ろ盾**（design-review M5）: `PushNotification` が使えない・エラーの環境ではチャットの先頭行に同じ 1 行を書く。送るのは主エージェントだけ、`AskUserQuestion` の直前、権限の確認プロンプトは対象外
 - **§5.8 の実送信の確認**: PR2 の evaluator 2 巡目で要判断が出て止まったとき、`AskUserQuestion` の直前に `PushNotification` を送った。結果は「Terminal notification sent. Mobile push requested.」（Remote Control 接続中のメインセッションで送れることを確認。2026-09-19）
+
+## PR3 の設計（上流からの読み替え）
+
+- **hook（進行中メモの注入）**: 上流 `session_task_status.py` の `build_context(index_text, base_dir)` と `_in_progress_blocks` / `_memo_lines` をそのまま移す（見出し語・上限の定数を含む）。yt-gui の差分は 2 点: テストは `TASK_INDEX_PATH` 環境変数ではなく既存どおり `TASK_INDEX` の差し替えと `build_context()` の直接呼び出しで行う／Python 3.10 未満のガードは入れない（3.14 固定）。PR1 で入れた片方欠落の 1 行に「`## タスク` が無いので進行中メモも注入できていない」を足す
+- **テスト**: 上流 `scripts/smoke_session_status.py` のケース（C1〜C3・H1〜H3 の 14 件）を `tests/test_session_task_status.py` の pytest へ移す。変異（上流の 19 件）は、policy §2.6 の「自動化するならコピーを変異させる」に従い、**リポジトリの一部（hook・テスト・`docs/task/`）を一時ディレクトリへ複写して変異させ、そこで pytest を流す**使い捨てスクリプトで回す（スクリプトは scratchpad に置き、結果の表だけをここに貼る）。無変異の複写で green を先に確かめる（A7）
+- **mypy の対象**: 現状は hook のうち `block_main_commit.py` だけが `[tool.mypy] files` に入っている。今回 hook のコードが大きく増えるので、`session_task_status.py` も入れる（ほかの hook は本 Issue の範囲外）
+- **docs-guide §3.2**: タスクメモの見出し規約（引用ブロック・申し送り・進捗）と「進捗欄と訂正ログ」を上流どおり置く。§4.2 に「単一 PR で完結する小タスクの特例」（上流 #20）と archive 行のメトリクス句（上流 #26）。§2.1 に `harness-retro-log.md`
+- **git-workflow**: §5 に分割点 A / B（yt-gui では hook の節は §5.6）、§5.2 に「訂正ログの止め規則」、§5.3 に harness-retro の行、§5.6 の hook 表の行を進行中メモの注入に更新、§5.8 の該当箇所表に harness-retro と共通の「訂正ログの止め規則」、§5.9 を新設
+- **§5.9 の読み替え**: 「置き場所の選び方」の表の例を yt-gui の実物に置き換える（検査ランナーの行は pytest のテストに、「長いジョブの起こし方を hook にした」の例は雛形の採用プロジェクトの事例と明記）。記録ファイル `docs/harness-retro-log.md` は空の雛形で置く
+- **start-task**: 上流 #26 の 3 点（手順 1 の「本文の鮮度」の確認・手順 4 でタスクメモを §3.2 の形で作る・分割点の注記）を移す。「本文の鮮度」は GraphQL で本文の編集時刻と前提 Issue の close 時刻を比べる 1 コマンドで、Issue #326 の PR3 条件の「start-task を追従させる」に含める
+- **本タスクメモ自身を新しい形に直す**（引用ブロック・`## 進捗` を受け入れ条件ごとに・`## 訂正ログ`・`## 次にやること`）。PR3 のマージ後、次のセッションで hook がこのメモの申し送りを注入することを実地の確認にする
 
 ## PR2 の評価ゲートの巡回
 
