@@ -10,10 +10,10 @@
 
 - [x] C1 PR1 安全網（SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close） — 証跡: PR #327・下の「検出器の有効性確認」M1〜M6
 - [x] C2 PR2 評価ゲートの規律（policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8・harness.md） — 証跡: PR #328・下の「PR2 の評価ゲートの巡回」
-- [ ] C3 PR3 進行中メモの注入（hook・pytest・変異） — 証跡: `tests/test_session_task_status.py`・下の「検出器の有効性確認」PR3 の変異 22 件（`433b488`）
-- [ ] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: 未
-- [ ] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: 未
-- [ ] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: 未
+- [x] C3 PR3 進行中メモの注入（hook・pytest・変異） — 証跡: `tests/test_session_task_status.py`・下の「検出器の有効性確認」PR3 の変異 22 件（`433b488`）
+- [x] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: `docs/docs-guide.md` §3.2・§4.2、CLAUDE.md タスク管理ルール（evaluator PR3 条件 2 ✅）
+- [x] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: `docs/git-workflow.md` §5・§5.2・§5.6・§5.8、start-task・finish-task・docs-upkeep（evaluator PR3 条件 3・4 ✅）
+- [x] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: `.claude/skills/harness-retro/SKILL.md`・`docs/git-workflow.md` §5.9・`docs/harness-retro-log.md`（evaluator PR3 条件 6 ✅）
 - [ ] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: 未
 - [ ] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 未
 - [ ] C9 PR4 長いジョブの起こし方の規則 — 証跡: 未
