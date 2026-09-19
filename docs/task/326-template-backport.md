@@ -15,7 +15,7 @@
 | PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 完了（#327） |
 | PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 進行中 |
 | PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 未着手 |
-| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則 | 未着手 |
+| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則（policy §8.3 C6 の注記「investigate だけ」も直す） | 未着手 |
 
 **順序の理由**: PR3 の「訂正ログの止め規則」と harness-retro は PR2 の §5.2 止め時・§5.8 通知を前提にする。#27（限定句）は当初 PR1 の予定だったが、evaluator 軸 5 と「指摘の区分」節を前提にしているため PR2 へ移した。
 
@@ -34,14 +34,19 @@
   - A6: 上流は「一括ランナーの登録簿に足す」。yt-gui では同じ失敗（足した検査が一度も走らない）が **pytest の収集規則から外れた名前**で起きるので、「`tests/test_*.py`・`test_` 関数の名前にし、足したテストが実行件数に出ていることを確かめる」に置き換える
   - A7: 無変異の状態で green を確かめてから壊す（PR1 で実施済みの手順）
   - A9: `mutation_engine.py` の例は落とし、原則だけ残す
-  - A10: `pgrep` / `pkill` の注記は Windows 主体の yt-gui では外し、成果物（PyInstaller のビルド出力など）のハッシュ記録という原則だけ残す
+  - A10: 成果物のハッシュ記録は yt-gui では誰も実行しない（pytest は成果物を読まない）ので、評価・測定の前後で `HEAD` と作業ツリーが同じかを見る形に置き換える（design-review M1）。`pgrep` / `pkill` の注記は外す
   - shell の既知の罠の注記: yt-gui の検査は Python（pytest）で、shell は CI の YAML 内に限られるので持ち込まない
-  - C6 の注記: 「出所を添える」項目を持つ agent は、PR2 時点では investigate だけ。implementer は PR4 で足し、そのとき注記も直す。§5.2「実装の委譲」の義務との対比も PR4
+  - C6 の注記: 「出所を添える」項目を持つ agent は、PR2 時点では investigate だけ。**PR4 で implementer を足したら、この注記（「investigate だけ」）は偽になるので必ず直す**。§5.2「実装の委譲」の義務との対比も PR4
 - **§2.6**: 「追跡下のファイルを変異させない」は、yt-gui の既存の手順（green をコミットしてから手で壊し、`git checkout` で戻す）を否定しない。手で壊すのは今のまま、**自動化するならコピーを変異させる**、と書き分ける。red のログをタスクメモか PR に貼る規則は、そのまま足す
 - **evaluator**: 軸 1・4 は yt-gui 固有の文言（yt-dlp 連携・Signal/Slot）のまま残し、軸 5・6、「指摘の区分」節、3 値の総合判定、件数行を足す。進め方の `change_set.py snapshot` は、yt-gui の `git diff main...HEAD` のまま
 - **§5.2**: 「評価ゲートの指摘区分と止め時」を evaluator のモード節の後に足す。**CLAUDE.md の evaluator モード（`always`）は変えない**。止め時の規則は巡回の終わり方を決めるもので、起動可否とは別
 - **§5.8 通知**: yt-gui の §5.6=hooks・§5.7=権限の次なので、番号は上流と同じ §5.8。該当箇所の表には start-task / verify-gate / finish-task の行と、共通行の「§5 step 8」だけを置く。harness-retro の行と「訂正ログの止め規則」は PR3 で足す
-- **`rules/harness.md`**: yt-gui の `scripts/` はビルド用の道具で、測定器ではない。測定器は `tests/` のテストと `.claude/hooks/` の hook なので、`paths` はこの 2 つにする。`tests/**` は既存の `testing.md` と重なるが、testing.md はテストファーストと red の単独コミット禁止、harness.md は検出器の検出力と役目が違うので分けて置く
+- **`rules/harness.md`**: 当初は `tests/**` と `.claude/hooks/**` だけの予定だったが、design-review（M4）の指摘を受け、ユーザー判断で**広く取る**ことにした。`scripts/download_binaries.py` の sha256 検証・`.github/workflows/` の CI ゲート・hook を登録する `.claude/settings.json` も、偽 PASS を出しうる測定器である。`tests/**` は既存の `testing.md` と重なるが、testing.md はテストファーストと red の単独コミット禁止、harness.md は検出器の検出力と役目が違うので、重なりは許す（差は「読み込まれる瞬間」だけ）
+- **評価軸 5 の範囲**（ユーザー判断・design-review H2）: evaluator は `always` で、ほぼ全 feature / bugfix がテストを足すため、上流のままだと「変異 → red の証跡が無い」で毎回 `[欠陥]` になりうる。**テストファーストで実装前に red だった実行ログ（FAILED 行と実装前の HEAD）も証跡として認める**（policy §2.6・§8.1 A1）。回帰テスト・hook・判定ロジックは従来どおり「直してから戻して red を見る」
+- **証跡の鮮度**（design-review M2）: 上流は `change_set.py` の fingerprint で「古い」を判定するが、yt-gui には無い。A1 の出すものに**壊す前（または実装前）のコミット hash** を必須にし、evaluator は `git log <hash>..HEAD -- <検出器のファイル>` で鮮度を判定する
+- **止め時の規則の追加**（design-review H1・L4）: yt-gui には「変更集合と検証記録」の節が無いので、規則 3 に「`[欠陥]` を直したら verify を回し直してから再評価」、規則 4 に「`[証跡・文言]` の修正がコード・テストに及んだら verify を回し直す」、規則 5 に「要判断が残る巡はユーザーの決定待ちで止まる」を足した
+- **`Follow-up: #` の確認**（design-review M3）: 上流の `grep -c 'Follow-up: #'` は、PR1 で直した `Closes #` と同じ誤検出の形。行頭に固定して抜き出し、起票した番号と突き合わせる形にした
+- **§5.8 の後ろ盾**（design-review M5）: `PushNotification` が使えない・エラーの環境ではチャットの先頭行に同じ 1 行を書く。送るのは主エージェントだけ、`AskUserQuestion` の直前、権限の確認プロンプトは対象外
 
 ## 検出器の有効性確認（policy §2.6）
 
