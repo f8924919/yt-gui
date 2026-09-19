@@ -83,7 +83,7 @@ argument-hint: "[merged-branch-name]"
    - 形: `メトリクス: コミット N（PR #M）・訂正ログ K 件・evaluator J 巡`
    - コミット数 N = `git rev-list --count main..HEAD`（**実装 PR のブランチ上・執筆時点**の値。本手順 C の補完経路では docs ブランチではなく実装 PR の数 — `git rev-list --count <基点>..<PR の最終コミット>` で取り、基点はタスクメモ冒頭の引用ブロックの「基点」。archive 移動コミット自身とその後の修正は含まない。複数 PR なら PR ごとに並べる。マージ済みの PR は `gh pr view <PR> --json commits -q '.commits | length'` で取る）
    - 訂正ログ件数 K = タスクメモ `## 訂正ログ` 表のデータ行数（ヘッダと区切り行を除く）
-   - evaluator 巡数 J = タスクメモの verify-gate 行（または「検証ゲート」表・評価ゲートの巡回表）から**手で数える**（機械取得はしない。起動しなかったなら `0 巡`）
+   - evaluator 巡数 J = タスクメモの verify-gate 行（または「検証ゲート」表・評価ゲートの巡回表）から**手で数える**（機械取得はしない。起動しなかったなら `0 巡`。複数 PR なら N と同じく PR ごとに並べる — 例: `evaluator 1・4・1 巡`）
 
    完了の経緯・保留項目への申し送りがあれば、同ファイル末尾の「完了タスクの経緯・申し送り」へ書く（`docs/task/index.md` には残さない。[docs-guide.md](../../../docs/docs-guide.md) §3.2）。
 5. 変更が docs のみなので、必要に応じて `docs-check` サブエージェントで index・リンクの整合を点検する。

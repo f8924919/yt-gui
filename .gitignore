@@ -24,3 +24,6 @@ cookies.txt
 
 # Claude Code 個人ローカル設定
 .claude/settings.local.json
+
+# 実装ブリーフ（implementer へファイルで渡す。docs/git-workflow.md §5.2）
+.brief/

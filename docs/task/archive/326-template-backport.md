@@ -1,9 +1,9 @@
 # claude-templates の更新（上流 #20〜#79）を逆輸入
 
 > Issue: [#326](https://github.com/f8924919/yt-gui/issues/326)
-> **ステータス: 進行中**（2026-09-19 着手。PR1 #327・PR2 #328 マージ済み、PR3 作業中）
-> ブランチ: `feature/326-task-memo-lifecycle`（PR3）
-> 基点: `main` の `48cb3d9`（PR2 マージ後）
+> **ステータス: 完了**（2026-09-19 着手・完了。PR1 #327・PR2 #328・PR3 #329・PR4 で完結）
+> ブランチ: `feature/326-implementer`（PR4）
+> 基点: `main` の `7ffb256`（PR3 マージ後）
 > **PR を 4 本に分割して進める。** PR1〜PR3 の本文は `Refs #326` とし、Issue を閉じるのは最後の PR4 の `Closes #326` だけにする。途中の PR をマージしたあと `/finish-task` の B-2 に来ても、ここに書いた分割を理由に close しない。
 
 ## 進捗（受け入れ条件 = Issue #326 の PR1〜PR4 節）
@@ -14,9 +14,9 @@
 - [x] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: `docs/docs-guide.md` §3.2・§4.2、CLAUDE.md タスク管理ルール（evaluator PR3 条件 2 ✅）
 - [x] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: `docs/git-workflow.md` §5・§5.2・§5.6・§5.8、start-task・finish-task・docs-upkeep（evaluator PR3 条件 3・4 ✅）
 - [x] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: `.claude/skills/harness-retro/SKILL.md`・`docs/git-workflow.md` §5.9・`docs/harness-retro-log.md`（evaluator PR3 条件 6 ✅）
-- [ ] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: 未
-- [ ] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 未
-- [ ] C9 PR4 長いジョブの起こし方の規則 — 証跡: 未
+- [x] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: `.claude/agents/implementer.md`・`.claude/skills/start-task/implementer-brief-template.md`・`docs/git-workflow.md` §5.2「実装の委譲」（evaluator PR4 1 巡目の [欠陥]「戻す条件」を閉じた）
+- [x] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 下の「PR4 の列挙の追従」表・`.claude/agents/docs-check.md` 観点 10（evaluator PR4 条件 2 ✅）
+- [x] C9 PR4 長いジョブの起こし方の規則 — 証跡: `docs/git-workflow.md` §5.1（evaluator PR4 条件 3 ✅）
 - [x] verify-gate（PR3） — 証跡: 下の「検証ゲート」表の PR3 行
 
 ## 訂正ログ
@@ -29,16 +29,15 @@
 
 ## 次にやること（申し送り・2026-09-19 時点）
 
-1. PR3 の evaluator 1 巡目は PASS（follow-up あり）。残りの [証跡・文言] 5 件を直したら PR を出す（`Refs #326`）。
-2. PR3 マージ後の新しいセッションで、SessionStart hook がこのメモの引用ブロック・本節・進捗の未チェック項目を注入するかを確かめる。
-3. PR4（implementer・長いジョブの規則）へ。PR4 で implementer を足したら policy §8.3 C6 の注記「investigate だけ」を直す。
+1. 本メモを archive へ移して PR4 を出す（`Closes #326`）。マージ後は `/finish-task`（B で #326 が自動 close されているかを確かめる）。
+2. 新しいセッションで SessionStart hook がこのメモを注入するかを確かめる（PR3 マージ後の main で hook を直接実行し、引用ブロック・次にやること・未チェック項目が出ることは確認済み。新セッションでの実地確認は未）。
 
 訂正ログ: 3 件（止まった: 2026-09-19 — 2 件目で止まり、ユーザー判断で遡及記載のまま続行。3 件目でも止まり、ユーザー判断で**以後は止めずに続ける**。理由: 3 件とも書いた直後にレビューで捕まった小さな転記・前提の誤りで、方針の見直しを要する型ではないため）
 - 2 件目で読み直した結果: どちらも「書いた指示・前提を実物に当てていなかった」型で、設計の方針は変えない。書いた確認コマンドは書いた PR 自身に当て、前提の分類（測定器か否か）は design-review に回す。
 
 ## 背景
 
-前回の取り込み（[#285](archive/285-template-backport.md)・#297、上流 `43374c0` = PR #19 まで）以降に、雛形 `claude-templates` へ PR #20〜#79 が入った。3 テーマ（hook・skill のコード／運用・docs・エージェント定義／scripts 群）を `investigate` で並列に突き合わせ、ユーザーと取り込み範囲を決めた。取り込まないものとその理由は Issue 本文の「取り込まないもの」節が正本。
+前回の取り込み（[#285](285-template-backport.md)・#297、上流 `43374c0` = PR #19 まで）以降に、雛形 `claude-templates` へ PR #20〜#79 が入った。3 テーマ（hook・skill のコード／運用・docs・エージェント定義／scripts 群）を `investigate` で並列に突き合わせ、ユーザーと取り込み範囲を決めた。取り込まないものとその理由は Issue 本文の「取り込まないもの」節が正本。
 
 ## PR 分割
 
@@ -46,8 +45,8 @@
 |---|---|---|---|
 | PR1 | `feature/326-safety-net` | SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close 安全網 | 完了（#327） |
 | PR2 | `feature/326-evaluation-discipline` | policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・限定句の伝播・rules/harness.md | 完了（#328） |
-| PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 進行中 |
-| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則（policy §8.3 C6 の注記「investigate だけ」も直す） | 未着手 |
+| PR3 | `feature/326-task-memo-lifecycle` | 進行中メモの申し送り注入・タスクメモの見出し規約・分割点・harness-retro | 完了（#329） |
+| PR4 | `feature/326-implementer` | implementer エージェントとブリーフ・長いジョブの起こし方の規則（policy §8.3 C6 の注記「investigate だけ」も直す） | 進行中 |
 
 **順序の理由**: PR3 の「訂正ログの止め規則」と harness-retro は PR2 の §5.2 止め時・§5.8 通知を前提にする。#27（限定句）は当初 PR1 の予定だったが、evaluator 軸 5 と「指摘の区分」節を前提にしているため PR2 へ移した。
 
@@ -96,6 +95,49 @@
 - **訂正ログと評価ゲートの巡回表の境界**（design-review H3）: evaluator の指摘は巡回表が正本で、訂正ログには数えない（二重に止まらないように）。訂正ログに載せるのは、メモや PR に書いた主張が誤りだった件だけ。docs-guide §3.2 に明記した
 - **本タスクメモ自身を新しい形に直す**（引用ブロック・`## 進捗` を受け入れ条件ごとに・`## 訂正ログ`・`## 次にやること`）。PR3 のマージ後、次のセッションで hook がこのメモの申し送りを注入することを実地の確認にする
 
+## PR4 の設計（上流からの読み替え）
+
+- **implementer（`.claude/agents/implementer.md`）**: 上流 #66 / #77 をほぼそのまま移す（Sonnet / `high`・書き込みが要るので `permissionMode: plan` は付けない・commit / push をしない約束は本文だけで担保）。外すもの: `change_set.py` の snapshot / compare（yt-gui に無い）、hook `check_long_job_command.py` / `block_running_script_edit.py` への言及（入れていない。長いジョブは git-workflow §5.1 の節を指すだけ）、「変異の死因とカバー」の機械書式（yt-gui は死因の表。policy §8.1 A1）。
+- **ブリーフの雛形（`start-task/implementer-brief-template.md`）**: 上流どおり。fingerprint・hook の注記を外す。置き場は `.brief/`（`.gitignore` に足す。scratchpad はセッション固有で分割点の `/clear` で消えるので使わない）。
+- **git-workflow §5.2「実装の委譲」**: いつ委譲するか / しないか・ブリーフの渡し方・主エージェントの義務 5 点を上流どおり置く（のちに yt-gui で義務 6 を足して 6 点。下の「雛形からの意図的な差分」）。義務 1 の「verify の報告は証跡として採ってよい」の根拠は、上流の fingerprint ではなく「verify は実装していない」ことだけにする。§5 step 6・§5.2 冒頭（実装は Sonnet）・委譲表・effort と `permissionMode` の段落（書き込みを行うのは verify / docs-check / implementer）・費用対効果の段落を追従させる。qemu-g5 の効果測定の注記は「雛形 claude-templates の採用プロジェクトでの 1 タスクの観測」と限定して残す
+- **start-task 手順 6**: 自分で書くか implementer へ委譲するかの分岐を上流どおり足す
+- **CLAUDE.md**: 上流と同じく「実装の委譲（implementer）」の 1 行を Git / GitHub 運用ルールの節に置く（モードなし）
+- **列挙の追従（上流 D'）**: エージェント名を 3 つ以上並べている行を木全体から拾い（`docs/task/archive/` を除く）、1 行ずつ読んで implementer を足すか・足さない理由が文面から読めるかを判定する。件数は数えたコマンドと出力をこのメモに貼る（policy §8.3 C6）。docs-check に観点 10「エージェント / hook / skill を列挙している散文」を足す
+- **policy §8.3 C6 の注記**: 「出所を添える」項目を持つ agent を investigate と implementer の 2 本にし、§5.2「実装の委譲」の義務 2・4 との違いの注記を足す（上流 #67 / #77）
+- **長いジョブの起こし方**（当初は verify.md に置く案。design-review H3 とユーザー判断で正本を git-workflow §5.1 に移し、verify.md・implementer.md はそこを指す形にした）: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す（verify.md。PR4 の evaluator 2 巡目のユーザー判断で implementer.md にも足した）。verify.md・implementer は §5.1 を指す
+- **permissions**: 上流は「implementer へ委譲するならテストの入口も allow に」と書く。yt-gui は `uv run pytest *` が既に allow にある（§5.7）ので追加なし — 着手時に settings.json で確かめる
+
+### PR4 の列挙の追従（policy §8.3 C6 の数え方つき）
+
+エージェント名を 3 つ以上並べている行を、implementer を足す前の木で数えた（`docs/task/archive/` と本メモを除く。名前が別々に 3 つ以上ある行。`verify` は `verify-gate` にも当たるので多めに拾う側）:
+
+```bash
+git grep -n -E 'investigate|criteria-review|design-review|evaluator|verify|docs-check|implementer' \
+  -- . ':!docs/task/archive/' ':!docs/task/326-template-backport.md' |
+  awk -F: '{line=$0; sub(/^[^:]*:[^:]*:/, "", line); n=0;
+    split("investigate criteria-review design-review evaluator verify docs-check", a, " ");
+    for (i in a) if (index(line, a[i])) n++; if (n>=3) print $1":"$2}'
+→ 14 行（2026-09-19、PR3 マージ後の main = 7ffb256 の木）
+```
+
+| 箇所 | 判定 |
+|---|---|
+| `.claude/agents/evaluator.md:13`・`.claude/agents/design-review.md:13`（Opus にする理由の「Sonnet 勢」の列挙） | **更新**（`implementer` も Sonnet で、結果を主エージェントが検証する側。上流は据え置いたが、§5.2 冒頭の「実装は Sonnet」と揃える） |
+| `.claude/skills/start-task/SKILL.md:3`（description） | **更新**（実装の分岐） |
+| `docs/git-workflow.md:210`（§5.3 の start-task 行） | **更新**（実装の分岐） |
+| `docs/git-workflow.md:119`（読み取り専任の 4 本） | **更新**（`implementer` は書き込みが要るため対象外、と明記） |
+| `docs/testing/policy.md:252`（C6 の適用範囲） | **更新**（「出所を添える」項目を持つのは investigate と implementer の 2 本） |
+| `docs/git-workflow.md:85`（step 4.5） | 据え置き（実装前レビューの説明） |
+| `docs/git-workflow.md:117`（effort を固定する理由） | 据え置き（「特に」「逆に」で 2 例を挙げる文で、全エージェントの名簿ではない） |
+| `docs/git-workflow.md:156`（「巡」の定義） | 据え置き（評価ゲートの構成の話で、implementer は登場しない） |
+| `docs/git-workflow.md:211`・`:344`、`.claude/skills/verify-gate/SKILL.md:3`・`:41` | 据え置き（PR 前ゲートの構成は `verify` → `docs-check` → `evaluator` で、implementer は step 6 の側） |
+| `docs/testing/policy.md:218`（A10 の例） | 据え置き（docs-check と evaluator の干渉の例示で、名簿ではない） |
+
+表のほかに、委譲表（§5.2）に implementer の行を足し、「費用対効果」の段落に「小さい実装は implementer を介さず自分で書く」を足した（どちらも 3 つ以上並べる行ではないので上の 14 行には入らない）。
+
+- **雛形からの意図的な差分**: 主エージェントの義務に 6「commit / push は主エージェントが行い、委譲時の HEAD と委譲後の HEAD・`origin/<branch>` を比べる」を足した。implementer の「commit しない」は本文の約束だけで、implementer は feature ブランチで動くので main 保護 hook の対象でもない（当初「main 保護 hook の不発火があるから」と書いたが、feature ブランチには無関係で根拠がずれていた — design-review H2 の指摘）。実際の歯止めは §5.7 の都度確認だけで、親の権限モードによっては効かない。
+- **design-review（PR4）の反映とユーザー判断**: 長いジョブの規則の正本を git-workflow §5.1 に移した（長いジョブを起こすのは主に主エージェントで、verify は起こさない。ユーザー判断）。変異 → red の確認は主エージェントに固定し、implementer には作業ツリーを戻す git 操作を禁じた（ユーザー判断）。メトリクス句の evaluator 巡数は PR ごとに並べる（ユーザー判断）。「Sonnet 勢」への implementer の追加は維持し、役割語で書かれた git-workflow の同じ主張（「…受け入れ条件レビュー・実装が結果を客観的に検証できる」）も揃えた（ユーザー判断）。ほか: `download_binaries.py --yes`（GPL 同意の入力待ちを避ける）、implementer に「テストを弱めない」と「同じ木で動かす（worktree 隔離では起動しない）」、義務 1 の理由を「verify-gate の verify は最後の変更の後に走るゲート」に、C6 の注記を implementer の実際の報告項目に合わせた、docs-check 観点 10 に役割語・数の言い方の列挙を足した。PowerShell ツールにも `run_in_background` があることはツール定義で確かめた
+
 ## PR2 の評価ゲートの巡回
 
 | 巡 | 区分 | 指摘 | 閉じ方の種別 | 証跡 |
@@ -110,9 +152,26 @@
 | 3 | [欠陥] | evaluator.md 軸 5 の区分の書き出し（「証跡やメタ行が無いは [欠陥]」）が、同じ段の hash・メタ行の扱い（証跡・文言）と §5.2 に矛盾していた | 書き出しを「ログ自体が無いは [欠陥]、あるが古い（hash・メタ行が無い場合を含む）は [証跡・文言]」に替えた | `46df91b` |
 | 3 | [証跡・文言] | タスクメモに、要判断を区分として扱う古い用法（巡回表の区分列・設計メモの規則 5 の言い回し）が残っていた | 当時の用法である旨を注記した | `46df91b` |
 | 3 | [証跡・文言] | evaluator.md の制約だけ、要判断を書く条件（どちらを正とするかが決まらないとき）が無条件になっていた | 条件を入れて軸 3・§5.2 規則 5 と揃えた | `46df91b` |
-| 4 | [証跡・文言] | 巡回表が 2 巡目と 3 巡目の行の間の空行で途切れ、3 巡目の行が表として表示されない | 空行を消し、3 巡目の証跡欄を `46df91b` に替えた（あわせて参考指摘の軸 5 (b) の適用範囲を明確化） | 本コミット |
+| 4 | [証跡・文言] | 巡回表が 2 巡目と 3 巡目の行の間の空行で途切れ、3 巡目の行が表として表示されない | 空行を消し、3 巡目の証跡欄を `46df91b` に替えた（あわせて参考指摘の軸 5 (b) の適用範囲を明確化） | `8d446ab` |
 
 4 巡目の総合判定は **PASS（follow-up あり）**（[欠陥] 0 件 / [証跡・文言] 1 件）。残った 1 件はこの PR で直したので follow-up Issue は作らない。§5.2 規則 2 により再評価は行わない。
+
+## PR4 の評価ゲートの巡回
+
+| 巡 | 区分 | 指摘 | 閉じ方の種別 | 証跡 |
+|---|---|---|---|---|
+| 1 | [欠陥] | Issue が挙げるブリーフの書式のうち「戻す条件」の節が雛形に無い | コード（雛形）修正: 「手を止めて戻す条件」節を足し、§5.2 のブリーフの渡し方にも 1 行 | `8d446ab` |
+| 1 | [証跡・文言] | git-workflow の方向語 2 件（「上の費用対効果」「下記『実装の委譲』」）が逆 | 文言修正 | `8d446ab` |
+| 1 | [証跡・文言] | タスクメモが diff より古い（C7〜C9 が未チェック・次にやることが済んだ項目・「implementer は verify.md の節を指す」） | 文言修正 | `8d446ab` |
+| 1 | [証跡・文言] | 義務の要約が CLAUDE.md と start-task で食い違う・委譲表の「受け取るもの」に数の出所が無い | 文言修正（両方に「変異 → red は自分で」、表に「数の出所」） | `8d446ab` |
+| 2 | [欠陥] | §5.1 の「サブエージェントの報告に起こし方を 1 行」に implementer の報告フォーマットが従っていない（4176ca5 で §5.1 へ移して主語が一般化された時に取り残された）。要判断つき | **ユーザー判断**: implementer に欄を足す。報告フォーマット・委譲表の「受け取るもの」・§5.1 の文に implementer を入れた | `2172d1d` |
+| 2 | [証跡・文言] | タスクメモの PR4 設計の implementer 行に「長いジョブは verify.md の節を指すだけ」が残っていた・巡回表の証跡欄が「本コミット」のまま | 文言修正・証跡欄を `8d446ab` に | `2172d1d` |
+
+| 3 | [証跡・文言] | 巡回表の 1 巡目と 2 巡目の間の空行で表が切れていた・2 巡目の証跡欄が「本コミット」のまま・委譲表の verify 行に「起こし方」が無い | 空行を消す・証跡欄を `2172d1d` に・verify 行に「起こし方」を足し、§5.1 の主語を「コマンドを走らせるサブエージェント（verify・implementer）」に絞った | 本コミット |
+
+3 巡目の総合判定は **PASS（follow-up あり）**（[欠陥] 0 件 / [証跡・文言] 3 件）。3 件はこの PR で直したので follow-up Issue は作らない。§5.2 規則 2 により再評価は行わない。
+
+1 巡目の参考指摘（`--yes` が無いときは止まり続けるとは限らず、stdin が閉じていれば黙って終わる）も §5.1 の文言に反映した。
 
 ## 検出器の有効性確認（policy §2.6）
 
@@ -167,3 +226,4 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 | PR1 | green（ruff check / format --check / mypy / pytest 584 passed。E501 の折り返しのみ修正） | 指摘なし | 1 巡目 PASS（要対応 0 件。参考の文言 2 点は反映済み。evaluator 自身も hook の複製へ 4 変異を入れて red を確認） |
 | PR2 | green（コード変更なし。巡ごとに回し直し、pytest 584 passed） | 自動修正 1 件は重複のため戻した。§8.3 C6 の出典の限定句を追加 | 4 巡で PASS（follow-up あり）。1〜3 巡目は FAIL（各 [欠陥] 1 件）。経緯は「PR2 の評価ゲートの巡回」 |
 | PR3 | green（ruff check / format --check / mypy 59 files / pytest 600 passed） | 不整合なし（CLAUDE.md のドキュメントマップに記録ファイルは載せない判断。arch の関連仕様行の欠落は既存で範囲外） | 1 巡目 PASS（follow-up あり）: [欠陥] 0 件 / [証跡・文言] 5 件（死因表が古い・上流の変異 1 件の移し漏れ・finish-task C-4 の文の吸い込み・§5.3 の start-task 行・次にやることが古い）をこの PR で直した。規則 2 により再評価なし |
+| PR4 | green（コード変更なし。巡ごとに回し直し、pytest 600 passed） | 列挙の追従（観点 10）で漏れなし。タスクメモの「義務 5 点」を補った | 3 巡で PASS（follow-up あり）。1・2 巡目は FAIL（各 [欠陥] 1 件: ブリーフの戻す条件・implementer の起こし方の欄。2 巡目は要判断つきでユーザー判断）。経緯は「PR4 の評価ゲートの巡回」 |
