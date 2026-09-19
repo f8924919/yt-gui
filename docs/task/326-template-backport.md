@@ -108,6 +108,36 @@
 - **長いジョブの起こし方（verify.md）**: hook は入れない（Issue の除外どおり）。上流 verify.md の節から hook への言及を外し、yt-gui の長いジョブ（PyInstaller のビルド・`scripts/download_binaries.py`・CI の待ち）を例にする。pytest 全体は 10 秒前後なので前景でよい、と実測を添える。報告フォーマットに「起こし方」の 1 行を足す。implementer は verify.md の節を指す
 - **permissions**: 上流は「implementer へ委譲するならテストの入口も allow に」と書く。yt-gui は `uv run pytest *` が既に allow にある（§5.7）ので追加なし — 着手時に settings.json で確かめる
 
+### PR4 の列挙の追従（policy §8.3 C6 の数え方つき）
+
+エージェント名を 3 つ以上並べている行を、implementer を足す前の木で数えた（`docs/task/archive/` と本メモを除く。名前が別々に 3 つ以上ある行。`verify` は `verify-gate` にも当たるので多めに拾う側）:
+
+```bash
+git grep -n -E 'investigate|criteria-review|design-review|evaluator|verify|docs-check|implementer' \
+  -- . ':!docs/task/archive/' ':!docs/task/326-template-backport.md' |
+  awk -F: '{line=$0; sub(/^[^:]*:[^:]*:/, "", line); n=0;
+    split("investigate criteria-review design-review evaluator verify docs-check", a, " ");
+    for (i in a) if (index(line, a[i])) n++; if (n>=3) print $1":"$2}'
+→ 14 行（2026-09-19、PR3 マージ後の main = 7ffb256 の木）
+```
+
+| 箇所 | 判定 |
+|---|---|
+| `.claude/agents/evaluator.md:13`・`.claude/agents/design-review.md:13`（Opus にする理由の「Sonnet 勢」の列挙） | **更新**（`implementer` も Sonnet で、結果を主エージェントが検証する側。上流は据え置いたが、§5.2 冒頭の「実装は Sonnet」と揃える） |
+| `.claude/skills/start-task/SKILL.md:3`（description） | **更新**（実装の分岐） |
+| `docs/git-workflow.md:210`（§5.3 の start-task 行） | **更新**（実装の分岐） |
+| `docs/git-workflow.md:119`（読み取り専任の 4 本） | **更新**（`implementer` は書き込みが要るため対象外、と明記） |
+| `docs/testing/policy.md:252`（C6 の適用範囲） | **更新**（「出所を添える」項目を持つのは investigate と implementer の 2 本） |
+| `docs/git-workflow.md:85`（step 4.5） | 据え置き（実装前レビューの説明） |
+| `docs/git-workflow.md:117`（effort を固定する理由） | 据え置き（「特に」「逆に」で 2 例を挙げる文で、全エージェントの名簿ではない） |
+| `docs/git-workflow.md:156`（「巡」の定義） | 据え置き（評価ゲートの構成の話で、implementer は登場しない） |
+| `docs/git-workflow.md:211`・`:344`、`.claude/skills/verify-gate/SKILL.md:3`・`:41` | 据え置き（PR 前ゲートの構成は `verify` → `docs-check` → `evaluator` で、implementer は step 6 の側） |
+| `docs/testing/policy.md:218`（A10 の例） | 据え置き（docs-check と evaluator の干渉の例示で、名簿ではない） |
+
+表のほかに、委譲表（§5.2）に implementer の行を足し、「費用対効果」の段落に「小さい実装は implementer を介さず自分で書く」を足した（どちらも 3 つ以上並べる行ではないので上の 14 行には入らない）。
+
+- **雛形からの意図的な差分**: 主エージェントの義務に 6「commit / push は主エージェントが行い、委譲の後は `git log` で implementer がコミットしていないことも確かめる」を足した。yt-gui では main 保護 hook が単一の `git commit` に発火しないことがあり（ハーネス本体の既知の不具合）、機構の担保がさらに弱いため。
+
 ## PR2 の評価ゲートの巡回
 
 | 巡 | 区分 | 指摘 | 閉じ方の種別 | 証跡 |

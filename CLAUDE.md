@@ -41,6 +41,7 @@ GitHub Issue は「起票・仕様・受け入れ条件の正本」、`docs/task
 - **Issue ベース開発**: 修正・機能追加は Issue に基づいて行う。Claude が起票する Issue は、AI が単独で実装・完結できる粒度の技術仕様（背景・受け入れ条件・対象ファイル・関連 spec/arch リンク）まで記述する。
 - **ブランチ命名**: `feature/<issue>-<desc>` / `bugfix/<issue>-<desc>` / `hotfix/<issue>-<desc>`、Issue を伴わない作業は `refactor/<desc>` / `docs/<desc>` / `chore/<desc>`。
 - コミットメッセージは常に日本語。Issue 本文・PR の本文・コメントは[言語ルール](#言語ルール)に従い、原則日本語・既存スレッドが日本語以外なら当該言語に合わせる。
+- **実装の委譲（implementer）**: 設計と受け入れ条件が固まった実装は `implementer`（Sonnet）へ委譲してよい（モードなし）。**ブリーフは prompt ではなく `.brief/` のファイルで渡し**、設計・仕様の判断とテスト内容の決定は委譲しない。取り決めと**主エージェント側の義務**（検証の回し直し・行単位の突合・実際の例外で読む・境界をまたぐ引用を洗う・発火順序まで確かめる）の正本は [docs/git-workflow.md](docs/git-workflow.md) §5.2「実装の委譲」。
 - **評価ゲート（evaluator）モード**: `always`（`always` / `auto` / `off`）。`feature` / `bugfix` / `hotfix` で受け入れ条件・spec の充足を独立評価する `evaluator` の起動可否を決める単一の正本。定義・`auto` の閾値は [docs/git-workflow.md](docs/git-workflow.md) §5.2。
 - **設計レビュー（design-review）モード**: `auto`（`always` / `auto` / `off`）。実装前に設計案の妥当性を点検する `design-review`（Opus）の起動可否を決める単一の正本。`auto` は [docs/git-workflow.md](docs/git-workflow.md) §5.5 の構造トリガで発火する。定義・モード表は §5.2。
 - **受け入れ条件レビュー（criteria-review）**: 安価な常時運用の助言のためモードを設けない。受け入れ条件を持つ作業（`feature` / `bugfix` / `hotfix`）で用いる（§5.2）。

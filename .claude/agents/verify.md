@@ -25,6 +25,15 @@ uv run pytest                      # テスト
 
 テストを対象に含む変更では、必要に応じて `tests/` も同じ lint / format / 型チェックの対象とする。各コマンドの正本は `CLAUDE.md` を参照。
 
+## 長いジョブの起こし方
+
+**正本はここ**（[implementer.md](implementer.md) と [git-workflow.md](../../docs/git-workflow.md) §5.2「実装の委譲」はここへリンクする）。yt-gui はこの規則を機械で止める hook を入れていない（雛形の hook は Bash ツール専用で、Windows の PowerShell には効かないため）。守るのはこの節の約束だけである。
+
+- **30 秒を超える見込み、または所要が事前に分からないコマンドは、ツールの `run_in_background` で起こす**（Bash / PowerShell どちらのツールでも使える）。yt-gui で当たるのは、PyInstaller のビルド（`uv run pyinstaller yt-gui.spec`）・同梱バイナリの取得（`scripts/download_binaries.py`）・CI の待ち（`gh pr checks --watch` 等）。`uv run pytest` 全体は 10 秒前後（2026-09-19 実測、600 件）なので前景でよい。完了は通知で戻ってくるので、**コマンドの中で `sleep` のループや `kill -0` で待たない**（呼び出しはタイムアウトで切れる）。
+- **タイムアウトで切れても、走っているジョブを再起動しない。** 結果はログに残っている（`tail` で読む）。切れるたびに十数分のスイートを起動し直して 1 時間以上を失った実例がある（雛形 claude-templates の採用プロジェクトでの事例）。
+- **待機・停止に `pgrep -f` / `pkill -f` を使わない**（パターンを含む自分のシェルにマッチする）。
+- **報告に「30 秒超のコマンドをどう起こしたか」を 1 行書く**（例: `pyinstaller を run_in_background で 1 回`。無ければ「30 秒超のコマンドなし」）。呼び出し元はこれで規則が守られたかを見る。
+
 ## 進め方
 
 1. 上記コマンドを順に実行し、失敗を確認する。
@@ -44,5 +53,6 @@ uv run pytest                      # テスト
 
 - **結果**: ruff / format / mypy / pytest それぞれの最終状態（pass/fail、テストは件数）
 - **修正点**: 何をどう直したか（`path:line` を添える）
+- **起こし方**: 30 秒超のコマンドをどう起こしたか 1 行（`run_in_background` の有無。「長いジョブの起こし方」の出すもの）
 - **要判断**: 設計・仕様の判断が必要で手を付けなかった失敗があれば、その内容と当たり
 - **残課題**: green にできなかった項目があれば原因の見立て
