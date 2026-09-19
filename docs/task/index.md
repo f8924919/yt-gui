@@ -3,7 +3,7 @@
 **進行中・未着手**のタスクを管理します。タスク追加・状態変更時にこのファイルを更新してください。
 完了したタスクは [docs-guide.md](../docs-guide.md) §4.2 の手順で [archive/](archive/index.md) へ移動します（下の表からは削除）。
 
-> **このファイルは短く保つ。** セッション開始時に毎回読み込まれる（[SessionStart hook](../../.claude/hooks/session_task_status.py) が下記 2 つの表を自動で注入する。[git-workflow.md](../git-workflow.md) §5.6）ため、**「今なにが残っているか」だけ**を置きます。完了タスクの経緯・判断の理由・着手時の申し送りは [archive/index.md](archive/index.md) の「完了タスクの経緯・申し送り」へ書きます。
+> **このファイルは短く保つ。** セッション開始時に毎回読み込まれる（[SessionStart hook](../../.claude/hooks/session_task_status.py) が下記 2 つの表と、`進行中` のタスクメモの申し送り・未完了項目を自動で注入する。[git-workflow.md](../git-workflow.md) §5.6。メモ側の見出し規約は [docs-guide.md](../docs-guide.md) §3.2）ため、**「今なにが残っているか」だけ**を置きます。完了タスクの経緯・判断の理由・着手時の申し送りは [archive/index.md](archive/index.md) の「完了タスクの経緯・申し送り」へ書きます。
 
 ## ステータス凡例
 
@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [326-template-backport.md](326-template-backport.md) | 進行中 | 雛形 claude-templates の更新（上流 #20〜#79）を 4 本の PR に分けて逆輸入（PR1 安全網から着手） | 2026-09-19 |
+| [326-template-backport.md](326-template-backport.md) | 進行中 | 雛形 claude-templates の更新（上流 #20〜#79）を 4 本の PR に分けて逆輸入（PR1・PR2 マージ済み、PR3 作業中） | 2026-09-19 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |

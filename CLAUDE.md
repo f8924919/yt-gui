@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 進行中・未完了のタスクは [docs/task/index.md](docs/task/index.md) で管理する。
 
-> **`未着手` または `進行中` のタスクがある場合は、それらの対応を行うかをユーザーに尋ねること。** 一覧はセッション開始時に [SessionStart hook](.claude/hooks/session_task_status.py) が自動で注入する（[docs/git-workflow.md](docs/git-workflow.md) §5.6）。**注入が見当たらない場合は hook が動いていないので、[docs/task/index.md](docs/task/index.md) を直接読んで確認すること。** タスクを完了したら [docs/docs-guide.md](docs/docs-guide.md) §4.2 の手順で `docs/task/archive/` へアーカイブする。新規タスクが発生した場合は `docs/task/{slug}.md` を作成して index.md にも追記する。
+> **`未着手` または `進行中` のタスクがある場合は、それらの対応を行うかをユーザーに尋ねること。** 一覧はセッション開始時に [SessionStart hook](.claude/hooks/session_task_status.py) が自動で注入する（[docs/git-workflow.md](docs/git-workflow.md) §5.6）。**注入が見当たらない場合は hook が動いていないので、[docs/task/index.md](docs/task/index.md) を直接読んで確認すること。** タスクを完了したら [docs/docs-guide.md](docs/docs-guide.md) §4.2 の手順で `docs/task/archive/` へアーカイブする。新規タスクが発生した場合は `docs/task/{slug}.md` を作成して index.md にも追記する（1 PR で完結する小タスクは `docs/task/archive/` に直接作ってよい。[docs/docs-guide.md](docs/docs-guide.md) §4.2 の特例）。
 
 GitHub Issue は「起票・仕様・受け入れ条件の正本」、`docs/task/` は「作業中の設計・進捗メモ」として併用する。両者は相互リンクで紐付ける。詳細は [docs/git-workflow.md](docs/git-workflow.md) を参照。
 
