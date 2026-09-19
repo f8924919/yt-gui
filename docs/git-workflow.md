@@ -92,7 +92,7 @@ main ──┬──────────────────┬──→
    - docs / CLAUDE.md を変更した場合は `docs-check` サブエージェント（Sonnet）で整合性（index 更新漏れ・リンク切れ・**旧語彙の残存**・命名・関連仕様リンク・限定句の伝播）を点検する。
    - **`feature` / `bugfix` / `hotfix` ブランチでは `evaluator` サブエージェント（Opus）で評価ゲートを通す**（受け入れ条件・spec の充足を独立判定。`verify` で green にした後に実行する）。起動可否は [CLAUDE.md](../CLAUDE.md) の評価ゲート（evaluator）モードに従う（§5.2）。
 8. `gh` で PR を作成（ベース `main`、本文は原則日本語＝対応する Issue スレッドが日本語以外ならその言語に合わせる、関連 Issue を `Closes #<issue>` で紐付け）。
-   - **`Closes #<issue>` の有無は作成直後に機械的に確認する**（`gh pr view <pr> --json closingIssuesReferences -q '[.closingIssuesReferences[].number]'`。GitHub が実際に紐付けた Issue 番号が出る）。書き漏らすと Issue が open のまま残り、気づくのは後日になる。本文の文字列を `grep 'Closes #'` で数える方法は、`Closes #` という語を説明に書いただけの本文でも当たるので使わない。Issue を複数 PR に分けて途中の PR が `Refs #` にとどめる場合は、空の `[]` が正しい。
+   - **`Closes #<issue>` の有無は作成直後に機械的に確認する**（`gh pr view <pr> --json closingIssuesReferences -q '[.closingIssuesReferences[].number]'`。GitHub が実際に紐付けた Issue 番号が出る）。書き漏らすと Issue が open のまま残り、気づくのは後日になる。本文の文字列を `grep 'Closes #'` で数える方法は、`Closes #` という語を説明に書いただけの本文でも当たるので使わない。Issue を複数 PR に分けて途中の PR が `Refs #` にとどめる場合は、空の `[]` が正しい。**作成直後は GitHub の紐付けが遅れて `[]` になることがある**（#330 で観測）。本文の行頭に `Closes #` があるのに `[]` なら、数秒おいて引き直してから書き漏らしと判断する。
    - **PR を出した直後はマージ待ちで止まる**ので通知を出す（§5.8）。
 9. **ユーザーの承認後**にマージし、マージ済みブランチを削除。**対応 Issue が open のままなら、受け入れ条件の充足を現在の `main` で裏取りしたうえで close する**（`Closes #` の書き漏らしを拾う安全網。親 Issue・部分完了は close しない）。完了タスクの archive 移動は**原則 step 6〜8 の実装 PR に同梱**する（[docs-guide.md](docs-guide.md) §4.2。#222）。マージ後の後処理（main 最新化・ブランチ削除・対応 Issue の close、同梱できなかった場合のまとめ archive 移動）は `/finish-task` skill で実行できる（§5.3）。
 
