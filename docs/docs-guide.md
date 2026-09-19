@@ -140,7 +140,7 @@ CLAUDE.md には概要 1〜2 行と詳細ファイルへのリンクのみを残
 | `## タスク` | タスクメモ（`docs/task/{slug}.md`）を持つ進行中・未着手のタスク |
 | `## 起票済み・未着手の Issue` | メモをまだ作っていない（着手時に作る）未着手の Issue |
 
-**完了したタスクの経緯・分割の理由・着手時の申し送りは [`docs/task/archive/index.md`](task/archive/index.md) の「完了タスクの経緯・申し送り」へ書きます**（`docs/task/index.md` には書かない）。未着手 Issue の行からその節へリンクして導線を保ってください。表の見出し（`## タスク` / `## 起票済み・未着手の Issue`）は hook が抽出のキーにしているため、改名する場合は [`session_task_status.py`](../.claude/hooks/session_task_status.py) も合わせて直します（見出しが見つからない場合は何も注入しないフェイルオープン）。
+**完了したタスクの経緯・分割の理由・着手時の申し送りは [`docs/task/archive/index.md`](task/archive/index.md) の「完了タスクの経緯・申し送り」へ書きます**（`docs/task/index.md` には書かない）。未着手 Issue の行からその節へリンクして導線を保ってください。表の見出し（`## タスク` / `## 起票済み・未着手の Issue`）は hook が抽出のキーにしているため、改名する場合は [`session_task_status.py`](../.claude/hooks/session_task_status.py) も合わせて直します（見出しが見つからない場合は、表の代わりに見つからなかった旨を 1 行注入する。[git-workflow.md](git-workflow.md) §5.6）。
 
 #### `docs/research/` — 調査メモ
 

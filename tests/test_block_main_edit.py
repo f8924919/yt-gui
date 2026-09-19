@@ -3,7 +3,8 @@
 hook は stdin の JSON（`tool_input.file_path`）を受け取り、リポジトリのカレント
 ブランチが main のときのリポジトリ内ファイル編集を permissionDecision: deny で
 返す。それ以外（main 以外・リポジトリ外・不正入力）はフェイルオープンで何も
-出力せず exit 0 する（#285）。
+出力せず exit 0 する（#285）。リポジトリ配下にネストした別の git リポジトリ
+（`.git` がディレクトリまたはファイル）のファイルも対象外（#326）。
 
 ブランチ判定・所属判定の対象はリポジトリルート（hook ファイルからの相対）で
 固定のため、判定ロジックは `repo_root` を引数に取るヘルパを直接呼んで検証し、
@@ -114,6 +115,41 @@ def test_inside_repo_accepts_nested_path(main_repo):
 def test_inside_repo_rejects_outside_path(main_repo, tmp_path):
     outside = tmp_path / "elsewhere" / "memory.md"
     assert block_main_edit._inside_repo(str(outside), main_repo) is False
+
+
+# ── ネストした git リポジトリ ───────────────────────────────────────────────
+
+
+def test_in_nested_repo_detects_git_dir(main_repo):
+    nested = main_repo / "vendor" / "upstream"
+    (nested / ".git").mkdir(parents=True)
+    assert block_main_edit._in_nested_repo(str(nested / "src" / "a.c"), main_repo)
+
+
+def test_in_nested_repo_detects_git_file(main_repo):
+    """worktree は `.git` をファイルで持つ（worktree 隔離のサブエージェント）。"""
+    worktree = main_repo / ".claude" / "worktrees" / "agent-1"
+    worktree.mkdir(parents=True)
+    (worktree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    assert block_main_edit._in_nested_repo(str(worktree / "a.py"), main_repo)
+
+
+def test_in_nested_repo_false_for_plain_subdir(main_repo):
+    (main_repo / "docs").mkdir()
+    path = str(main_repo / "docs" / "a.md")
+    assert not block_main_edit._in_nested_repo(path, main_repo)
+
+
+def test_in_nested_repo_false_for_root_file(main_repo):
+    """ルート自身の `.git` はネスト扱いしない。"""
+    assert not block_main_edit._in_nested_repo(str(main_repo / "a.py"), main_repo)
+
+
+def test_allows_edit_in_nested_repo_on_main(monkeypatch, capsys, main_repo):
+    nested = main_repo / "vendor" / "upstream"
+    (nested / ".git").mkdir(parents=True)
+    payload = _edit_payload(nested / "a.c")
+    assert not _run_main(monkeypatch, capsys, main_repo, payload)
 
 
 # ── main()（ブロック / 通過） ────────────────────────────────────────────────

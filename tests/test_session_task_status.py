@@ -1,8 +1,9 @@
 """Claude Code SessionStart hook（.claude/hooks/session_task_status.py）のテスト。
 
 hook は docs/task/index.md の 2 つの表（`## タスク` / `## 起票済み・未着手の
-Issue`）を抽出し、additionalContext として注入する。ファイル欠落・見出しの
-改名・パース失敗時は何も注入せず通す（フェイルオープン・#285）。
+Issue`）を抽出し、additionalContext として注入する。ファイル欠落・パース失敗時は
+何も注入せず通す（フェイルオープン・#285）。見出しが見つからないときは黙らずに
+その旨を 1 行注入する（両方欠落・片方欠落とも。#326）。
 
 表の抽出・整形は純粋ロジックとして直接検証し、注入の有無は `TASK_INDEX` を
 差し替えた main() で確認する。実運用の index.md に対する疎通も 1 本置く。
@@ -157,10 +158,52 @@ def test_fails_open_when_index_missing(monkeypatch, capsys, tmp_path):
     assert _context(monkeypatch, capsys, tmp_path / "no_such_index.md") is None
 
 
-def test_fails_open_when_headings_renamed(monkeypatch, capsys, tmp_path):
+def test_reports_when_no_heading_matches(monkeypatch, capsys, tmp_path):
+    """見出しが 1 つも一致しないときは黙らず、期待と実際の見出しを注入する（#326）。
+
+    黙って諦めると見出しの改名で注入が静かに止まり、CLAUDE.md の「注入が無い =
+    hook が動いていない」の判断を誤らせる。
+    """
     index = tmp_path / "index.md"
     index.write_text("# タスク一覧\n\n## 別の見出し\n\n本文\n", encoding="utf-8")
-    assert _context(monkeypatch, capsys, index) is None
+    context = _context(monkeypatch, capsys, index)
+    assert context is not None
+    assert "期待する見出しが見つからない" in context
+    assert "期待: ## タスク / ## 起票済み・未着手の Issue" in context
+    assert "実際: ## 別の見出し" in context
+
+
+# ── 見出しの欠落の通知（build_context） ──────────────────────────────────────
+
+_ISSUE_HEADING = "## 起票済み・未着手の Issue"
+ONLY_TASK = SAMPLE.split(_ISSUE_HEADING)[0]
+ONLY_ISSUE = "# タスク一覧\n\n" + _ISSUE_HEADING + SAMPLE.split(_ISSUE_HEADING)[1]
+
+
+def test_build_context_has_no_missing_note_when_both_present():
+    context = session_task_status.build_context(SAMPLE)
+    assert "見つからなかった見出し" not in context
+    assert "期待する見出しが見つからない" not in context
+
+
+def test_build_context_reports_no_h2_at_all():
+    context = session_task_status.build_context("# t\n\n本文だけ\n")
+    assert "期待する見出しが見つからない" in context
+    assert "実際: （H2 見出しなし）" in context
+
+
+def test_build_context_reports_missing_issue_heading():
+    """片方（Issue 表）だけ欠けたら、残った表を出しつつ欠けた見出しを知らせる（#326）"""
+    context = session_task_status.build_context(ONLY_TASK)
+    assert "概要 A" in context  # 残った表は注入される
+    assert "**見つからなかった見出し**: ## 起票済み・未着手の Issue" in context
+    assert "実際: ## ステータス凡例 / ## タスク" in context
+
+
+def test_build_context_reports_missing_task_heading():
+    context = session_task_status.build_context(ONLY_ISSUE)
+    assert "概要 C" in context
+    assert "**見つからなかった見出し**: ## タスク（実際: " in context
 
 
 def test_fails_open_on_invalid_stdin(monkeypatch, capsys, tmp_path):

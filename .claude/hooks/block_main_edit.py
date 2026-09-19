@@ -11,6 +11,9 @@ block_main_commit.py は commit / push を止めるが、そこに至るまで�
 - git コマンド失敗（リポジトリ外・detached HEAD 等）→ 通す
 - **リポジトリ外のファイルは対象外**（Claude Code のメモリなど、リポジトリと
   無関係の書き込みを巻き込まないため）
+- **ネストした git リポジトリ内のファイルは対象外**（上流 clone やサブエージェントの
+  worktree（`.git` がファイル）など。ネスト側のブランチは本リポジトリの main 判定と
+  無関係で、止めると別ブランチでの正規の作業を塞ぐ。#326）
 
 ブロック時は permissionDecision: deny と理由を JSON で stdout に返す。
 標準ライブラリのみに依存し、Windows / macOS / Linux で動作する。
@@ -51,6 +54,25 @@ def _inside_repo(raw_path: str, repo_root: Path) -> bool:
     return True
 
 
+def _in_nested_repo(raw_path: str, repo_root: Path) -> bool:
+    """対象ファイルが repo_root 配下のネストした git リポジトリ内かを返す。
+
+    repo_root に達するまでの親ディレクトリに `.git`（ディレクトリまたはファイル）が
+    あればネストとみなす。解決できなければ False（main 判定へ進む）。
+    """
+    try:
+        resolved = Path(raw_path).resolve()
+        root = repo_root.resolve()
+    except OSError:
+        return False
+    for parent in resolved.parents:
+        if parent == root:
+            break
+        if (parent / ".git").exists():
+            return True
+    return False
+
+
 def _edited_path(tool_input: dict) -> str:
     """編集対象のパスを返す。Edit / Write は `file_path`、NotebookEdit は
     `notebook_path` を使うため両方を見る。見つからなければ空文字（通す）。"""
@@ -76,7 +98,11 @@ def main() -> None:
     if not raw_path:
         return
 
-    if not _inside_repo(raw_path, REPO_ROOT) or not _on_main(REPO_ROOT):
+    if (
+        not _inside_repo(raw_path, REPO_ROOT)
+        or _in_nested_repo(raw_path, REPO_ROOT)
+        or not _on_main(REPO_ROOT)
+    ):
         return
 
     reason = (

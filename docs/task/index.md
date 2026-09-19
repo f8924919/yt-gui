@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （進行中・未着手のタスクはありません） | — | — | — |
+| [326-template-backport.md](326-template-backport.md) | 進行中 | 雛形 claude-templates の更新（上流 #20〜#79）を 4 本の PR に分けて逆輸入（PR1 安全網から着手） | 2026-09-19 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
