@@ -207,7 +207,7 @@ evaluator の `auto` が「変更規模のしきい値」で発火するのに�
 
 | skill | 役割 | 対応するフロー |
 |---|---|---|
-| [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票・ブランチ作成・`investigate` 起動・`criteria-review`（受け入れ条件レビュー・助言）・（§5.5 発火時）`design-review`（設計レビュー・助言）・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める）・実装 | step 1〜6 |
+| [`start-task`](../.claude/skills/start-task/SKILL.md) | Issue 確認/起票（本文の鮮度を前提 Issue の close と比べる）・ブランチ作成・`investigate` 起動・`criteria-review`（受け入れ条件レビュー・助言）・（§5.5 発火時）`design-review`（設計レビュー・助言）・docs 先/テスト先の順序ゲート（判断は自動化せず確認に留める。docs 先行の時点でタスクメモを [docs-guide.md](docs-guide.md) §3.2 の形で作る）・実装 | step 1〜6 |
 | [`verify-gate`](../.claude/skills/verify-gate/SKILL.md) | ブランチ種別を判定し `verify` →（docs 変更時）`docs-check` →（feature/bugfix/hotfix のみ）`evaluator` を順に起動・集約 | step 7 |
 | [`finish-task`](../.claude/skills/finish-task/SKILL.md) | `main` 最新化・マージ済みブランチ削除・**対応 Issue の close**（`Closes #` の書き漏らしを拾う安全網）・（実装 PR に同梱できなかった場合の補完として）完了タスクの archive 移動（複数タスクまとめ可・docs ブランチ＋PR） | step 9 |
 | [`harness-retro`](../.claude/skills/harness-retro/SKILL.md) | ハーネス見直し。`extract` で窓内の archive・訂正ログ・コミットと全メモリから候補を抜き出し、実害の実例・置き場所・配分つきの候補表をユーザーに示して選ばれたものを起票・記録する。`cleanup` でメモリを縮める・畳む・統合し、消した名前を先に記録する | §5.9（**標準フロー外**・ユーザーが求めたとき） |

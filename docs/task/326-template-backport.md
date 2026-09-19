@@ -10,14 +10,14 @@
 
 - [x] C1 PR1 安全網（SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close） — 証跡: PR #327・下の「検出器の有効性確認」M1〜M6
 - [x] C2 PR2 評価ゲートの規律（policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8・harness.md） — 証跡: PR #328・下の「PR2 の評価ゲートの巡回」
-- [ ] C3 PR3 進行中メモの注入（hook・pytest・変異） — 証跡: `tests/test_session_task_status.py`・下の「検出器の有効性確認」PR3 の変異 21 件（`3cf90de`）
+- [ ] C3 PR3 進行中メモの注入（hook・pytest・変異） — 証跡: `tests/test_session_task_status.py`・下の「検出器の有効性確認」PR3 の変異 22 件（`433b488`）
 - [ ] C4 PR3 タスクメモの見出し規約・進捗欄と訂正ログ・archive への直接作成の特例（docs-guide §3.2 / §4.2） — 証跡: 未
 - [ ] C5 PR3 分割点 A / B・訂正ログの止め規則・skill と rule の追従（git-workflow §5 / §5.2 / §5.6 / §5.8） — 証跡: 未
 - [ ] C6 PR3 harness-retro（skill・§5.9・記録ファイル） — 証跡: 未
 - [ ] C7 PR4 implementer とブリーフ（§5.2「実装の委譲」） — 証跡: 未
 - [ ] C8 PR4 エージェント名の列挙の追従・docs-check 観点 — 証跡: 未
 - [ ] C9 PR4 長いジョブの起こし方の規則 — 証跡: 未
-- [ ] verify-gate（PR3） — 証跡: 未
+- [x] verify-gate（PR3） — 証跡: 下の「検証ゲート」表の PR3 行
 
 ## 訂正ログ
 
@@ -29,7 +29,7 @@
 
 ## 次にやること（申し送り・2026-09-19 時点）
 
-1. PR3 の docs の残り（design-review の M4・M5・L2 の反映）を仕上げ、`/verify-gate` を回して PR を出す（`Refs #326`）。
+1. PR3 の evaluator 1 巡目は PASS（follow-up あり）。残りの [証跡・文言] 5 件を直したら PR を出す（`Refs #326`）。
 2. PR3 マージ後の新しいセッションで、SessionStart hook がこのメモの引用ブロック・本節・進捗の未チェック項目を注入するかを確かめる。
 3. PR4（implementer・長いジョブの規則）へ。PR4 で implementer を足したら policy §8.3 C6 の注記「investigate だけ」を直す。
 
@@ -84,7 +84,7 @@
 ## PR3 の設計（上流からの読み替え）
 
 - **hook（進行中メモの注入）**: 上流 `session_task_status.py` の `build_context(index_text, base_dir)` と `_in_progress_blocks` / `_memo_lines` をそのまま移す（見出し語・上限の定数を含む）。yt-gui の差分は 2 点: テストは `TASK_INDEX_PATH` 環境変数ではなく既存どおり `TASK_INDEX` の差し替えと `build_context()` の直接呼び出しで行う／Python 3.10 未満のガードは入れない（3.14 固定）。PR1 で入れた片方欠落の 1 行に「`## タスク` が無いので進行中メモも注入できていない」を足す
-- **テスト**: 上流 `scripts/smoke_session_status.py` のケース（`CASES` の C1〜C3・H1〜H3 の 13 件。当初「14 件」と書いたが数え直すと 13 件 — 訂正ログ 3 件目）を `tests/test_session_task_status.py` の pytest へ移す。変異（上流の 19 件）は、policy §2.6 の「自動化するならコピーを変異させる」に従い、**リポジトリの一部（hook・テスト・`docs/task/`）を一時ディレクトリへ複写して変異させ、そこで pytest を流す**使い捨てスクリプトで回す（スクリプトは scratchpad に置き、結果の表だけをここに貼る）。無変異の複写で green を先に確かめる（A7）
+- **テスト**: 上流 `scripts/smoke_session_status.py` のケース（`CASES` の C1〜C3・H1〜H3 の 13 件。当初「14 件」と書いたが数え直すと 13 件 — 訂正ログ 3 件目）を `tests/test_session_task_status.py` の pytest へ移す。変異（上流の 19 件と yt-gui で足した分岐）は、policy §2.6 の「自動化するならコピーを変異させる」に従い、**リポジトリの一部（hook・テスト・`docs/task/`）を一時ディレクトリへ複写して変異させ、そこで pytest を流す**使い捨てスクリプトで回す（スクリプトは scratchpad に置き、結果の表だけをここに貼る）。無変異の複写で green を先に確かめる（A7）
 - **mypy の対象**: 現状は hook のうち `block_main_commit.py` だけが `[tool.mypy] files` に入っている。今回 hook のコードが大きく増えるので、`session_task_status.py` も入れる（ほかの hook は本 Issue の範囲外）
 - **docs-guide §3.2**: タスクメモの見出し規約（引用ブロック・申し送り・進捗）と「進捗欄と訂正ログ」を上流どおり置く。§4.2 に「単一 PR で完結する小タスクの特例」（上流 #20）と archive 行のメトリクス句（上流 #26）。§2.1 に `harness-retro-log.md`
 - **git-workflow**: §5 に分割点 A / B（yt-gui では hook の節は §5.6）、§5.2 に「訂正ログの止め規則」、§5.3 に harness-retro の行、§5.6 の hook 表の行を進行中メモの注入に更新、§5.8 の該当箇所表に harness-retro と共通の「訂正ログの止め規則」、§5.9 を新設
@@ -130,33 +130,35 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 ### PR3（進行中メモの注入）
 
 - **テストファーストの red**: 実装前の HEAD `a2230f9` で、追加したテストを流して 18 failed / 12 passed（`build_context()` の新しい引数と注入が無いため。既存の見出し欠落のテスト 4 件も新しい呼び出し形で落ちた）。
-- **変異（1 回目）**: green をコミット（`91f6dfe`）した後、hook・テスト・`docs/task/` を一時ディレクトリへ複写し、複写側の hook を 1 か所ずつ壊して pytest を流した（policy §2.6「自動化するならコピーを変異させる」。ランナーは scratchpad の使い捨て）。対照（無変異の複写）は 30 passed。**撃墜 19 / 19**、原本は無傷（`git status --porcelain` が空）。
-- **ランナー自身の不具合**: 最初の実行は pytest に `-rN`（要約なし）を渡していたため FAILED 行を拾えず、「死因なし・0 / 19」と出た。件数（`12 failed` 等）は出ていたので、死因の表を件数と突き合わせて気づいた（policy §8.1 A1 の「件数だけで満足しない」がそのまま効いた）。`-rf` に直して再実行したのが下の表。
-
-| 変異 | 落ちたテスト（死因） |
-|---|---|
-| 進行中の判定を潰す | C1-in-progress-one ほか進行中メモを使う 11 件と main() の経路（12 failed） |
-| 未着手も開く | C1-not-started-is-not-opened |
-| 「申し送り」を語から外す | C3-no-checkbox-table-form |
-| 「進捗」を前方一致から完全一致へ | C1-in-progress-two-heading-variants |
-| 未チェックの印を [x] に | C1-in-progress-one ほか 6 件（7 failed） |
-| 入れ子の未チェックを見ない | C1-in-progress-one |
-| 引用ブロックを出さない | C1-in-progress-one・C1-in-progress-two-heading-variants |
-| メモごとの上限を外す | C2-per-memo-limit |
-| 合計の上限を外す | C2-total-limit |
-| 合計上限の後のメモを黙って落とす | C2-total-limit |
-| メモ欠落を黙って飛ばす | C3-memo-missing |
-| 「チェック項目が無い」と「未チェック項目なし」を同じ文にする | C3-no-checkbox-table-form |
-| 節が無いときの 1 行を出さない | C3-old-format-no-sections |
-| 「訂正ログ」を申し送りの語に足す | C1-in-progress-one |
-| 片方の見出しの欠落を知らせない | H1・H2 と PR1 の片方欠落のテスト 2 件（4 failed） |
-| 両方あっても欠落を知らせる | C1-in-progress-one・H1・H2 ほか 3 件（6 failed） |
-| `## タスク` が無いときに進行中メモに触れない | H1-no-task-heading |
-| 実際の見出しを出さない | H1・H2・PR1 の片方欠落のテスト 1 件（3 failed） |
-| メモを index の親ではなくリポジトリルート基準で解決する | test_main_injects_in_progress_memo_next_to_index |
-
+- **変異（1 回目・`91f6dfe`）**: green をコミットした後、hook・テスト・`docs/task/` を一時ディレクトリへ複写し、複写側の hook を 1 か所ずつ壊して pytest を流した（policy §2.6「自動化するならコピーを変異させる」。ランナーは scratchpad の使い捨て）。上流の 19 件のうち 18 件（「両方無いときも表の組み立てへ進む」を移し漏らした）と、yt-gui で足した「リポジトリルート基準」の 1 件で 19 件、撃墜 19 / 19。
+- **ランナー自身の不具合**: 1 回目の最初の実行は pytest に `-rN`（要約なし）を渡していたため FAILED 行を拾えず、「死因なし・0 / 19」と出た。件数（`12 failed` 等）は出ていたので、死因の表を件数と突き合わせて気づいた（policy §8.1 A1 の「件数だけで満足しない」がそのまま効いた）。
 - **テストファーストの red（2 回目）**: design-review H2 の 2 分岐（リンクの無い進行中の行・UTF-8 でない index）のテストを足し、実装前の HEAD `d64f088` で 2 failed / 30 passed。
-- **変異（2 回目）**: HEAD `3cf90de` で、ランナーに design-review H1 の安全策を入れて回し直した（複写元は `git archive HEAD`・変異ごとに新しいディレクトリ・`PYTHONDONTWRITEBYTECODE=1`・死亡は exit 1 だけ・収集件数が対照と一致しなければハーネスの失敗）。対照 32 passed、**撃墜 21 / 21**（上の 19 件に「リンクの無い進行中の行を黙って落とす」→ `C3-in-progress-row-without-link`、「UTF-8 でない index で落ちる」→ `test_fails_open_when_index_is_not_utf8` を足した）、原本は無傷。途中、ruff format が `except (A, B):` を Python 3.14 の `except A, B:` に直していたため置換対象が 0 回になり、fail-closed でハーネスが止まった（置換対象を直して再実行）。
+- **変異（最新・`433b488`）**: ランナーに design-review H1 の安全策を入れた（複写元は `git archive HEAD`・変異ごとに新しいディレクトリ・`PYTHONDONTWRITEBYTECODE=1`・死亡は exit 1 だけ・収集件数が対照と一致しなければハーネスの失敗）。対照 32 passed。**撃墜 22 / 22**、原本は無傷。上流の 19 件（evaluator の指摘で移し漏れの 1 件を足した）＋ yt-gui で足した分岐の 3 件（リンクの無い進行中の行・UTF-8 でない index・リポジトリルート基準）。途中、ruff format が `except (A, B):` を Python 3.14 の `except A, B:` に直していたため置換対象が 0 回になり、fail-closed でハーネスが止まった（置換対象を直して再実行）。死因は次のとおり（`433b488` での実行）。
+
+| 変異 | failed 数 | 落ちたテスト（死因） |
+|---|---|---|
+| 進行中の判定を潰す | 14 | C1-in-progress-one・C1-in-progress-two-heading-variants・C1-not-started-is-not-opened・C2-per-memo-limit・C2-total-limit・C2-within-limit-not-cut・C3-all-checked・C3-in-progress-row-without-link・C3-memo-missing・C3-no-checkbox-table-form・C3-old-format-no-sections・H2-no-issue-heading・test_main_injects_in_progress_memo_next_to_index・test_repository_task_index_is_parsable |
+| 未着手も開く | 1 | C1-not-started-is-not-opened |
+| 「申し送り」を語から外す | 1 | C3-no-checkbox-table-form |
+| 「進捗」を前方一致から完全一致へ | 1 | C1-in-progress-two-heading-variants |
+| 未チェックの印を [x] に | 7 | C1-in-progress-one・C1-in-progress-two-heading-variants・C2-per-memo-limit・C2-total-limit・C2-within-limit-not-cut・C3-all-checked・test_main_injects_in_progress_memo_next_to_index |
+| 入れ子の未チェックを見ない | 1 | C1-in-progress-one |
+| 引用ブロックを出さない | 2 | C1-in-progress-one・C1-in-progress-two-heading-variants |
+| メモごとの上限を外す | 1 | C2-per-memo-limit |
+| 合計の上限を外す | 1 | C2-total-limit |
+| 合計上限の後のメモを黙って落とす | 1 | C2-total-limit |
+| メモ欠落を黙って飛ばす | 1 | C3-memo-missing |
+| 「チェック項目が無い」と「未チェック項目なし」を同じ文にする | 1 | C3-no-checkbox-table-form |
+| 節が無いときの 1 行を出さない | 1 | C3-old-format-no-sections |
+| 「訂正ログ」を申し送りの語に足す | 1 | C1-in-progress-one |
+| 片方の見出しの欠落を知らせない | 4 | H1-no-task-heading・H2-no-issue-heading・test_build_context_reports_missing_issue_heading・test_build_context_reports_missing_task_heading |
+| 両方あっても欠落を知らせる | 7 | test_build_context_has_no_missing_note_when_both_present・C1-in-progress-one・H1-no-task-heading・H2-no-issue-heading・test_build_context_reports_missing_issue_heading・test_build_context_reports_missing_task_heading・test_repository_task_index_is_parsable |
+| ## タスク が無いときに進行中メモに触れない | 1 | H1-no-task-heading |
+| 実際の見出しを出さない | 3 | H1-no-task-heading・H2-no-issue-heading・test_build_context_reports_missing_issue_heading |
+| 両方無いときも表の組み立てへ進む | 3 | H3-no-both-headings・test_build_context_reports_no_h2_at_all・test_reports_when_no_heading_matches |
+| リンクの無い進行中の行を黙って落とす | 1 | C3-in-progress-row-without-link |
+| UTF-8 でない index で落ちる | 1 | test_fails_open_when_index_is_not_utf8 |
+| メモを index の親ではなくリポジトリルート基準で解決する | 2 | test_main_injects_in_progress_memo_next_to_index・test_repository_task_index_is_parsable |
 
 ## 検証ゲート
 
@@ -164,3 +166,4 @@ PR1 の hook 変更は、green の状態をコミット（`e79122d`）してか�
 |---|---|---|---|
 | PR1 | green（ruff check / format --check / mypy / pytest 584 passed。E501 の折り返しのみ修正） | 指摘なし | 1 巡目 PASS（要対応 0 件。参考の文言 2 点は反映済み。evaluator 自身も hook の複製へ 4 変異を入れて red を確認） |
 | PR2 | green（コード変更なし。巡ごとに回し直し、pytest 584 passed） | 自動修正 1 件は重複のため戻した。§8.3 C6 の出典の限定句を追加 | 4 巡で PASS（follow-up あり）。1〜3 巡目は FAIL（各 [欠陥] 1 件）。経緯は「PR2 の評価ゲートの巡回」 |
+| PR3 | green（ruff check / format --check / mypy 59 files / pytest 600 passed） | 不整合なし（CLAUDE.md のドキュメントマップに記録ファイルは載せない判断。arch の関連仕様行の欠落は既存で範囲外） | 1 巡目 PASS（follow-up あり）: [欠陥] 0 件 / [証跡・文言] 5 件（死因表が古い・上流の変異 1 件の移し漏れ・finish-task C-4 の文の吸い込み・§5.3 の start-task 行・次にやることが古い）をこの PR で直した。規則 2 により再評価なし |
