@@ -100,7 +100,7 @@
 
 - **implementer（`.claude/agents/implementer.md`）**: 上流 #66 / #77 をほぼそのまま移す（Sonnet / `high`・書き込みが要るので `permissionMode: plan` は付けない・commit / push をしない約束は本文だけで担保）。外すもの: `change_set.py` の snapshot / compare（yt-gui に無い）、hook `check_long_job_command.py` / `block_running_script_edit.py` への言及（入れていない。長いジョブは verify.md の節を指すだけ）、「変異の死因とカバー」の機械書式（yt-gui は死因の表。policy §8.1 A1）。
 - **ブリーフの雛形（`start-task/implementer-brief-template.md`）**: 上流どおり。fingerprint・hook の注記を外す。置き場は `.brief/`（`.gitignore` に足す。scratchpad はセッション固有で分割点の `/clear` で消えるので使わない）。
-- **git-workflow §5.2「実装の委譲」**: いつ委譲するか / しないか・ブリーフの渡し方・主エージェントの義務 5 点を上流どおり置く。義務 1 の「verify の報告は証跡として採ってよい」の根拠は、上流の fingerprint ではなく「verify は実装していない」ことだけにする。§5 step 6・§5.2 冒頭（実装は Sonnet）・委譲表・effort と `permissionMode` の段落（書き込みを行うのは verify / docs-check / implementer）・費用対効果の段落を追従させる。qemu-g5 の効果測定の注記は「雛形 claude-templates の採用プロジェクトでの 1 タスクの観測」と限定して残す
+- **git-workflow §5.2「実装の委譲」**: いつ委譲するか / しないか・ブリーフの渡し方・主エージェントの義務 5 点を上流どおり置く（のちに yt-gui で義務 6 を足して 6 点。下の「雛形からの意図的な差分」）。義務 1 の「verify の報告は証跡として採ってよい」の根拠は、上流の fingerprint ではなく「verify は実装していない」ことだけにする。§5 step 6・§5.2 冒頭（実装は Sonnet）・委譲表・effort と `permissionMode` の段落（書き込みを行うのは verify / docs-check / implementer）・費用対効果の段落を追従させる。qemu-g5 の効果測定の注記は「雛形 claude-templates の採用プロジェクトでの 1 タスクの観測」と限定して残す
 - **start-task 手順 6**: 自分で書くか implementer へ委譲するかの分岐を上流どおり足す
 - **CLAUDE.md**: 上流と同じく「実装の委譲（implementer）」の 1 行を Git / GitHub 運用ルールの節に置く（モードなし）
 - **列挙の追従（上流 D'）**: エージェント名を 3 つ以上並べている行を木全体から拾い（`docs/task/archive/` を除く）、1 行ずつ読んで implementer を足すか・足さない理由が文面から読めるかを判定する。件数は数えたコマンドと出力をこのメモに貼る（policy §8.3 C6）。docs-check に観点 10「エージェント / hook / skill を列挙している散文」を足す
