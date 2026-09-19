@@ -6,7 +6,8 @@ Issue`）を抽出し、additionalContext として注入する。ファイル�
 その旨を 1 行注入する（両方欠落・片方欠落とも。#326）。
 `## タスク` 表で `進行中` の行はタスクメモを開き、冒頭の引用ブロック・
 「次にやること／申し送り」節・「進捗」節の未チェック項目を上限つきで注入する（#326）。
-進行中メモのケース表は雛形 claude-templates の `scripts/smoke_session_status.py` を移したもの。
+進行中メモのケース表は雛形 claude-templates の `scripts/smoke_session_status.py` を
+移したもの。
 
 表の抽出・整形は純粋ロジックとして直接検証し、注入の有無は `TASK_INDEX` を
 差し替えた main() で確認する。実運用の index.md に対する疎通も 1 本置く。
@@ -161,6 +162,13 @@ def test_fails_open_when_index_missing(monkeypatch, capsys, tmp_path):
     assert _context(monkeypatch, capsys, tmp_path / "no_such_index.md") is None
 
 
+def test_fails_open_when_index_is_not_utf8(monkeypatch, capsys, tmp_path):
+    """index.md が UTF-8 で読めなくても例外で落ちず、何も注入せず通す。"""
+    index = tmp_path / "index.md"
+    index.write_bytes("## タスク\n".encode("cp932"))
+    assert _context(monkeypatch, capsys, index) is None
+
+
 def test_reports_when_no_heading_matches(monkeypatch, capsys, tmp_path):
     """見出しが 1 つも一致しないときは黙らず、期待と実際の見出しを注入する（#326）。
 
@@ -229,7 +237,8 @@ MEMO_FULL = (
     "# #900 — 見本\n\n" + QUOTE + "\n## 何が起きているか\n\n本文 BODY-900。\n\n"
     "## 進捗\n\n- [x] 済み DONE-900\n- [ ] 未完 TODO-900a\n  - [ ] 入れ子 TODO-900b\n"
     "* [ ] 星 TODO-900c\n- [x] 済み DONE-900d\n\n"
-    "## 訂正ログ\n\n| 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |\n"
+    "## 訂正ログ\n\n"
+    "| 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |\n"
     "|---|---|---|---|\n| 2000-01-01 | FIXLOG-900 | 正 | 検査 |\n\n"
     "## 次にやること（申し送り・2000-01-01 時点）\n\n1. NEXT-900 を回す。\n\n"
     "### 触ってはいけない\n\n- HANDS-OFF-900\n\n"
@@ -263,13 +272,17 @@ def _long_memo(tag: str, n: int) -> str:
 
 
 def _index(rows: list[tuple[str, str]]) -> str:
-    body = "".join(f"| [{f}]({f}) | {st} | 概要 | 2000-01-01 |\n" for f, st in rows)
+    body = "".join(
+        f"| {f if ' ' in f else f'[{f}]({f})'} | {st} | 概要 | 2000-01-01 |\n"
+        for f, st in rows
+    )
     return (
         "# タスク一覧\n\n## タスク\n\n"
         "| タスク | ステータス | 概要 | 更新日 |\n|---|---|---|---|\n"
         + body
         + "\n<!-- 記入例:\n| [x.md](x.md) | 進行中 | y | z |\n-->\n\n"
-        "## 起票済み・未着手の Issue\n\n| Issue | 概要 | 着手時に読むもの |\n|---|---|---|\n"
+        "## 起票済み・未着手の Issue\n\n"
+        "| Issue | 概要 | 着手時に読むもの |\n|---|---|---|\n"
         "| #1 | a | b |\n"
     )
 
@@ -293,38 +306,52 @@ INDEX_NO_ISSUE = (
     f"# タスク一覧\n\n## タスク\n\n{_TASK_TABLE}\n{RENAMED_ISSUE}\n\n{_ISSUE_TABLE}"
 )
 INDEX_NO_BOTH = (
-    f"# タスク一覧\n\n{RENAMED_TASK}\n\n{_TASK_TABLE}\n{RENAMED_ISSUE}\n\n{_ISSUE_TABLE}"
+    f"# タスク一覧\n\n{RENAMED_TASK}\n\n{_TASK_TABLE}\n"
+    f"{RENAMED_ISSUE}\n\n{_ISSUE_TABLE}"
 )
 MISSING_ONE = "見つからなかった見出し"
 MISMATCH = "期待する見出しが見つからないため表を注入できなかった"
 NO_MEMO_NOTE = "進行中メモも注入できていない"
 
-# (ID, index の行 [(ファイル名, ステータス)], ファイル {名前: 本文}, 含むべき文字列, 含まない文字列)
+# (ID, index の行 [(ファイル名, ステータス)], ファイル {名前: 本文},
+#  含むべき文字列, 含まない文字列)
 # ファイルに "@index" があれば、行から組み立てずにその本文を index にする
 MEMO_CASES = [
     (
         "C1-in-progress-one",
         [("900.md", "進行中")],
         {"900.md": MEMO_FULL},
-        ["タスクメモを持つタスク", "900.md", "ステータス: 進行中", "feature/900-x"]
-        + ["NEXT-900", "HANDS-OFF-900", "TODO-900a", "TODO-900b", "TODO-900c"],
-        # ## 訂正ログ は注入しない（独立 H2 の契約）。両方の見出しがあれば欠落の 1 行も出さない
+        [
+            *(
+                "タスクメモを持つタスク",
+                "900.md",
+                "ステータス: 進行中",
+                "feature/900-x",
+            ),
+            *("NEXT-900", "HANDS-OFF-900", "TODO-900a", "TODO-900b", "TODO-900c"),
+        ],
+        # ## 訂正ログ は注入しない（独立 H2 の契約）。
+        # 両方の見出しがあれば欠落の 1 行も出さない
         ["DONE-900", "BODY-900", "REF-900", "FIXLOG-900", MISSING_ONE, MISMATCH],
     ),
     (
         "H1-no-task-heading",
         [],
         {"@index": INDEX_NO_TASK, "900.md": MEMO_FULL},
-        ["起票済み・未着手の Issue", "SYNTH-ISSUE-7c1", MISSING_ONE, "## タスク（実際"]
-        + [RENAMED_TASK, NO_MEMO_NOTE],
+        [
+            *("起票済み・未着手の Issue", "SYNTH-ISSUE-7c1", MISSING_ONE),
+            *("## タスク（実際", RENAMED_TASK, NO_MEMO_NOTE),
+        ],
         ["タスクメモを持つタスク", "SYNTH-TASK-7c1", "NEXT-900", MISMATCH],
     ),
     (
         "H2-no-issue-heading",
         [],
         {"@index": INDEX_NO_ISSUE, "900.md": MEMO_FULL},
-        ["タスクメモを持つタスク", "SYNTH-TASK-7c1", "NEXT-900", MISSING_ONE]
-        + ["## 起票済み・未着手の Issue（実際", RENAMED_ISSUE],
+        [
+            *("タスクメモを持つタスク", "SYNTH-TASK-7c1", "NEXT-900", MISSING_ONE),
+            *("## 起票済み・未着手の Issue（実際", RENAMED_ISSUE),
+        ],
         ["SYNTH-ISSUE-7c1", NO_MEMO_NOTE, MISMATCH],
     ),
     (
@@ -352,7 +379,11 @@ MEMO_CASES = [
         "C3-old-format-no-sections",
         [("902.md", "進行中")],
         {"902.md": MEMO_OLD},
-        ["引用ブロックが無い", "「次にやること／申し送り」の節が無い", "「進捗」の節が無い"],
+        [
+            "引用ブロックが無い",
+            "「次にやること／申し送り」の節が無い",
+            "「進捗」の節が無い",
+        ],
         ["BODY-902", "DONE-902"],
     ),
     (
@@ -391,6 +422,15 @@ MEMO_CASES = [
         ["D-item-040", "E-item-001"],
     ),
     (
+        # リンクの無い進行中の行は黙って落とさず、その旨を 1 行出す
+        # （yt-gui で足した分岐）
+        "C3-in-progress-row-without-link",
+        [("リンクなしの行 NOLINK-906", "進行中")],
+        {},
+        ["リンクの無い進行中の行: ", "NOLINK-906"],
+        [],
+    ),
+    (
         "C2-within-limit-not-cut",
         [("S.md", "進行中")],
         {"S.md": _long_memo("S", 10)},
@@ -406,7 +446,10 @@ MEMO_CASES = [
     ids=[case[0] for case in MEMO_CASES],
 )
 def test_build_context_in_progress_memos(tmp_path, rows, files, must, must_not):
-    """進行中メモの注入（C1〜C3）と見出し欠落（H1〜H3）。メモは index の親基準で解決する。"""
+    """進行中メモの注入（C1〜C3）と見出し欠落（H1〜H3）。
+
+    メモは index の親ディレクトリ基準で解決する。
+    """
     for name, text in files.items():
         if name != "@index":
             (tmp_path / name).write_text(text, encoding="utf-8")
@@ -431,9 +474,20 @@ def test_main_injects_in_progress_memo_next_to_index(monkeypatch, capsys, tmp_pa
 
 
 def test_repository_task_index_is_parsable(monkeypatch, capsys):
-    """本リポジトリの docs/task/index.md が hook の想定構造を満たしている。"""
+    """本リポジトリの docs/task/index.md が hook の想定構造を満たしている。
+
+    進行中メモの中身は決め打ちで見ない（メモは作業のたびに変わる）。見るのは、
+    見出しがそろっていることと、`進行中` の行の数だけメモの注入ブロックが出ること
+    （0 件なら 0 件で一致する — 「対象なし」と「注入が壊れた」を件数で区別する）。
+    """
     repo_index = Path(__file__).parent.parent / "docs" / "task" / "index.md"
     context = _context(monkeypatch, capsys, repo_index)
     assert context is not None
     assert "タスクメモを持つタスク" in context
     assert "起票済み・未着手の Issue" in context
+    assert "見つからなかった見出し" not in context
+    grouped = session_task_status._sections(repo_index.read_text(encoding="utf-8"))
+    rows = session_task_status._table_rows(grouped["## タスク"])
+    in_progress = [r for r in rows if len(r) > 1 and "進行中" in r[1]]
+    assert context.count("**進行中タスクメモ: ") == len(in_progress)
+    assert "メモが読めない" not in context

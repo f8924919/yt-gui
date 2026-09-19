@@ -16,9 +16,12 @@ CLAUDE.md の「セッション開始時に docs/task/index.md を確認する�
 長いセッションは文脈が要約されて計画の精度が落ちるので、`/clear` した新セッションから
 **メモを探さずに**再開できるようにするため（docs/git-workflow.md §5 の分割点 A / B）:
 
-- 冒頭の引用ブロック（本文先頭から最初の `## ` までの連続する `>` 行。Issue・ブランチ・基点）
-- 見出しに NEXT_KEYWORDS（「次にやること」「申し送り」）を**含む** H2 節の全文（文書順に全部）
-- 見出しが PROGRESS_PREFIX（「進捗」）で**始まる** H2 節の未チェック項目（`- [ ]` / `* [ ]`。入れ子も）
+- 冒頭の引用ブロック（本文先頭から最初の `## ` までの連続する `>` 行。
+  Issue・ブランチ・基点）
+- 見出しに NEXT_KEYWORDS（「次にやること」「申し送り」）を**含む** H2 節の全文
+  （文書順に全部）
+- 見出しが PROGRESS_PREFIX（「進捗」）で**始まる** H2 節の未チェック項目
+  （`- [ ]` / `* [ ]`。入れ子も）
 
 見出しの語はここの定数が正本（docs/docs-guide.md §3.2 の見出し規約はここへリンクする）。
 注入量には上限を置く（PER_MEMO_LIMIT / TOTAL_LIMIT。注入後の行数で数える）。index.md を
@@ -35,7 +38,8 @@ CLAUDE.md の「セッション開始時に docs/task/index.md を確認する�
 注入できていないことも同じ行に書く）。注入自体は出ているので、欠けた表は黙っていると
 気づけない（#326。docs/git-workflow.md §5.6 の共通方針）。タスクメモ側も同じで、
 **メモが読めない・節が無い・チェック項目が無い・未チェック 0 件はそれぞれ別の 1 行**を
-出す（「無い」と「全部済んだ」を同じ文にしない）。
+出す（「無い」と「全部済んだ」を同じ文にしない）。`進行中` なのにメモへのリンクが
+無い行も黙って落とさず 1 行出す（雛形には無い、yt-gui で足した分岐）。
 
 組み立ては build_context(index_text, base_dir) に切り出してあり、テストはこれを直接呼ぶ
 （tests/test_session_task_status.py）。
@@ -183,14 +187,14 @@ def _memo_link(cell: str) -> tuple[str, str] | None:
 def _cut(lines: list[str], limit: int, path: str) -> list[str]:
     if len(lines) <= limit:
         return lines
-    return lines[: max(limit - 1, 0)] + [f"…以下は {path} を読む"]
+    return [*lines[: max(limit - 1, 0)], f"…以下は {path} を読む"]
 
 
 def _display_path(p: Path) -> str:
     """注入文に載せるパス。リポジトリ内ならルート相対、外（テストの一時ディレクトリ）なら絶対。"""
     try:
         return p.resolve().relative_to(REPO_ROOT).as_posix()
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return p.as_posix()
 
 
@@ -204,6 +208,8 @@ def _in_progress_blocks(rows: list[list[str]], base_dir: Path) -> list[str]:
             continue
         link = _memo_link(row[0])
         if link is None:
+            # 進行中なのにメモへのリンクが無い行は、黙って落とさずに知らせる
+            out.append(f"- リンクの無い進行中の行: {row[0]}")
             continue
         label, href = link
         path = _display_path(base_dir / href)
@@ -214,7 +220,7 @@ def _in_progress_blocks(rows: list[list[str]], base_dir: Path) -> list[str]:
         block = [f"**進行中タスクメモ: {label}**（{path}）"]
         try:
             text = (base_dir / href).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             block.append(f"- メモが読めない: {path}")
             out.extend([*block, ""])
             continue
@@ -283,8 +289,8 @@ def build_context(index_text: str, base_dir: Path) -> str:
             "",
             *blocks,
             "CLAUDE.md のタスク管理ルールに従い、未着手 / 進行中のものがあれば"
-            "**対応するかをユーザーに尋ねること**。進行中メモの注入があれば、"
-            "まずその申し送りに従って再開する。詳細は "
+            "**対応するかをユーザーに尋ねること**。進行中メモを続けると決まったら、"
+            "注入された申し送りから再開する。詳細は "
             "docs/task/index.md と docs/task/archive/index.md を参照。",
         ]
     )
@@ -297,8 +303,8 @@ def main() -> None:
 
     try:
         index_text = TASK_INDEX.read_text(encoding="utf-8")
-    except OSError:
-        return  # index.md が無い → 何も注入しない
+    except OSError, UnicodeDecodeError:
+        return  # index.md が無い・読めない → 何も注入しない
 
     context = build_context(index_text, TASK_INDEX.parent)
 
