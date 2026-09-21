@@ -2,7 +2,7 @@
 
 > Issue: [#333](https://github.com/f8924919/yt-gui/issues/333)
 > ステータス: 進行中（2026-09-22 着手）
-> ブランチ: `feature/333-template-backport`
+> ブランチ: `feature/333-template-backport`（PR [#335](https://github.com/f8924919/yt-gui/pull/335)）
 > 基点: `b46c6e0`（`main`）
 > 上流の基点: claude-templates `8fa3bad`（= PR #79 マージ。前回 [#326](archive/326-template-backport.md) の到達点）／取り込み対象は `origin/main` = `5b262d0`
 
@@ -14,9 +14,9 @@
 - [x] C4 限定を外したことに伴う注記の追従（適用範囲・義務 2/4 との違い。agent 定義 2 本と start-task 手順 3 は変更しない） — 証跡: 「C6 の適用範囲」注記の「**出所を問わない**（上記）」「**主エージェント自身が書く数に対応する agent 側の項目は無い**」、義務 2・4 の注記の「**C6 は「数そのものを、出所にかかわらず書く前に数え直す」**」。変更しなかった 3 ファイルは下の「限定語の洗い出し」
 - [x] C5 訂正ログの止め規則に「誤った値そのものの語で伝播先を洗う」箇条を足す（箇条 1 の読み直し・旧 4 → 5 の繰り下げ） — 証跡: `docs/git-workflow.md`「訂正ログの止め規則」箇条 4「**訂正を 1 件積んだら、止まる前から毎回、その誤りの語で伝播先を洗う。**」・箇条 1「表を頭から読み直し」・箇条 5「（1〜4 のすべて。…）」（`ce795bd`）
 - [x] C6 §8.1 に A12 を足す（A11 は明示的な欠番行・対比句は落とす・実例は yt-gui 自身・§8 冒頭の番号注記の更新・雛形との違い注記） — 証跡: `docs/testing/policy.md` の A12 行「**docs が「〜できます」と約束した挙動に、それを踏むテストがあるか**」と A11 の欠番行、§8 冒頭「項目番号（A1〜A12〈**A11 は欠番**〉/ B1〜B4 / C1〜C6）」、「雛形との違い」注記の A11 / A12 の 2 文（`ce795bd`）。対比句は「**A8 と対**」へ読み替えた
-- [x] C7 取り込まないものを PR 本文に列挙する — 証跡: PR 本文（Issue #333 の C7 の **7 項目**を転記する。`gh issue view 333 --json body -q .body | sed -n '/### C7 /,/### C8 /p' | grep -c '^- '` → 7・`7a1d686` 時点）
-- [ ] C8 検証（lint / 型 / pytest・docs-check・follow-up Issue の起票と `Follow-up: #<N>`） — 証跡: follow-up [#334](https://github.com/f8924919/yt-gui/issues/334) 起票済み・`docs/task/index.md` の未着手表に追加済み。検証ゲートは未
-- [ ] verify-gate — 証跡: 未
+- [x] C7 取り込まないものを PR 本文に列挙する — 証跡: PR [#335](https://github.com/f8924919/yt-gui/pull/335) 本文「取り込まなかったもの（7 項目…）」（`gh issue view 333 --json body -q .body | sed -n '/### C7 /,/### C8 /p' | grep -c '^- '` → 7）
+- [x] C8 検証（lint / 型 / pytest・docs-check・follow-up Issue の起票と `Follow-up: #<N>`） — 証跡: PR #335 本文の「検証」節（verify green・docs-check 3 件反映・evaluator PASS（follow-up あり））。`gh pr view 335 --json body -q .body | grep -oE '^Follow-up: #[0-9]+'` → `Follow-up: #334`
+- [x] verify-gate — 証跡: verify green（ruff check / format --check / mypy 61 files / pytest 600 passed）→ docs-check 指摘 3 件を `9b8bab6` で反映 → evaluator PASS（follow-up あり）・`[欠陥]` 0 件 / `[証跡・文言]` 4 件を `7a1d686`・`e22d119` で全件この PR で直した
 
 ## 設計の要点（上流からの読み替え）
 
@@ -90,6 +90,7 @@ $ git grep -n -F -e "サブエージェントの報告一般" -- . ':!docs/task/
 
 ## 次にやること
 
+- PR [#335](https://github.com/f8924919/yt-gui/pull/335) のレビュー・マージを待つ。マージ後は `/finish-task`。
 - **訂正ログ 3 件。止め規則（[git-workflow.md](../git-workflow.md) §5.2「訂正ログの止め規則」箇条 1・3）で 2 件目と 3 件目に止まった。**2 件目では「PR 本文の数は先にコマンドを流して貼る」と決めて続け、その直後に同じ型の 3 件目が出た。**3 件目の判断（ユーザー・2026-09-22）: 以後は止めずに続ける** — 3 件はすべて「数・主張を確かめずに書いた」型で、残る作業は PR 作成のみ、そこに書く数（取り込まないもの 7 項目・変更 6 ファイル）はすべて PR 本文を書く直前に数え直す形にしたので、新たな数の主張が出ないため。
 - 続けると決まったら: Issue #333 本文の C6（A12 の主張・⑤ の値）と Issue #334 本文の同じ主張を直し、PR を出す。PR 本文には C7 の「取り込まないもの」**7 項目**と `Closes #333` / 行頭の `Follow-up: #334` を並べる。
 
