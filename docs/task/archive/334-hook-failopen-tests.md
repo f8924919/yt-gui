@@ -1,7 +1,7 @@
 # #334 format_edited_file hook のフェイルオープン 2 分岐にテストを足す
 
 > Issue: [#334](https://github.com/f8924919/yt-gui/issues/334)
-> ステータス: 進行中（2026-09-22 着手）
+> ステータス: 完了（2026-09-22 着手・完了。PR [#338](https://github.com/f8924919/yt-gui/pull/338)）
 > ブランチ: `bugfix/334-hook-failopen-tests`
 > 基点: `18306ba`（`main`）
 > 単一 PR で完結する小タスクなので archive に直接置く（[docs-guide.md](../../docs-guide.md) §4.2 の特例）
@@ -13,7 +13,7 @@
 - [x] C3 分岐に入ったこと自体を spy で確かめる（C1 は which 呼ばれた + run 呼ばれない、C2 は run 呼ばれた + 引数） — 証跡: `_spy_which` / `_spy_run` と、C1 の `assert which_calls == [...]` / `assert run_calls == []`、C2 の `assert len(run_calls) == 1` / `run_calls[0][0] == "ruff-stub"` / `run_calls[0][-1] == str(path)`
 - [x] C4 変異 → red の証跡（対照 green・変異 6 つ・死因の表・復元確認・壊す前の hash） — 証跡: 下の「変異 → red」
 - [x] C5 `uv run pytest -q -rs` が green で、足したテストが passed に数えられている — 証跡: 下の「対照（無変異）」。`-v` で 3 件とも `PASSED`（skipped / deselected でない）
-- [ ] verify-gate — 証跡: 未
+- [x] verify-gate — 証跡: verify green（ruff / mypy 61 files / pytest 603 passed・skip 0）→ docs-check 不整合なし → evaluator PASS（follow-up あり）・`[欠陥]` 0 件 / `[証跡・文言]` 2 件を `b6614cf` でこの PR で直した
 
 ## 設計の要点
 
@@ -68,7 +68,7 @@ $ uv run pytest tests/test_format_edited_file.py -q -rs  → 17 passed（skip 0�
 
 ## 次にやること
 
-- `/verify-gate` を回す（verify → docs-check → evaluator）。
-- PR 本文に変異の死因表と「既存の in-process パターンに合わせた。policy §1 との乖離は #337 で扱う」を書く。
+- なし。PR [#338](https://github.com/f8924919/yt-gui/pull/338) のマージを待つ。
+- 関連で残っているのは [#337](https://github.com/f8924919/yt-gui/issues/337)（policy §1 の「hook は subprocess 実行で検証する」と実態の乖離）。**着手時はテスト関数の数を数え直すこと** — #337 本文の表は `18306ba` 時点の実測で、本 PR で `tests/test_format_edited_file.py` が増えている。
 
 訂正ログ: 0 件
