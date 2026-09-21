@@ -11,7 +11,7 @@
 - [x] C1 `shutil.which` が `None` のとき無出力・例外なしで終わるテスト — 証跡: `tests/test_format_edited_file.py::test_main_is_silent_when_formatter_is_missing`（`cad3ae4`）
 - [x] C2 整形が例外を送出するとき無出力・例外なしで終わるテスト（`OSError` 系・`subprocess.SubprocessError` 系を各 1 ケース以上） — 証跡: 同 `::test_main_is_silent_when_format_fails[oserror]`（`FileNotFoundError`）と `[subprocess-error]`（`subprocess.TimeoutExpired`）
 - [x] C3 分岐に入ったこと自体を spy で確かめる（C1 は which 呼ばれた + run 呼ばれない、C2 は run 呼ばれた + 引数） — 証跡: `_spy_which` / `_spy_run` と、C1 の `assert which_calls == [...]` / `assert run_calls == []`、C2 の `assert len(run_calls) == 1` / `run_calls[0][0] == "ruff-stub"` / `run_calls[0][-1] == str(path)`
-- [x] C4 変異 → red の証跡（対照 green・変異 4 つ・死因の表・復元確認・壊す前の hash） — 証跡: 下の「変異 → red」
+- [x] C4 変異 → red の証跡（対照 green・変異 6 つ・死因の表・復元確認・壊す前の hash） — 証跡: 下の「変異 → red」
 - [x] C5 `uv run pytest -q -rs` が green で、足したテストが passed に数えられている — 証跡: 下の「対照（無変異）」。`-v` で 3 件とも `PASSED`（skipped / deselected でない）
 - [ ] verify-gate — 証跡: 未
 
@@ -31,7 +31,7 @@
 | # | 数えるもの | コマンド | 値 |
 |---|---|---|---|
 | ① | `tests/test_format_edited_file.py` のテスト関数 | `grep -c '^def test_' tests/test_format_edited_file.py` | **14** |
-| ② | hook 3 ファイルのテストのうち真の subprocess 実行（#337 の根拠） | `grep -rn "_run_hook_subprocess(" tests/test_block_main_edit.py` | **2 本**（`test_session_task_status.py`・`test_format_edited_file.py` は 0 本） |
+| ② | hook 3 ファイルのテストのうち真の subprocess 実行（#337 の根拠） | `grep -c "= _run_hook_subprocess(" tests/test_block_main_edit.py` | **2 本**（`test_session_task_status.py`・`test_format_edited_file.py` は 0 本）。`grep -rn "_run_hook_subprocess("` だと**定義行を含む 3 行**が出るので、呼び出しだけを数える形にした |
 
 ## 変異 → red（C4）
 
@@ -56,8 +56,10 @@ $ uv run pytest tests/test_format_edited_file.py -q -rs  → 17 passed（skip 0�
 | M2 | `except OSError, subprocess.SubprocessError:` を `except ZeroDivisionError:` に（try/except を実質無効化） | 2 failed / 15 passed | `test_main_is_silent_when_format_fails[oserror]`・`[subprocess-error]` |
 | M3 | except の tuple から **`OSError` を落とす** | 1 failed / 16 passed | `test_main_is_silent_when_format_fails[oserror]` **のみ** |
 | M4 | except の tuple から **`subprocess.SubprocessError` を落とす** | 1 failed / 16 passed | `test_main_is_silent_when_format_fails[subprocess-error]` **のみ** |
+| M5 | `which` 分岐で **stderr に print** する | 1 failed / 16 passed | `test_main_is_silent_when_formatter_is_missing` |
+| M6 | 整形失敗の分岐で **stderr に print** する | 2 failed / 15 passed | `test_main_is_silent_when_format_fails[oserror]`・`[subprocess-error]` |
 
-**撃墜 4 / 4。狙ったテストがそれぞれ落ちている**（件数だけでなく死因が一致）。**M3 / M4 が 2 ケース設計の根拠**で、片方のケースしか無ければ対応する tuple 縮退の変異は生き残っていた。変異後も原本は無傷（最終の `git status --porcelain` が空・HEAD は `cad3ae4`）。
+**撃墜 6 / 6。狙ったテストがそれぞれ落ちている**（件数だけでなく死因が一致）。**M3 / M4 が 2 ケース設計の根拠**で、片方のケースしか無ければ対応する tuple 縮退の変異は生き残っていた。変異後も原本は無傷（各回 `git diff --quiet` が 0）。**M5 / M6 は `evaluator` の所見を受けて足した分**で、「黙って通す」に stderr を含める判断（ユーザー・2026-09-22）に合わせて `_assert_silent` を入れた後に取った（`evaluator` の時点では stderr へ書く変異が生き残っていた）。
 
 ## 訂正ログ
 

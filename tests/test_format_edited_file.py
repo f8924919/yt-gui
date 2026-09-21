@@ -140,6 +140,17 @@ def test_main_skips_non_target_file(monkeypatch, capsys, fake_repo):
 # かどうかまで見る。
 
 
+def _assert_silent(capsys) -> None:
+    """フェイルオープンの「黙って通す」は stdout / stderr の両方が空であること。
+
+    hook 自身はどこにも print せず、整形の出力も `capture_output=True` で呑む。
+    stdout だけを見ると、stderr へ書く退行を見逃す（#334）。
+    """
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def _spy_which(monkeypatch, result):
     """`shutil.which` を差し替え、渡されたコマンド名を記録するリストを返す。"""
     calls: list[str] = []
@@ -176,7 +187,7 @@ def test_main_is_silent_when_formatter_is_missing(monkeypatch, capsys, fake_repo
 
     assert which_calls == [format_edited_file.FORMAT_CMD[0]]  # 分岐まで来ている
     assert run_calls == []  # 整形は起動していない
-    assert capsys.readouterr().out == ""
+    _assert_silent(capsys)
     assert path.read_text(encoding="utf-8") == "x   =    1"  # 整形されない
 
 
@@ -205,7 +216,7 @@ def test_main_is_silent_when_format_fails(monkeypatch, capsys, fake_repo, error)
     assert len(run_calls) == 1  # 整形を起動し、例外を受けている
     assert run_calls[0][0] == "ruff-stub"  # which の戻り値をそのまま使う
     assert run_calls[0][-1] == str(path)
-    assert capsys.readouterr().out == ""
+    _assert_silent(capsys)
     assert path.read_text(encoding="utf-8") == "x   =    1"  # 整形されない
 
 
