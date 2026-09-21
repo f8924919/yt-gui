@@ -174,6 +174,8 @@
 - **約束の言葉づかいまで錨にする。** docstring の「**黙って**通す」を stdout だけと読むと、stderr へ書く退行が素通りする（`evaluator` の変異で生き残りが判明）。stdout / stderr の両方を見る `_assert_silent` を入れた。**リポジトリで初めての stderr の assert**。
 - **1 つの except 節で複数の型を束ねているコードは、型ごとにケースが要る。** `except OSError, subprocess.SubprocessError:` の tuple から片方を落とす変異は、残った型のケースしか無いと生き残る（`criteria-review` の指摘で条件に入れ、変異 M3 / M4 で実証した）。**同じ形は他の hook にもある**（`format_edited_file.py` の `except OSError, ValueError:`・`except json.JSONDecodeError, ValueError:`）ので、そこにテストを足すときも同じ観点で見ること。
 
+**[240-hook-cross-repo.md](240-hook-cross-repo.md) の記述の訂正**: 同メモの「`tests/test_block_main_commit.py` 新設（**importlib 読込**・一時 git リポジトリで検証）」は**誤り**。同ファイルは初版から一貫して `sys.executable` で hook を**スクリプトとして起動**しており、`importlib` は使っていない（`grep -c "importlib" tests/test_block_main_commit.py` → 0）。**archive のメモ本文はその時点の記録として書き直さず、訂正はここと [testing/policy.md](../../testing/policy.md) §1 の hook の行に置く**（[#337](https://github.com/f8924919/yt-gui/issues/337) / [337-hook-test-method.md](337-hook-test-method.md)）。
+
 ### 区間ダウンロード
 
 [81-download-sections.md](81-download-sections.md) は ffmpeg による後処理切り出しで完了した。**ネイティブ `download_ranges` 経路はハングするため見送っており**、通信量を節約できる版の実現可否は [#84](https://github.com/f8924919/yt-gui/issues/84) に分離済み。着手時はまず当該タスクメモのハング再現条件から読み直すこと。
