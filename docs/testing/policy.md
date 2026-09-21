@@ -31,14 +31,14 @@
 | 純粋関数 | `yt_gui/app_update.py`（`parse_latest_version` / `check_for_update` / `should_check_on_startup` / `should_notify`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
-| 開発ツール（Claude Code hook） | `.claude/hooks/block_main_commit.py`（コマンド解析・実効ディレクトリ解決のロジック。**全件をスクリプトとして起動して検証する** — `settings.json` と同じ起動形式を pytest で再現し、セッション内での発火確認の代替にした経緯（#232 / PR #233）。ブランチ判定は一時 git リポジトリで検証。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#240 / #337） | ◯ |
+| 開発ツール（Claude Code hook） | `.claude/hooks/block_main_commit.py`（コマンド解析・実効ディレクトリ解決のロジック。**全件をスクリプトとして起動して検証する**（`sys.executable` で hook の `.py` を直接叩く）。**この方式を選んだ理由は一次資料で裏取りできていない**ので、ここには書かない（調べた範囲と結論は #337 と[タスクメモ](../task/337-hook-test-method.md)）。ブランチ判定は一時 git リポジトリで検証。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#240 / #337） | ◯ |
 | 開発ツール（Claude Code hook） | `.claude/hooks/block_main_edit.py`・`.claude/hooks/session_task_status.py`・`.claude/hooks/format_edited_file.py`（ブロック判定・表の抽出/整形・整形対象の判定。**判定ロジックは in-process で検証する** — パッケージ外なので `importlib` で hook を読み、`monkeypatch` で `sys.stdin` と `REPO_ROOT` 等の定数を差し替えて `main()` を直接呼ぶ。**スクリプトとしての起動経路は `block_main_edit.py` のフェイルオープン系だけ**が subprocess で確認しており、`session_task_status.py` と `format_edited_file.py` には**起動するテストが無い**。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外・#285 / #337） | ◯ |
 | ビルドスクリプト | `scripts/download_binaries.py`（pins 検証・リトライ/診断・notices 生成のロジック。HTTP は `_download` の monkeypatch ＋ `retries`/`sleep` 注入でオフライン検証・#265。`importlib` で読み込み、`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。実ダウンロードは対象外） | ◯ |
 | CI ワークフロー定義 | `.github/workflows/update-binaries.yml`（PR 作成トークンの設定＝`PIN_UPDATE_TOKEN` の指定・`GITHUB_TOKEN` へのフォールバック・未設定時の警告と PR 本文注記。設定が失われても既存テストは素通りし CI 未発火の症状へ静かに戻るため、yml をパースして構造を検証する・#284。`--cov=yt_gui` の範囲外につきカバレッジ計測対象外。ワークフローの実行そのものは対象外） | ◯ |
 
 > **hook のテストの方式**（実測と経緯は [#337](https://github.com/f8924919/yt-gui/issues/337) と[タスクメモ](../task/337-hook-test-method.md)。**件数はここに書きません** — 木が育つと腐るので、数えるコマンドはタスクメモ側に置いてあります）:
 > - **新規の hook テストは原則 in-process** にします。`block_main_commit.py` の全件スクリプト起動は **#232 / PR #233 由来の歴史的経緯であって、新規の模範ではありません**。
-> - **in-process を原則にする理由**: `monkeypatch` で `REPO_ROOT`・`shutil.which`・`subprocess.run` を差し替えられるので、**分岐に入ったこと自体**を見るテストが書けます（§8.1 A2。実例は `format_edited_file.py` のフェイルオープン 2 分岐・#334）。スクリプト起動ではこれらを差し替えられません。
+> - **in-process を原則にする理由**: `monkeypatch` で `REPO_ROOT`・`shutil.which`・`subprocess.run` を差し替えられるので、**分岐に入ったこと自体**を見るテストが書けます（§8.1 A2。実例は `format_edited_file.py` のフェイルオープンの各分岐・#334）。スクリプト起動ではこれらを差し替えられません。
 > - **スクリプトとしての起動経路で見るもの**: stdin が空・閉じている場合や、`REPO_ROOT` を差し替えずに実際のリポジトリへ当てたときのフェイルオープン（`block_main_edit.py` のフェイルオープン系）。`if __name__ == "__main__":` を通る経路そのものは in-process では担保できません。
 > - **`settings.json` に登録された `uv run --no-sync --project … python <path>` の起動形式そのものは、いずれのテストも検証していない（実地確認に委ねる）。** 過去に実際に踏んだ不発火（shell form のままで素の `git commit` が deny されなかった・#235 / PR #236）は、pytest ではなく**セッション内の実地 smoke** で見つかっています。**「subprocess で検証しているから登録も大丈夫」とは読まないでください。**
 
