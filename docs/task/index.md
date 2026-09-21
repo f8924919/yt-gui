@@ -29,4 +29,5 @@
 | Issue | 概要 | 着手時に読むもの |
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
+| [#334](https://github.com/f8924919/yt-gui/issues/334) | `format_edited_file` hook のフェイルオープン 2 分岐にテストを足す（policy §8.1 A12 の実例） | [policy.md](../testing/policy.md) §8.1 A12 / A2 / A1 |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
