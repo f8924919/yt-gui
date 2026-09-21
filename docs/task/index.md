@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （進行中・未着手のタスクはありません） | — | — | — |
+| [333-template-backport.md](333-template-backport.md) | 進行中 | claude-templates の更新（上流 #82〜#99）から docs 3 点を逆輸入 | 2026-09-22 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
