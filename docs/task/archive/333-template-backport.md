@@ -4,7 +4,7 @@
 > ステータス: 完了（2026-09-22 着手・完了。PR [#335](https://github.com/f8924919/yt-gui/pull/335) マージ）
 > ブランチ: `feature/333-template-backport`（PR [#335](https://github.com/f8924919/yt-gui/pull/335)）
 > 基点: `b46c6e0`（`main`）
-> 上流の基点: claude-templates `8fa3bad`（= PR #79 マージ。前回 [#326](archive/326-template-backport.md) の到達点）／取り込み対象は `origin/main` = `5b262d0`
+> 上流の基点: claude-templates `8fa3bad`（= PR #79 マージ。前回 [#326](326-template-backport.md) の到達点）／取り込み対象は `origin/main` = `5b262d0`
 
 ## 進捗（受け入れ条件 = Issue #333 の C1〜C8）
 
@@ -55,7 +55,7 @@ b46c6e0:docs/testing/policy.md:2
 
 ## A12 の実例の裏取り（変異・`9b8bab6`）
 
-`evaluator` が「主張が実測を上回る」と指摘したので、`.claude/hooks/format_edited_file.py` を 1 か所ずつ変異させて実測した（追跡下のファイルを直接変異させ、各回 `git checkout -- <file>` で復元。前後で `git status --porcelain` が空・HEAD は `9b8bab6`。[policy.md](../testing/policy.md) §8.1 A4）。
+`evaluator` が「主張が実測を上回る」と指摘したので、`.claude/hooks/format_edited_file.py` を 1 か所ずつ変異させて実測した（追跡下のファイルを直接変異させ、各回 `git checkout -- <file>` で復元。前後で `git status --porcelain` が空・HEAD は `9b8bab6`。[policy.md](../../testing/policy.md) §8.1 A4）。
 
 | 変異 | `uv run mypy` | `uv run pytest` |
 |---|---|---|
@@ -91,7 +91,7 @@ $ git grep -n -F -e "サブエージェントの報告一般" -- . ':!docs/task/
 ## 次にやること
 
 - なし。PR [#335](https://github.com/f8924919/yt-gui/pull/335) はマージ済み。残りは follow-up [#334](https://github.com/f8924919/yt-gui/issues/334)（`format_edited_file` hook のフェイルオープン 2 分岐にテストを足す）。
-- **訂正ログ 3 件。止め規則（[git-workflow.md](../git-workflow.md) §5.2「訂正ログの止め規則」箇条 1・3）で 2 件目と 3 件目に止まった。**2 件目では「PR 本文の数は先にコマンドを流して貼る」と決めて続け、その直後に同じ型の 3 件目が出た。**3 件目の判断（ユーザー・2026-09-22）: 以後は止めずに続ける** — 3 件はすべて「数・主張を確かめずに書いた」型で、残る作業は PR 作成のみ、そこに書く数（取り込まないもの 7 項目・変更 6 ファイル）はすべて PR 本文を書く直前に数え直す形にしたので、新たな数の主張が出ないため。
+- **訂正ログ 3 件。止め規則（[git-workflow.md](../../git-workflow.md) §5.2「訂正ログの止め規則」箇条 1・3）で 2 件目と 3 件目に止まった。**2 件目では「PR 本文の数は先にコマンドを流して貼る」と決めて続け、その直後に同じ型の 3 件目が出た。**3 件目の判断（ユーザー・2026-09-22）: 以後は止めずに続ける** — 3 件はすべて「数・主張を確かめずに書いた」型で、残る作業は PR 作成のみ、そこに書く数（取り込まないもの 7 項目・変更 6 ファイル）はすべて PR 本文を書く直前に数え直す形にしたので、新たな数の主張が出ないため。
 - 続けると決まったら: Issue #333 本文の C6（A12 の主張・⑤ の値）と Issue #334 本文の同じ主張を直し、PR を出す。PR 本文には C7 の「取り込まないもの」**7 項目**と `Closes #333` / 行頭の `Follow-up: #334` を並べる。
 
 訂正ログ: 3 件（止まった: 2026-09-22）
