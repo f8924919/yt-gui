@@ -124,6 +124,7 @@
 | [285-template-backport.md](285-template-backport.md) | 雛形 claude-templates の改良を逆輸入。PR1 hooks 層（SessionStart のタスク注入・main 編集ブロック・編集後整形・ブランチ削除の除外・§5.6 新設 / PR #287）、PR2 権限ルールと effort / permissionMode の固定（§5.7 新設 / PR #288）、PR3 評価ゲート・設計レビューのモード制（evaluator=always / design-review=auto）。evaluator が上流由来の不具合 2 件（NotebookEdit 未ブロック・`allowed-tools` の意味論誤り）を検出し、発生源の qemu-gui#124・雛形の claude-templates#12 へ横展開を起票（Issue #285） | 2026-07-31 |
 | [326-template-backport.md](326-template-backport.md) | 雛形 claude-templates の更新（上流 #20〜#79）を 4 本の PR で逆輸入。PR1 安全網（SessionStart hook の見出し欠落通知・ネストしたリポジトリの除外・finish-task の Issue close / PR #327）、PR2 評価ゲートの規律（policy §8・evaluator 軸 5 / 6・指摘区分と止め時・§5.8 通知・rules/harness.md / PR #328）、PR3 タスクメモのライフサイクル（進行中メモの注入・見出し規約・訂正ログ・分割点）と harness-retro（§5.9 / PR #329）、PR4 実装の委譲（implementer・ブリーフ・§5.2）と長いジョブの起こし方（§5.1 / PR #330）。scripts 群・代表操作ゲート・長いジョブの hook 本体は取り込まない（Issue #326）。メトリクス: コミット 5・7・8・7（PR #327・#328・#329・#330）・訂正ログ 3 件・evaluator 1・4・1・3 巡 | 2026-09-19 |
 | [333-template-backport.md](333-template-backport.md) | 雛形 claude-templates の更新（上流 #82〜#99）から docs 3 点を逆輸入（PR #335）。§8.3 C6 の母集団から出所の限定を外し（自分が書く数も対象）数え方の道具を性質と確かめ方で書く（上流 #87 / #92）、訂正ログの止め規則に「誤って書いた値そのもの・改名した識別子の語で伝播先を洗う」箇条を新設（上流 #86）、§8.1 に A12「docs が約束した挙動にテストの錨があるか」を追加（上流 #98 の A12 のみ。A11 は雛形固有なので理由つきの欠番）。#80 の参照様式と `consistency.py refs`・#81・`adopter_tree.py`・§5.10 ほか 7 項目は取り込まない（Issue #333）。A12 の実例として見つけた穴は follow-up #334 へ。メトリクス: コミット 8（PR #335）・訂正ログ 3 件・evaluator 1 巡 | 2026-09-22 |
+| [334-hook-failopen-tests.md](334-hook-failopen-tests.md) | `format_edited_file` hook のフェイルオープン 2 分岐（整形コマンドが見つからない・整形の起動が失敗する）にテストを足した（PR #338）。#333 で policy §8.1 に A12「docs が約束した挙動にテストの錨があるか」を入れたときの**実例として挙げた穴そのもの**。どちらの分岐も無出力・例外なしで終わるので、差し替えた `shutil.which` / `subprocess.run` の**呼び出し記録**まで見る（§8.1 A2）。整形の失敗は `OSError` 系と `subprocess.SubprocessError` 系の 2 ケースを持つ — 実装が 1 つの except 節で 2 型を束ねており、tuple から片方を落とす変異は 1 ケースだけでは生き残るため。「黙って通す」に **stderr** を含める判断をし、リポジトリで初めて stderr を assert した。hook 本体は変更なし。policy §1 の「hook は subprocess 実行で検証する」との乖離は #337 へ分離。メトリクス: コミット 3（PR #338）・訂正ログ 0 件・evaluator 1 巡 | 2026-09-22 |
 
 ## 完了タスクの経緯・申し送り
 
@@ -166,6 +167,12 @@
 - **上流 #80（記述を名指しで指す参照の様式と機械検査）は保留**。現行 docs の `.md:<行>` 参照が 0 件で動機が弱く、検査本体が `scripts/consistency.py`（yt-gui は非採用）だったため。**再検討する条件**は「恒久 docs に `.md:<行>` 参照が増えてきたとき」で、そのときは検査を `tests/` の pytest として書く（`tests/test_session_task_status.py` の前例）。上流側はこの機能で #90 / #91 / #92 の 3 本の修正を出しているので、取り込むならそれらを含めた版を見ること。
 - **#326 の follow-up 候補のうち「mypy の対象に `block_main_edit.py`・`format_edited_file.py` を足す」は解決済み**（`pyproject.toml` の `[tool.mypy] files` に両方入っている）。
 - **訂正ログの止め規則が実地で 2 回発火した**（訂正 3 件・箇条 1 と箇条 3）。3 件とも「自分が書く数・主張を、添えた手段で確かめずに書いた」型で、**まさにこの PR が強化した §8.3 C6 / §8.1 A1 の対象**だった。新設した箇条 4（当該タスクのメモを除外せずに洗う）は、メモ自身に残った 1 件まで見えたので設計どおり効いている。
+
+[334-hook-failopen-tests.md](334-hook-failopen-tests.md) は [333-template-backport.md](333-template-backport.md) の follow-up。**A12 を入れた PR で見つけた穴を、次の PR で塞いだ**形になっている。申し送り:
+
+- **A12 の実例は「塞いだら書き換える」。** `docs/testing/policy.md` の A12 の実例は、穴が未修理である前提の現在形で書いていたため、塞ぐ PR のマージで偽になるところだった（`evaluator` が検出）。**過去形にして、足したテスト名を添える**形に直してある。docs の実例は**実装が動けば腐る**ので、A12 の項目自体がその管理対象になる。
+- **約束の言葉づかいまで錨にする。** docstring の「**黙って**通す」を stdout だけと読むと、stderr へ書く退行が素通りする（`evaluator` の変異で生き残りが判明）。stdout / stderr の両方を見る `_assert_silent` を入れた。**リポジトリで初めての stderr の assert**。
+- **1 つの except 節で複数の型を束ねているコードは、型ごとにケースが要る。** `except OSError, subprocess.SubprocessError:` の tuple から片方を落とす変異は、残った型のケースしか無いと生き残る（`criteria-review` の指摘で条件に入れ、変異 M3 / M4 で実証した）。**同じ形は他の hook にもある**（`format_edited_file.py` の `except OSError, ValueError:`・`except json.JSONDecodeError, ValueError:`）ので、そこにテストを足すときも同じ観点で見ること。
 
 ### 区間ダウンロード
 
