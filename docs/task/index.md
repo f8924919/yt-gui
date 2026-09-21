@@ -30,4 +30,3 @@
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
-| [#337](https://github.com/f8924919/yt-gui/issues/337) | policy §1 の「hook は subprocess 実行で検証する」が実態と乖離している | [policy.md](../testing/policy.md) §1 の hook の行・[archive/334-hook-failopen-tests.md](archive/334-hook-failopen-tests.md) |

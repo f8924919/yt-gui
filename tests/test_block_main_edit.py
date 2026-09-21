@@ -9,7 +9,11 @@ hook は stdin の JSON（`tool_input.file_path`）を受け取り、リポジ�
 ブランチ判定・所属判定の対象はリポジトリルート（hook ファイルからの相対）で
 固定のため、判定ロジックは `repo_root` を引数に取るヘルパを直接呼んで検証し、
 `main()` 全体は `REPO_ROOT` を差し替えて確認する。フェイルオープン系は
-ブランチに依存しないため subprocess 実行で確認する。
+ブランチに依存せず `REPO_ROOT` の差し替えも要らないため、**スクリプトとして
+起動して**確認する。**この hook を `if __name__ == "__main__":` から通すのは
+それらだけ**（`block_main_commit.py` 側は全件がその経路を通るので、リポジトリ
+全体で唯一というわけではない）。方式の正本は
+[testing/policy.md](../docs/testing/policy.md) §1 の hook の行・#337。
 """
 
 import importlib.util
