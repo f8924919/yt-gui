@@ -52,7 +52,7 @@ tests/test_format_edited_file.py:3
 | `tests/test_session_task_status.py` | 19 | **0 本** | 全件 |
 | `tests/test_format_edited_file.py` | 16 | **0 本** | 全件 |
 
-**`block_main_commit.py` の「全件」は、`importlib` が 0 件であることから導いた**（hook のロジックへ届く経路が起動ヘルパしかない）。起動ヘルパを呼ぶ行を数えると 43 行だが、これは定義行と入れ子のヘルパを含むので**テスト本数とは一致しない** — 数として使わない。
+**`block_main_commit.py` の「全件」は、`importlib` が 0 件であることから導いた**（hook のロジックへ届く経路が起動ヘルパしかない）。**起動ヘルパを呼ぶ行を数えてもテスト本数とは一致しない**（定義行と入れ子のヘルパを含み、引く語をどう選ぶかで値が動く）ので、**その数は使わない** — `importlib` が 0 件であることの方が、「hook のロジックへ届く経路が起動しかない」を直接に言える。
 
 ## C5 の洗い出し
 
@@ -61,7 +61,7 @@ tests/test_format_edited_file.py:3
 | 当たった場所 | 判定 |
 |---|---|
 | `docs/testing/policy.md` の hook 2 行と新しい注記 | **書き換え対象そのもの**（C3） |
-| `tests/test_block_main_edit.py` の冒頭 docstring | **追従させた**（C5）。理由づけは両方残す — 「ブランチに依存せず `REPO_ROOT` の差し替えも要らない」（なぜ起動でよいか）と「`if __name__ == "__main__":` を通る経路を見る唯一のテスト」（起動で何が見えるか）。方式の正本は §1 を指す |
+| `tests/test_block_main_edit.py` の冒頭 docstring | **追従させた**（C5）。理由づけは両方残す — 「ブランチに依存せず `REPO_ROOT` の差し替えも要らない」（なぜ起動でよいか）と「`if __name__ == "__main__":` から通す」（起動で何が見えるか）。**「唯一のテスト」とは書かない** — `block_main_commit.py` 側は全件がその経路を通るので、リポジトリ全体で読むと偽になる（`docs-check` の指摘）。方式の正本は §1 を指す |
 | `tests/test_block_main_edit.py` の起動テストの docstring（「スクリプトとして起動しても不正入力で落ちない」） | **変更不要**（新しい記述と整合） |
 | `docs/task/archive/334-hook-failopen-tests.md`・`docs/task/archive/index.md`・`docs/task/index.md` | **`#337` への参照**（「#337 で別に扱う」）であって独立した主張ではない。**直さない** |
 | `docs/testing/policy.md` の `download_binaries.py` の行の「`importlib` で読み込み」 | **正しい**（`tests/test_download_binaries.py` に `importlib` が実在）。無関係 |
@@ -82,6 +82,15 @@ $ sed -n '34,44p' docs/testing/policy.md | grep -oE '[0-9]+ *(本|件|個)|全 [
 **この型は #333 の訂正ログ 3 件と同じ**（自分が書く数・主張を確かめずに書く）。今回は**規則を書いた直後に自分で当てた**ので、訂正ログを積む前に捕まえられた。C7 を条件に入れた `criteria-review` の指摘が効いた形。
 
 数え直しの結果は「C4 の実測」の表と一致した（`sys.executable` の行番号だけ `tests/test_block_main_edit.py:235` → `:237` に動いた — docstring を 2 行増やしたため。**行番号を主張に使っていないので表の値は不変**）。
+
+## 残した数についての判断（`docs-check` の指摘）
+
+policy.md の注記に「`format_edited_file.py` のフェイルオープン **2 分岐**・#334」という数が残っている。**これは残す。**
+
+- C3 が禁じたのは「**木が育つと腐る数**」（テスト本数のような、テストを足すたびに変わる値）。**hook のコードが持つ分岐の数は構造そのもの**で、増えたらその時点で A12 の実例の記述自体を書き直す対象になる（#334 でまさに書き直した）。
+- 一方で `docs-check` が「際どい」と見たのは妥当で、**同じ語で一括禁止にすると読み手が判断できない**。そこで **C3 の趣旨は「テスト方式・本数の数を書かない」**であることを、この判断とともにここに残す。
+
+`docs-check` の grep は `(本|件|個|つ|分岐)` で引いて当てた。**主エージェント側の C7 の grep は `(本|件|個)` だけで「2 分岐」を拾えていなかった** — 数を表す語の範囲を狭く採ると洗い漏れる、という形（洗い出しの語の選び方は [policy.md](../testing/policy.md) §8.3 C6 の道具の話と同じ）。
 
 ## 訂正ログ
 
