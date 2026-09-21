@@ -1,7 +1,7 @@
 # #337 policy §1 の hook のテスト方式を実態に合わせる
 
 > Issue: [#337](https://github.com/f8924919/yt-gui/issues/337)
-> ステータス: 完了（2026-09-22 着手・完了）
+> ステータス: 完了（2026-09-22 着手・完了。PR [#339](https://github.com/f8924919/yt-gui/pull/339)）
 > ブランチ: `bugfix/337-hook-test-method`
 > 基点: `3bdf5db`（`main`）
 
