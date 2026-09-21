@@ -39,10 +39,31 @@
 | ② | 上流の変更ファイル（`docs/task/` 以外） | `git diff --name-only 8fa3bad origin/main -- project-skeleton ':!project-skeleton/docs/task' \| wc -l`（同上） | **14 件** |
 | ③ | `§8.3 C6` を指すポインタ | `git grep -n -F "§8.3 C6" -- .claude docs ':!docs/task/archive'` | **3 一致 / 3 行**（`implementer.md`・`investigate.md`・`start-task/SKILL.md`） |
 | ④ | 旧限定語 | `git grep -n -F -e "報告にある数" -e "受け取った報告" -- . ':!docs/task/archive'` | **3 一致 / 2 行**（いずれも `docs/testing/policy.md`） |
-| ⑤ | §8 冒頭の番号注記 | `git grep -n -F "A1〜A10" -- docs .claude CLAUDE.md` | **1 行**（`docs/testing/policy.md`） |
+| ⑤ | §8 冒頭の番号注記 | `git grep -n -F "A1〜A10" -- docs .claude CLAUDE.md ':!docs/task/archive'` | **1 一致 / 1 行**（`docs/testing/policy.md`）。除外を外すと **2 一致 / 2 行**（`docs/task/archive/326-template-backport.md` の経緯の記述。凍結済みなので直さない） |
 | ⑥ | 現行 docs の `.md:<行>` 参照（上流 #80 を取らない根拠） | `git grep -nE '\.md:[0-9]+' -- docs .claude CLAUDE.md ':!docs/task/archive' \| wc -l` | **0 件**（木全体では 31 一致 / 4 ファイル。すべて凍結済みの `docs/task/archive/`） |
 
-**③〜⑤は「一致数」と「当たった行数」を区別している**（④は 2 行に 3 一致。同じ行に 2 つの限定語がある）。使った道具が 1 行の複数一致を落とさないことは、④ の行がまさにその形なので `git grep -o` と `git grep -c` の両方を採って確かめた（一致 3 > 行 2）。
+**③〜⑤は「一致数」と「当たった行数」を区別している**（④は 2 行に 3 一致。同じ行に 2 つの限定語がある）。使った道具が 1 行の複数一致を落とさないことを、④ の行（まさにその形）で確かめたプローブ:
+
+```
+$ git grep -o -F -e "報告にある数" -e "受け取った報告" b46c6e0 -- . ':!docs/task/archive' | wc -l
+3
+$ git grep -c -F -e "報告にある数" -e "受け取った報告" b46c6e0 -- . ':!docs/task/archive'
+b46c6e0:docs/testing/policy.md:2
+```
+
+**一致 3 > 行 2** なので、この道具は 1 行に複数ある一致を落としていない。
+
+## A12 の実例の裏取り（変異・`9b8bab6`）
+
+`evaluator` が「主張が実測を上回る」と指摘したので、`.claude/hooks/format_edited_file.py` を 1 か所ずつ変異させて実測した（追跡下のファイルを直接変異させ、各回 `git checkout -- <file>` で復元。前後で `git status --porcelain` が空・HEAD は `9b8bab6`。[policy.md](../testing/policy.md) §8.1 A4）。
+
+| 変異 | `uv run mypy` | `uv run pytest` |
+|---|---|---|
+| M1 `if executable is None: return` を**削除** | **red**（`List item 0 has incompatible type "str \| None"` 1 error） | 600 passed |
+| M2 `if executable is None:` の `return` を `raise SystemExit(1)` に変える | Success（61 files） | 600 passed |
+| M3 `try` / `except OSError, subprocess.SubprocessError` を外して例外を伝播させる | Success（61 files） | 600 passed |
+
+**フェイルオープンの挙動だけを変える M2 / M3 は全部 green** で、テストはこの約束をまったく見ていない。**M1 が red になるのは型の網**（`executable` が `str | None` のまま `subprocess.run` の第 1 引数リストへ渡る）であって、挙動の錨ではない。当初 A12 に書いた「この 2 分岐を消しても検証はすべて green」は M1 で偽だったので、文面を挙動側の言い方へ直した（訂正ログ 1 件目）。
 
 ## 限定語の洗い出し（C4・新設した止め規則 箇条 4 の自己適用）
 
@@ -63,10 +84,12 @@ $ git grep -n -F -e "サブエージェントの報告一般" -- . ':!docs/task/
 
 | 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
 |---|---|---|---|
+| 2026-09-22 | A12 の実例に「この 2 分岐を消しても検証はすべて green のまま通る」と書いた | `which` 側の早期 return を**削除**すると mypy が `[list-item]` で red になる。green のまま通るのは**挙動だけを変えたとき**（M2 / M3） | **書く前に変異させて実測すること**（§8.1 A1 と同じ形。docs に「壊しても green」と書くなら、それ自体が検出力の主張なので変異の証跡が要る）。`evaluator` が複製を変異させて捕まえた |
+| 2026-09-22 | 着手前の表 ⑤ に、コマンドは `':!docs/task/archive'` 無しで貼り、値は除外つきの「1 行」と書いた | 貼ったコマンドの出力は **2 一致 / 2 行**（除外つきなら 1 一致 / 1 行） | **貼るコマンドを実際に流して出力と値を突き合わせる**（§8.3 C6。③④⑥は除外を付けているのに ⑤ だけ付け忘れ、値だけ除外つきで書いた）。`evaluator` が同じコマンドを流して捕まえた |
 
 ## 次にやること
 
-- `/verify-gate`（lint / 型 / pytest・docs-check）を回す。evaluator は `always` なので起動する。
-- PR 本文には C7 の「取り込まないもの」の 6 項目と `Closes #333` / `Follow-up: #334` を並べる。
+- **訂正ログが 2 件になったので止め規則（[git-workflow.md](../git-workflow.md) §5.2「訂正ログの止め規則」箇条 1）で止まり、方針をユーザーに問う。**
+- 続けると決まったら: Issue #333 本文の C6（A12 の主張・⑤ の値）と Issue #334 本文の同じ主張を直し、PR を出す。PR 本文には C7 の「取り込まないもの」6 項目と `Closes #333` / 行頭の `Follow-up: #334` を並べる。
 
-訂正ログ: 0 件
+訂正ログ: 2 件
