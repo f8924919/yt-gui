@@ -1,7 +1,7 @@
 # プロンプト監査の指摘反映（文言のみ）
 
 > Issue: なし（`docs` ブランチ・受け入れ条件を持たない作業）
-> ステータス: 進行中（実装・検証は完了。push と PR 作成が `gh` の認証切れで未了）
+> ステータス: 完了（PR #340）
 > ブランチ: `docs/prompt-audit-cleanup`
 > 基点: f454b1b
 
@@ -41,9 +41,9 @@
 - [x] E `CLAUDE.md` の見出し文言 — 証跡: コミット 935ad12
 - [x] F `CLAUDE.md` の思考言語の文言統一 — 証跡: コミット 935ad12
 - [x] verify-gate — 証跡: `uv run pytest` 603 passed（2026-09-24 14:37 頃・作業ツリー = 935ad12 の内容）／`docs-check` 修正点なし・要対応 1 件（メトリクス句）。`docs` ブランチにつき `evaluator` は対象外（git-workflow §5.2）
-- [ ] push（`git push -u origin docs/prompt-audit-cleanup`） — 証跡: 未。**`gh` の認証切れでブロック中**
-- [ ] PR 作成（ベース `main`・本文日本語・Issue 無しなので `Closes #` は書かない） — 証跡: 未
-- [ ] メトリクス句の追記と archive への移動（`docs-guide.md` §4.2） — 証跡: 未
+- [x] push（`git push -u origin docs/prompt-audit-cleanup`） — 証跡: 2026-09-24 に push 済み（`gh` の再ログイン後）
+- [x] PR 作成（ベース `main`・本文日本語・Issue 無しなので `Closes #` は書かない） — 証跡: PR #340
+- [x] メトリクス句の追記と archive への移動（`docs-guide.md` §4.2） — 証跡: 本メモの archive 移動コミット（コミット 3（PR #340））
 
 ## 訂正ログ
 
@@ -52,20 +52,8 @@
 
 ## 次にやること（申し送り・2026-09-24 時点）
 
-**このブランチ（`docs/prompt-audit-cleanup`）のまま再開すること**（`main` で再開すると、このメモは注入されない。git-workflow §5 分割点 A）。
-
-1. **`gh` の認証を直す。** ここでブロックしている。現象と切り分け済みの事実:
-   - `gh auth status` → `The token in default is invalid.` / `gh api user` → HTTP 401
-   - `GH_TOKEN` / `GITHUB_TOKEN` はいずれも未設定（環境変数の横取りではない）
-   - `GH_CONFIG_DIR` 未設定。`gh` は `C:\Program Files\GitHub CLI\gh` v2.101.0、実行ユーザーは `f8924`
-   - `%APPDATA%\GitHub CLI\hosts.yml` は `users: f8924919: {}` のみで **`oauth_token` を持たない**（トークンは Windows 資格情報マネージャー側）。最終更新 14:39:11 で、その後のログイン試行では**更新されていない**
-   - ユーザーは RDP の別 PowerShell からログインしたと報告しているが、本セッションからは 401 のまま。`gh auth status` は失敗時もアカウント名 `f8924919` を出力するため、成否の読み違いの可能性あり（`✓ Logged in` か `X Failed to log in` かで判定する）
-   - 直し方: `gh auth logout -h github.com -u f8924919` の後に `gh auth login -h github.com -p https -w`。`gh api user --jq .login` が `f8924919` を返せば成功
-   - 素の `git push` は Git Credential Manager が TTY を要求して失敗する（`/dev/tty: No such device`）。`git -c credential.helper='!gh auth git-credential' push` も `gh` 側が無効なので同じく失敗した
-2. `git push -u origin docs/prompt-audit-cleanup`
-3. `gh pr create`（ベース `main`・本文は日本語・**対応 Issue が無いので `Closes #` は書かない**）
-4. PR 番号が確定したら、本メモを `docs/task/archive/` へ戻し、`docs/task/index.md` の `## タスク` 表から行を削除、`docs/task/archive/index.md` の「ドキュメント整備」表へ行を戻す（**この PR の前のコミットで一度書いた行の文面が `git log -p` に残っている**）。その概要セル末尾にメトリクス句を付ける: `メトリクス: コミット N（PR #M）・訂正ログ 0 件・evaluator 0 巡`（N は `git rev-list --count f454b1b..<PR の最終コミット>`）
-5. マージ後は `/finish-task`（Issue が無いので B はスキップ、C は同梱済みにつきスキップ。A のブランチ削除のみ）
+- マージ後は `/finish-task`（Issue が無いので B はスキップ、C は同梱済みにつきスキップ。A のブランチ削除のみ）
+- push が止まった原因は `gh` の認証切れ（`The token in default is invalid.`）。RDP の別 PowerShell でのログインは本セッションに効かず、**本セッション内で `! gh auth logout` → `! gh auth login -h github.com -p https -w`** を実行して解消した（トークンは `hosts.yml` に平文で保存された）
 
 **この PR の後に残る監査の宿題**（本タスクの範囲外・着手しない）:
 
