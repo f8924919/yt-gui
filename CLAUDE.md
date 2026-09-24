@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 言語ルール
 
 - **入出力は日本語**: ユーザーへの応答・ドキュメント・コミットメッセージ・PR の説明はすべて日本語で記述する。
-- **思考は英語**: 推論・計画・内部の思考プロセスは英語で行う。
+- **思考は英語でよい**: 推論・計画・内部の思考プロセスは英語で行ってよい（各サブエージェント定義の「言語ルール」と同じ）。
 - **既存スレッドへの追従（例外）**: 既に存在する GitHub Issue / PR の**本文・コメント**が日本語以外で書かれている場合は、そのスレッドの言語に合わせて記述する（外部参加者とのやり取りを成立させるため）。この例外の対象は Issue / PR の本文・コメントに限る。Claude が新規に起票する Issue / PR は日本語をデフォルトとし、ユーザーへのチャット応答・ドキュメント・コミットメッセージは常に日本語とする。
 
 ## 調査ルール: docs 先・コード裏取り
@@ -34,7 +34,7 @@ GitHub Issue は「起票・仕様・受け入れ条件の正本」、`docs/task
 
 ## Git / GitHub 運用ルール
 
-絶対に守るルール（詳細・ブランチ命名表・Issue 起票テンプレは [docs/git-workflow.md](docs/git-workflow.md)）。
+中核ルール（詳細・ブランチ命名表・Issue 起票テンプレは [docs/git-workflow.md](docs/git-workflow.md)）。
 
 - **`main` で直接作業しない**: 必ず `main` からブランチを切り、`main` へ PR を出す（GitHub Flow）。`main` 上での**ファイル編集**と `git commit` / `git push` は hook がブロックする（[docs/git-workflow.md](docs/git-workflow.md) §1・§5.6）。
 - **GitHub 操作は `gh` を使う**: 起票・閲覧・PR 作成は `gh` コマンド経由。
