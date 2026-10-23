@@ -1,8 +1,8 @@
 # claude-templates の更新（上流 #100〜#111）から 3 点を逆輸入
 
 > Issue: [#357](https://github.com/f8924919/yt-gui/issues/357)
-> ステータス: 完了（2026-10-23 着手・完了。PR 作成前に verify-gate を通過）
-> ブランチ: `feature/357-template-backport`
+> ステータス: 完了（2026-10-23 着手・完了。PR [#358](https://github.com/f8924919/yt-gui/pull/358)）
+> ブランチ: `feature/357-template-backport`（PR [#358](https://github.com/f8924919/yt-gui/pull/358)）
 > 基点: `314b142`（`main`）
 > 上流の基点: claude-templates `5b262d0`（= PR #99 マージ。前回 [#333](333-template-backport.md) の到達点）／取り込み対象は `origin/main` = `06ec996`
 
@@ -14,7 +14,7 @@
 - [x] C4 policy §8.0「探索の段と証跡の段」を yt-gui 向けに新設 — 証跡: `docs/testing/policy.md` §8.0 と §8.1「雛形との違い」の §8.0 の文（`5808b17`。〈`pyproject.toml`〉は evaluator 1 巡目の指摘で本コミットに足した）
 - [x] C5 §8.0 のポインタ（policy §2.6・§8.1 A1・rules 2 本・evaluator・git-workflow §5.2・verify-gate・start-task・ブリーフ雛形・criteria-review (c)） — 証跡: 各ファイルの §8.0 へのリンク（`5808b17`）。`evaluator.md` 軸 5 の区分の箇条への 1 文（鮮度の判定にプローブの `git hash-object`）は条件の「枝 (a) 以降は変えない」からのずれで、理由は下の「書き換えの洗い出し」と PR 本文
 - [x] C6 書き換えの自己適用（洗い出しの記録） — 証跡: 下の「書き換えの洗い出し」（evaluator 1 巡目の指摘で、このメモを含めて引き直した）
-- [x] C7 取り込まないものを PR 本文に列挙する — 証跡: PR 本文「取り込まないもの」
+- [x] C7 取り込まないものを PR 本文に列挙する — 証跡: PR [#358](https://github.com/f8924919/yt-gui/pull/358) 本文「取り込まないもの」
 - [x] C8 検証（lint / 型 / pytest・docs-check） — 証跡: verify green（`5808b17` 時点で ruff check / format --check / mypy 61 files / pytest 603 passed。以後は docs のみ）・docs-check 指摘 2 件を `ecc8418` で反映
 - [x] verify-gate — 証跡: verify green → docs-check（archive index の行の漏れ・既存の #337 メモへのリンク切れ）を `ecc8418` で反映 → evaluator 1 巡目 PASS（follow-up あり）・`[欠陥]` 0 件 / `[証跡・文言]` 5 件を全件この PR で直した（下の「評価ゲートの巡回」）
 
@@ -124,6 +124,6 @@
 
 ## 次にやること
 
-- PR を作成し、本文に「取り込まないもの」（C7）と C5 のずれを書く。PR 番号を archive index とこのメモに入れる。
+- PR #358 のマージ待ち。マージ後は `/finish-task`。
 
 訂正ログ: 0 件
