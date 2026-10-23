@@ -34,16 +34,19 @@ argument-hint: "[issue-number or task-description]"
    - `investigate` サブエージェントを起動し、docs 先・コード裏取りの結論（要点・関連 `path:line`・裏取りメモ）だけを受け取る。
    - **設計・実装方針の判断は委譲しない**。investigate は判断材料の収集のみ。
    - **報告に出てきた数・件数・回数を、そのまま受け入れ条件・Issue 本文・タスクメモへ転記しない。** 転記する前に**一次資料を自分で数える**（規則の正本は [testing/policy.md](../../../docs/testing/policy.md) §8.3 C6。ここには再掲しない）。
+   - **報告の否定形（「無い」）・見た対象より広い主張・「要確認」を、そのまま受け入れ条件・Issue 本文・タスクメモ・docs へ書かない。** 探し方を変えて確かめるか、要確認のまま条件から外す（正本は [testing/policy.md](../../../docs/testing/policy.md) §8.3 C8）。
 
 3.5. **受け入れ条件レビュー（`criteria-review` 起動）**（step 3.5）
    - `investigate` の結論を踏まえ、`criteria-review` サブエージェントを起動して受け入れ条件・spec **そのものの妥当性**（テスト可能・網羅的・非曖昧・Issue 意図との整合）を点検し、指摘・改善案を受け取る。
-   - **`bugfix` / 原因の特定を含む Issue、テスト・hook を足す／変える Issue では、受け入れ条件が [testing/policy.md](../../../docs/testing/policy.md) §8 の「出すもの」を要求しているかも点検対象に含める**（原因の 3 点・否定形の独立 run 数・ログのメタ行・変異 → red の証跡）。無ければ条件へ追記を提案する。
+   - **`bugfix` / 原因の特定を含む Issue、テスト・hook を足す／変える Issue では、受け入れ条件が [testing/policy.md](../../../docs/testing/policy.md) §8 の「出すもの」を要求しているかも点検対象に含める**（原因の 3 点・否定形の独立 run 数・ログのメタ行・変異 → red の証跡。変異の対象の正本は [testing/policy.md](../../../docs/testing/policy.md) §8.0「A1 の対象」）。無ければ条件へ追記を提案する。
    - **助言でありゲートではない**。指摘の採否・受け入れ条件の修正可否は主エージェント＋ユーザーが判断する（§5.1）。**【通知】** 条件を書き換えるかを仰ぐときは通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。`evaluator`（step 7・実装の適合性を PR 前に評価）とは対象が逆である点に注意。
    - `refactor` / `docs` / `chore`（受け入れ条件を持たない作業）では省略してよい。条件を修正した場合は Issue 本文へ反映してから先へ進む。
 
 4. **【確認ゲート】docs 先行**（step 4）
    - 設計を `docs/spec/` / `docs/arch/` に**先に**反映する（[docs-guide.md](../../../docs/docs-guide.md) §4 の更新先に従う）。
    - **タスクメモ `docs/task/<slug>.md` をここで作る**（[docs-guide.md](../../../docs/docs-guide.md) §3.2「タスクメモの見出し規約」「進捗欄と訂正ログ」の形）: 冒頭の引用ブロック（Issue・ステータス・ブランチ・基点。空行を挟まず連続させる）、`## 進捗` は**受け入れ条件ごとに `- [ ] Cn … — 証跡: 未`** の 1 行（段階を項目にしない）、空の `## 訂正ログ`（見出しと表ヘッダ）、`## 次にやること`（末尾に `訂正ログ: 0 件`）。同時に `docs/task/index.md` の `## タスク` 表へ `進行中` で載せ、「起票済み・未着手の Issue」表に同じ Issue の行があれば外す。以後 SessionStart hook がこのメモの申し送り・未完了項目を毎セッション注入する（git-workflow §5.6）。1 PR で完結する小タスクは archive に直接作ってよい（docs-guide §4.2 の特例）。
+   - 測定器・判定器・trace・外部コマンドが出す**値・閾値・換算・件数・見出し**を設計・条件・docs に書くときは、その値を作る行を開いてから書く（正本は [testing/policy.md](../../../docs/testing/policy.md) §8.3 C9）。
+   - 既存の規則・条件を書き換える設計なら、[git-workflow.md](../../../docs/git-workflow.md) §5.2「訂正ログの止め規則」の「書き換えたときも洗う」で判定し、`design-review` の有無にかかわらず、書き換えを含むコミットの前に洗う。
    - **これは判断であり skill は自動化しない**。設計内容は主エージェントが立案し、設計上の選択・トレードオフはユーザーに確認する（§5.1）。**【通知】** 設計の分岐を仰ぐときは通知を出す（[git-workflow.md](../../../docs/git-workflow.md) §5.8）。skill の役割は「実装より先に docs を固める」順序を守らせること。
 
 4.5. **設計レビュー（`design-review` 起動・条件付き）**（step 4.5）
@@ -53,11 +56,12 @@ argument-hint: "[issue-number or task-description]"
 
 5. **【確認ゲート】テスト先行**（step 5）
    - 受け入れ条件・spec に基づいてテストを**先に**書く（実装に合わせて書かない。[テスト方針](../../../docs/testing/policy.md)）。
+   - **探索の段**では、scratchpad の試しのスクリプトと試しの run で進めてよく、変異 → red・死因の表・回数の規則を掛けず、evaluator も起こさない。安全の守りは段にも種類にもよらず掛ける。事実として書くと決めたら証跡の段に移る（段の定義・移るときの手順・A1 の対象の正本は [testing/policy.md](../../../docs/testing/policy.md) §8.0。ここには再掲しない）。
    - **テスト内容の決定は判断であり skill は自動化しない**。何を検証するかは主エージェント＋ユーザーが決める（**【通知】** [git-workflow.md](../../../docs/git-workflow.md) §5.8）。skill は「実装より先にテストを書く」順序を守らせること。
 
 6. **実装 → green**（step 6）
    - 実装してテストを green にする。red 単独ではコミットせず、green にしてから 1 コミットにまとめる（§5.1）。
-   - **自分で書くか `implementer` へ委譲するかを決める。** 委譲してよいのは**対象ファイルが列挙でき、判定・期待値が固まっている**場合だけ。委譲するなら [`implementer-brief-template.md`](implementer-brief-template.md) を `.brief/<slug>.md` へ複写して埋め、起動プロンプトにはパスと「読め・読み直せ」だけを書く。**取り決めと主エージェント側の義務（検証を自分で回し直す・行単位の突合・実際の例外で読む・境界をまたぐ引用を洗う・発火順序まで確かめる・commit は自分で行い委譲後に HEAD を確かめる・変異 → red は自分で）の正本は [git-workflow.md](../../../docs/git-workflow.md) §5.2「実装の委譲」**（ここには再掲しない）。
+   - **自分で書くか `implementer` へ委譲するかを決める。** 委譲してよいのは**対象ファイルが列挙でき、判定・期待値が固まっている**場合だけ。委譲するなら [`implementer-brief-template.md`](implementer-brief-template.md) を `.brief/<slug>.md` へ複写して埋め、起動プロンプトにはパスと「読め・読み直せ」だけを書く。ブリーフの「段」（探索 / 証跡）は主エージェントが書く（[testing/policy.md](../../../docs/testing/policy.md) §8.0）。**取り決めと主エージェント側の義務（検証を自分で回し直す・行単位の突合・実際の例外で読む・境界をまたぐ引用を洗う・発火順序まで確かめる・commit は自分で行い委譲後に HEAD を確かめる・変異 → red は自分で）の正本は [git-workflow.md](../../../docs/git-workflow.md) §5.2「実装の委譲」**（ここには再掲しない）。
 
 > **セッションの分割点**（git-workflow §5 の分割点 A / B）: 手順 4.5 の後（設計確定後）と手順 6 の後（`/verify-gate` の前）は新セッションに分けてよい。分ける前にタスクメモの「次にやること」を更新し、再開は SessionStart hook が注入した申し送りに従う。
 
