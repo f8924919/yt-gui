@@ -49,15 +49,16 @@ jobs:
       - name: Refresh pins
         run: uv run python scripts/refresh_pins.py --summary-out "${RUNNER_TEMP}/pin-update-body.md"
 
-      # PAT 未設定・失効時は GITHUB_TOKEN にフォールバックするが、そのままだと必須 CI が
-      # 発火しない状態（#284 の症状）へ静かに戻る。ログと PR 本文の両方で可視化する。
+      # PAT 未設定（secret が空）のときは GITHUB_TOKEN にフォールバックするが、そのままだと
+      # 必須 CI が発火しない状態（#284 の症状）へ静かに戻る。ログと PR 本文の両方で可視化する。
+      # 失効した PAT は空ではないのでここには来ず、PR 作成ステップが失敗する（docs/build.md）。
       - name: Warn if PAT is missing
         if: ${{ env.HAS_PIN_UPDATE_TOKEN == 'false' }}
         run: |
           echo "::warning::secret PIN_UPDATE_TOKEN が未設定のため GITHUB_TOKEN で PR を作成します。この PR では必須 CI（test / test-windows）が発火しません（#284）。docs/build.md「PR 作成トークン」を参照してください。"
           {
             echo "> [!WARNING]"
-            echo "> secret \`PIN_UPDATE_TOKEN\` が未設定または失効しているため、この PR は \`GITHUB_TOKEN\` で作成されました。"
+            echo "> secret \`PIN_UPDATE_TOKEN\` が未設定のため、この PR は \`GITHUB_TOKEN\` で作成されました。"
             echo "> **必須 CI（\`test\` / \`test-windows\`）が発火しません**（#284）。PAT を再発行して secret を更新してください（docs/build.md「PR 作成トークン」）。"
             echo ""
             cat "${RUNNER_TEMP}/pin-update-body.md"

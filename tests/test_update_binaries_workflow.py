@@ -74,7 +74,9 @@ def test_create_pr_step_falls_back_to_github_token(
 ) -> None:
     """secret 未設定時は GITHUB_TOKEN にフォールバックすること。
 
-    失効中も上流更新の検知・検証と PR 作成自体は継続させる方針（#284）。
+    未設定でも上流更新の検知・検証と PR 作成自体は継続させる方針（#284）。
+    失効した PAT は空ではないのでこの経路に入らない
+    （docs/build.md「失効時の挙動と対応」）。
     """
     token = create_pr_step["with"]["token"]
     assert "||" in token, "フォールバックの `||` が失われている"

@@ -212,12 +212,12 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | Repository permissions | **Contents: Read and write** / **Pull requests: Read and write** の 2 つのみ（他は No access） |
 | 登録先 | リポジトリ secret **`PIN_UPDATE_TOKEN`**（`gh secret set PIN_UPDATE_TOKEN`） |
 
-**未設定・失効時の挙動**: secret が空のときはワークフローを失敗させず `GITHUB_TOKEN` にフォールバックする。上流バイナリの更新検知・sha256 検証まで止めてしまうと、サプライチェーン検証の恩恵ごと失われるため。ただしフォールバックしたことが分からないと #284 の症状（CI 未発火）へ静かに戻るので、次の 2 つで可視化する。
+**未設定時の挙動**: secret が空のときはワークフローを失敗させず `GITHUB_TOKEN` にフォールバックする。上流バイナリの更新検知・sha256 検証まで止めてしまうと、サプライチェーン検証の恩恵ごと失われるため。ただしフォールバックしたことが分からないと #284 の症状（CI 未発火）へ静かに戻るので、次の 2 つで可視化する。
 
 - ジョブログとサマリに `::warning::` を出力する
 - **作成される PR 本文の冒頭に注記を差し込む**（「PAT 未設定のため必須 CI が発火しない」）
 
-**失効時の対応**: fine-grained PAT には有効期限がある。期限切れ後は上記の警告付きで PR が作られるので、注記入りの PR を見たら PAT を再発行して `PIN_UPDATE_TOKEN` を更新する。期限管理が負担になった場合は GitHub App トークン（`actions/create-github-app-token`）への移行を検討する。
+**失効時の挙動と対応**: fine-grained PAT には有効期限がある。**失効しても secret は空にならないので、上記のフォールバックは起きない** — 未設定の判定は `secrets.PIN_UPDATE_TOKEN != ''`、PR 作成のトークンは `secrets.PIN_UPDATE_TOKEN || github.token` で、どちらも値が空かどうかしか見ない。失効したトークンがそのまま PR 作成ステップに渡り、GitHub に拒否されて**ジョブが失敗する**（警告も PR 本文の注記も出ず、PR は作られない）。ピンの解決と sha256 検証は PR 作成より前のステップで終わっているので、検証そのものは止まらない。**ワークフローの失敗通知を見たら、PAT を再発行して `PIN_UPDATE_TOKEN` を更新する**（GitHub の Fine-grained tokens 画面の Regenerate token は設定を引き継ぎ、古いトークンはその場で無効になる）。失効の前に GitHub から期限切れの予告が届くので、そこで差し替えれば失敗の回を避けられる。期限管理が負担になった場合は GitHub App トークン（`actions/create-github-app-token`）への移行を検討する。
 
 ## ワークフロー権限とリポジトリのセキュリティ設定
 
