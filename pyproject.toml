@@ -14,7 +14,7 @@ dependencies = [
     "pyinstaller==6.22.3",
     "pyinstaller-hooks-contrib==2026.8",
     "pyside6>=6.11.0",
-    "setuptools==84.2.0",
+    "setuptools==84.2.1",
     "yt-dlp==2026.8.19",
     "yt-dlp-ejs==0.8.0",
 ]
