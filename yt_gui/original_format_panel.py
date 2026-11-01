@@ -44,7 +44,7 @@ _NICO_DEFAULT_WIDTH = 1280
 _NICO_DEFAULT_HEIGHT = 720
 _NICO_DEFAULT_DURATION = 8.0
 _NICO_DEFAULT_OPACITY = 0.8
-_NICO_DEFAULT_FONT_SIZE = 32
+_NICO_DEFAULT_FONT_SCALE = 100
 
 
 class _ToggleListWidget(QListWidget):
@@ -335,13 +335,15 @@ class _NicoCommentsGroup(QGroupBox):
         self._opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
         params.addWidget(self._opacity_spin, 1, 1)
 
-        self._font_label = QLabel(t("nico_font_size"))
+        self._font_label = QLabel(t("nico_font_scale"))
         params.addWidget(self._font_label, 1, 2)
-        self._font_spin = QSpinBox()
-        self._font_spin.setRange(8, 128)
-        self._font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
-        self._font_spin.setSuffix(" px")
-        params.addWidget(self._font_spin, 1, 3)
+        self._font_scale_spin = QSpinBox()
+        self._font_scale_spin.setRange(25, 300)
+        self._font_scale_spin.setSingleStep(5)
+        self._font_scale_spin.setValue(_NICO_DEFAULT_FONT_SCALE)
+        self._font_scale_spin.setSuffix(" %")
+        self._font_scale_spin.setToolTip(t("nico_font_scale_tooltip"))
+        params.addWidget(self._font_scale_spin, 1, 3)
 
         params.setColumnStretch(4, 1)  # 余白を右に逃がして左寄せ
         layout.addLayout(params)
@@ -359,7 +361,7 @@ class _NicoCommentsGroup(QGroupBox):
         self._height_spin.setValue(_NICO_DEFAULT_HEIGHT)
         self._duration_spin.setValue(_NICO_DEFAULT_DURATION)
         self._opacity_spin.setValue(_NICO_DEFAULT_OPACITY)
-        self._font_spin.setValue(_NICO_DEFAULT_FONT_SIZE)
+        self._font_scale_spin.setValue(_NICO_DEFAULT_FONT_SCALE)
         self._set_controls_enabled(False)
 
     def retranslate(self):
@@ -372,7 +374,8 @@ class _NicoCommentsGroup(QGroupBox):
         self._resolution_label.setText(t("nico_resolution"))
         self._duration_label.setText(t("nico_duration"))
         self._opacity_label.setText(t("nico_opacity"))
-        self._font_label.setText(t("nico_font_size"))
+        self._font_label.setText(t("nico_font_scale"))
+        self._font_scale_spin.setToolTip(t("nico_font_scale_tooltip"))
 
     def get_opts(self) -> dict:
         """ニコニコ動画コメント → ASS 変換オプションを返す。
@@ -396,7 +399,7 @@ class _NicoCommentsGroup(QGroupBox):
             "resolution_h": h,
             "duration_sec": float(self._duration_spin.value()),
             "opacity": float(self._opacity_spin.value()),
-            "font_size": int(self._font_spin.value()),
+            "font_scale_percent": int(self._font_scale_spin.value()),
         }
 
     def restore_from(self, settings: dict):
@@ -411,7 +414,9 @@ class _NicoCommentsGroup(QGroupBox):
             float(nico.get("duration_sec", _NICO_DEFAULT_DURATION))
         )
         self._opacity_spin.setValue(float(nico.get("opacity", _NICO_DEFAULT_OPACITY)))
-        self._font_spin.setValue(int(nico.get("font_size", _NICO_DEFAULT_FONT_SIZE)))
+        self._font_scale_spin.setValue(
+            int(nico.get("font_scale_percent", _NICO_DEFAULT_FONT_SCALE))
+        )
         self._convert_check.setChecked(bool(nico.get("convert_to_ass", False)))
         self._embed_mkv_check.setChecked(bool(nico.get("embed_to_mkv", False)))
         self._hardsub_check.setChecked(bool(nico.get("burn_in", False)))
@@ -458,7 +463,7 @@ class _NicoCommentsGroup(QGroupBox):
         for w in (
             self._duration_spin,
             self._opacity_spin,
-            self._font_spin,
+            self._font_scale_spin,
             self._auto_res_check,
         ):
             w.setEnabled(enabled)

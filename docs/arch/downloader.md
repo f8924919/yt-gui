@@ -152,6 +152,10 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
   - `danmaku` → 入力 `{stem}.danmaku.xml` / `-f Bilibili`（`comment.bilibili.com/{cid}.xml` の Bilibili XML 用パーサ）
 - 出力は `{stem}.{lang}.ass`（`stem` は同名衝突回避の `(n)` サフィックスを含む実効ステム）
 - subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f {format} -dm {sec} -fs {size} -a {opacity} {input}` を実行
+- `{size}` は `_comment_font_size(lang, W, H, opts.get("font_scale_percent", 100))` で計算する。`基準の高さ × 基準比率 × 倍率 ÷ 100`。基準比率は `_COMMENT_FONT_RATIO`（`comments` 0.07 / `danmaku` 0.035）で、種別が分かるこの層で引く（`get_opts()` の dict に種別は無い）。基準の高さは `H`、縦動画（`H > W`）のみ動画の幅を舞台の幅と見なして `W × 9 / 16`。正方形は横動画と同じ扱い。旧キー `font_size` は読まない。値の根拠と限定句は [画面仕様](../spec/screens/original-format-panel.md#コメント弾幕グループ) を参照
+- `{size}` は整数化せず `f"{size:g}"` で渡す。ASS の `Fontsize` と `\fs` は danmaku2ass が整数に丸める。`big` / `small` と弾幕ごとのサイズ値は danmaku2ass が `-fs` への倍率で計算する（ビリビリの位置指定弾幕 mode 7 は例外で、`-fs` も倍率も効かない）。`-fs` はレーン数と縁取りの太さにも連動する
+- `{W}` / `{H}` は `_with_downloaded_resolution(opts, info)` で決める。`_run_download` が返す `extract_info(download=True)` の結果に `width` / `height` があり、`auto_resolution` が真ならその値を使う（映像「自動」選択時に手動値へ落ちないようにするため）。それ以外は `resolution_w` / `resolution_h`。`opts` にどちらも無いときの既定は 1920×1080（パネルの既定 1280×720 とは別）
+- `width` / `height` が取れず手動値になった場合、`Fontsize` が `PlayResY` に比例するので、縦横比が同じならレンダラの拡大縮小で動画に対する文字の比率は保たれる見込み。縦横比が異なる場合は保たれない
 - 失敗（バイナリ欠如・入力ファイル不在・サブプロセス非 0 終了）はいずれも `log_callback` に警告を流すのみで例外を投げない
 
 ### コメント/弾幕 ASS と動画の MKV 統合

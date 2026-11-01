@@ -16,7 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| （進行中・未着手のタスクはありません） | — | — | — |
+| [372-comment-font-ratio.md](372-comment-font-ratio.md) | 進行中 | コメント・弾幕の ASS フォントサイズを動画の高さに対する比率で決める（[#372](https://github.com/f8924919/yt-gui/issues/372)） | 2026-11-01 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
