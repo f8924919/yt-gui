@@ -147,7 +147,7 @@ STRINGS: dict[str, str] = {
     "nico_duration": "表示時間 (秒):",
     "nico_opacity": "不透明度:",
     "nico_font_scale": "文字サイズ倍率:",
-    "nico_font_scale_tooltip": "100% が Web 表示相当の大きさです。動画の解像度が変わっても、動画に対する文字の比率は変わりません。",
+    "nico_font_scale_tooltip": "100% が Web 表示相当の大きさです。動画の解像度に合わせて文字の大きさを計算します。",
     "warn_danmaku2ass_missing": "⚠️ danmaku2ass が見つかりません。ASS 変換をスキップしました。",
     "warn_danmaku2ass_failed": "⚠️ コメントの ASS 変換に失敗しました: {error}",
     "warn_nico_ass_skip_no_source": "⚠️ {filename} が見つからないため ASS 変換をスキップ",
