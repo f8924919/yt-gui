@@ -26,7 +26,7 @@
 | メタデータ埋め込みチェック | デフォルト ON |
 | チャプター埋め込みチェック | デフォルト ON |
 | 出力形式ラジオグループ | コンテナ結合 / remux のみ / H.264 MP4 再変換 / 音声のみ の 4 択 |
-| コメント・弾幕グループ | `QGroupBox`（`comments` または `danmaku` lang が字幕リストに含まれるときだけ可視化）。コメント/弾幕 ASS 変換チェック + 解像度/表示時間/不透明度/フォントサイズの SpinBox |
+| コメント・弾幕グループ | `QGroupBox`（`comments` または `danmaku` lang が字幕リストに含まれるときだけ可視化）。コメント/弾幕 ASS 変換チェック + 解像度/表示時間/不透明度/文字サイズ倍率の SpinBox |
 
 複合フォーマット（★印）選択時は音声リストを `set_included_mode()` で「映像に含まれます」1 行表示に切り替え、`setEnabled(False)` で操作不可にする。
 
@@ -72,7 +72,7 @@
 
 責務:
 
-- コメント ASS 変換チェック / MKV 統合チェック / ハードサブ焼きこみチェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・フォントサイズの各 SpinBox の保持
+- コメント ASS 変換チェック / MKV 統合チェック / ハードサブ焼きこみチェック / 解像度自動追従チェック / 解像度・表示時間・不透明度・文字サイズ倍率の各 SpinBox の保持
 - ASS 変換 ↔ MKV 統合の連動制御（OFF 時に MKV を解除 / MKV ON 時に ASS を強制 ON）
 - ASS 変換 ↔ ハードサブ焼きこみの連動制御（OFF 時に焼きこみを解除 / 焼きこみ ON 時に ASS を強制 ON）
 - 解像度自動追従 OFF 時のみ手動解像度 SpinBox を有効化
@@ -109,7 +109,7 @@
 | `is_audio_skipped()` | `bool` | 音声コンボが「ダウンロードしない」か |
 | `get_embed_metadata()` | `bool` | メタデータ埋め込みフラグ |
 | `get_embed_chapters()` | `bool` | チャプター埋め込みフラグ |
-| `get_nico_comments_opts()` | `dict` | コメント/弾幕 → ASS 変換 / MKV 統合 / ハードサブ焼きこみオプション（`convert_to_ass` / `embed_to_mkv` / `burn_in` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_size`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す |
+| `get_nico_comments_opts()` | `dict` | コメント/弾幕 → ASS 変換 / MKV 統合 / ハードサブ焼きこみオプション（`convert_to_ass` / `embed_to_mkv` / `burn_in` / `auto_resolution` / `resolution_w` / `resolution_h` / `duration_sec` / `opacity` / `font_scale_percent`）。`auto_resolution=True` のときは選択中の映像フォーマットの実解像度を `resolution_w/h` に詰めて返す。`font_scale_percent` は種別に依らない倍率で、基準比率の適用は `downloader.py` の [ASS 変換](downloader.md#コメント弾幕の-ass-変換) が行う |
 | `get_raw_settings()` | `dict` | 現在の設定スナップショット（音声は `audio_ids: list[str]`、ニコニコ動画コメント設定は `nico_comments: dict` を含む） |
 | `get_snapshot()` | `PanelSnapshot` | `build_job_spec` ([job_spec.md](job_spec.md)) に渡すための UI 非依存スナップショット。`get_format_spec` / `get_subtitle_opts` / 各 `get_embed_*` / `get_remux_only` / `get_audio_only` / `get_recode_video` / `has_multiple_audio_selected` / `get_raw_settings` を 1 つの dataclass にまとめたもの |
 | `restore_from_settings(settings: dict)` | — | 設定を復元する。旧キー `audio_id: str \| None` は後方互換のため受け入れる。`nico_comments` 欠如時はデフォルト値を採用 |

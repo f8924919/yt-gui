@@ -1619,6 +1619,218 @@ def test_convert_comments_uses_niconico_format_and_json_input(
     assert cmd[-1].endswith("動画.comments.json")
 
 
+# ── コメント/弾幕のフォントサイズ（#372） ────────────────────────────────────
+
+
+def _ass_cmd(downloader, tmp_path, monkeypatch, lang: str, opts: dict) -> list[str]:
+    """ASS 変換を実行し、danmaku2ass に渡すコマンドを返す。"""
+    ext = "json" if lang == "comments" else "xml"
+    (tmp_path / f"v.{lang}.{ext}").write_text("")
+    fake_bin = tmp_path / "danmaku2ass"
+    fake_bin.write_text("")
+    downloader._danmaku2ass_path = str(fake_bin)
+    downloader.log_callback = lambda m: None
+
+    captured: dict[str, list[str]] = {}
+
+    def _fake_run(cmd, **k):
+        captured["cmd"] = cmd
+        return type("R", (), {})()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+    downloader._convert_nico_comments_to_ass(str(tmp_path / "v"), lang, opts)
+    return captured["cmd"]
+
+
+def _font_size(cmd: list[str]) -> float:
+    return float(cmd[cmd.index("-fs") + 1])
+
+
+@pytest.mark.parametrize(
+    "lang,expected",
+    [("comments", 97.2), ("danmaku", 48.6)],
+)
+def test_comment_font_size_uses_ratio_per_lang(
+    downloader, tmp_path, monkeypatch, lang, expected
+) -> None:
+    opts = {"resolution_w": 1920, "resolution_h": 1080, "font_scale_percent": 100}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, lang, opts)
+    assert _font_size(cmd) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "lang,ratio",
+    [("comments", 0.09), ("danmaku", 0.045)],
+)
+@pytest.mark.parametrize(
+    "width,height",
+    [(640, 360), (1280, 720), (1920, 1080), (3840, 2160)],
+)
+def test_comment_font_size_keeps_ratio_across_resolutions(
+    downloader, tmp_path, monkeypatch, lang, ratio, width, height
+) -> None:
+    opts = {"resolution_w": width, "resolution_h": height}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, lang, opts)
+    assert cmd[cmd.index("-s") + 1] == f"{width}x{height}"
+    assert _font_size(cmd) / height == pytest.approx(ratio)
+
+
+@pytest.mark.parametrize(
+    "scale,expected",
+    [(25, 24.3), (50, 48.6), (100, 97.2), (300, 291.6)],
+)
+def test_comment_font_size_is_proportional_to_scale(
+    downloader, tmp_path, monkeypatch, scale, expected
+) -> None:
+    opts = {"resolution_w": 1920, "resolution_h": 1080, "font_scale_percent": scale}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
+    assert _font_size(cmd) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "width,height,expected",
+    [
+        (1080, 1920, 54.675),  # 縦動画は 幅 × 9 / 16 が基準
+        (1920, 1080, 97.2),
+        (640, 480, 43.2),  # 4:3 は高さが基準
+        (1080, 1080, 97.2),  # 正方形は横動画と同じ扱い
+    ],
+)
+def test_comment_font_size_base_height_by_orientation(
+    downloader, tmp_path, monkeypatch, width, height, expected
+) -> None:
+    opts = {"resolution_w": width, "resolution_h": height}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
+    assert _font_size(cmd) == pytest.approx(expected)
+
+
+def test_comment_font_size_defaults_when_opts_empty(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", {})
+    assert cmd[cmd.index("-s") + 1] == "1920x1080"
+    assert _font_size(cmd) == pytest.approx(97.2)
+
+
+def test_comment_font_size_ignores_legacy_font_size(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    opts = {"resolution_w": 1920, "resolution_h": 1080, "font_size": 32}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
+    assert _font_size(cmd) == pytest.approx(97.2)
+
+
+def test_comment_font_size_arg_has_no_float_noise(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """`-fs` の文字列に浮動小数の誤差（47.51999999999999 等）を出さない。"""
+    opts = {"resolution_w": 640, "resolution_h": 480, "font_scale_percent": 110}
+    cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
+    assert cmd[cmd.index("-fs") + 1] == "47.52"
+
+
+def _download_comment_cmd(
+    downloader, tmp_path, monkeypatch, info, nico_opts: dict
+) -> list[str]:
+    """コメント付きの download_video を流し、danmaku2ass のコマンドを返す。"""
+    downloader.status_callback = lambda *a, **k: None
+    downloader._resolve_unique_path = lambda *a, **k: (
+        str(tmp_path / "v"),
+        ".mp4",
+        None,
+        _FakeReservation(),
+    )
+    downloader._run_download = lambda *a, **k: info
+    (tmp_path / "v.comments.json").write_text("[]")
+    fake_bin = tmp_path / "danmaku2ass"
+    fake_bin.write_text("")
+    downloader._danmaku2ass_path = str(fake_bin)
+    captured: dict[str, list[str]] = {}
+
+    def _fake_run(cmd, **k):
+        captured["cmd"] = cmd
+        return type("R", (), {})()
+
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+    job = _job(
+        subtitle_opts={"subtitleslangs": ["comments"]},
+        orig_settings={"nico_comments": {"convert_to_ass": True, **nico_opts}},
+    )
+    downloader.download_video("https://example.com/v", job)
+    return captured["cmd"]
+
+
+_MANUAL_720P = {"auto_resolution": True, "resolution_w": 1280, "resolution_h": 720}
+
+
+def test_comment_ass_uses_downloaded_resolution_when_auto(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    """映像「自動」でも、実ダウンロードの解像度を `-s` と `-fs` に使う。"""
+    cmd = _download_comment_cmd(
+        downloader,
+        tmp_path,
+        monkeypatch,
+        {"width": 1080, "height": 1920},
+        _MANUAL_720P,
+    )
+    assert cmd[cmd.index("-s") + 1] == "1080x1920"
+    assert _font_size(cmd) == pytest.approx(54.675)
+
+
+@pytest.mark.parametrize(
+    "info",
+    [None, {}, {"width": 1080}, {"height": 1920}, {"width": None, "height": None}],
+)
+def test_comment_ass_falls_back_when_resolution_unknown(
+    downloader, tmp_path, monkeypatch, info
+) -> None:
+    cmd = _download_comment_cmd(downloader, tmp_path, monkeypatch, info, _MANUAL_720P)
+    assert cmd[cmd.index("-s") + 1] == "1280x720"
+    assert _font_size(cmd) == pytest.approx(64.8)
+
+
+def test_comment_ass_keeps_manual_resolution_when_auto_off(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    cmd = _download_comment_cmd(
+        downloader,
+        tmp_path,
+        monkeypatch,
+        {"width": 1080, "height": 1920},
+        {**_MANUAL_720P, "auto_resolution": False},
+    )
+    assert cmd[cmd.index("-s") + 1] == "1280x720"
+    assert _font_size(cmd) == pytest.approx(64.8)
+
+
+def test_run_download_returns_extract_info_result(downloader, monkeypatch) -> None:
+    info = {"width": 1920, "height": 1080}
+
+    class _FakeYDL:
+        def __init__(self, opts):
+            self._pps: dict[str, list] = {"post_process": []}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def add_post_processor(self, pp, when=None):
+            self._pps["post_process"].append(pp)
+
+        def extract_info(self, url, download=False, extra_info=None):
+            assert download is True
+            return info
+
+    monkeypatch.setattr("yt_gui.downloader.YoutubeDL", _FakeYDL)
+    assert (
+        downloader._run_download({}, "https://example.com/v", _job(), extra_info=None)
+        is info
+    )
+
+
 def test_cut_section_skips_when_infile_missing(
     downloader, tmp_path, monkeypatch
 ) -> None:

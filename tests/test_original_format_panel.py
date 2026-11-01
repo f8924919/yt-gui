@@ -11,6 +11,7 @@ pytest.importorskip("pytestqt")
 
 from PySide6.QtWidgets import QAbstractItemView
 
+from yt_gui.i18n import t
 from yt_gui.original_format_panel import (
     _AUTO_SENTINEL,
     _SKIP_SENTINEL,
@@ -157,6 +158,70 @@ def test_nico_burn_in_round_trip(panel):
 
     panel._nico_group.restore_from({"nico_comments": opts})
     assert panel._nico_group._hardsub_check.isChecked() is True
+
+
+# ── コメント・弾幕の文字サイズ倍率（#372） ─────────────────────────────────
+
+
+def test_nico_font_scale_spin_spec(panel):
+    spin = panel._nico_group._font_scale_spin
+    assert (spin.minimum(), spin.maximum()) == (25, 300)
+    assert spin.singleStep() == 5
+    assert spin.value() == 100
+    assert spin.suffix() == " %"
+    assert spin.toolTip() == t("nico_font_scale_tooltip")
+
+
+def test_nico_font_scale_get_opts_replaces_font_size(panel):
+    panel._nico_group._font_scale_spin.setValue(150)
+    opts = panel._nico_group.get_opts()
+    assert opts["font_scale_percent"] == 150
+    assert "font_size" not in opts
+
+
+def test_nico_font_scale_round_trip(panel):
+    panel._nico_group._font_scale_spin.setValue(150)
+    opts = panel._nico_group.get_opts()
+    panel._nico_group._font_scale_spin.setValue(100)
+    panel._nico_group.restore_from({"nico_comments": opts})
+    assert panel._nico_group._font_scale_spin.value() == 150
+
+
+def test_nico_font_scale_restore_ignores_legacy_font_size(panel):
+    panel._nico_group._font_scale_spin.setValue(150)
+    panel._nico_group.restore_from({"nico_comments": {"font_size": 64}})
+    assert panel._nico_group._font_scale_spin.value() == 100
+
+
+def test_nico_font_scale_reset_returns_to_default(panel):
+    panel._nico_group._font_scale_spin.setValue(150)
+    panel._nico_group.reset()
+    assert panel._nico_group._font_scale_spin.value() == 100
+
+
+def test_nico_font_scale_retranslate_updates_text(panel):
+    group = panel._nico_group
+    group._font_label.setText("x")
+    group._font_scale_spin.setToolTip("x")
+    group.retranslate()
+    assert group._font_label.text() == t("nico_font_scale")
+    assert group._font_scale_spin.toolTip() == t("nico_font_scale_tooltip")
+
+
+@pytest.mark.parametrize(
+    "auto,detected,expected",
+    [
+        (True, (1920, 1080), 1080),  # 検出値がスピンの値に優先する
+        (True, None, 720),
+        (False, (1920, 1080), 720),
+    ],
+)
+def test_nico_get_opts_resolution_h_source(panel, auto, detected, expected):
+    group = panel._nico_group
+    group._height_spin.setValue(720)
+    group._auto_res_check.setChecked(auto)
+    group._get_video_resolution = lambda: detected
+    assert group.get_opts()["resolution_h"] == expected
 
 
 # ── コメント・弾幕グループの表示条件（#168 ビリビリ弾幕一般化） ───────────────

@@ -31,6 +31,12 @@ _COMMENT_SOURCE_FORMAT = {
     _COMMENTS_LANG: ("json", "NiconicoYtdlpJson2"),
     _DANMAKU_LANG: ("xml", "Bilibili"),
 }
+# コメント/弾幕 lang → 基準の高さに対する文字サイズの比率（倍率 100% のとき）。
+# 値の根拠は docs/spec/screens/original-format-panel.md のコメント・弾幕グループ。
+_COMMENT_FONT_RATIO = {
+    _COMMENTS_LANG: 0.09,
+    _DANMAKU_LANG: 0.045,
+}
 # 中断時に掃除するサイドカー専用字幕の `.{lang}.{ext}` サフィックス。
 _SIDECAR_SUB_SUFFIXES = (
     f".{_LIVE_CHAT_LANG}.json",
@@ -51,6 +57,28 @@ _THUMBNAIL_EMBED_CONTAINERS = frozenset(
     {"mp3", "mkv", "mka", "ogg", "opus", "flac", "m4a", "mp4", "m4v", "mov"}
 )
 _DOWNLOAD_PROGRESS_RE = re.compile(r"\[download\]\s+\d")
+
+
+def _comment_font_size(lang: str, width: int, height: int, scale_percent: int) -> float:
+    """コメント/弾幕の `danmaku2ass -fs` に渡す文字サイズを返す。
+
+    縦動画は動画の幅を舞台の幅と見なし、`幅 × 9 / 16` を基準の高さにする。
+    """
+    base_height = width * 9 / 16 if height > width else height
+    return base_height * _COMMENT_FONT_RATIO[lang] * scale_percent / 100
+
+
+def _with_downloaded_resolution(opts: dict, info: dict | None) -> dict:
+    """自動追従 ON なら、実ダウンロードの解像度で `resolution_w/h` を上書きする。
+
+    映像「自動」選択時のパネルは手動値を返すため、ここで実際の値へ揃える。
+    解像度を取得できないときは `opts` のまま。
+    """
+    width = (info or {}).get("width")
+    height = (info or {}).get("height")
+    if not (opts.get("auto_resolution") and width and height):
+        return opts
+    return {**opts, "resolution_w": width, "resolution_h": height}
 
 
 class DownloadSkipped(Exception):
@@ -534,7 +562,9 @@ class Downloader:
         # `.part` を掃除が巻き込む）。
         try:
             try:
-                self._run_download(ydl_opts, url, job, extra_info=extra_info)
+                downloaded_info = self._run_download(
+                    ydl_opts, url, job, extra_info=extra_info
+                )
             except DownloadCancelled:
                 # 中断時は部分ファイルを掃除してから呼び出し側へ再送出する。
                 self._cleanup_partial_files(effective_stem)
@@ -573,7 +603,9 @@ class Downloader:
                 and comment_lang
             ):
                 self._convert_nico_comments_to_ass(
-                    effective_stem, comment_lang, nico_comments_opts
+                    effective_stem,
+                    comment_lang,
+                    _with_downloaded_resolution(nico_comments_opts, downloaded_info),
                 )
 
                 if (
@@ -899,8 +931,8 @@ class Downloader:
         job: JobSpec,
         *,
         extra_info: dict | None,
-    ) -> None:
-        """ydl を起動してダウンロードを実行する。
+    ) -> dict | None:
+        """ydl を起動してダウンロードを実行し、`extract_info` の結果を返す。
 
         サイドカー専用字幕 (live_chat / ニコニコ動画 comments / ビリビリ
         danmaku) が埋め込み対象に含まれるときは convert/embed がサイドカーを
@@ -923,7 +955,10 @@ class Downloader:
                 # バージョン更新時にここが壊れる可能性があるので注意。
                 pp_list = ydl._pps["post_process"]
                 pp_list.insert(0, pp_list.pop())
-            ydl.extract_info(url, download=True, extra_info=extra_info)
+            info: dict | None = ydl.extract_info(
+                url, download=True, extra_info=extra_info
+            )
+            return info
 
     def _cleanup_partial_files(self, effective_stem: str) -> None:
         """中断時の一時ファイル・字幕サイドカーを削除する（非致命: 失敗はログのみ）。
@@ -993,18 +1028,23 @@ class Downloader:
                 self.log_callback(t("warn_danmaku2ass_missing"))
             return
 
+        width = opts.get("resolution_w", 1920)
+        height = opts.get("resolution_h", 1080)
+        font_size = _comment_font_size(
+            lang, width, height, opts.get("font_scale_percent", 100)
+        )
         cmd = [
             self._danmaku2ass_path,
             "-o",
             ass_path,
             "-s",
-            f"{opts.get('resolution_w', 1920)}x{opts.get('resolution_h', 1080)}",
+            f"{width}x{height}",
             "-f",
             src_format,
             "-dm",
             str(opts.get("duration_sec", 8.0)),
             "-fs",
-            str(opts.get("font_size", 32)),
+            f"{font_size:g}",
             "-a",
             str(opts.get("opacity", 0.8)),
             src_path,
