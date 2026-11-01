@@ -326,7 +326,7 @@ class _NicoCommentsGroup(QGroupBox):
         self._duration_spin.setValue(_NICO_DEFAULT_DURATION)
         params.addWidget(self._duration_spin, 0, 3)
 
-        # 行2: 不透明度 | フォントサイズ
+        # 行2: 不透明度 | 文字サイズ倍率
         self._opacity_label = QLabel(t("nico_opacity"))
         params.addWidget(self._opacity_label, 1, 0)
         self._opacity_spin = QDoubleSpinBox()
