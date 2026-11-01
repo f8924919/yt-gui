@@ -18,10 +18,10 @@
 - [x] C7 倍率指定の UI と ja / en の文言 — 証跡: `test_nico_font_scale_spin_spec`・`_reset_returns_to_default`・`_retranslate_updates_text`
 - [x] C8 `font_scale_percent` の往復 — 証跡: `test_nico_font_scale_get_opts_replaces_font_size`・`_round_trip`
 - [x] C9 旧 `font_size` を使わない — 証跡: `test_nico_font_scale_restore_ignores_legacy_font_size`・`test_comment_font_size_ignores_legacy_font_size`
-- [ ] C10 実動画の見比べと比率の確定 — 証跡: 未
-- [x] C11 焼きこみ・MKV 統合の回帰 — 証跡: 全テスト 641 passed（`0371bdb`）。ビリビリの実動画でも MKV と焼きこみを生成
+- [ ] C10 実動画の見比べと比率の確定 — 証跡: 本メモの「実動画の見比べ」。比率はユーザー確認済み、MKV のプレイヤー確認のみ未
+- [x] C11 焼きこみ・MKV 統合の回帰 — 証跡: 全テスト 641 passed（`1e31f1c`）。ビリビリの実動画でも MKV と焼きこみを生成
 - [x] C12 原因の 3 点と変異 → red の証跡 — 証跡: 本メモの「原因」「変異 → red」
-- [ ] C13 spec / arch の更新 — 証跡: 未
+- [x] C13 spec / arch の更新 — 証跡: `docs/spec/screens/original-format-panel.md`・`docs/arch/downloader.md`・`docs/arch/original_format_panel.md`
 - [x] C14 実ダウンロードの解像度を `-s` と `-fs` に使う — 証跡: `test_comment_ass_*`・`test_run_download_returns_extract_info_result`、下記の実動画で手動値 1280×720 から `PlayRes` 1920×1080
 
 ## 原因
@@ -37,28 +37,31 @@
 
 ## 変異 → red
 
-基点 `0371bdb`。`tests/test_downloader.py` と `tests/test_original_format_panel.py` を実行し、変異ごとに `git checkout` で戻して `git diff --quiet` を確認した。実装前の red は基点 `6d66c66` で 29 failed。
+基点 `1e31f1c`（確定値）。`tests/test_downloader.py` と `tests/test_original_format_panel.py` を実行し、変異ごとに `git checkout` で戻して `git diff --quiet` を確認した。実装前の red は基点 `6d66c66` で 29 failed。
 
 | 変異 | 結果 | 狙ったテスト |
 |---|---|---|
 | 基準比率の除去 | 21 failed | `test_comment_font_size_uses_ratio_per_lang` ほか |
 | `comments` と `danmaku` の比率の入れ替え | 21 failed | `test_comment_font_size_uses_ratio_per_lang` ほか |
-| 縦動画の分岐の除去 | 1 failed | `test_comment_font_size_base_height_by_orientation[1080-1920-42.525]` |
-| 縦判定の `>` を `>=` へ | 1 failed | `test_comment_font_size_base_height_by_orientation[1080-1080-75.6]` |
+| 縦動画の分岐の除去 | 1 failed | `test_comment_font_size_base_height_by_orientation[1080-1920-54.675]` |
+| 縦判定の `>` を `>=` へ | 1 failed | `test_comment_font_size_base_height_by_orientation[1080-1080-97.2]` |
 | `get_opts` の `font_scale_percent` の除去 | 2 failed | `test_nico_font_scale_get_opts_replaces_font_size`・`test_nico_font_scale_round_trip` |
 | 実ダウンロードの解像度の不使用 | 1 failed | `test_comment_ass_uses_downloaded_resolution_when_auto` |
 
-## 実動画の見比べ（C10・途中）
+## 実動画の見比べ（C10）
 
-条件: コミット `0371bdb`、ビリビリ `BV1p5411a7nL`（36 秒）、映像「自動」（`30077+30280`、1920×1080）、倍率 100%、手動値 1280×720、`danmaku2ass` は `bin/pins.json` の ref、Windows。ニコニコは未実施（`sm46647529` はセンシティブ判定でログイン必須のため）。
+共通の条件: 映像「自動」、倍率 100%、手動値 1280×720、`danmaku2ass` は `bin/pins.json` の ref、Windows。Web は未ログイン、devicePixelRatio 1.5、1920×1080 のウィンドウの通常プレイヤー。比較したコミットは `0371bdb`、確定値の確認は `1e31f1c`。
 
-| 対象 | 値 |
-|---|---|
-| Web（未ログイン、devicePixelRatio 1.5、動画枠 1354×762） | `--fontSize` 27、漢字 1 文字の幅 27px、高さの 3.54% |
-| 焼きこみ `Fontsize` 38（比率 0.035） | 漢字 1 文字の幅 29.6px、高さの 2.74% |
-| 焼きこみ `Fontsize` 50 / 100（無地の背景） | 中国語の漢字 39.0 / 77.9px（係数 0.78）、日本語の漢字 37.2 / 74.3px（係数 0.74） |
+| 動画 | 解像度 | Web | 焼きこみ |
+|---|---|---|---|
+| ビリビリ `BV1p5411a7nL` | 1920×1080 | `--fontSize` 27、漢字の幅 27px、動画枠の高さ 762 の 3.54% | `Fontsize` 38 で漢字の幅 29.6px、高さの 2.74% |
+| ニコニコ `sm31143779` | 960×540 | 「中国国営放送も堕ちたな」の幅が高さの 74.1%（キャンバス 569 / 768） | 同じ文で比率 0.07 が 53.1%、0.09 が 68.5%、0.10 が 75.6% |
 
-ASS の `Fontsize` は 1 文字の幅（CSS の `font-size` に相当）の約 1.3 倍にあたる。同じ見た目にする比率の候補はビリビリ 0.045、ニコニコ 0.09。係数はレンダラが選ぶフォントに依存する。ユーザーの目視確認で確定する。
+- 無地の背景の `Fontsize` 50 / 100 で、中国語の漢字は幅 39.0 / 77.9px（係数 0.78）、日本語の漢字は 37.2 / 74.3px（係数 0.74）。
+- ニコニコで Web に合う比率は、比較画像からの概算で `INMU-KING` が約 0.08、`再生数が81000おめでとナス！` が約 0.087、上の実測文が約 0.098。
+- **確定値: ニコニコ 0.09、ビリビリ 0.045**（ユーザーの目視確認、2026-11-01）。
+- `1e31f1c` の確認: 手動値 1280×720 のビリビリで `PlayRes` 1920×1080、`Fontsize` 49。ニコニコの ASS で通常 49 に対し `big` 70、`small` 31。MKV から取り出した字幕は `Fontsize` 49、Dialogue 360 件で ASS と一致。
+- サイズ以外の差（段階 2 以降）: Web のほうが流れが速く見える、Web は太字、行の配置が違う。ビリビリの Web にある巨大なオレンジの文字は弾幕 XML に無い（XML は mode 1 / 4 / 5 の 360 件のみ）。
 
 ## 訂正ログ
 
@@ -67,8 +70,7 @@ ASS の `Fontsize` は 1 文字の幅（CSS の `font-size` に相当）の約 1
 
 ## 次にやること（申し送り）
 
-1. ユーザーに比較画像を確認してもらい、基準比率（候補 0.045 / 0.09）を確定する。ニコニコはログイン不要の動画 URL をもらう。
-2. 確定値をコード、テスト、spec、arch、Issue に反映する。旧値 0.035 / 0.07 の語で伝播先を洗う。
-3. `/verify-gate` から PR へ。
+1. ユーザーに MKV をプレイヤーで確認してもらう（C10 の残り）。
+2. `/verify-gate` から PR へ。完了時に archive へ移す。
 
 訂正ログ: 0 件
