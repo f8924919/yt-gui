@@ -1648,7 +1648,7 @@ def _font_size(cmd: list[str]) -> float:
 
 @pytest.mark.parametrize(
     "lang,expected",
-    [("comments", 75.6), ("danmaku", 37.8)],
+    [("comments", 97.2), ("danmaku", 48.6)],
 )
 def test_comment_font_size_uses_ratio_per_lang(
     downloader, tmp_path, monkeypatch, lang, expected
@@ -1660,7 +1660,7 @@ def test_comment_font_size_uses_ratio_per_lang(
 
 @pytest.mark.parametrize(
     "lang,ratio",
-    [("comments", 0.07), ("danmaku", 0.035)],
+    [("comments", 0.09), ("danmaku", 0.045)],
 )
 @pytest.mark.parametrize(
     "width,height",
@@ -1677,7 +1677,7 @@ def test_comment_font_size_keeps_ratio_across_resolutions(
 
 @pytest.mark.parametrize(
     "scale,expected",
-    [(25, 18.9), (50, 37.8), (100, 75.6), (300, 226.8)],
+    [(25, 24.3), (50, 48.6), (100, 97.2), (300, 291.6)],
 )
 def test_comment_font_size_is_proportional_to_scale(
     downloader, tmp_path, monkeypatch, scale, expected
@@ -1690,10 +1690,10 @@ def test_comment_font_size_is_proportional_to_scale(
 @pytest.mark.parametrize(
     "width,height,expected",
     [
-        (1080, 1920, 42.525),  # 縦動画は 幅 × 9 / 16 が基準
-        (1920, 1080, 75.6),
-        (640, 480, 33.6),  # 4:3 は高さが基準
-        (1080, 1080, 75.6),  # 正方形は横動画と同じ扱い
+        (1080, 1920, 54.675),  # 縦動画は 幅 × 9 / 16 が基準
+        (1920, 1080, 97.2),
+        (640, 480, 43.2),  # 4:3 は高さが基準
+        (1080, 1080, 97.2),  # 正方形は横動画と同じ扱い
     ],
 )
 def test_comment_font_size_base_height_by_orientation(
@@ -1709,7 +1709,7 @@ def test_comment_font_size_defaults_when_opts_empty(
 ) -> None:
     cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", {})
     assert cmd[cmd.index("-s") + 1] == "1920x1080"
-    assert _font_size(cmd) == pytest.approx(75.6)
+    assert _font_size(cmd) == pytest.approx(97.2)
 
 
 def test_comment_font_size_ignores_legacy_font_size(
@@ -1717,16 +1717,16 @@ def test_comment_font_size_ignores_legacy_font_size(
 ) -> None:
     opts = {"resolution_w": 1920, "resolution_h": 1080, "font_size": 32}
     cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
-    assert _font_size(cmd) == pytest.approx(75.6)
+    assert _font_size(cmd) == pytest.approx(97.2)
 
 
 def test_comment_font_size_arg_has_no_float_noise(
     downloader, tmp_path, monkeypatch
 ) -> None:
-    """`-fs` の文字列に浮動小数の誤差（75.60000000000001 等）を出さない。"""
+    """`-fs` の文字列に浮動小数の誤差（97.20000000000002 等）を出さない。"""
     opts = {"resolution_w": 1920, "resolution_h": 1080}
     cmd = _ass_cmd(downloader, tmp_path, monkeypatch, "comments", opts)
-    assert cmd[cmd.index("-fs") + 1] == "75.6"
+    assert cmd[cmd.index("-fs") + 1] == "97.2"
 
 
 def _download_with_comments(downloader, tmp_path, info, nico_opts: dict) -> dict:

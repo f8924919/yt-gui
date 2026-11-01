@@ -34,8 +34,8 @@ _COMMENT_SOURCE_FORMAT = {
 # コメント/弾幕 lang → 基準の高さに対する文字サイズの比率（倍率 100% のとき）。
 # 値の根拠は docs/spec/screens/original-format-panel.md のコメント・弾幕グループ。
 _COMMENT_FONT_RATIO = {
-    _COMMENTS_LANG: 0.07,
-    _DANMAKU_LANG: 0.035,
+    _COMMENTS_LANG: 0.09,
+    _DANMAKU_LANG: 0.045,
 }
 # 中断時に掃除するサイドカー専用字幕の `.{lang}.{ext}` サフィックス。
 _SIDECAR_SUB_SUFFIXES = (
