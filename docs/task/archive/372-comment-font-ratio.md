@@ -1,7 +1,7 @@
 # コメント・弾幕の ASS フォントサイズを動画の高さに対する比率で決める
 
 > Issue: [#372](https://github.com/f8924919/yt-gui/issues/372)
-> ステータス: 進行中
+> ステータス: 完了（2026-11-01）
 > ブランチ: `bugfix/372-comment-font-ratio`
 > 基点: `6d66c66`
 
@@ -19,7 +19,7 @@
 - [x] C8 `font_scale_percent` の往復 — 証跡: `test_nico_font_scale_get_opts_replaces_font_size`・`_round_trip`
 - [x] C9 旧 `font_size` を使わない — 証跡: `test_nico_font_scale_restore_ignores_legacy_font_size`・`test_comment_font_size_ignores_legacy_font_size`
 - [x] C10 実動画の見比べと比率の確定 — 証跡: 本メモの「実動画の見比べ」。比率と VLC での MKV はユーザーが確認
-- [x] C11 焼きこみ・MKV 統合の回帰 — 証跡: 全テスト 641 passed（`a76b1d8`）。ビリビリの実動画でも MKV と焼きこみを生成
+- [x] C11 焼きこみ・MKV 統合の回帰 — 証跡: 全テスト 641 passed（`3943a5f`）。ビリビリの実動画でも MKV と焼きこみを生成
 - [x] C12 原因の 3 点と変異 → red の証跡 — 証跡: 本メモの「原因」「変異 → red」
 - [x] C13 spec / arch の更新 — 証跡: `docs/spec/screens/original-format-panel.md`・`docs/arch/downloader.md`・`docs/arch/original_format_panel.md`
 - [x] C14 実ダウンロードの解像度を `-s` と `-fs` に使う — 証跡: `test_comment_ass_*`（`-s` と `-fs` を確認）・`test_run_download_returns_extract_info_result`、下記の実動画で手動値 1280×720 から `PlayRes` 1920×1080
@@ -110,15 +110,19 @@
 | 1 | 証跡 S4 | メモの限定句の不足 | 文言修正 | `73151fb` |
 | 1 | 証跡 S5 | 解像度の主張の強さが spec と arch で違う | 文言修正 | `a76b1d8` |
 | 1 | 証跡 S6 | 行番号の基点と `_run_download` の戻り値の説明なし | 文言修正 | `73151fb` |
-| 2 | 欠陥 D-A | `yt_gui/locales/ja.py:150`・`en.py:150` のツールチップが限定なしで比率の維持を断定 | コード修正 | `0b03dce` で断定をやめ、3 巡目の指摘で 2 文目を削除 |
+| 2 | 欠陥 D-A | `yt_gui/locales/ja.py:150`・`en.py:150` のツールチップが限定なしで比率の維持を断定 | コード修正 | `0b03dce` で断定をやめ、`3943a5f` で 2 文目を削除 |
 | 2 | 証跡 S-A | ニコニコの値が漢字の幅でなく文全体の幅 | 文言修正・条件改訂 | 本メモの注記、Issue #372 の C10 |
 | 2 | 証跡 S-B | ビリビリの焼きこみの値が実測か不明 | 文言修正 | 本メモの注記（無地の背景の実測） |
-| 2 | 証跡 S-C | フォールバック時の拡大縮小が未確認のまま spec で断定 | 証跡の再取得 | 本メモのフォールバックの実測、`docs/arch/downloader.md` |
+| 2 | 証跡 S-C | フォールバック時の拡大縮小が未確認のまま spec で断定 | 証跡の再取得 | 本メモの手動値の実測、`docs/arch/downloader.md` |
 | 2 | 証跡 S-D | 巡回表が無く、evaluator の指摘が訂正ログに載っている | 文言修正 | 本表へ移し、訂正ログを 0 件へ |
-| 3 | 欠陥 | `yt_gui/locales/ja.py:150`・`en.py:150` の「動画の解像度に合わせて計算」が手動値の経路で誤り | コード修正 | ツールチップの 2 文目を削除 |
+| 3 | 欠陥 | `yt_gui/locales/ja.py:150`・`en.py:150` の「動画の解像度に合わせて計算」が手動値の経路で誤り | コード修正 | `3943a5f` |
 | 3 | 欠陥 | `docs/spec/screens/original-format-panel.md:154` の除外句が自動使用 OFF を含まない。整数化の差も arch とずれ | 文言修正 | spec、arch、本メモ、Issue #372 の前提 |
 | 3 | 証跡 | 巡回表の D-A の証跡にコミットが無い | 文言修正 | 本表 |
 | 3 | 証跡 | フォールバックの実測にメタ行と基準値が無い | 証跡の再取得 | 本メモの手動値の実測 |
+| 4 | 証跡 | Issue の前提に整数化の差が無い | 文言修正 | Issue #372 の前提 |
+| 4 | 証跡 | 「手動値」の語が実際の経路より広い | 文言修正 | `docs/arch/downloader.md`、Issue #372 の前提 |
+| 4 | 証跡 | 巡回表の証跡列のコミットとラベル | 文言修正 | 本表 |
+| 4 | 証跡 | C11 の証跡の hash が古い | 証跡の再取得 | `3943a5f` で 641 passed |
 
 ## 訂正ログ
 
@@ -127,7 +131,6 @@
 
 ## 次にやること（申し送り）
 
-1. `evaluator` の再評価。
-2. archive へ移して PR を作る。
+完了。evaluator は 4 巡目で PASS（欠陥 0 件）。ビリビリの取得データの不足は [#373](https://github.com/f8924919/yt-gui/issues/373) へ。ASS 変換の自作は未起票。
 
 訂正ログ: 0 件
