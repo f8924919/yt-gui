@@ -60,7 +60,7 @@ URL 種別を判別して返す。
 |---|---|
 | `_build_ydl_opts(job, *, out_dir, is_playlist, cookies_path, cookies_browser)` | `JobSpec` から `ydl_opts` dict を組み立てる純粋関数。`_append_audio_postprocessors` / `_append_video_postprocessors` / `_append_subtitle_options` の 3 サブヘルパに分岐 |
 | `_resolve_unique_path(ydl_opts, url, job, *, extra_info)` | 同名ファイル衝突を避けるため `(stem, final_ext)` を予測し、必要なら `outtmpl` を ` (N)` 付きに上書きする |
-| `_run_download(ydl_opts, url, job, *, extra_info)` | `YoutubeDL` 起動とダウンロード実行。サイドカー専用字幕の strip PP 順序操作もここに集約 |
+| `_run_download(ydl_opts, url, job, *, extra_info)` | `YoutubeDL` 起動とダウンロード実行。`extract_info` の結果を返す。サイドカー専用字幕の strip PP 順序操作もここに集約 |
 
 `_build_ydl_opts` は副作用がないため [`tests/test_downloader.py`](../testing/index.md) で表ベースの単体テストを行う。
 
