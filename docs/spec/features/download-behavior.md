@@ -119,6 +119,8 @@ YouTube Live など `json3` 形式しか配信されない動画では、`FFmpeg
 
 `comments` / `danmaku` は[コメント・弾幕グループ](../screens/original-format-panel.md#コメント弾幕グループ)で ASS 変換・動画統合の対象になります（`live_chat` はサイドカー保存のみ）。
 
+ビリビリの `danmaku` は、取得元の XML に入っている弾幕だけを扱います。XML は弾幕の一部で、Web プレイヤーの表示より内容や量が少ない動画があります。Web で見える位置指定の弾幕（巨大な文字など）が入っていないこともあります。
+
 実装:
 
 - 自動字幕ループでは `_SIDECAR_ONLY_SUB_LANGS = {"live_chat", "comments", "danmaku"}` をスキップ（手動扱いの 1 エントリだけが UI に出る）
