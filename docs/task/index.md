@@ -30,4 +30,3 @@
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
-| [#373](https://github.com/f8924919/yt-gui/issues/373) | ビリビリの弾幕を Web と同じ窓口（seg.so）から取得できるか調べて対応する | [archive/372-comment-font-ratio.md](archive/372-comment-font-ratio.md) |
