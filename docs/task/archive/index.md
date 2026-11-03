@@ -58,6 +58,7 @@
 | [244-btn-adding-state.md](244-btn-adding-state.md) | URL タイトル取得中の add_button 状態消失を修正。`_fetching` フラグ＋テキスト解決の `_refresh_add_button_text()` 集約（優先順位 fetching > edit_mode > 通常）で、言語切替・編集モードの出入りの 3 経路すべてで「取得中...」表示が維持されるようにした。`add_button.setText` の直接呼び出しは同メソッド 1 箇所のみの規約に（Issue #244） | 2026-07-12 |
 | [249-parallel-filename-race.md](249-parallel-filename-race.md) | 並列 DL 時の同名ファイル衝突（TOCTOU レース）をパス予約方式で修正。`(n)` 決定を「存在 or 予約中」のロック内原子判定に変更・中間パスも単一 n で予約・try/finally で全経路解除・キャンセル掃除 glob を `stem + ".*"` に厳密化（design-review で発見した兄弟アイテム巻き込みも解消）（Issue #249 / PR #250） | 2026-07-13 |
 | [372-comment-font-ratio.md](372-comment-font-ratio.md) | コメント・弾幕の ASS フォントサイズを動画の高さに対する比率で決める（ニコニコ 0.09 / ビリビリ 0.045）。px 指定を倍率指定へ置き換え、映像「自動」でも実ダウンロードの解像度を使う。実動画と Web の見比べで比率を確定（Issue #372 / PR #374）。メトリクス: コミット 11（PR #374）・訂正ログ 0 件・evaluator 4 巡 | 2026-11-01 |
+| [373-bilibili-danmaku-decision.md](373-bilibili-danmaku-decision.md) | ビリビリの弾幕の取得元を Web と同じ窓口へ変える案を調査し、非公開 API への依存を避けるため実装を見送った。yt-dlp の XML のままとし、制約を spec に記載（Issue #373 / PR #375）。メトリクス: コミット 1（PR #375）・訂正ログ 0 件・evaluator 0 巡 | 2026-11-03 |
 
 ## ニコニコ動画コメント取得
 
