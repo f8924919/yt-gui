@@ -83,7 +83,7 @@
 
 | 方向 | 内容 |
 |------|------|
-| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `set_comment_lang(lang)` / `setVisible(bool)` |
+| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `set_niconico(niconico: bool)` / `setVisible(bool)` |
 | 子 → 親 | コンストラクタ引数 `get_video_resolution: Callable[[], tuple[int, int] | None]` で映像解像度を取得 |
 | 子 → 親 | `request_select_comments` シグナル: ASS 変換 ON 時に親が字幕リストのコメント/弾幕 lang（`comments` または `danmaku`）を自動選択する |
 
