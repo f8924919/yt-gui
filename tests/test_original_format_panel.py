@@ -208,6 +208,62 @@ def test_nico_font_scale_retranslate_updates_text(panel):
     assert group._font_scale_spin.toolTip() == t("nico_font_scale_tooltip")
 
 
+# ── 表示時間はビリビリだけ（#387 C19） ─────────────────────────────────────
+
+
+def _load_subtitle_langs(panel, langs: list[str]) -> None:
+    panel._on_fetch_done(
+        {
+            "title": "t",
+            "video": [("v [1]", "1", "mp4")],
+            "audio": [("a [2]", "2")],
+            "subtitles": [(f"{lang} [json]", lang, False) for lang in langs],
+        }
+    )
+
+
+def test_nico_duration_disabled_for_niconico_with_tooltip(panel):
+    _load_subtitle_langs(panel, ["comments"])
+    group = panel._nico_group
+    group._convert_check.setChecked(True)
+    assert group._duration_spin.isEnabled() is False
+    assert group._duration_spin.toolTip() == t("nico_duration_niconico_tooltip")
+    assert group._opacity_spin.isEnabled() is True
+
+
+def test_nico_duration_stays_disabled_across_convert_toggle(panel):
+    _load_subtitle_langs(panel, ["comments"])
+    group = panel._nico_group
+    group._convert_check.setChecked(True)
+    group._convert_check.setChecked(False)
+    group._convert_check.setChecked(True)
+    assert group._duration_spin.isEnabled() is False
+
+
+def test_nico_duration_enabled_for_bilibili(panel):
+    _load_subtitle_langs(panel, ["danmaku"])
+    group = panel._nico_group
+    group._convert_check.setChecked(True)
+    assert group._duration_spin.isEnabled() is True
+    assert group._duration_spin.toolTip() == ""
+
+
+def test_nico_duration_follows_latest_fetch(panel):
+    _load_subtitle_langs(panel, ["comments"])
+    _load_subtitle_langs(panel, ["danmaku"])
+    group = panel._nico_group
+    group._convert_check.setChecked(True)
+    assert group._duration_spin.isEnabled() is True
+
+
+@pytest.mark.parametrize("lang", ["ja", "en"])
+def test_nico_duration_tooltip_text_exists(lang):
+    import importlib
+
+    strings = importlib.import_module(f"yt_gui.locales.{lang}").STRINGS
+    assert strings["nico_duration_niconico_tooltip"].strip()
+
+
 @pytest.mark.parametrize(
     "auto,detected,expected",
     [

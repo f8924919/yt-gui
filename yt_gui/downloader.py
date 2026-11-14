@@ -1,6 +1,7 @@
 import contextlib
 import glob
 import os
+import random
 import re
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-from . import get_resource_base
+from . import get_resource_base, nico_ass
 from .i18n import t
 from .job_spec import JobSpec
 from .output_template import DEFAULT_PLAYLIST_TEMPLATE, DEFAULT_VIDEO_TEMPLATE
@@ -66,6 +67,17 @@ def _comment_font_size(lang: str, width: int, height: int, scale_percent: int) -
     """
     base_height = width * 9 / 16 if height > width else height
     return base_height * _COMMENT_FONT_RATIO[lang] * scale_percent / 100
+
+
+def _nico_ass_platform() -> str:
+    """ニコニコの ASS 変換に渡す OS の区分（`windows` / `macos` / `other`）を返す。"""
+    # 変数に受けるのは、mypy が sys.platform の分岐を実行環境で刈らないようにするため
+    name: str = sys.platform
+    if name == "win32":
+        return "windows"
+    if name == "darwin":
+        return "macos"
+    return "other"
 
 
 def _with_downloaded_resolution(opts: dict, info: dict | None) -> dict:
@@ -1006,10 +1018,10 @@ class Downloader:
         return ext in _SUBTITLE_CLEANUP_EXTS
 
     def _convert_nico_comments_to_ass(self, stem: str, lang: str, opts: dict) -> None:
-        """コメント/弾幕サイドカーを danmaku2ass で ASS に変換する。
+        """コメント/弾幕サイドカーを ASS に変換する。
 
-        `lang` に応じて入力サイドカー（ニコニコ `comments`→json /
-        ビリビリ `danmaku`→xml）と danmaku2ass 入力フォーマットを切り替える。
+        ニコニコ（`comments`）は `nico_ass` の自作の変換を使い、失敗したときだけ
+        danmaku2ass に回す（#387）。ビリビリ（`danmaku`→xml）は danmaku2ass。
         失敗・バイナリ欠如はいずれも非致命としてログのみ。
         """
         src_ext, src_format = _COMMENT_SOURCE_FORMAT[lang]
@@ -1022,6 +1034,10 @@ class Downloader:
                 self.log_callback(
                     t("warn_nico_ass_skip_no_source").format(filename=base)
                 )
+            return
+        if lang == _COMMENTS_LANG and self._convert_nico_comments_native(
+            src_path, ass_path, opts
+        ):
             return
         if not os.path.exists(self._danmaku2ass_path):
             if self.log_callback:
@@ -1072,6 +1088,50 @@ class Downloader:
             # _danmaku2ass_path が exists() を通ったあとに消えた等のレース
             if self.log_callback:
                 self.log_callback(t("warn_danmaku2ass_missing"))
+
+    def _convert_nico_comments_native(
+        self, src_path: str, ass_path: str, opts: dict
+    ) -> bool:
+        """ニコニコのコメントを `nico_ass` で ASS に変換する（#387）。
+
+        変換できた、または書き込みに失敗した（警告のみ）ときは True を返す。
+        JSON が読めない・変換の例外のときは警告を出して False を返し、呼び出し元が
+        danmaku2ass で変換する。書き込みは `.part` から置き換える
+        （中断時は掃除の対象）。
+        """
+        log = self.log_callback or (lambda _msg: None)
+        platform = _nico_ass_platform()
+        try:
+            with open(src_path, encoding="utf-8") as f:
+                text = f.read()
+            result = nico_ass.convert(
+                text,
+                width=opts.get("resolution_w", 1920),
+                height=opts.get("resolution_h", 1080),
+                font_scale_percent=opts.get("font_scale_percent", 100),
+                opacity=opts.get("opacity", 0.8),
+                platform=platform,
+                measure=nico_ass.pillow_measurer(platform),
+                metrics=nico_ass.font_metrics(platform),
+                rng=random.Random(0),
+            )
+        except Exception as e:  # 失敗は danmaku2ass へ回す
+            log(t("warn_nico_ass_fallback").format(error=e))
+            return False
+        if result.skipped:
+            log(t("warn_nico_ass_skipped").format(count=result.skipped))
+        part_path = f"{ass_path}.part"
+        try:
+            with open(part_path, "w", encoding="utf-8-sig", newline="\n") as f:
+                f.write(result.ass)
+            os.replace(part_path, ass_path)
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                os.remove(part_path)
+            log(t("warn_nico_ass_write_failed").format(error=e))
+            return True
+        log(t("status_nico_ass_created").format(filename=os.path.basename(ass_path)))
+        return True
 
     @staticmethod
     def _build_cut_cmd(

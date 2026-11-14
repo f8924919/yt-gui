@@ -406,6 +406,32 @@ def download_danmaku2ass(force=False):
 # GPL / MIT の再配布義務に基づき、同梱する各コンポーネントの著作権・ライセンス・
 # 対応ソース入手先を列挙したファイルを生成し、バンドルに同梱する。
 
+# niconicomments（MIT）の許諾表示の全文。`yt_gui/nico_ass.py` の
+# `NICONICOMMENTS_LICENSE` と同じ（tests/test_download_binaries.py が一致を確かめる）。
+_NICONICOMMENTS_LICENSE = """\
+MIT License
+
+Copyright (c) 2022 xpadev-net
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
+
+
 COMPONENTS = [
     {
         "name": "FFmpeg (ffmpeg, ffprobe)",
@@ -443,6 +469,16 @@ COMPONENTS = [
         "distribution": "https://github.com/denoland/deno/releases",
         "note": "yt-dlp の JavaScript ランタイムとして使用。",
     },
+    {
+        "name": "niconicomments",
+        "license": "MIT",
+        "copyright": "Copyright (c) 2022 xpadev-net",
+        "homepage": "https://github.com/xpadev-net/niconicomments",
+        "source": ("https://github.com/xpadev-net/niconicomments (ref: 899203436285)"),
+        "distribution": "式・定数・色表を yt_gui/nico_ass.py に移植して同梱",
+        "note": "ニコニコ動画コメント → ASS 字幕変換（#387）の移植元。",
+        "license_text": _NICONICOMMENTS_LICENSE,
+    },
 ]
 
 
@@ -479,6 +515,8 @@ def write_third_party_notices(dest_dir: str = LICENSES_DIR) -> str:
             f"- 備考: {c['note']}",
             "",
         ]
+        if c.get("license_text"):
+            lines += ["```text", c["license_text"], "```", ""]
     content = "\n".join(lines)
     out_path = os.path.join(dest_dir, "THIRD-PARTY-NOTICES.md")
     with open(out_path, "w", encoding="utf-8") as f:

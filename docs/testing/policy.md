@@ -124,6 +124,8 @@ tests/
 ├── test_i18n.py
 ├── test_settings.py
 ├── test_downloader.py
+├── test_nico_ass.py               ← 純粋ロジック（ニコニコのコメントの ASS 変換。Pillow の実測は 1 本だけ）
+├── data/                          ← テスト用の実物のデータ（`sm31143779.comments.*`）
 ├── test_download_binaries.py
 ├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
 ├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
