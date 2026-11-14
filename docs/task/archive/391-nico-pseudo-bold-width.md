@@ -1,11 +1,11 @@
 # ニコニコのコメントの MS Pゴシックの幅を Chrome の擬似ボールドに合わせる
 
 > Issue: [#391](https://github.com/f8924919/yt-gui/issues/391)
-> ステータス: 進行中
+> ステータス: 完了（PR #393）
 > ブランチ: `feature/391-nico-pseudo-bold-width`
 > 基点: `3df961e`
 
-受け入れ条件の正本は Issue。設計は [arch/nico_ass.md](../arch/nico_ass.md) の「擬似ボールドの増分」。前のタスクは [#387](archive/387-nico-ass-converter.md)。
+受け入れ条件の正本は Issue。設計は [arch/nico_ass.md](../../arch/nico_ass.md) の「擬似ボールドの増分」。前のタスクは [#387](387-nico-ass-converter.md)。
 
 ## 進捗
 
@@ -832,6 +832,6 @@ render(normal, "normal")
 
 ## 次にやること
 
-C1〜C7 は証跡つきで完了。evaluator は 2 巡目で PASS（follow-up あり。指摘 2 件はメモの文言で、この PR で直した）。次は PR。
+完了（[PR #393](https://github.com/f8924919/yt-gui/pull/393)）。C1〜C7 は証跡つきで完了し、evaluator は 2 巡目で PASS（follow-up あり。指摘 2 件はメモの文言で、この PR で直した）。
 
 訂正ログ: 1 件

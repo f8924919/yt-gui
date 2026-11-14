@@ -58,7 +58,7 @@
 
 ## 擬似ボールドの増分
 
-Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600（`defont`）で描くとき擬似ボールドをかけ、送り幅も広げる。Web の幅に合わせるため、この増分を測定と ASS の両方に足す（[#391](https://github.com/f8924919/yt-gui/issues/391)。実測の記録は[タスクメモ](../task/391-nico-pseudo-bold-width.md)）。
+Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600（`defont`）で描くとき擬似ボールドをかけ、送り幅も広げる。Web の幅に合わせるため、この増分を測定と ASS の両方に足す（[#391](https://github.com/f8924919/yt-gui/issues/391)。実測の記録は[タスクメモ](../task/archive/391-nico-pseudo-bold-width.md)）。
 
 - **差し込み口**: 増分は、測定器（`measure`）・寸法（`metrics`）と同じく、`measure_comment` と `convert` に引数 `advance(ch, face, font_px) -> float` で渡す。幅の測定と ASS の `\fsp` は同じ `advance` を呼ぶので、食い違わない。本番は `pseudo_bold_advancer(platform)`、増分を足さないときは `no_advance`（常に 0）を渡す。
 - **対象**（`pseudo_bold_advancer`）: `platform` が `"windows"`、区間のフォントが `FontFace("MS PGothic", 600)`、そのフォントのファイルが見つかった（`_resolve_font` が `None` でない）ときだけ、下の規則の値を返す。それ以外（Arial、`gothic` / `mincho` の太さ 400、macOS / その他、Pillow もフォントも無いとき）は 0。結果はモジュール単位でキャッシュする。

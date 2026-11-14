@@ -16,7 +16,6 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [391-nico-pseudo-bold-width.md](391-nico-pseudo-bold-width.md) | 進行中 | ニコニコのコメントの MS Pゴシックの幅を Chrome の擬似ボールドに合わせる（#391） | 2026-11-14 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
