@@ -94,7 +94,7 @@
 - JSON 全体が読めないときや、それ以外の変換の例外は呼び出し元へ送る。`downloader._convert_nico_comments_to_ass` が警告を出して `danmaku2ass` に切り替える。
 - ファイルの書き込みは `downloader` が受け持つ。`{stem}.comments.ass.part` へ書いてから置き換え、中断時の掃除の対象にする。書き込みの `OSError` は警告だけにし、`danmaku2ass` には回さない。
 - コメントが 0 件でもヘッダだけの ASS を出す。
-- 入力の上限と細かい扱い（niconicomments に合わせたものと、ASS のために決めたもの）: 本文は 16,384 文字・256 行で切る（`HTML5Comment.ts:34-35`、文字数は Python の文字数）、コマンドは先頭 64 個・各 128 文字まで読む（`comment.ts:66-67`）、本文の CR は落とす（ASS の行が壊れるため）、タイムゾーンの無い `postedAt` は UTC とみなす、空の行と、解像度の都合で終了が開始以前になる行は `Dialogue` を出さない（`skipped` には数えない）、`font_scale_percent` が 0 以下なら `ValueError`。
+- 入力の上限と細かい扱い（niconicomments に合わせたものと、ASS のために決めたもの）: 本文は 16,384 文字・256 行で切る（`HTML5Comment.ts:34-35`、文字数は Python の文字数）、コマンドは先頭 64 個・各 128 文字まで読む（`comment.ts:66-67`）、本文の CR は落とす（ASS の行が壊れるため）、本文の対になっていないサロゲート（JSON の `\udXXX`）は U+FFFD に置き換える（UTF-8 に書けないため）、タイムゾーンの無い `postedAt` は UTC とみなす、空の行と、解像度の都合で終了が開始以前になる行は `Dialogue` を出さない（`skipped` には数えない）、`font_scale_percent` が 0 以下なら `ValueError`。
 
 ## 計算量
 
