@@ -30,3 +30,5 @@
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
+| [#387](https://github.com/f8924919/yt-gui/issues/387) | ニコニコのコメントの ASS 変換を自作し、コマンドと表示時間を Web に合わせる | [archive/372-comment-font-ratio.md](archive/372-comment-font-ratio.md) |
+| [#388](https://github.com/f8924919/yt-gui/issues/388) | ニコニコのコメントの自動縮小、ender / full、コメントアートを再現する（#387 の後） | [archive/372-comment-font-ratio.md](archive/372-comment-font-ratio.md) |
