@@ -945,7 +945,7 @@ def _parse_row(entry: object) -> _Row | None:
     if posted is None:
         return None
     # 対になっていないサロゲート（JSON の `\udXXX`）は UTF-8 に書けないので置き換える
-    body = _RE_LONE_SURROGATE.sub("�", body)
+    body = _RE_LONE_SURROGATE.sub("\ufffd", body)
     return _Row(vpos, posted, body, commands, premium)
 
 
