@@ -145,7 +145,7 @@ STRINGS: dict[str, str] = {
     "nico_convert_ass": "Convert comments to ASS subtitle",
     "nico_resolution": "Resolution:",
     "nico_duration": "Display duration (sec):",
-    "nico_duration_niconico_tooltip": "Niconico comments use the same display time as the website (including the @seconds command), so this setting only applies to Bilibili danmaku.",
+    "nico_duration_niconico_tooltip": "Niconico comments use the same display time as the website (including the @seconds command), so this setting only applies to Bilibili danmaku (if conversion fails and falls back to danmaku2ass, this value is used for Niconico too).",
     "nico_opacity": "Opacity:",
     "nico_font_scale": "Text size scale:",
     "nico_font_scale_tooltip": "100% is about the size shown on the website.",

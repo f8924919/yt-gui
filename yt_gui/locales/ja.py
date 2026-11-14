@@ -145,7 +145,7 @@ STRINGS: dict[str, str] = {
     "nico_convert_ass": "コメントを ASS 字幕に変換",
     "nico_resolution": "画面解像度:",
     "nico_duration": "表示時間 (秒):",
-    "nico_duration_niconico_tooltip": "ニコニコ動画のコメントは Web と同じ計算で表示時間が決まる（@秒数 の指定も反映する）ため、この設定はビリビリの弾幕にだけ効きます。",
+    "nico_duration_niconico_tooltip": "ニコニコ動画のコメントは Web と同じ計算で表示時間が決まる（@秒数 の指定も反映する）ため、この設定はビリビリの弾幕にだけ効きます（変換に失敗して danmaku2ass に切り替えたときは、ニコニコでもこの値を使います）。",
     "nico_opacity": "不透明度:",
     "nico_font_scale": "文字サイズ倍率:",
     "nico_font_scale_tooltip": "100% が Web 表示相当の大きさです。",

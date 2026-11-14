@@ -23,7 +23,7 @@
 - [x] C12 配置と衝突判定、行が足りないとき — 証跡: `tests/test_nico_ass.py` の `test_layout_*`（固定の `long - 20`、判定線と余白と 5 刻み、左の判定線だけ、長さの違う軌跡の交差、行が足りないときの乱数の回数、負の posY）。変異 `long-20`・`query-step-5`・`padding-5`・`left-line-off`・`analytic-off` で red
 - [x] C13 改行を含むコメント（1 行 1 Dialogue） — 証跡: `tests/test_nico_ass.py` の `test_measure_comment_multiline_uses_max_width_and_total_height`・`test_convert_multiline_one_dialogue_per_line_left_aligned`。変異 `fixed-left-align` で red
 - [x] C14 上下固定の幅の縮小 — 証跡: `tests/test_nico_ass.py` の `test_resize_*`（ちょうど 512・1 超過・大きく超過・増やす側の止め方・倍率の後の判定）。変異 `stage-512`・`grow-keeps-last`・`resize-after-scale` で red
-- [x] C15 Pillow の実測と概算への切り替え — 証跡: 凍結した環境での確認は下の「実動画との見比べ」。`tests/test_nico_ass.py` の `test_pillow_measurer_*`（Pillow なしと未知のフォントで概算、実フォントは関係で検査。Windows で skip されずに pass）。配布物に Pillow が入るかはビルドで未確認（次にやること）
+- [x] C15 Pillow の実測と概算への切り替え — 証跡: 凍結した環境での確認は下の「実動画との見比べ」。`tests/test_nico_ass.py` の `test_pillow_measurer_*`（Pillow なしと未知のフォントで概算、実フォントは関係で検査。Windows で skip されずに pass）。配布物に Pillow が入ることはビルドで確認した（下の「配布物」）
 - [x] C16 フォントの寸法からの文字サイズ換算 — 証跡: `tests/test_nico_ass.py` の `test_convert_windows_defont_runs_use_each_font_coefficient`・`test_convert_missing_metrics_falls_back_to_372_ratio`。実フォントの寸法と、libass で描いた幅・位置の測定は下の「確認した事実」
 - [x] C17 ASS の形とエスケープ — 証跡: `tests/test_nico_ass.py` の `test_convert_header`・`test_convert_escapes_braces_backslash_and_spaces`、BOM は `test_convert_comments_uses_new_converter_without_danmaku2ass`（642b50e）
 - [x] C18 不正なコメント、失敗時の danmaku2ass、書き込み、0 件 — 証跡: `tests/test_nico_ass.py` の `test_convert_skips_invalid_rows_and_counts`・`test_convert_raises_when_whole_json_unreadable`、`tests/test_downloader.py` の `test_convert_comments_*`（件数の警告・読めない JSON と例外で danmaku2ass・書き込みの失敗は警告だけ・`.part` から置き換え・0 件）。変異 `dl-no-fallback`・`dl-no-skip-log`・`dl-direct-write` で red
@@ -141,6 +141,15 @@
 | E3 | タスクメモの C23 が未チェック | 直した | 上の進捗 |
 | E4 | 変異の表の基点が HEAD の祖先でない | いまの HEAD で取り直した | 上の「変異 → red」（b97d888） |
 
+### evaluator 2 巡目（2026-11-14、HEAD `e7fdea3`、FAIL: [欠陥] 1 件 / [証跡・文言] 3 件。1 巡目の 11 件はすべて閉じた）
+
+| 指摘 | 内容 | 閉じ方 | 証跡 |
+|---|---|---|---|
+| [欠陥] 1 | danmaku2ass に切り替えたときニコニコにも「表示時間」が効くのに、spec とツールチップは「ビリビリだけ」と書く | ユーザー判断で実装（設定値を渡す）を正とし、spec の表と「表示時間」の項、ツールチップ（ja / en）、arch `original_format_panel.md` に切り替え時の例外を書いた | この節の後のコミット |
+| [証跡・文言] 2 | タスクメモの C15 と「次にやること」が古い | 直した | 同上 |
+| [証跡・文言] 3 | arch の「測った幅と描く幅が一致する」が測った範囲を上回る | Windows・4 フォント・0.2% 以内の限定とメモへのリンクを足した | 同上 |
+| [証跡・文言] 4 | 1 を直すときの伝播 | `ビリビリだけに効` / `設定は使わない` / `ビリビリの弾幕にだけ効` で `git grep` し、当たった spec 2 行・ツールチップ 2 行・arch 1 行をすべて直した（`downloader.md:149` は元から切り替え時の値を書いている） | 同上 |
+
 ## 訂正ログ
 
 | 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
@@ -148,10 +157,10 @@
 
 ## 次にやること（申し送り・2026-11-14 時点）
 
-C1〜C22 は証跡つきで完了（C21 はユーザーの目視で確定）。残りは C23 の点検と PR。
+C1〜C23 は証跡つきで完了（C21 はユーザーの目視で確定、`_live` は #391 へ）。evaluator 2 巡目の [欠陥] 1 件（切り替え時の表示時間）はユーザー判断で spec と文言を実装に揃えた。
 
-1. `/verify-gate`（verify → docs-check → evaluator）を回す。C23 は docs-check の結果で確定する。
-2. push と PR はユーザーの確認を取ってから。PR 本文に変異の表と C21 の表を引き、#391 を「関連」に書く。
-3. 完了したら、このメモを `docs/task/archive/` へ移す（docs-guide §4.2。PR に同梱）。
+1. evaluator の 3 巡目（[欠陥] を直したので再評価）。
+2. push と PR はユーザーの確認を取ってから。PR 本文に変異の表と C21 の表を引き、`Follow-up: #391` を書く。
+3. このメモを `docs/task/archive/` へ移す（docs-guide §4.2。PR に同梱）。
 
 訂正ログ: 0 件
