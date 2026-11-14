@@ -29,7 +29,7 @@
 - [x] C18 不正なコメント、失敗時の danmaku2ass、書き込み、0 件 — 証跡: `tests/test_nico_ass.py` の `test_convert_skips_invalid_rows_and_counts`・`test_convert_raises_when_whole_json_unreadable`、`tests/test_downloader.py` の `test_convert_comments_*`（件数の警告・読めない JSON と例外で danmaku2ass・書き込みの失敗は警告だけ・`.part` から置き換え・0 件）。変異 `dl-no-fallback`・`dl-no-skip-log`・`dl-direct-write` で red
 - [x] C19 「表示時間」の UI — 証跡: `tests/test_original_format_panel.py` の `test_nico_duration_*`（無効とツールチップ、切り替えても無効、ビリビリで有効、取り直しで追従、ja / en の文言）。変異 `panel-ignore-nico`・`panel-sticky-nico` で red
 - [x] C20 テストの収集、変異 → red の表、実物のフィクスチャ、所要時間 — 証跡: 下の「変異 → red」と「所要時間」。`uv run pytest -q -rs` は 801 passed・skip 0（642b50e）
-- [ ] C21 実動画との見比べ — 証跡: 下の「実動画との見比べ」（数値の記録まで。ユーザーの目視確認待ち）
+- [x] C21 実動画との見比べ — 証跡: 下の「実動画との見比べ」。ユーザーが並べた画像を目視で確認して確定（2026-11-14）。幅の差は [#391](https://github.com/f8924919/yt-gui/issues/391) へ回した
 - [x] C22 MIT の著作権表示と許諾表示の全文 — 証跡: `tests/test_download_binaries.py` の `test_third_party_notices_include_niconicomments_mit_full_text`（モジュールの `NICONICOMMENTS_LICENSE` と `COMPONENTS` の全文が一致し、告知に載る）
 - [ ] C23 spec / arch の更新 — 証跡: 未
 
@@ -113,6 +113,7 @@
 - 表示時間: 上固定の「野獣先輩」（13.64 秒から 3 秒）は、Web で 13.60 秒に無く 13.70 秒に有り、16.60 秒に有り 16.70 秒に無い。ASS は 13.64〜16.64 秒で、差は 0.1 秒以内（目安 ±0.5 秒）。流れる「ボロクソで草」の 94.0 秒の横位置の差は中心で 13 px（540p の速さ 2.39 px / 1/100 秒で約 0.05 秒分）。
 - 縦位置: 固定コメントは、行も重なり方（266.5 秒の行が足りずに重なる所を含む）も Web と同じで、差は ±4 px 以内。流れるコメントは一部の段が Web と違う（94.0 秒の「ボロクソで草」は Web が 1 段下。356.7 秒にも違う段がある）。
 - 幅の差の原因: Chrome は太字の無い MS PGothic を太さ 600 で描くとき擬似ボールドをかけ、送り幅も広げる。ブラウザの canvas の `measureText` で、100px の「漢」× 10 は 400 で 1000、600 で 1019.5、カナ混じり 18 文字は 1564.8 → 1600（1 文字あたり約 +2%）。Arial は本物の Bold があるので変わらない（「H」× 10 は 400 / 600 / 700 とも 722.2）。yt-gui の測定（Pillow）と libass はこの増分を持たないので、Windows の `defont` の日本語は Web より 2〜3% 細く、small では約 6% 細い（増分が文字の大きさに比例しないと見られる。未確認）。流れるコメントの段の違いは、幅の差で衝突判定の結果が変わるためと見ている（未確認）。
+- 確定: ユーザーが並べた画像（5 時刻）を目視で確認し、C21 を確定した（2026-11-14）。幅の差は #388 ではなく新しい [#391](https://github.com/f8924919/yt-gui/issues/391) に回した（ユーザー判断。#388 は縮小とコメントアートで、内容が違うため）。
 - `_live`: この動画に `_live` のコメントは無く、見比べていない。擬似ボールド: 焼きこみ（libass）も Web も太く見え、見た目の差は上の幅の差だけ。
 - 並べた画像（左が焼きこみ、右が Web）は、ユーザーに送った `compare.png`（scratchpad、追跡しない）。
 
@@ -123,11 +124,10 @@
 
 ## 次にやること（申し送り・2026-11-14 時点）
 
-実装・テスト・docs はコミット済み（642b50e、c19668e）。残りは実物での確認と PR。
+C1〜C22 は証跡つきで完了（C21 はユーザーの目視で確定）。残りは C23 の点検と PR。
 
-1. **C15 の残り**: ビルドした実行ファイルでニコニコの ASS が Pillow の測定で作られること（概算に落ちていないこと）を、C21 の実動画で確かめる。同じ `.comments.json` を開発環境の `convert`（Pillow の測定）でも変換し、ASS が同一なら Pillow が使われている。
-2. **C21 実動画との見比べ**: `sm31143779` を焼きこみ付きでダウンロードし、流れる・上下固定・色付きが出る時刻を 3 点以上選んで、Web と表示時間（目安 ±0.5 秒）と文字の大きさを測って記録する。`_live` の縁取りと擬似ボールドの見え方も見る。**ユーザーの目視確認で確定**する。記録にはコミット、入力の sha256（上記）、取得日、「Windows で 1 本の動画を確認した結果」を書く。目安を超えた差は #388 へ回す。
-3. **C23**: spec / arch は更新済み。`docs-check` で整合を点検する。
-4. `/verify-gate`（verify → docs-check → evaluator）を回して PR を作る。PR 本文に上の変異の表を引く。
+1. `/verify-gate`（verify → docs-check → evaluator）を回す。C23 は docs-check の結果で確定する。
+2. push と PR はユーザーの確認を取ってから。PR 本文に変異の表と C21 の表を引き、#391 を「関連」に書く。
+3. 完了したら、このメモを `docs/task/archive/` へ移す（docs-guide §4.2。PR に同梱）。
 
 訂正ログ: 0 件
