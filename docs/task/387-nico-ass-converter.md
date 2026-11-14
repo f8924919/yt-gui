@@ -23,13 +23,13 @@
 - [x] C12 配置と衝突判定、行が足りないとき — 証跡: `tests/test_nico_ass.py` の `test_layout_*`（固定の `long - 20`、判定線と余白と 5 刻み、左の判定線だけ、長さの違う軌跡の交差、行が足りないときの乱数の回数、負の posY）。変異 `long-20`・`query-step-5`・`padding-5`・`left-line-off`・`analytic-off` で red
 - [x] C13 改行を含むコメント（1 行 1 Dialogue） — 証跡: `tests/test_nico_ass.py` の `test_measure_comment_multiline_uses_max_width_and_total_height`・`test_convert_multiline_one_dialogue_per_line_left_aligned`。変異 `fixed-left-align` で red
 - [x] C14 上下固定の幅の縮小 — 証跡: `tests/test_nico_ass.py` の `test_resize_*`（ちょうど 512・1 超過・大きく超過・増やす側の止め方・倍率の後の判定）。変異 `stage-512`・`grow-keeps-last`・`resize-after-scale` で red
-- [ ] C15 Pillow の実測と概算への切り替え — 証跡: `tests/test_nico_ass.py` の `test_pillow_measurer_*`（Pillow なしと未知のフォントで概算、実フォントは関係で検査。Windows で skip されずに pass）。配布物に Pillow が入るかはビルドで未確認（次にやること）
+- [x] C15 Pillow の実測と概算への切り替え — 証跡: 凍結した環境での確認は下の「実動画との見比べ」。`tests/test_nico_ass.py` の `test_pillow_measurer_*`（Pillow なしと未知のフォントで概算、実フォントは関係で検査。Windows で skip されずに pass）。配布物に Pillow が入るかはビルドで未確認（次にやること）
 - [x] C16 フォントの寸法からの文字サイズ換算 — 証跡: `tests/test_nico_ass.py` の `test_convert_windows_defont_runs_use_each_font_coefficient`・`test_convert_missing_metrics_falls_back_to_372_ratio`。実フォントの寸法と、libass で描いた幅・位置の測定は下の「確認した事実」
 - [x] C17 ASS の形とエスケープ — 証跡: `tests/test_nico_ass.py` の `test_convert_header`・`test_convert_escapes_braces_backslash_and_spaces`、BOM は `test_convert_comments_uses_new_converter_without_danmaku2ass`（642b50e）
 - [x] C18 不正なコメント、失敗時の danmaku2ass、書き込み、0 件 — 証跡: `tests/test_nico_ass.py` の `test_convert_skips_invalid_rows_and_counts`・`test_convert_raises_when_whole_json_unreadable`、`tests/test_downloader.py` の `test_convert_comments_*`（件数の警告・読めない JSON と例外で danmaku2ass・書き込みの失敗は警告だけ・`.part` から置き換え・0 件）。変異 `dl-no-fallback`・`dl-no-skip-log`・`dl-direct-write` で red
 - [x] C19 「表示時間」の UI — 証跡: `tests/test_original_format_panel.py` の `test_nico_duration_*`（無効とツールチップ、切り替えても無効、ビリビリで有効、取り直しで追従、ja / en の文言）。変異 `panel-ignore-nico`・`panel-sticky-nico` で red
 - [x] C20 テストの収集、変異 → red の表、実物のフィクスチャ、所要時間 — 証跡: 下の「変異 → red」と「所要時間」。`uv run pytest -q -rs` は 801 passed・skip 0（642b50e）
-- [ ] C21 実動画との見比べ — 証跡: 未
+- [ ] C21 実動画との見比べ — 証跡: 下の「実動画との見比べ」（数値の記録まで。ユーザーの目視確認待ち）
 - [x] C22 MIT の著作権表示と許諾表示の全文 — 証跡: `tests/test_download_binaries.py` の `test_third_party_notices_include_niconicomments_mit_full_text`（モジュールの `NICONICOMMENTS_LICENSE` と `COMPONENTS` の全文が一致し、告知に載る）
 - [ ] C23 spec / arch の更新 — 証跡: 未
 
@@ -92,6 +92,29 @@
 | `dl-direct-write`（`.part` を使わない） | 0 → 1 | 生き残ったので `test_convert_comments_writes_part_then_replaces` を足し（c19668e）、再実行で red |
 | `panel-ignore-nico`（ニコニコでも有効） | 2 | `test_nico_duration_disabled_for_niconico_with_tooltip` ほか |
 | `panel-sticky-nico`（取り直しで戻らない） | 1 | `test_nico_duration_follows_latest_fetch` |
+
+### 実動画との見比べ（C21・C15 の残り、2026-11-14、Windows で 1 本の動画を確認した結果）
+
+- 対象: `sm31143779`（2026-11-14 取得）。アプリと同じ経路（`Downloader.download_video`、焼きこみ ON、解像度の自動追従 ON → 960 × 540、不透明度 0.8、倍率 100%）で取得した。コミットは `78785e5`。取得したコメントの sha256 は `884247fc…27ed78`（フィクスチャの元ファイルと同一）。ログは `[コメント] SCP-114514.comments.ass を生成しました` で、danmaku2ass は使われていない。焼きこみまで 38.9 秒。
+- C15（実行時に Pillow で測られるか）: PyInstaller で `nico_ass` を含めて凍結した確認用の実行ファイル（同じ PyInstaller、同じフック）でも、MS PGothic の半角カナ 5 文字の幅は 304.3（概算なら 250）で、同じコメントから同じ ASS（sha256 `5fdf56e8…61b0f2`。アプリの出力と一致、フィクスチャの 1920 × 1080 では `757dd6de…`）ができた。アプリ本体の exe を直接動かしたのではない（GUI のため）。
+- Web 側: 内蔵ブラウザ（Chromium 156、Windows、devicePixelRatio 1.5）のニコニコ動画のプレイヤー。コメントの canvas（1364 × 768）の画素を、再生が目標の時刻に達した瞬間に止めて読んだ。`video` を直接シークするとコメントの層が追従しないので、`?from=` で数秒前から自然に再生させた。焼きこみ側は、同じ ASS の文字だけ不透明にした写しを黒地に描いたフレーム。どちらも色ごとのインクの外接矩形を 960 × 540 に換算して比べた。
+
+| 時刻 | 種類 | コメント | 焼きこみ x / y | Web x / y | 幅の差 |
+|---|---|---|---|---|---|
+| 14.5 秒 | 上固定・big・黄 | 野獣先輩 | 374–586 / 12–59 | 371.6–588.4 / 8.4–58.4 | −2.2% |
+| 14.5 秒 | 下固定・big・赤 | 日本支部はもう臭い | 260–707 / 482–531 | 254.1–712.3 / 480.0–529.3 | −2.4% |
+| 20.5 秒 | 下固定・medium・青 | 「Ticonderoga(タイコンデロガ)」の方が良い | 141–821 / 442–479 | 126.0–834.7 / 442.0–481.4 | −4.0% |
+| 20.5 秒 | 下固定・big・赤 | オブジェクトクラスをケテルに修正しろ | 130–827 / 492–531 | 121.8–836.1 / 490.6–531.4 | −2.4% |
+| 94.0 秒 | 流れる・medium・赤 | ボロクソで草 | 391–587 / 102–135 | 375.1–577.1 / 127.4–161.9 | −3.0% |
+| 266.5 秒 | 下固定・big・シアン | アメリカ合衆国 | 314–643 / 482–531 | 309.0–647.5 / 479.3–529.3 | −2.8% |
+| 356.7 秒 | 下固定・big・紫 | イキスギィ! | 358–601 / 206–253 | 354.0–603.9 / 203.4–254.1 | −2.8% |
+| 356.7 秒 | 下固定・small・cyan2 | この結論に至るまでに大分時間がかかってしまったようだ。 | 172–782 / 455–476 | 152.0–801.6 / 456.8–478.6 | −6.1% |
+
+- 表示時間: 上固定の「野獣先輩」（13.64 秒から 3 秒）は、Web で 13.60 秒に無く 13.70 秒に有り、16.60 秒に有り 16.70 秒に無い。ASS は 13.64〜16.64 秒で、差は 0.1 秒以内（目安 ±0.5 秒）。流れる「ボロクソで草」の 94.0 秒の横位置の差は中心で 13 px（540p の速さ 2.39 px / 1/100 秒で約 0.05 秒分）。
+- 縦位置: 固定コメントは、行も重なり方（266.5 秒の行が足りずに重なる所を含む）も Web と同じで、差は ±4 px 以内。流れるコメントは一部の段が Web と違う（94.0 秒の「ボロクソで草」は Web が 1 段下。356.7 秒にも違う段がある）。
+- 幅の差の原因: Chrome は太字の無い MS PGothic を太さ 600 で描くとき擬似ボールドをかけ、送り幅も広げる。ブラウザの canvas の `measureText` で、100px の「漢」× 10 は 400 で 1000、600 で 1019.5、カナ混じり 18 文字は 1564.8 → 1600（1 文字あたり約 +2%）。Arial は本物の Bold があるので変わらない（「H」× 10 は 400 / 600 / 700 とも 722.2）。yt-gui の測定（Pillow）と libass はこの増分を持たないので、Windows の `defont` の日本語は Web より 2〜3% 細く、small では約 6% 細い（増分が文字の大きさに比例しないと見られる。未確認）。流れるコメントの段の違いは、幅の差で衝突判定の結果が変わるためと見ている（未確認）。
+- `_live`: この動画に `_live` のコメントは無く、見比べていない。擬似ボールド: 焼きこみ（libass）も Web も太く見え、見た目の差は上の幅の差だけ。
+- 並べた画像（左が焼きこみ、右が Web）は、ユーザーに送った `compare.png`（scratchpad、追跡しない）。
 
 ## 訂正ログ
 
