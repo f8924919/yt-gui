@@ -10,6 +10,7 @@
 
 - `convert(comments_json, *, width, height, font_scale_percent, opacity, platform, measure, rng) -> ConvertResult`: ASS の文字列と、飛ばしたコメントの件数を返す。ファイルの読み書きはしない。
 - `font_candidates(font, platform)`: コマンドのフォント（`defont` / `gothic` / `mincho`）と OS から、フォントの候補を返す純関数。
+- 測定器の型は `measure(text, font_name, weight, size_px) -> float`（`size_px` は CSS の em。戻り値は送り幅の px）。
 - `pillow_measurer(platform)`: 実行時の測定器を返す。Pillow は関数の中で遅延 import し、`ImportError` なら概算の測定器を返す。結果はモジュール単位でキャッシュする。
 - `approx_measurer`: 概算の測定器（全角 1 文字分、半角 0.5 文字分。全角は `unicodedata.east_asian_width` の `F` / `W`）。
 
@@ -33,7 +34,7 @@
 ## フォント
 
 - `font_candidates` は niconicomments の `fonts.ts` の候補列を、文字の範囲ごとの組に直して返す。Windows の `defont` は英字（Latin）を Arial、それ以外を MS PGothic にする。ほかは 1 つのフォントで描く。
-- 幅を測るときも ASS に書くときも、同じ分け方を使う。ASS では区間ごとに `{\fn<名前>}` を書く。
+- 幅を測るときも ASS に書くときも、同じ分け方を使う。ASS では区間ごとに `{\fn<名前>\fs<サイズ>}` を書く。フォントごとに係数が違う（Arial 1.117、MS PGothic 1.000 など）ので、`\fs` も区間ごとに、その区間のフォントの係数で求める。Style の `Fontsize` は使わない（仮の値）。
 - フォント名は英語のファミリー名（`Arial`、`MS PGothic`、`Yu Gothic`、`Yu Mincho`、`Hiragino Sans` など）。フォントファイルは OS ごとの候補のパスから探し、`.ttc` は `getname()` でフェイスを照合して開く（index を決め打ちしない）。
 - 太さは `\b<weight>`（Style の Bold は 0）。測定器にも太さを渡し、太さ別のファイル（Arial Bold など）で測る。
 - ASS に書くフォントは変換した PC の OS のもの。MKV を別の OS で再生すると代わりのフォントになる。Linux など「その他」は Pillow で開けないので概算になる。
