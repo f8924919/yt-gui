@@ -33,6 +33,8 @@
 - [x] C22 MIT の著作権表示と許諾表示の全文 — 証跡: `tests/test_download_binaries.py` の `test_third_party_notices_include_niconicomments_mit_full_text`（モジュールの `NICONICOMMENTS_LICENSE` と `COMPONENTS` の全文が一致し、告知に載る）
 - [ ] C23 spec / arch の更新 — 証跡: 未
 
+> **コミットの読み替え（2026-11-14）**: push 前に、公開リポジトリへ `userId` を含む実物のデータを残さないため（ユーザー判断）履歴を作り直した。以下の記録にある `642b50e`・`c19668e`・`702b973`・`83e0d14`・`498055a` は、いまの `1b9c6e2`（実装とテスト）と `125712a`（このメモ）にまとめた。`yt_gui/` と `scripts/` は `c19668e` と同一（`git diff c19668e 1b9c6e2 -- yt_gui scripts` が空）。テストの違いは、実物のデータから `userId` などを除いて sha256 の期待値を変えたことと、`_ass_cmd` の docstring だけ。データを変えた後も、全件の変換の ASS の sha256 の先頭は `757dd6de606832ed` のままで、`uv run pytest -q` は 803 passed。
+
 ## 確認した事実
 
 - 移植元は niconicomments のコミット `899203436285`。Issue の表の値は、取得したソースの該当行で確認した（色名は `colors.ts` のキーを数えて 27）。
