@@ -1,11 +1,11 @@
 # ニコニコのコメントの ASS 変換を自作し、コマンドと表示時間を Web に合わせる
 
 > Issue: [#387](https://github.com/f8924919/yt-gui/issues/387)
-> ステータス: 進行中
+> ステータス: 完了（PR #392）
 > ブランチ: `feature/387-nico-ass-converter`
 > 基点: `6a6a034`
 
-受け入れ条件と移植元の値の正本は Issue。設計は [arch/nico_ass.md](../arch/nico_ass.md)。コメント再現度向上の第 2 段階の前半で、後半は #388。
+受け入れ条件と移植元の値の正本は Issue。設計は [arch/nico_ass.md](../../arch/nico_ass.md)。コメント再現度向上の第 2 段階の前半で、後半は #388。
 
 ## 進捗
 
@@ -172,10 +172,9 @@
 
 ## 次にやること（申し送り・2026-11-14 時点）
 
-C1〜C23 は証跡つきで完了（C21 はユーザーの目視で確定、`_live` は #391 へ）。evaluator 2 巡目の [欠陥] 1 件（切り替え時の表示時間）はユーザー判断で spec と文言を実装に揃えた。
+完了（[PR #392](https://github.com/f8924919/yt-gui/pull/392)）。C1〜C23 は証跡つきで完了し、evaluator は 3 巡目で PASS（follow-up あり）。残りは follow-up に回した。
 
-1. evaluator は 3 巡目で PASS（follow-up あり。#391）。
-2. push と PR はユーザーの確認を取ってから。PR 本文に変異の表と C21 の表を引き、`Follow-up: #391` を書く。
-3. このメモを `docs/task/archive/` へ移す（docs-guide §4.2。PR に同梱）。
+- [#391](https://github.com/f8924919/yt-gui/issues/391): Windows の MS Pゴシックの幅を Chrome の擬似ボールドに合わせる。`_live` の縁取りの見え方の確認もここで行う
+- [#388](https://github.com/f8924919/yt-gui/issues/388): 複数行の縮小、`full` / `ender`、コメントアート、古い描画方式
 
 訂正ログ: 0 件

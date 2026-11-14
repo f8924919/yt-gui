@@ -41,7 +41,7 @@
 
 - niconicomments の `charSize`、`lineHeight`、`fontSize`（CSS の `font-size` 相当）を、舞台の高さ 384 の単位で移植し、キャンバスへは `1920 / 683` 倍で換算する。倍率（`font_scale_percent`）はキャンバスの文字サイズに掛ける。幅の上限（512）の判定は倍率を掛けた後の幅で行う。
 - 幅は、測った文字サイズ（CSS の em）での幅とする。小さいサイズのヒンティングの丸めを避けるため、大きいサイズ（100px）で測って比例で縮める。
-- ASS の `Fontsize` は、描くフォントの `(usWinAscent + usWinDescent) / unitsPerEm` を em に掛けた値にする（libass はこの高さを `Fontsize` として扱う）。これで測った幅と描く幅が一致する（Windows・`bin/ffmpeg` の libass・Pillow 13 の 4 フォントで 0.2% 以内を確認。macOS は未確認。記録は[タスクメモ](../task/387-nico-ass-converter.md)）。係数はフォントファイルの OS/2 表から読む。フォントが見つからないときは、#372 の比率（`medium` で動画の高さの 0.09）に戻す。
+- ASS の `Fontsize` は、描くフォントの `(usWinAscent + usWinDescent) / unitsPerEm` を em に掛けた値にする（libass はこの高さを `Fontsize` として扱う）。これで測った幅と描く幅が一致する（Windows・`bin/ffmpeg` の libass・Pillow 13 の 4 フォントで 0.2% 以内を確認。macOS は未確認。記録は[タスクメモ](../task/archive/387-nico-ass-converter.md)）。係数はフォントファイルの OS/2 表から読む。フォントが見つからないときは、#372 の比率（`medium` で動画の高さの 0.09）に戻す。
 - この換算はニコニコだけで、ビリビリは #372 の `_comment_font_size` のまま。
 
 ## フォント
@@ -98,7 +98,7 @@
 
 ## 計算量
 
-配置は niconicomments をそのまま移植し、最適化はしていない（実物 1,432 件で 1 秒未満。測定の記録は [タスクメモ](../task/387-nico-ass-converter.md)）。遅くなったら、結果が同じになることをテストで守ったまま最適化する。変換はワーカースレッドで動き、Qt には触れない。
+配置は niconicomments をそのまま移植し、最適化はしていない（実物 1,432 件で 1 秒未満。測定の記録は [タスクメモ](../task/archive/387-nico-ass-converter.md)）。遅くなったら、結果が同じになることをテストで守ったまま最適化する。変換はワーカースレッドで動き、Qt には触れない。
 
 ## 対象外
 

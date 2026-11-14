@@ -68,6 +68,7 @@
 | [niconico-comments-phase1.md](niconico-comments-phase1.md) | フェーズ 1: `comments` lang を字幕リストに追加し JSON ファイルとして保存可能にする | 2026-05-24 |
 | [niconico-comments-phase2.md](niconico-comments-phase2.md) | フェーズ 2: danmaku2ass を PyInstaller でビルドして `bin/` に同梱し、コメント JSON を ASS に変換する | 2026-05-24 |
 | [niconico-comments-phase3.md](niconico-comments-phase3.md) | フェーズ 3: ffmpeg で動画 + ASS を MKV ソフトサブとして統合する | 2026-05-24 |
+| [387-nico-ass-converter.md](387-nico-ass-converter.md) | ニコニコのコメントの ASS 変換を自作し（niconicomments の HTML5 描画を移植）、コマンド・表示時間・衝突判定・上下固定の縮小・フォントの寸法からの文字サイズを Web に合わせる。danmaku2ass は失敗時とビリビリだけ。実動画と Web の見比べで確定し、MS Pゴシックの幅の差と `_live` は #391 へ（Issue #387 / PR #392）。メトリクス: コミット 18（PR #392）・訂正ログ 0 件・evaluator 3 巡 | 2026-11-14 |
 
 ## リファクタリング（フェーズ 1–7）
 
