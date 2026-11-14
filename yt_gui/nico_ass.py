@@ -70,7 +70,7 @@ class Command(NamedTuple):
 class Measured(NamedTuple):
     char_size: float
     line_height: float
-    font_px: float
+    font_px: int
     scale: float
     line_widths: list[int]
     width: float
@@ -99,6 +99,8 @@ class _Rng(Protocol):
 Measure = Callable[[str, str, int, float], float]
 # 寸法: (フォント名, 太さ) -> FontMetrics | None
 MetricsFn = Callable[[str, int], FontMetrics | None]
+# 擬似ボールドの増分: (1 字, 区間のフォント, font_px[CSS の px]) -> 足す送り幅[px]
+Advance = Callable[[str, FontFace, int], float]
 
 
 # ---------------------------------------------------------------------------
@@ -360,18 +362,21 @@ def measure_comment(
     *,
     platform: str,
     measure: Measure,
+    advance: Advance,
     font_scale: float,
 ) -> Measured:
     lines_runs = [font_runs(line, cmd.font, platform) for line in lines]
     base_char = char_size(cmd.size)
     base_line_height = line_height(cmd.size)
 
+    def run_width(text: str, face: FontFace, font_px: int) -> float:
+        width = measure(text, face.name, face.weight, font_px)
+        return width + sum(advance(ch, face, font_px) for ch in text)
+
     def widths_at(size: float) -> list[int]:
         font_px, scale = font_size_and_scale(size)
         return [
-            math.ceil(
-                sum(measure(t, f.name, f.weight, font_px) for t, f in runs) * scale
-            )
+            math.ceil(sum(run_width(t, f, font_px) for t, f in runs) * scale)
             for runs in lines_runs
         ]
 
@@ -742,6 +747,27 @@ def _no_metrics(font_name: str, weight: int) -> FontMetrics | None:
     return None
 
 
+# 擬似ボールドの増分（arch の「擬似ボールドの増分」。規則の根拠はタスクメモ #391）
+_PSEUDO_BOLD_FACE = FontFace("MS PGothic", 600)
+_PSEUDO_BOLD_BITMAP_MAX_PX = 22
+_PSEUDO_BOLD_EM_RATIO = 5 / 256
+
+
+def pseudo_bold_advance(ch: str, font_px: int) -> float:
+    """Chrome が擬似ボールドの MS PGothic の 1 字に足す送り幅（CSS の px）。"""
+    if unicodedata.category(ch) == "Cf":
+        return 0.0
+    if font_px <= _PSEUDO_BOLD_BITMAP_MAX_PX:
+        return 1.0
+    if ch.isspace():
+        return 0.0
+    return font_px * _PSEUDO_BOLD_EM_RATIO
+
+
+def no_advance(ch: str, face: FontFace, font_px: int) -> float:
+    return 0.0
+
+
 # フォント名 -> {太さ: ファイル名の候補}（arch の「フォント」）
 _WINDOWS_FONT_FILES: dict[str, dict[int, list[str]]] = {
     "Arial": {600: ["arialbd.ttf"]},
@@ -795,6 +821,23 @@ def _resolve_font(platform: str, name: str, weight: int) -> tuple[str, int] | No
                 if family == name:
                     return path, index
     return None
+
+
+@functools.cache
+def pseudo_bold_advancer(platform: str) -> Advance:
+    """Windows で MS PGothic（太さ 600）のファイルが見つかったときだけ増分を返す。"""
+    if platform != "windows":
+        return no_advance
+    face = _PSEUDO_BOLD_FACE
+    if _resolve_font(platform, face.name, face.weight) is None:
+        return no_advance
+
+    def advance(ch: str, run_face: FontFace, font_px: int) -> float:
+        if run_face != face:
+            return 0.0
+        return pseudo_bold_advance(ch, font_px)
+
+    return advance
 
 
 @functools.cache
@@ -969,6 +1012,20 @@ def _ass_time(centiseconds: int) -> str:
     return f"{hours}:{minutes:02d}:{seconds:02d}.{cs:02d}"
 
 
+def _split_by_advance(
+    text: str, face: FontFace, font_px: int, advance: Advance
+) -> list[tuple[str, float]]:
+    """区間を、増分の値が同じ字の並びに分ける（arch の「擬似ボールドの増分」）。"""
+    pieces: list[tuple[str, float]] = []
+    for ch in text:
+        adv = advance(ch, face, font_px)
+        if pieces and pieces[-1][1] == adv:
+            pieces[-1] = (pieces[-1][0] + ch, adv)
+        else:
+            pieces.append((ch, adv))
+    return pieces
+
+
 def _escape(text: str) -> str:
     return (
         text.replace("\\", "＼")
@@ -1028,6 +1085,7 @@ def convert(
     platform: str,
     measure: Measure,
     metrics: MetricsFn,
+    advance: Advance,
     rng: _Rng,
 ) -> ConvertResult:
     data = json.loads(comments_json)
@@ -1055,7 +1113,12 @@ def convert(
             continue
         lines = _body_lines(row.body)
         measured = measure_comment(
-            lines, cmd, platform=platform, measure=measure, font_scale=font_scale
+            lines,
+            cmd,
+            platform=platform,
+            measure=measure,
+            advance=advance,
+            font_scale=font_scale,
         )
         placed.append(_Placed(cmd, lines, measured, row.vpos))
         items.append(
@@ -1145,9 +1208,18 @@ def convert(
                 x = left + m.line_widths[i] * c / 2
                 position = f"\\pos({_num(offset_x + k * x)},{_num(py)})"
             text = f"{{{anchor}{position}\\b{runs[0][1].weight}{style_tags}}}"
-            for (run_text, face), fm in zip(runs, all_metrics, strict=True):
+            pieces = [
+                _split_by_advance(run_text, face, m.font_px, advance)
+                for run_text, face in runs
+            ]
+            spaced = any(adv for run in pieces for _, adv in run)
+            for (_, face), fm, run_pieces in zip(
+                runs, all_metrics, pieces, strict=True
+            ):
                 size = em * k * (fm.ascent + fm.descent)
-                text += f"{{\\fn{face.name}\\fs{_num(size)}}}{_escape(run_text)}"
+                for piece, adv in run_pieces:
+                    fsp = f"\\fsp{_num(adv * m.scale * c * k)}" if spaced else ""
+                    text += f"{{\\fn{face.name}\\fs{_num(size)}{fsp}}}{_escape(piece)}"
             times = f"{_ass_time(start)},{_ass_time(end)}"
             out.append(f"Dialogue: 0,{times},Default,,0,0,0,,{text}\n")
     return ConvertResult("".join(out), skipped)

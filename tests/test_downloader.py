@@ -1710,6 +1710,7 @@ def test_convert_comments_passes_options(downloader, tmp_path, monkeypatch) -> N
     assert (captured["width"], captured["height"]) == (1280, 720)
     assert (captured["font_scale_percent"], captured["opacity"]) == (150, 0.5)
     assert captured["platform"] == "macos"
+    assert captured["advance"] is nico_ass.pseudo_bold_advancer("macos")
     assert "duration_sec" not in captured
 
 
