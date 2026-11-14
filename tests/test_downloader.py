@@ -1729,10 +1729,12 @@ def test_convert_comments_unreadable_json_falls_back_to_danmaku2ass(
     downloader, tmp_path, monkeypatch
 ) -> None:
     logs, calls = _nico_setup(downloader, tmp_path, monkeypatch, "{", d2a=True)
-    _run_nico(downloader, tmp_path)
+    _run_nico(downloader, tmp_path, {"duration_sec": 3.5})
     assert len(calls) == 1
     cmd = calls[0]
     assert cmd[cmd.index("-f") + 1] == "NiconicoYtdlpJson2"
+    # 切り替えたときは、ニコニコでも「表示時間」の設定値を使う（spec）
+    assert cmd[cmd.index("-dm") + 1] == "3.5"
     assert cmd[-1].endswith("動画.comments.json")
     assert any(
         log.startswith(t("warn_nico_ass_fallback").split("{")[0]) for log in logs
