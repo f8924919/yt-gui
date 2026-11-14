@@ -146,12 +146,13 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 
 `nico_comments_opts.convert_to_ass=True` かつ `subtitle_opts.subtitleslangs` にコメント/弾幕 lang（`comments` または `danmaku`）が含まれる場合、`extract_info(download=True)` 完了後に処理対象 lang を渡して `_convert_nico_comments_to_ass(stem, lang, opts)` を呼び出す（メソッド名は歴史的経緯で `nico` を維持）。実装上の要点:
 
+- `comments`（ニコニコ）はアプリ内の変換 `nico_ass.convert`（[nico_ass.md](nico_ass.md)）を先に使う。本体は `_convert_nico_comments_native`。解像度、文字サイズの倍率、不透明度は下記と同じ値を渡し、`platform` は `_nico_ass_platform()`（`sys.platform` から `windows` / `macos` / `other`）、`measure` / `metrics` は `nico_ass.pillow_measurer(platform)` / `nico_ass.font_metrics(platform)` の戻り値、`rng` は `random.Random(0)`（同じ入力から同じ ASS にするため）。結果は UTF-8（BOM 付き）で `{stem}.comments.ass.part` に書いてから置き換え（`.part` は中断時の掃除の対象。書き込みの `OSError` は `.part` を消して `warn_nico_ass_write_failed` の警告だけ）、飛ばしたコメントの件数は `warn_nico_ass_skipped` で出し、生成したら `status_nico_ass_created`。入力の読み込みか `nico_ass.convert` が例外を投げたときだけ、`warn_nico_ass_fallback` を出して以下の `danmaku2ass` の経路で変換する（そのとき「表示時間」は無効になったスピンボックスの値がそのまま渡る）。`danmaku2ass` の実行ファイルが無くても、ニコニコの変換は動く
 - 処理対象 lang は `_SIDECAR_ONLY_SUB_LANGS` のうち danmaku2ass で変換可能なもの（`_COMMENT_DANMAKU_LANGS = {"comments", "danmaku"}`）のうち `subtitleslangs` に含まれるものを採用する。単一動画ではニコニコ・ビリビリのどちらか一方しか出現しないため対象は最大 1 件。
 - lang → (拡張子, danmaku2ass 入力フォーマット) のマップで入出力を組み立てる。
   - `comments` → 入力 `{stem}.comments.json` / `-f NiconicoYtdlpJson2`（yt-dlp の `v1/threads` JSON 用パーサ）
   - `danmaku` → 入力 `{stem}.danmaku.xml` / `-f Bilibili`（`comment.bilibili.com/{cid}.xml` の Bilibili XML 用パーサ）
 - 出力は `{stem}.{lang}.ass`（`stem` は同名衝突回避の `(n)` サフィックスを含む実効ステム）
-- subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f {format} -dm {sec} -fs {size} -a {opacity} {input}` を実行
+- `danmaku` と、`comments` の切り替え時は、subprocess で `bin/danmaku2ass[.exe] -o {ass} -s {W}x{H} -f {format} -dm {sec} -fs {size} -a {opacity} {input}` を実行
 - `{size}` は `_comment_font_size(lang, W, H, opts.get("font_scale_percent", 100))` で計算する。`基準の高さ × 基準比率 × 倍率 ÷ 100`。基準比率は `_COMMENT_FONT_RATIO`（`comments` 0.09 / `danmaku` 0.045）で、種別が分かるこの層で引く（`get_opts()` の dict に種別は無い）。基準の高さは `H`、縦動画（`H > W`）のみ動画の幅を舞台の幅と見なして `W × 9 / 16`。正方形は横動画と同じ扱い。旧キー `font_size` は読まない。値の根拠と限定句は [画面仕様](../spec/screens/original-format-panel.md#コメント弾幕グループ) を参照
 - `{size}` は整数化せず `f"{size:g}"` で渡す。ASS の `Fontsize` と `\fs` は danmaku2ass が整数に丸める。`big` / `small` と弾幕ごとのサイズ値は danmaku2ass が `-fs` への倍率で計算する（ビリビリの位置指定弾幕 mode 7 は例外で、`-fs` も倍率も効かない）。`-fs` はレーン数と縁取りの太さにも連動する
 - `{W}` / `{H}` は `_with_downloaded_resolution(opts, info)` で決める。`_run_download` が返す `extract_info(download=True)` の結果に `width` / `height` があり、`auto_resolution` が真ならその値を使う（映像「自動」選択時に手動値へ落ちないようにするため）。それ以外は `resolution_w` / `resolution_h`。`opts` にどちらも無いときの既定は 1920×1080（パネルの既定 1280×720 とは別）
@@ -192,7 +193,7 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 | deno | `bin/deno[.exe]` |
 | danmaku2ass | `bin/danmaku2ass[.exe]` |
 
-PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。danmaku2ass バイナリが欠如している場合は ASS 変換のみがスキップされ、JSON 保存・その他のダウンロードは通常通り動作する（非致命扱い）。
+PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。danmaku2ass バイナリが欠如している場合は、ビリビリの弾幕の ASS 変換（とニコニコのコメントを danmaku2ass に切り替えたときの変換）のみがスキップされ、JSON 保存・その他のダウンロードは通常通り動作する（非致命扱い）。ニコニコのコメントは通常 `nico_ass` で変換するので、danmaku2ass が無くても ASS ができる。
 
 ### Cookies
 

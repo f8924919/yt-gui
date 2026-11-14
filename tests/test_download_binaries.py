@@ -352,6 +352,28 @@ def test_write_third_party_notices_lists_all_components(tmp_path):
     assert "FFmpeg" in text and "danmaku2ass" in text and "Deno" in text
 
 
+def test_third_party_notices_include_niconicomments_mit_full_text(tmp_path):
+    """niconicomments（#387 で式を移植）の MIT 許諾表示の全文が告知に載る（C22）。"""
+    from yt_gui import nico_ass
+
+    component = next(
+        c for c in download_binaries.COMPONENTS if c["name"] == "niconicomments"
+    )
+    assert component["license"] == "MIT"
+    assert "899203436285" in component["source"]
+    license_text = component["license_text"]
+    assert license_text.startswith("MIT License\n\nCopyright (c) 2022 xpadev-net\n")
+    assert "Permission is hereby granted, free of charge" in license_text
+    assert license_text.endswith("SOFTWARE.")
+    # モジュール冒頭の許諾表示と同じ全文
+    assert license_text == nico_ass.NICONICOMMENTS_LICENSE
+
+    out = download_binaries.write_third_party_notices(str(tmp_path))
+    with open(out, encoding="utf-8") as fh:
+        text = fh.read()
+    assert license_text in text
+
+
 def test_third_party_notices_ffmpeg_linux_points_to_btbn(tmp_path):
     """ffmpeg (Linux) の配布元が BtbN であり、旧取得元が残っていない（#272）。"""
     out = download_binaries.write_third_party_notices(str(tmp_path))

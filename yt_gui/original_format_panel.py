@@ -259,6 +259,9 @@ class _NicoCommentsGroup(QGroupBox):
         self._get_video_resolution = get_video_resolution
         self._output_audio_only = False
         self._output_remux_only = False
+        # ニコニコ（`comments`）は表示時間を Web と同じ計算で決めるため、
+        # 「表示時間」はビリビリの弾幕のときだけ有効にする（#387）。
+        self._niconico = False
         self.setVisible(False)
         # 内部の SpinBox が潰れないよう vertical SizePolicy を Fixed にする
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -373,6 +376,9 @@ class _NicoCommentsGroup(QGroupBox):
         self._auto_res_check.setText(t("nico_auto_resolution"))
         self._resolution_label.setText(t("nico_resolution"))
         self._duration_label.setText(t("nico_duration"))
+        self._duration_spin.setToolTip(
+            t("nico_duration_niconico_tooltip") if self._niconico else ""
+        )
         self._opacity_label.setText(t("nico_opacity"))
         self._font_label.setText(t("nico_font_scale"))
         self._font_scale_spin.setToolTip(t("nico_font_scale_tooltip"))
@@ -459,9 +465,18 @@ class _NicoCommentsGroup(QGroupBox):
         self._width_spin.setEnabled((not checked) and self._convert_check.isChecked())
         self._height_spin.setEnabled((not checked) and self._convert_check.isChecked())
 
+    def set_niconico(self, niconico: bool):
+        """取得した字幕がニコニコのコメントかどうかを受け取り、
+        「表示時間」の有効/無効とツールチップを更新する。"""
+        self._niconico = niconico
+        self._set_controls_enabled(self._convert_check.isChecked())
+
     def _set_controls_enabled(self, enabled: bool):
+        self._duration_spin.setEnabled(enabled and not self._niconico)
+        self._duration_spin.setToolTip(
+            t("nico_duration_niconico_tooltip") if self._niconico else ""
+        )
         for w in (
-            self._duration_spin,
             self._opacity_spin,
             self._font_scale_spin,
             self._auto_res_check,
@@ -1239,6 +1254,9 @@ class OriginalFormatPanel(QGroupBox):
         # `comments` lang (ニコニコ動画) が含まれるときだけグループを可視化
         # 可視化前後でパネルの sizeHint が変わるので親 (ダイアログ) に通知する
         self._nico_group.setVisible(self._has_nico_comments_lang())
+        self._nico_group.set_niconico(
+            any(lang == _COMMENTS_LANG for _, lang, _ in self._subtitle_formats)
+        )
         self.updateGeometry()
         self._signals.size_hint_changed.emit()
 

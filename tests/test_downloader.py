@@ -11,13 +11,17 @@
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 from pathlib import Path
 from typing import ClassVar
 
 import pytest
 
+from yt_gui import nico_ass
 from yt_gui.downloader import Downloader
+from yt_gui.i18n import t
 from yt_gui.job_spec import JobSpec
 
 
@@ -1593,37 +1597,195 @@ def test_convert_danmaku_uses_bilibili_format_and_xml_input(
     assert cmd[-1].endswith("動画.danmaku.xml")  # 入力は xml サイドカー
 
 
-def test_convert_comments_uses_niconico_format_and_json_input(
-    downloader, tmp_path, monkeypatch
-) -> None:
-    """ニコニコは従来どおり `{stem}.comments.json` を入力に
-    `-f NiconicoYtdlpJson2` で変換する（一般化後も退行しない）。"""
-    (tmp_path / "動画.comments.json").write_text("[]")
-    fake_bin = tmp_path / "danmaku2ass"
-    fake_bin.write_text("")
-    downloader._danmaku2ass_path = str(fake_bin)
-    downloader.log_callback = lambda m: None
+# ── ニコニコは自作の変換（#387 C1 / C18） ──────────────────────────────────
 
-    captured: dict = {}
+_NICO_ROW = {
+    "body": "あ",
+    "commands": ["ue"],
+    "vposMs": 1000,
+    "isPremium": False,
+    "postedAt": "2020-01-01T00:00:00+09:00",
+}
+
+
+def _nico_setup(downloader, tmp_path, monkeypatch, json_text: str, *, d2a: bool):
+    """`動画.comments.json` を置き、danmaku2ass の呼び出しを記録する準備をする。"""
+    (tmp_path / "動画.comments.json").write_text(json_text, encoding="utf-8")
+    if d2a:
+        fake_bin = tmp_path / "danmaku2ass"
+        fake_bin.write_text("")
+        downloader._danmaku2ass_path = str(fake_bin)
+    else:
+        downloader._danmaku2ass_path = str(tmp_path / "missing-danmaku2ass")
+    logs: list[str] = []
+    downloader.log_callback = logs.append
+    calls: list[list[str]] = []
 
     def _fake_run(cmd, **k):
-        captured["cmd"] = cmd
+        calls.append(cmd)
         return type("R", (), {})()
 
     monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+    return logs, calls
 
-    downloader._convert_nico_comments_to_ass(str(tmp_path / "動画"), "comments", {})
 
-    cmd = captured["cmd"]
+def _run_nico(downloader, tmp_path, opts=None) -> None:
+    downloader._convert_nico_comments_to_ass(
+        str(tmp_path / "動画"), "comments", opts or {}
+    )
+
+
+def test_convert_comments_uses_new_converter_without_danmaku2ass(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs, calls = _nico_setup(
+        downloader, tmp_path, monkeypatch, json.dumps([_NICO_ROW]), d2a=False
+    )
+    _run_nico(downloader, tmp_path)
+    assert calls == []
+    raw = (tmp_path / "動画.comments.ass").read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf[Script Info]")
+    assert "Dialogue:" in raw.decode("utf-8-sig")
+    assert not (tmp_path / "動画.comments.ass.part").exists()
+    assert logs == [t("status_nico_ass_created").format(filename="動画.comments.ass")]
+
+
+def test_convert_comments_writes_part_then_replaces(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    _nico_setup(downloader, tmp_path, monkeypatch, "[]", d2a=False)
+    replaced: list[tuple[str, str, bool]] = []
+    real_replace = os.replace
+
+    def _spy(src, dst):
+        replaced.append((src, dst, os.path.exists(dst)))
+        real_replace(src, dst)
+
+    monkeypatch.setattr("yt_gui.downloader.os.replace", _spy)
+    _run_nico(downloader, tmp_path)
+    ass = str(tmp_path / "動画.comments.ass")
+    assert replaced == [(ass + ".part", ass, False)]
+
+
+def test_convert_comments_zero_comments_writes_header_only(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    _nico_setup(downloader, tmp_path, monkeypatch, "[]", d2a=False)
+    _run_nico(downloader, tmp_path)
+    text = (tmp_path / "動画.comments.ass").read_text(encoding="utf-8-sig")
+    assert text.startswith("[Script Info]")
+    assert "Dialogue:" not in text
+
+
+def test_convert_comments_warns_skipped_count(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    rows = [_NICO_ROW, {**_NICO_ROW, "vposMs": "x"}, {**_NICO_ROW, "body": 1}]
+    logs, _ = _nico_setup(
+        downloader, tmp_path, monkeypatch, json.dumps(rows), d2a=False
+    )
+    _run_nico(downloader, tmp_path)
+    assert t("warn_nico_ass_skipped").format(count=2) in logs
+
+
+def test_convert_comments_passes_options(downloader, tmp_path, monkeypatch) -> None:
+    _nico_setup(downloader, tmp_path, monkeypatch, "[]", d2a=False)
+    captured: dict = {}
+
+    def _fake_convert(text, **kwargs):
+        captured.update(kwargs, text=text)
+        return nico_ass.ConvertResult(ass="[Script Info]\n", skipped=0)
+
+    monkeypatch.setattr("yt_gui.downloader.nico_ass.convert", _fake_convert)
+    monkeypatch.setattr("yt_gui.downloader.sys.platform", "darwin")
+    opts = {
+        "resolution_w": 1280,
+        "resolution_h": 720,
+        "font_scale_percent": 150,
+        "opacity": 0.5,
+        "duration_sec": 3.0,
+    }
+    _run_nico(downloader, tmp_path, opts)
+    assert captured["text"] == "[]"
+    assert (captured["width"], captured["height"]) == (1280, 720)
+    assert (captured["font_scale_percent"], captured["opacity"]) == (150, 0.5)
+    assert captured["platform"] == "macos"
+    assert "duration_sec" not in captured
+
+
+@pytest.mark.parametrize(
+    ("sys_platform", "expected"),
+    [("win32", "windows"), ("darwin", "macos"), ("linux", "other")],
+    ids=["windows", "macos", "linux"],
+)
+def test_nico_ass_platform(monkeypatch, sys_platform, expected) -> None:
+    from yt_gui.downloader import _nico_ass_platform
+
+    monkeypatch.setattr("yt_gui.downloader.sys.platform", sys_platform)
+    assert _nico_ass_platform() == expected
+
+
+def test_convert_comments_unreadable_json_falls_back_to_danmaku2ass(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs, calls = _nico_setup(downloader, tmp_path, monkeypatch, "{", d2a=True)
+    _run_nico(downloader, tmp_path, {"duration_sec": 3.5})
+    assert len(calls) == 1
+    cmd = calls[0]
     assert cmd[cmd.index("-f") + 1] == "NiconicoYtdlpJson2"
+    # 切り替えたときは、ニコニコでも「表示時間」の設定値を使う（spec）
+    assert cmd[cmd.index("-dm") + 1] == "3.5"
     assert cmd[-1].endswith("動画.comments.json")
+    assert any(
+        log.startswith(t("warn_nico_ass_fallback").split("{")[0]) for log in logs
+    )
+
+
+def test_convert_comments_converter_exception_falls_back(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs, calls = _nico_setup(downloader, tmp_path, monkeypatch, "[]", d2a=True)
+
+    def _boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("yt_gui.downloader.nico_ass.convert", _boom)
+    _run_nico(downloader, tmp_path)
+    assert len(calls) == 1
+    assert t("warn_nico_ass_fallback").format(error="boom") in logs
+
+
+def test_convert_comments_write_failure_only_warns(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    logs, calls = _nico_setup(
+        downloader, tmp_path, monkeypatch, json.dumps([_NICO_ROW]), d2a=True
+    )
+
+    def _fail_replace(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("yt_gui.downloader.os.replace", _fail_replace)
+    _run_nico(downloader, tmp_path)
+    assert calls == []
+    assert t("warn_nico_ass_write_failed").format(error="disk full") in logs
+    assert not (tmp_path / "動画.comments.ass").exists()
+    assert not (tmp_path / "動画.comments.ass.part").exists()
+
+
+def test_nico_ass_part_file_is_cleanup_target() -> None:
+    assert Downloader._is_cleanup_target("/d/動画.comments.ass.part") is True
 
 
 # ── コメント/弾幕のフォントサイズ（#372） ────────────────────────────────────
 
 
 def _ass_cmd(downloader, tmp_path, monkeypatch, lang: str, opts: dict) -> list[str]:
-    """ASS 変換を実行し、danmaku2ass に渡すコマンドを返す。"""
+    """ASS 変換を実行し、danmaku2ass に渡すコマンドを返す。
+
+    入力は空のファイルにする。ニコニコ（`comments`）は空の JSON が読めないので
+    自作の変換から danmaku2ass に切り替わり（#387）、その経路の文字サイズを見る。
+    """
     ext = "json" if lang == "comments" else "xml"
     (tmp_path / f"v.{lang}.{ext}").write_text("")
     fake_bin = tmp_path / "danmaku2ass"
@@ -1732,7 +1894,11 @@ def test_comment_font_size_arg_has_no_float_noise(
 def _download_comment_cmd(
     downloader, tmp_path, monkeypatch, info, nico_opts: dict
 ) -> list[str]:
-    """コメント付きの download_video を流し、danmaku2ass のコマンドを返す。"""
+    """弾幕付き（ビリビリ）の download_video を流し、danmaku2ass のコマンドを返す。
+
+    ニコニコは自作の変換（#387）で danmaku2ass を呼ばないので、解像度の決め方
+    （種別に依らない）は danmaku2ass を使うビリビリで確かめる。
+    """
     downloader.status_callback = lambda *a, **k: None
     downloader._resolve_unique_path = lambda *a, **k: (
         str(tmp_path / "v"),
@@ -1741,7 +1907,7 @@ def _download_comment_cmd(
         _FakeReservation(),
     )
     downloader._run_download = lambda *a, **k: info
-    (tmp_path / "v.comments.json").write_text("[]")
+    (tmp_path / "v.danmaku.xml").write_text("<i></i>")
     fake_bin = tmp_path / "danmaku2ass"
     fake_bin.write_text("")
     downloader._danmaku2ass_path = str(fake_bin)
@@ -1753,7 +1919,7 @@ def _download_comment_cmd(
 
     monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
     job = _job(
-        subtitle_opts={"subtitleslangs": ["comments"]},
+        subtitle_opts={"subtitleslangs": ["danmaku"]},
         orig_settings={"nico_comments": {"convert_to_ass": True, **nico_opts}},
     )
     downloader.download_video("https://example.com/v", job)
@@ -1775,7 +1941,7 @@ def test_comment_ass_uses_downloaded_resolution_when_auto(
         _MANUAL_720P,
     )
     assert cmd[cmd.index("-s") + 1] == "1080x1920"
-    assert _font_size(cmd) == pytest.approx(54.675)
+    assert _font_size(cmd) == pytest.approx(27.3375)
 
 
 @pytest.mark.parametrize(
@@ -1787,7 +1953,7 @@ def test_comment_ass_falls_back_when_resolution_unknown(
 ) -> None:
     cmd = _download_comment_cmd(downloader, tmp_path, monkeypatch, info, _MANUAL_720P)
     assert cmd[cmd.index("-s") + 1] == "1280x720"
-    assert _font_size(cmd) == pytest.approx(64.8)
+    assert _font_size(cmd) == pytest.approx(32.4)
 
 
 def test_comment_ass_keeps_manual_resolution_when_auto_off(
@@ -1801,7 +1967,7 @@ def test_comment_ass_keeps_manual_resolution_when_auto_off(
         {**_MANUAL_720P, "auto_resolution": False},
     )
     assert cmd[cmd.index("-s") + 1] == "1280x720"
-    assert _font_size(cmd) == pytest.approx(64.8)
+    assert _font_size(cmd) == pytest.approx(32.4)
 
 
 def test_run_download_returns_extract_info_result(downloader, monkeypatch) -> None:

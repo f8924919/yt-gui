@@ -28,6 +28,7 @@
 | 純粋ヘルパ (downloader) | `Downloader._build_ydl_opts` ほか（`fetch_formats` の分類・`fetch_title_or_entries`・`_resolve_unique_path`・`_progress_hook`・`_YtdlpLogger` 等を `YoutubeDL` スタブでテスト） | ◯ |
 | 純粋関数 | `yt_gui/extension_server.py`（`handle_request` / `ExtensionServer` ライフサイクル / `resolve_allow_reuse_address` の bind 排他分岐） | ◯ |
 | 純粋関数 | `yt_gui/yt_dlp_update.py`（`parse_latest_version` / `compare_versions` / `check_for_update`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
+| 純粋関数 | `yt_gui/nico_ass.py`（コマンドの解釈・文字サイズ・速さと横位置・配置・上下固定の縮小・ASS の生成。文字の幅は決定的な測定器、フォントの寸法は差し替えた関数を注入して検証し、Pillow の実測は実フォントがある環境で 1 本だけ。期待値は niconicomments の式から手で計算した値・#387） | ◯ |
 | 純粋関数 | `yt_gui/app_update.py`（`parse_latest_version` / `check_for_update` / `should_check_on_startup` / `should_notify`。HTTP は `fetch` 引数差し替えでオフライン検証） | ◯ |
 | エントリーポイント | `yt_gui/__main__.py` ・ `main.py` | × |
 | 翻訳辞書 | `yt_gui/locales/*.py` | × |
@@ -124,6 +125,7 @@ tests/
 ├── test_i18n.py
 ├── test_settings.py
 ├── test_downloader.py
+├── test_nico_ass.py               ← 純粋ロジック（ニコニコのコメントの ASS 変換。Pillow の実測は 1 本だけ）
 ├── test_download_binaries.py
 ├── test_refresh_pins.py           ← scripts/refresh_pins.py の純粋ロジック
 ├── test_extension_server.py       ← 純粋ロジック（handle_request / ExtensionServer）
@@ -141,7 +143,8 @@ tests/
 ├── test_original_format_dialog.py ← Qt（@pytest.mark.qt）
 ├── test_settings_dialog.py        ← Qt（@pytest.mark.qt）
 ├── test_log_dialog.py             ← Qt（@pytest.mark.qt）
-└── test_app.py                    ← Qt（@pytest.mark.qt）
+├── test_app.py                    ← Qt（@pytest.mark.qt）
+└── data/                          ← テスト用の実物のデータ（`sm31143779.comments.*`）
 ```
 
 Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` を呼び、Qt 非導入環境ではモジュールごと skip します（§2.5）。

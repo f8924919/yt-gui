@@ -77,12 +77,13 @@
 - ASS 変換 ↔ ハードサブ焼きこみの連動制御（OFF 時に焼きこみを解除 / 焼きこみ ON 時に ASS を強制 ON）
 - 解像度自動追従 OFF 時のみ手動解像度 SpinBox を有効化
 - 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェック・ハードサブ焼きこみチェックの有効/無効切替
+- コメントの種別に応じた「表示時間」SpinBox の有効/無効切替（`comments` のときは無効にし、ツールチップ `nico_duration_niconico_tooltip` で Web と同じ計算になることを示す。`danmaku2ass` に切り替えたときだけ、そのスピンボックスの値が使われることもツールチップに書く）。親が取得結果ごとに `set_niconico(字幕に comments があるか)` を呼び、有効/無効は `_set_controls_enabled` の 1 か所で「ASS 変換 ON かつニコニコでない」として決める（変換のチェックを切り替えても上書きされない）
 
 親パネルとの委譲経路:
 
 | 方向 | 内容 |
 |------|------|
-| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `setVisible(bool)` |
+| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `set_niconico(niconico: bool)` / `setVisible(bool)` |
 | 子 → 親 | コンストラクタ引数 `get_video_resolution: Callable[[], tuple[int, int] | None]` で映像解像度を取得 |
 | 子 → 親 | `request_select_comments` シグナル: ASS 変換 ON 時に親が字幕リストのコメント/弾幕 lang（`comments` または `danmaku`）を自動選択する |
 
