@@ -146,7 +146,7 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 
 `nico_comments_opts.convert_to_ass=True` かつ `subtitle_opts.subtitleslangs` にコメント/弾幕 lang（`comments` または `danmaku`）が含まれる場合、`extract_info(download=True)` 完了後に処理対象 lang を渡して `_convert_nico_comments_to_ass(stem, lang, opts)` を呼び出す（メソッド名は歴史的経緯で `nico` を維持）。実装上の要点:
 
-- `comments`（ニコニコ）はアプリ内の変換 `nico_ass.convert`（[nico_ass.md](nico_ass.md)）を先に使う。解像度と文字サイズの倍率は下記の `{W}` / `{H}` と同じ値を渡し、`platform` は `sys.platform`、`measure` は `nico_ass.pillow_measurer`。飛ばしたコメントの件数は警告ログに出す。`nico_ass.convert` が例外を投げたときだけ、警告を出して以下の `danmaku2ass` の経路で変換する。`danmaku2ass` の実行ファイルが無くても、ニコニコの変換は動く
+- `comments`（ニコニコ）はアプリ内の変換 `nico_ass.convert`（[nico_ass.md](nico_ass.md)）を先に使う。解像度、文字サイズの倍率、不透明度は下記と同じ値を渡し、`platform` は `sys.platform`、`measure` は `nico_ass.pillow_measurer(sys.platform)` の戻り値。結果は `{stem}.comments.ass.part` に書いてから置き換え（書き込みの `OSError` は警告だけ）、飛ばしたコメントの件数は警告ログに出す。`nico_ass.convert` が例外を投げたときだけ、警告を出して以下の `danmaku2ass` の経路で変換する（そのとき「表示時間」は無効になったスピンボックスの値がそのまま渡る）。`danmaku2ass` の実行ファイルが無くても、ニコニコの変換は動く
 - 処理対象 lang は `_SIDECAR_ONLY_SUB_LANGS` のうち danmaku2ass で変換可能なもの（`_COMMENT_DANMAKU_LANGS = {"comments", "danmaku"}`）のうち `subtitleslangs` に含まれるものを採用する。単一動画ではニコニコ・ビリビリのどちらか一方しか出現しないため対象は最大 1 件。
 - lang → (拡張子, danmaku2ass 入力フォーマット) のマップで入出力を組み立てる。
   - `comments` → 入力 `{stem}.comments.json` / `-f NiconicoYtdlpJson2`（yt-dlp の `v1/threads` JSON 用パーサ）

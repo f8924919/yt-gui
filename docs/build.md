@@ -33,7 +33,9 @@ ffmpeg / ffprobe・danmaku2ass は GPL、deno は MIT ライセンスである�
 
 `THIRD-PARTY-NOTICES.md` は各コンポーネントの名称・ライセンス・著作権者・対応ソース入手先を列挙し、GPL が要求する**対応ソース提供の書面によるオファー**を兼ねる。アーカイブにライセンス本文を同梱しない配布元（macOS ffmpeg＝evermeet / osxexperts、deno）については、対応ソース入手先を同告知に明記してこれを担保する（GPL 本文自体はバンドル同梱の `licenses/LICENSE` で参照可能）。
 
-バイナリではないが、`yt_gui/nico_ass.py` は niconicomments（MIT）の式・定数・色表を移植しているので、`COMPONENTS` に載せて同告知に著作権表示と許諾表示を出す。
+バイナリではないが、`yt_gui/nico_ass.py` は niconicomments（MIT）の式・定数・色表を移植しているので、`COMPONENTS` に載せて同告知に著作権表示と許諾表示の全文を出す（配布物ではソースのコメントが残らないため）。
+
+`yt_gui/nico_ass.py` が文字の幅を測るので、Pillow（FreeType 拡張を含む）が配布物に入る。Python の依存は告知に載せない方針のまま。
 
 `yt-gui.spec` は `bin/licenses/` 配下を再帰的に `licenses/` へ同梱する。これらは `bin/` 配下のためリポジトリにはコミットせず、ビルド時に毎回生成する。
 
