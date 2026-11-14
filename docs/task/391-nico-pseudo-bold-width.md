@@ -15,7 +15,7 @@
 - [x] C4 Arial・`gothic` / `mincho`・macOS / その他・概算の測定器の出力が変わらない（テストと変異の記録） — 証跡: `test_convert_output_unchanged_where_no_pseudo_bold`（#391 の前の出力の sha256 と一致）、`test_pseudo_bold_advancer_targets_only_windows_ms_pgothic_600`、`test_pseudo_bold_advancer_is_zero_when_font_not_found`、`test_convert_no_fsp_on_lines_without_advance`。変異は下の「変異 → red（C4）」
 - [x] C5 流れるコメントの段の違いを、#387 と同じ時刻で見比べて記録する — 証跡: 下の「実動画との見比べ」
 - [x] C6 `_live` の縁取りを `sm9560870` の 6.31 秒で見比べて記録する — 証跡: 下の「`_live`（C6）」
-- [x] C7 spec / arch に、増分の規則・適用範囲・限界を書く — 証跡: `docs/arch/nico_ass.md` の「擬似ボールドの増分」、`docs/spec/screens/original-format-panel.md` の「ニコニコのコメントの変換」、`docs/arch/downloader.md`（b5944b8、7b3868a、本コミット）
+- [x] C7 spec / arch に、増分の規則・適用範囲・限界を書く — 証跡: `docs/arch/nico_ass.md` の「擬似ボールドの増分」、`docs/spec/screens/original-format-panel.md` の「ニコニコのコメントの変換」、`docs/arch/downloader.md`、`docs/testing/policy.md` の §3（b5944b8、7b3868a、fc063ff と次のコミット）
 
 ## Chrome の実測（C1、2026-11-14）
 

@@ -144,7 +144,7 @@ tests/
 ├── test_settings_dialog.py        ← Qt（@pytest.mark.qt）
 ├── test_log_dialog.py             ← Qt（@pytest.mark.qt）
 ├── test_app.py                    ← Qt（@pytest.mark.qt）
-└── data/                          ← テスト用の実物のデータ（`sm31143779.comments.*`）
+└── data/                          ← テスト用の実物のデータ（`sm31143779.comments.*`、Chrome の実測 `nico_chrome_widths.json`）
 ```
 
 Qt UI テスト（`@pytest.mark.qt`）は冒頭で `pytest.importorskip("PySide6")` / `pytest.importorskip("pytestqt")` を呼び、Qt 非導入環境ではモジュールごと skip します（§2.5）。
