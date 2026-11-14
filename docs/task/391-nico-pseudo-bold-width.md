@@ -49,7 +49,7 @@ Arial kan 8:0.000 10:0.000 12:0.000 15:0.000 20:0.000 24:0.000 30:0.000 39:0.000
   - 1 / 0.7617: U+3099、U+0301（結合文字。MS PGothic では幅のある字として描かれる）、U+20BB7（CJK 拡張 B）
   - ハングルの埋め字・点字・絵文字は MS PGothic に無く、Chrome が別のフォントで描く。増分はそのフォントによる。
 - 22 以下では、太さ 400 の幅も Chrome が 1 字ずつ整数に丸めている。半角カナ 1 字の幅は Pillow の比例とも、埋め込みビットマップの送り幅とも一致しない（例: 「ｱ」の 22px は Chrome 14、ビットマップ 12、比例 13.58）。ふつうの文で 0.1% 程度、半角カナ・句読点だけの文字列では ±2〜7% ずれる。本 Issue では再現しない（ユーザー判断、2026-11-14）。
-- fixture の `advances` は、1 字ずつ `600 {px}px "MS PGothic"` と `400 {px}px "MS PGothic"` の差を測った 63 点（9 字 × 10 / 18 / 22 / 23 / 27 / 39 / 100）。値は字の種類で 3 通りなので、作る script（`make_fixture.py`、`git hash-object` `939deea0`、scratchpad）は種類ごとに書き写し、実測の出力の 8 点と一致することを確かめた。fixture の sha256 は `30f3135216bf4b72…`。
+- fixture の `advances` は 63 点（9 字 × 10 / 18 / 22 / 23 / 27 / 39 / 100）。作る前に、1 字ずつ `600 {px}px "MS PGothic"` と `400 {px}px "MS PGothic"` の差を 63 点とも Chrome で測った。値は字の種類で 3 通りなので、作る script（`make_fixture.py`、`git hash-object` `939deea0`、scratchpad）は種類ごとに書き写し、作った時点でその実測と照合したのは 8 点だけ。全点の照合は下の「63 点の測り直し」で行った。fixture の sha256 は `30f3135216bf4b72…`。
 - **63 点の測り直し（evaluator 1 巡目の欠陥 3 を受けて、2026-11-14）**: fixture の `advances` を 1 字ずつ Chrome で測り直し、全点が fixture と一致した（食い違い 0）。fixture は種類ごとに書き写して作ったが、値は全点の実測と同じ。
 
   ```js
@@ -120,7 +120,7 @@ script は `c2table.py`（scratchpad）。テストの判定は `pytest.approx(r
 worktree のコピー（`2389c35`）を 1 つずつ変異させ、`tests/test_nico_ass.py` と `tests/test_downloader.py` を走らせた。無変異のコピーは 409 passed、戻した後も 409 passed、狙ったテストは 18 変異すべてで落ちた（`ALL TARGETED KILLED`）。置換が 1 か所に当たらないときは止まる。script は `mutate391.py`、表は `mut_table.py` でログから作った（本文と hash は末尾の「プローブの本文」）。
 
 - M1〜M15 は 1 巡目（`2d5bf96`、`mutate391.py` の旧版 `be47dec1…`）でも回し、狙ったテストは全部落ちた。evaluator 1 巡目の指摘で M16（フォント名を見ない）・M17（downloader が `no_advance` を渡す。macos の検査では `no_advance` と見分けられなかった）・M18（本番の増分が常に 0。C2 のしきい値のテストの red）を足し、落ちたテストを全部並べる形にして回し直した。M17 を殺す `test_convert_comments_passes_pseudo_bold_advancer_of_platform` は `2389c35` で足した。
-- M18 で C2 の 21 点が全部落ちる（足す前の差は −1.45〜−9.94%。「8888888888」だけは MS PGothic を通らず、代わりに `win-mspg600` が落ちる）。
+- M18 で、C2 の 20 点と `win-mspg600` が落ちる（21 failed。足す前の差は −1.45〜−9.94%）。C2 の残る「8888888888」は MS PGothic を通らないので M18 では落ちず、M16 で落ちる。
 
 | 変異 | 件数 | 狙ったテスト | 落ちたテスト（全部） |
 |---|---|---|---|
@@ -180,6 +180,7 @@ worktree のコピー（`2389c35`）を 1 つずつ変異させ、`tests/test_ni
 | 巡 | HEAD | verify | docs-check | evaluator |
 |---|---|---|---|---|
 | 1 | `a8bbcb7` | green（914 passed、skip 0） | 指摘なし | FAIL（[欠陥] 3 / [証跡・文言] 3） |
+| 2 | `d0a238d` | green（915 passed） | — （docs の変更はメモと spec の 1 行だけ） | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 2。2 件ともメモの文言で、この PR で直した） |
 
 evaluator 1 巡目の指摘と閉じ方:
 
@@ -831,6 +832,6 @@ render(normal, "normal")
 
 ## 次にやること
 
-C1〜C7 は証跡つきで完了。次は `/verify-gate`（verify → docs-check → evaluator）→ PR。
+C1〜C7 は証跡つきで完了。evaluator は 2 巡目で PASS（follow-up あり。指摘 2 件はメモの文言で、この PR で直した）。次は PR。
 
 訂正ログ: 1 件
