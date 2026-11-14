@@ -15,6 +15,7 @@
 - 寸法の型は `metrics(font_name, weight) -> FontMetrics | None`。`FontMetrics(ascent, descent)` は `usWinAscent / unitsPerEm` と `usWinDescent / unitsPerEm`。`None` はフォントが見つからないとき。
 - `pillow_measurer(platform)` / `font_metrics(platform)`: 実行時の測定器と寸法を返す。Pillow は関数の中で遅延 import し、`ImportError` なら概算の測定器と、常に `None` を返す寸法を返す。結果はモジュール単位でキャッシュする。
 - `approx_measurer`: 概算の測定器（全角 1 文字分、半角 0.5 文字分。全角は `unicodedata.east_asian_width` の `F` / `W`）。
+- `pseudo_bold_advance(ch, font_name, weight, platform, font_px) -> float`: Chrome の擬似ボールドで 1 字に足される送り幅（CSS の px）。下の「擬似ボールドの増分」。測定器と ASS の生成の両方がこの関数を呼ぶ。
 
 ## 内部の継ぎ目（テストが固定する形）
 
@@ -54,6 +55,23 @@
 - フォント名は英語のファミリー名（`Arial`、`MS PGothic`、`Yu Gothic`、`Yu Mincho`、`Hiragino Sans` など）。フォントファイルは OS ごとの候補のパスから探し、`.ttc` は `getname()` でフェイスを照合して開く（index を決め打ちしない）。
 - 太さは `\b<weight>`（Style の Bold は 0）。測定器にも太さを渡し、太さ別のファイル（Arial Bold など）で測る。
 - ASS に書くフォントは変換した PC の OS のもの。MKV を別の OS で再生すると代わりのフォントになる。Linux など「その他」は Pillow で開けないので概算になる。
+
+## 擬似ボールドの増分
+
+Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600（`defont`）で描くとき擬似ボールドをかけ、送り幅も広げる。Web の幅に合わせるため、この増分を測定と ASS の両方に足す（[#391](https://github.com/f8924919/yt-gui/issues/391)。実測の記録は[タスクメモ](../task/391-nico-pseudo-bold-width.md)）。
+
+- **対象**: `platform` が `"windows"`、フォントが `MS PGothic`、太さが 600 の区間だけ。Arial（本物の Bold がある）、`gothic` / `mincho`（太さ 400）、macOS / その他には足さない。
+- **1 字の増分**（`pseudo_bold_advance`、`font_px` は `font_size_and_scale` の CSS の px。縮小率 `scale` を掛ける前の値）:
+  - ゼロ幅の文字（Unicode の一般カテゴリ `Mn` / `Me` / `Cf`）は 0。
+  - `font_px` が 22 以下なら 1。空白も 1。
+  - 23 以上なら、空白（`str.isspace()`）は 0、それ以外は `font_px × 5 / 256`（MS PGothic の unitsPerEm は 256）。
+  - 22 / 23 の境目は、MS PGothic の埋め込みビットマップの大きさ（7〜22）と一致する。Chromium 156 / Windows 11 / devicePixelRatio 1.5 の canvas の `measureText` で測った規則で、ほかの devicePixelRatio は確かめていない。
+- **測定**: `pillow_measurer` は、フォントを開けた区間の送り幅に、各字の増分の合計を足す。フォントが開けずに概算へ落ちた区間と、`approx_measurer` には足さない。足した値は `measure_comment` の `ceil(合計 × scale)` に入るので、縮小の判定、衝突判定、流れる速さ、固定コメントの横位置のすべてに効く。
+- **ASS**: libass には擬似ボールドの送り幅の増分が無いので、区間の文字間隔 `sp` で同じ量を足す。値は `PlayRes` の単位で `増分 × scale × c × k`（`s` の係数 `ascent + descent` は掛けない）。
+  - 増分の違う字（空白とそれ以外など）は区間を分け、それぞれに `sp` を書く。
+  - 1 行に増分のある区間が 1 つでもあれば、その行のすべての区間のタグに `sp` を書く（増分の無い区間は `sp0`。前の区間の値を持ち越さないため）。増分のある区間が無い行には `sp` を書かない（出力は #391 の前と同じ）。
+  - `sp` を書くのは、`metrics` がその区間のフォントの寸法を返したとき（フォントが見つかったとき）だけ。見つからないときは測定も概算なので、増分を足さない。
+- **再現しないもの**: 22px 以下では、太さ 400 の送り幅も Chrome が 1 字ずつ整数に丸める（ヒンティング）。ふつうの文で 0.1% 程度、半角カナ・句読点だけの文字列では ±2〜7% ずれるが、再現しない。
 
 ## 処理の流れ
 
