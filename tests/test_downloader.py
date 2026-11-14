@@ -1714,6 +1714,32 @@ def test_convert_comments_passes_options(downloader, tmp_path, monkeypatch) -> N
     assert "duration_sec" not in captured
 
 
+def test_convert_comments_passes_pseudo_bold_advancer_of_platform(
+    downloader, tmp_path, monkeypatch
+) -> None:
+    # Windows で増分を渡しているかは、no_advance と見分けられる番兵で確かめる（#391）
+    _nico_setup(downloader, tmp_path, monkeypatch, "[]", d2a=False)
+    captured: dict = {}
+    sentinel = object()
+
+    def _fake_convert(text, **kwargs):
+        captured.update(kwargs)
+        return nico_ass.ConvertResult(ass="[Script Info]\n", skipped=0)
+
+    def _fake_advancer(platform):
+        captured["advancer_platform"] = platform
+        return sentinel
+
+    monkeypatch.setattr("yt_gui.downloader.nico_ass.convert", _fake_convert)
+    monkeypatch.setattr(
+        "yt_gui.downloader.nico_ass.pseudo_bold_advancer", _fake_advancer
+    )
+    monkeypatch.setattr("yt_gui.downloader.sys.platform", "win32")
+    _run_nico(downloader, tmp_path)
+    assert captured["advance"] is sentinel
+    assert captured["advancer_platform"] == "windows"
+
+
 @pytest.mark.parametrize(
     ("sys_platform", "expected"),
     [("win32", "windows"), ("darwin", "macos"), ("linux", "other")],
