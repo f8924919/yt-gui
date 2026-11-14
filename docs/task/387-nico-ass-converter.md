@@ -31,7 +31,7 @@
 - [x] C20 テストの収集、変異 → red の表、実物のフィクスチャ、所要時間 — 証跡: 下の「変異 → red」と「所要時間」。`uv run pytest -q -rs` は 801 passed・skip 0（642b50e）
 - [x] C21 実動画との見比べ — 証跡: 下の「実動画との見比べ」。ユーザーが並べた画像を目視で確認して確定（2026-11-14）。幅の差は [#391](https://github.com/f8924919/yt-gui/issues/391) へ回した
 - [x] C22 MIT の著作権表示と許諾表示の全文 — 証跡: `tests/test_download_binaries.py` の `test_third_party_notices_include_niconicomments_mit_full_text`（モジュールの `NICONICOMMENTS_LICENSE` と `COMPONENTS` の全文が一致し、告知に載る）
-- [ ] C23 spec / arch の更新 — 証跡: 未
+- [x] C23 spec / arch の更新 — 証跡: `docs/spec/screens/original-format-panel.md`、`docs/arch/nico_ass.md`・`downloader.md`・`original_format_panel.md`・`index.md`、`docs/build.md`、`docs/testing/policy.md`。docs-check（8097e05）と evaluator の D6 / E1 / E2 の対応（eba453f）
 
 > **コミットの読み替え（2026-11-14）**: push 前に、公開リポジトリへ `userId` を含む実物のデータを残さないため（ユーザー判断）履歴を作り直した。以下の記録にある `642b50e`・`c19668e`・`702b973`・`83e0d14`・`498055a` は、いまの `1b9c6e2`（実装とテスト）と `125712a`（このメモ）にまとめた。`yt_gui/` と `scripts/` は `c19668e` と同一（`git diff c19668e 1b9c6e2 -- yt_gui scripts` が空）。テストの違いは、実物のデータから `userId` などを除いて sha256 の期待値を変えたことと、`_ass_cmd` の docstring だけ。データを変えた後も、全件の変換の ASS の sha256 の先頭は `757dd6de606832ed` のままで、`uv run pytest -q` は 803 passed。
 
@@ -62,7 +62,7 @@
 
 ### 変異 → red（C20）
 
-2026-11-14。`git worktree` に置いたコピー（基点 642b50e、2 行目だけ c19668e）を書き換え、対象のテストファイルを流し、毎回元に戻して `git diff --quiet` を確かめた（追跡下の作業ツリーは触らない）。先に無変異で green を確かめた。ハーネスの `git hash-object`: `6b4af9c4da2ae675237b55bf0dfd6113f6c02fca`（1 回目）、`b831b2159c361c67e8a177eff99cfb8486be8f1e`（生き残り 2 件の再実行）。
+2026-11-14 に取り直した（evaluator の E4: 前の基点 `642b50e` / `c19668e` は履歴の作り直しで HEAD の祖先でなくなったため）。`git worktree` に置いた HEAD `b97d888` のコピーを書き換え、対象のテストファイルを流し、毎回元に戻して `git diff --quiet` を確かめた（追跡下の作業ツリーは触らない）。先に無変異で green を確かめた。ハーネスの `git hash-object`: `718cf68806fbca5456f4ee05a8580d7d12e67600`。32 件すべてで、狙ったテストが落ちた。
 
 | 変異 | 落ちた件数 | 狙ったテスト |
 |---|---|---|
@@ -73,12 +73,15 @@
 | `range-1530`（1531） | 10 | `test_naka_speed[zero]` ほか |
 | `left-line-off`（左の判定線を見ない） | 1 | `test_layout_naka_left_line_only_collision` |
 | `analytic-off`（軌跡の交差を見ない） | 1 | `test_layout_naka_different_long_trajectories_cross` |
-| `stage-512`（513） | 3 | `test_resize_one_over_steps_down_by_one` ほか |
-| `grow-keeps-last`（`<` を `<=`） | 0 → 1 | 生き残ったので `test_resize_grow_stops_before_reaching_limit` を足し（c19668e）、再実行で red |
-| `baseline-0.16`（0.15） | 9 | `test_convert_ue_position_time_and_font` ほか |
+| `traj-apart`（軌跡の交差を常に真） | 1 | `test_layout_naka_different_long_trajectories_apart` |
+| `stage-512`（513） | 4 | `test_resize_one_over_steps_down_by_one` ほか |
+| `grow-keeps-last`（`<` を `<=`） | 1 | `test_resize_grow_stops_before_reaching_limit` |
+| `resize-after-scale`（倍率の前の幅で判定） | 1 | `test_resize_judges_width_after_font_scale` |
+| `baseline-0.16`（0.15） | 10 | `test_convert_ue_position_time_and_font` ほか |
 | `stroke-0.4`（0.5） | 2 | `test_convert_opacity[normal]`・`[live]` |
 | `live-0.5`（0.6） | 1 | `test_convert_opacity[live]` |
 | `black-stroke`（`#000` も白に） | 1 | `test_convert_colors_and_stroke_color[shortblack]` |
+| `bord-k`（縁取りに `k` を掛けない） | 1 | `test_convert_scales_to_playres` |
 | `premium-check`（プレミアムを見ない） | 2 | `test_parse_commands_color_code_only_for_premium[nonpremium]` ほか |
 | `loc-first-wins`（後勝ち） | 1 | `test_parse_commands_first_wins_for_loc_size_color_font` |
 | `latin-range`（U+007F まで） | 1 | `test_font_runs_windows_defont_splits_latin` |
@@ -86,12 +89,17 @@
 | `start-floor`（ceil） | 3 | `test_convert_naka_moves_between_video_edges` ほか |
 | `end-ceil`（floor） | 1 | `test_convert_naka_moves_between_video_edges` |
 | `fixed-left-align`（中央揃え） | 1 | `test_convert_multiline_one_dialogue_per_line_left_aligned` |
-| `resize-after-scale`（倍率の前の幅で判定） | 1 | `test_resize_judges_width_after_font_scale` |
+| `sort-posted-first`（投稿日時を先に比べる） | 1 | `test_convert_orders_by_vpos_before_posted` |
+| `negative-posted`（負の `postedAt` も通す） | 1 | `test_convert_skips_invalid_rows_and_counts` |
+| `surrogate-keep`（サロゲートを置き換えない） | 1 | `test_convert_replaces_lone_surrogates` |
+| `font-open-guard`（開けないフォントで例外） | 1 | `test_pillow_measurer_unopenable_font_falls_back` |
 | `dl-no-fallback`（例外でも danmaku2ass に回さない） | 18 | `test_convert_comments_unreadable_json_falls_back_to_danmaku2ass`・`test_convert_comments_converter_exception_falls_back` ほか |
 | `dl-no-skip-log`（件数の警告を出さない） | 1 | `test_convert_comments_warns_skipped_count` |
-| `dl-direct-write`（`.part` を使わない） | 0 → 1 | 生き残ったので `test_convert_comments_writes_part_then_replaces` を足し（c19668e）、再実行で red |
+| `dl-direct-write`（`.part` を使わない） | 1 | `test_convert_comments_writes_part_then_replaces` |
 | `panel-ignore-nico`（ニコニコでも有効） | 2 | `test_nico_duration_disabled_for_niconico_with_tooltip` ほか |
 | `panel-sticky-nico`（取り直しで戻らない） | 1 | `test_nico_duration_follows_latest_fetch` |
+
+最初の表（基点 `642b50e`）で生き残った `grow-keeps-last` と `dl-direct-write` は、テストを足して閉じた。evaluator の 1 巡目で生き残りが見つかった `traj-apart`・`sort-posted-first`・`negative-posted`・`bord-k`・`font-open-guard` も、テストを足して上の表で閉じた。
 
 ### 実動画との見比べ（C21・C15 の残り、2026-11-14、Windows で 1 本の動画を確認した結果）
 
@@ -116,6 +124,22 @@
 - 確定: ユーザーが並べた画像（5 時刻）を目視で確認し、C21 を確定した（2026-11-14）。幅の差は #388 ではなく新しい [#391](https://github.com/f8924919/yt-gui/issues/391) に回した（ユーザー判断。#388 は縮小とコメントアートで、内容が違うため）。
 - `_live`: この動画に `_live` のコメントは無く、見比べていない。擬似ボールド: 焼きこみ（libass）も Web も太く見え、見た目の差は上の幅の差だけ。
 - 並べた画像（左が焼きこみ、右が Web）は、ユーザーに送った `compare.png`（scratchpad、追跡しない）。
+
+### evaluator 1 巡目（2026-11-14、HEAD `8097e05`、FAIL: [欠陥] 7 件 / [証跡・文言] 4 件）
+
+| 指摘 | 内容 | 閉じ方 | 証跡 |
+|---|---|---|---|
+| D1（C12） | 長さの違う軌跡が交わらない組のテストが無い | テストを足した | `test_layout_naka_different_long_trajectories_apart`、変異 `traj-apart`（eba453f） |
+| D2（C2） | vpos を先に比べる並びのテストが無い。負の `postedAt` も | テストを足した | `test_convert_orders_by_vpos_before_posted`、`test_convert_skips_invalid_rows_and_counts`（8 件）、変異 `sort-posted-first`・`negative-posted`（eba453f） |
+| D3（C10） | k ≠ 1 の `\bord` のテストが無い | テストを足した | `test_convert_scales_to_playres`（2.62）、変異 `bord-k`（eba453f） |
+| D4（C15） | 開けないフォントの経路のテストが無い | テストを足した | `test_pillow_measurer_unopenable_font_falls_back`、変異 `font-open-guard`（eba453f） |
+| D5（C18） | 対になっていないサロゲートで書き込みの例外が外へ漏れる | 直した（本文を U+FFFD に置き換え） | `test_convert_replaces_lone_surrogates`。直す前の HEAD `8097e05` で `UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800'` の red を確認。変異 `surrogate-keep`（eba453f、b97d888） |
+| D6（C23） | spec の文字サイズの段落がニコニコの今の実装と違う | 直した | `docs/spec/screens/original-format-panel.md`（eba453f） |
+| D7（C21） | `_live` を確認していない。表示時間を測ったのが 2 点 | ユーザー判断待ち | — |
+| E1 | spec の幅の差に「1 本の動画で測った」限定が無い | 直した | spec（eba453f） |
+| E2 | arch の「danmaku2ass が無いと ASS 変換がスキップ」が古い | 直した | `docs/arch/downloader.md`（eba453f） |
+| E3 | タスクメモの C23 が未チェック | 直した | 上の進捗 |
+| E4 | 変異の表の基点が HEAD の祖先でない | いまの HEAD で取り直した | 上の「変異 → red」（b97d888） |
 
 ## 訂正ログ
 
