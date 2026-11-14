@@ -193,7 +193,7 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 | deno | `bin/deno[.exe]` |
 | danmaku2ass | `bin/danmaku2ass[.exe]` |
 
-PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。danmaku2ass バイナリが欠如している場合は ASS 変換のみがスキップされ、JSON 保存・その他のダウンロードは通常通り動作する（非致命扱い）。
+PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サブディレクトリ。danmaku2ass バイナリが欠如している場合は、ビリビリの弾幕の ASS 変換（とニコニコのコメントを danmaku2ass に切り替えたときの変換）のみがスキップされ、JSON 保存・その他のダウンロードは通常通り動作する（非致命扱い）。ニコニコのコメントは通常 `nico_ass` で変換するので、danmaku2ass が無くても ASS ができる。
 
 ### Cookies
 

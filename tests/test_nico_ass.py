@@ -546,6 +546,13 @@ def test_layout_naka_different_long_trajectories_cross():
     assert nico_ass.layout(items, ScriptedRng([0.0])) == [0, 100]
 
 
+def test_layout_naka_different_long_trajectories_apart():
+    # 遅いコメントが左の判定線を抜けた後に、速いコメントが追いつく（判定の範囲の外）。
+    # 共有の範囲 708.8〜987.9 で、相対位置は -1294.6 から -488.7（< -305）
+    items = [item(long=1000), item(vpos=800)]
+    assert nico_ass.layout(items, ScriptedRng([0.0])) == [0, 0]
+
+
 def test_layout_naka_full_rows_go_random_once():
     rng = ScriptedRng([0.5])
     items = [item(height=400), item(height=400), item(height=400)]
@@ -680,6 +687,7 @@ def test_convert_scales_to_playres():
     )[2]
     assert tag_numbers(text, "pos") == pytest.approx([640, 9.7946], abs=0.006)
     assert runs_of(text)[0][1] == pytest.approx(50.60, abs=0.006)
+    assert float(tag_value(text, "bord")) == pytest.approx(2.62, abs=0.006)
 
 
 def test_convert_vertical_video_uses_width_based_stage():
@@ -804,6 +812,26 @@ def test_convert_orders_by_vpos_then_posted_then_input():
     assert ys == pytest.approx([UE_Y, 110.2205, 205.7491], abs=0.006)
 
 
+def test_convert_orders_by_vpos_before_posted():
+    # 後の vpos のほうが投稿日時は早い。vpos が先に比べられるので「あ」が先で 0 段目
+    rows = [
+        row(body="あい", commands=["ue"], vpos_ms=2000, posted="2020-01-01T00:00:00Z"),
+        row(body="あ", commands=["ue"], vpos_ms=1000, posted="2020-01-02T00:00:00Z"),
+    ]
+    lines = [fields(d)[2] for d in dialogues(run(rows).ass)]
+    assert [runs_of(t)[0][2] for t in lines] == ["あ", "あい"]
+    ys = [tag_numbers(t, "pos")[1] for t in lines]
+    assert ys == pytest.approx([UE_Y, 110.2205], abs=0.006)
+
+
+def test_convert_replaces_lone_surrogates():
+    # 対になっていないサロゲートは UTF-8 に書けないので U+FFFD にする
+    result = run([row(body="a\ud800b", commands=["ue"])])
+    result.ass.encode("utf-8")
+    runs = runs_of(fields(dialogues(result.ass)[0])[2])
+    assert "".join(body for _, _, body in runs) == "a�b"
+
+
 def test_convert_vpos_ms_floors_to_centiseconds():
     start, _, _ = fields(dialogues(run([row(commands=["ue"], vpos_ms=1239)]).ass)[0])
     assert start == "0:00:01.23"
@@ -818,10 +846,11 @@ def test_convert_skips_invalid_rows_and_counts():
         {**good, "vposMs": True},
         {k: v for k, v in good.items() if k != "isPremium"},
         {**good, "postedAt": "not a date"},
+        {**good, "postedAt": "1969-12-31T23:59:59Z"},
         "not an object",
     ]
     result = run([*bad, good])
-    assert result.skipped == 7
+    assert result.skipped == 8
     assert len(dialogues(result.ass)) == 1
 
 
@@ -884,6 +913,24 @@ def test_pillow_measurer_falls_back_without_pillow(monkeypatch):
     nico_ass.font_metrics.cache_clear()
     monkeypatch.setitem(sys.modules, "PIL", None)
     monkeypatch.setitem(sys.modules, "PIL.ImageFont", None)
+    try:
+        measure = nico_ass.pillow_measurer("windows")
+        assert measure("aあ", "Arial", 600, 20) == pytest.approx(30)
+        assert nico_ass.font_metrics("windows")("Arial", 600) is None
+    finally:
+        nico_ass.pillow_measurer.cache_clear()
+        nico_ass.font_metrics.cache_clear()
+
+
+def test_pillow_measurer_unopenable_font_falls_back(tmp_path, monkeypatch):
+    pytest.importorskip("PIL.ImageFont")
+    broken = tmp_path / "broken.ttf"
+    broken.write_bytes(b"not a font")
+    monkeypatch.setattr(
+        nico_ass, "_resolve_font", lambda platform, name, weight: (str(broken), 0)
+    )
+    nico_ass.pillow_measurer.cache_clear()
+    nico_ass.font_metrics.cache_clear()
     try:
         measure = nico_ass.pillow_measurer("windows")
         assert measure("aあ", "Arial", 600, 20) == pytest.approx(30)

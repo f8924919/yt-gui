@@ -109,6 +109,7 @@ MetricsFn = Callable[[str, int], FontMetrics | None]
 _RE_LONG = re.compile(r"[@＠]([0-9.]+)")
 _RE_COLOR_CODE = re.compile(r"#(?:[0-9a-z]{3}|[0-9a-z]{6})")
 _RE_HEX_COLOR = re.compile(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})")
+_RE_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 
 # ts: utils/comment.ts:55（DEFAULT_COMMENT_LONG）, :57（MAX_COMMENT_LONG）,
 #     :66-67（MAX_PARSED_COMMAND_MAIL_ENTRIES / _CHARS）
@@ -943,6 +944,8 @@ def _parse_row(entry: object) -> _Row | None:
     posted = _parse_posted(posted_at)
     if posted is None:
         return None
+    # 対になっていないサロゲート（JSON の `\udXXX`）は UTF-8 に書けないので置き換える
+    body = _RE_LONE_SURROGATE.sub("�", body)
     return _Row(vpos, posted, body, commands, premium)
 
 
