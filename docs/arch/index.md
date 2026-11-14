@@ -32,6 +32,7 @@
 | [output_template.md](output_template.md) | `output_template.py` — OUTPUT TEMPLATE 定数・検証/プレビュー補助 | [設定管理](../spec/settings.md) |
 | [i18n.md](i18n.md) | `i18n.py` — 多言語対応 | [多言語対応](../spec/i18n.md) |
 | [locales.md](locales.md) | `locales/` — 言語別文字列辞書 | [多言語対応](../spec/i18n.md) |
+| [nico_ass.md](nico_ass.md) | `nico_ass.py` — ニコニコのコメント JSON から ASS への変換（niconicomments の移植） | [オリジナル形式パネル](../spec/screens/original-format-panel.md#コメント弾幕グループ) |
 | [utils.md](utils.md) | `utils.py` — 共通ユーティリティ | — |
 | [yt_dlp_update.md](yt_dlp_update.md) | `yt_dlp_update.py` — yt-dlp バージョン照会・更新チェック（Phase A）／ side-load 実体更新（Phase B）の設計 | [yt-dlp 本体の更新](../spec/features/yt-dlp-update.md) |
 | [app_update.md](app_update.md) | `app_update.py` — アプリ本体の最新版照会・更新チェック | [アプリ本体の更新](../spec/features/app-update.md) |

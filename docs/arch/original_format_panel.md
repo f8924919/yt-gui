@@ -77,12 +77,13 @@
 - ASS 変換 ↔ ハードサブ焼きこみの連動制御（OFF 時に焼きこみを解除 / 焼きこみ ON 時に ASS を強制 ON）
 - 解像度自動追従 OFF 時のみ手動解像度 SpinBox を有効化
 - 出力モード（音声のみ / remux のみ）に応じた MKV 統合チェック・ハードサブ焼きこみチェックの有効/無効切替
+- コメントの種別に応じた「表示時間」SpinBox の有効/無効切替（`comments` のときは無効にし、ツールチップで Web と同じ計算になることを示す）
 
 親パネルとの委譲経路:
 
 | 方向 | 内容 |
 |------|------|
-| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `setVisible(bool)` |
+| 親 → 子 | `reset()` / `retranslate()` / `restore_from(settings)` / `get_opts()` / `update_output_mode(audio_only, remux_only)` / `set_comment_lang(lang)` / `setVisible(bool)` |
 | 子 → 親 | コンストラクタ引数 `get_video_resolution: Callable[[], tuple[int, int] | None]` で映像解像度を取得 |
 | 子 → 親 | `request_select_comments` シグナル: ASS 変換 ON 時に親が字幕リストのコメント/弾幕 lang（`comments` または `danmaku`）を自動選択する |
 
