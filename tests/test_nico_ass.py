@@ -89,6 +89,7 @@ def run(
     opacity: float = 0.8,
     platform: str = "windows",
     metrics=fake_metrics,
+    advance=nico_ass.no_advance,
     rng=None,
 ) -> nico_ass.ConvertResult:
     return nico_ass.convert(
@@ -100,6 +101,7 @@ def run(
         platform=platform,
         measure=fw_measure,
         metrics=metrics,
+        advance=advance,
         rng=rng if rng is not None else random.Random(0),
     )
 
@@ -133,6 +135,16 @@ def runs_of(text: str) -> list[tuple[str, Any, str]]:
         (name, float(size), body)
         for name, size, body in re.findall(
             r"\{\\fn([^\\}]+)\\fs([0-9.]+)\}([^{]*)", text
+        )
+    ]
+
+
+def fsp_runs_of(text: str) -> list[tuple[str, str, float]]:
+    """`{\\fn名前\\fsサイズ\\fsp間隔}本文` の区間を (名前, 本文, 間隔) で返す。"""
+    return [
+        (name, body, float(fsp))
+        for name, fsp, body in re.findall(
+            r"\{\\fn([^\\}]+)\\fs[0-9.]+\\fsp([0-9.]+)\}([^{]*)", text
         )
     ]
 
@@ -354,10 +366,17 @@ def test_font_size_and_scale(char, expected):
     assert scale == pytest.approx(expected[1])
 
 
-def _measure(lines, commands=(), font_scale=1.0, measure=fw_measure):
+def _measure(
+    lines, commands=(), font_scale=1.0, measure=fw_measure, advance=nico_ass.no_advance
+):
     cmd = nico_ass.parse_commands(list(commands), "\n".join(lines), False)
     return nico_ass.measure_comment(
-        lines, cmd, platform="windows", measure=measure, font_scale=font_scale
+        lines,
+        cmd,
+        platform="windows",
+        measure=measure,
+        advance=advance,
+        font_scale=font_scale,
     )
 
 
@@ -866,6 +885,7 @@ def test_convert_raises_when_whole_json_unreadable(text):
             platform="windows",
             measure=fw_measure,
             metrics=fake_metrics,
+            advance=nico_ass.no_advance,
             rng=random.Random(0),
         )
 
@@ -961,3 +981,277 @@ def test_pillow_measurer_measures_real_font():
     metrics = nico_ass.font_metrics("windows")("Arial", 600)
     assert metrics is not None
     assert metrics.ascent + metrics.descent > 1.0
+
+
+# ---------------------------------------------------------------------------
+# 擬似ボールドの増分（#391）
+# 期待値は Chrome の canvas の実測（tests/data/nico_chrome_widths.json。測った環境は
+# ファイルの measured と docs/task のタスクメモ）
+# ---------------------------------------------------------------------------
+
+MSPG = FontFace("MS PGothic", 600)
+ARIAL = FontFace("Arial", 600)
+
+
+def _chrome() -> dict:
+    data: dict = json.loads(
+        (DATA / "nico_chrome_widths.json").read_text(encoding="utf-8")
+    )
+    return data
+
+
+@pytest.mark.parametrize(
+    "case",
+    _chrome()["advances"],
+    ids=lambda c: f"U+{ord(c['ch']):04X}@{c['font_px']}",
+)
+def test_pseudo_bold_advance_matches_chrome(case):
+    got = nico_ass.pseudo_bold_advance(case["ch"], case["font_px"])
+    assert got == pytest.approx(case["increment"], abs=1e-5)
+
+
+def test_chrome_fixture_covers_each_kind_and_both_sides_of_22():
+    advances = _chrome()["advances"]
+    sizes = {c["font_px"] for c in advances}
+    assert {22, 23} <= sizes
+    kinds = {c["increment"] for c in advances if c["font_px"] == 39}
+    assert kinds == {0, 0.761719}  # 空白・ゼロ幅（0）と、それ以外
+    assert len(_chrome()["widths"]) == 21
+
+
+@pytest.fixture
+def resolvable_fonts(monkeypatch):
+    """フォントのファイルが見つかったことにする（実フォントに依存させない）。"""
+    monkeypatch.setattr(
+        nico_ass, "_resolve_font", lambda platform, name, weight: ("dummy", 0)
+    )
+    nico_ass.pseudo_bold_advancer.cache_clear()
+    yield
+    nico_ass.pseudo_bold_advancer.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("platform", "face", "expected"),
+    [
+        ("windows", MSPG, 39 * 5 / 256),
+        ("windows", ARIAL, 0),
+        ("windows", FontFace("MS PGothic", 400), 0),
+        ("windows", FontFace("Yu Gothic", 400), 0),
+        ("windows", FontFace("Yu Mincho", 400), 0),
+        ("macos", MSPG, 0),
+        ("macos", FontFace("Hiragino Sans", 600), 0),
+        ("other", MSPG, 0),
+        ("other", FontFace("sans-serif", 600), 0),
+    ],
+    ids=[
+        "win-mspg600",
+        "win-arial",
+        "win-mspg400",
+        "win-yugothic",
+        "win-yumincho",
+        "mac-mspg600",
+        "mac-hiragino",
+        "other-mspg600",
+        "other-sans",
+    ],
+)
+def test_pseudo_bold_advancer_targets_only_windows_ms_pgothic_600(
+    resolvable_fonts, platform, face, expected
+):
+    advance = nico_ass.pseudo_bold_advancer(platform)
+    assert advance("漢", face, 39) == pytest.approx(expected)
+
+
+def test_pseudo_bold_advancer_is_zero_when_font_not_found(monkeypatch):
+    monkeypatch.setattr(nico_ass, "_resolve_font", lambda platform, name, weight: None)
+    nico_ass.pseudo_bold_advancer.cache_clear()
+    try:
+        assert nico_ass.pseudo_bold_advancer("windows")("漢", MSPG, 39) == 0
+    finally:
+        nico_ass.pseudo_bold_advancer.cache_clear()
+
+
+def test_no_advance_is_zero():
+    assert nico_ass.no_advance("漢", MSPG, 18) == 0
+
+
+def _mspg_only(value: float):
+    def advance(ch: str, face: FontFace, font_px: int) -> float:
+        if face.name != "MS PGothic" or ch.isspace():
+            return 0.0
+        return value
+
+    return advance
+
+
+def test_measure_comment_adds_advance_before_ceil():
+    # 全角 27 × 2 = 54、増分 0.5 × 2 → ceil(55) = 55
+    m = _measure(["あい"], advance=_mspg_only(0.5))
+    assert m.line_widths == [55]
+    assert m.width == pytest.approx(55 * C0)
+
+
+def test_measure_comment_passes_char_face_and_font_px_to_advance():
+    calls: list[tuple[str, FontFace, int]] = []
+
+    def record(ch: str, face: FontFace, font_px: int) -> float:
+        calls.append((ch, face, font_px))
+        return 0.0
+
+    _measure(["aあ"], ["small"], advance=record)
+    assert calls == [("a", ARIAL, 18), ("あ", MSPG, 18)]
+
+
+def test_measure_comment_advance_uses_resized_font_px():
+    calls: list[int] = []
+
+    def record(ch: str, face: FontFace, font_px: int) -> float:
+        calls.append(font_px)
+        return 1.0
+
+    m = _measure(["あ" * 30], ["ue", "big"], advance=record)
+    assert m.font_px < 39  # 縮小された
+    assert calls[-30:] == [m.font_px] * 30
+
+
+def test_convert_writes_fsp_per_advance_value():
+    text = fields(
+        dialogues(
+            run([row(body="ab あ　い", commands=["ue"])], advance=_mspg_only(1.0)).ass
+        )[0]
+    )[2]
+    # 1 × scale 1 × c(1920/683) × k 1 = 2.81
+    assert fsp_runs_of(text) == [
+        ("Arial", "ab\\h", 0.0),
+        ("MS PGothic", "あ", 2.81),
+        ("MS PGothic", "　", 0.0),
+        ("MS PGothic", "い", 2.81),
+    ]
+
+
+def test_convert_fsp_scales_with_font_scale_and_resolution():
+    text = fields(
+        dialogues(
+            run(
+                [row(body="あ", commands=["ue"])],
+                width=960,
+                height=540,
+                font_scale_percent=150,
+                advance=_mspg_only(1.0),
+            ).ass
+        )[0]
+    )[2]
+    # 1 × C0 × 1.5 × k 0.5 = 2.108...
+    assert fsp_runs_of(text) == [("MS PGothic", "あ", 2.11)]
+
+
+def test_convert_fsp_value_uses_shrink_scale():
+    def three(ch: str, face: FontFace, font_px: int) -> float:
+        return 3.0
+
+    # 長い上固定は縮小され、文字サイズが 10 未満になると scale < 1
+    result = run([row(body="あ" * 120, commands=["ue", "small"])], advance=three)
+    text = fields(dialogues(result.ass)[0])[2]
+    fsp = fsp_runs_of(text)[0][2]
+    rows_ = [row(body="あ" * 120, commands=["ue", "small"])]
+    cmd = nico_ass.parse_commands(rows_[0]["commands"], rows_[0]["body"], False)
+    m = nico_ass.measure_comment(
+        ["あ" * 120],
+        cmd,
+        platform="windows",
+        measure=fw_measure,
+        advance=three,
+        font_scale=1.0,
+    )
+    assert m.scale < 1
+    assert fsp == pytest.approx(3.0 * m.scale * C0, abs=0.006)
+
+
+def test_convert_no_fsp_on_lines_without_advance():
+    result = run(
+        [row(body="abc", commands=["ue"]), row(body="あ", commands=["ue", "gothic"])],
+        advance=_mspg_only(1.0),
+    )
+    assert "\\fsp" not in result.ass
+
+
+def test_convert_default_no_advance_writes_no_fsp():
+    assert "\\fsp" not in run([row(body="ab あ　い")]).ass
+
+
+def _full_fixture_rows() -> list[dict]:
+    rows: list[dict] = json.loads(
+        gzip.decompress((DATA / "sm31143779.comments.json.gz").read_bytes())
+    )
+    return rows
+
+
+@pytest.mark.parametrize(
+    ("platform", "add_command", "expected"),
+    [
+        (
+            "macos",
+            None,
+            "bd8068d57446073d83494665c4fd56cb18579dcb41e14751d8cd18c1b17c0e8d",
+        ),
+        (
+            "other",
+            None,
+            "76f4b45f17603f942fc96dbdabeca60f60333b6ea5d41ebd52d00db9603f7c15",
+        ),
+        (
+            "windows",
+            "gothic",
+            "dd7bd2ff78d01ad17de8b302709ec5f480897a623d6ac352b6eaff1121bca5d3",
+        ),
+    ],
+    ids=["macos", "other", "windows-gothic"],
+)
+def test_convert_output_unchanged_where_no_pseudo_bold(platform, add_command, expected):
+    # 基準は #391 の前（HEAD 554fc5a）の出力。増分の無い経路は 1 バイトも変わらない
+    import hashlib
+
+    rows = _full_fixture_rows()
+    if add_command:
+        rows = [dict(r, commands=[*r["commands"], add_command]) for r in rows]
+    nico_ass.pseudo_bold_advancer.cache_clear()
+    try:
+        result = run(
+            rows,
+            platform=platform,
+            advance=nico_ass.pseudo_bold_advancer(platform),
+            rng=random.Random(42),
+        )
+    finally:
+        nico_ass.pseudo_bold_advancer.cache_clear()
+    assert hashlib.sha256(result.ass.encode()).hexdigest() == expected
+
+
+def _windows_fonts_available() -> bool:
+    fonts = Path(r"C:\Windows\Fonts")
+    return (
+        sys.platform == "win32"
+        and (fonts / "arialbd.ttf").exists()
+        and (fonts / "msgothic.ttc").exists()
+    )
+
+
+@pytest.mark.skipif(
+    not _windows_fonts_available(), reason="Arial Bold と MS PGothic が無い環境"
+)
+@pytest.mark.parametrize(
+    "case",
+    _chrome()["widths"],
+    ids=lambda c: f"{c['font_px']}px-{c['text'][:6]}",
+)
+def test_pillow_width_with_pseudo_bold_matches_chrome_within_1pct(case):
+    # C2: 計算した送り幅（Pillow ＋ 増分）と Chrome の measureText の差が ±1% 以内
+    pytest.importorskip("PIL.ImageFont")
+    measure = nico_ass.pillow_measurer("windows")
+    advance = nico_ass.pseudo_bold_advancer("windows")
+    px = case["font_px"]
+    total = 0.0
+    for text, face in nico_ass.font_runs(case["text"], "defont", "windows"):
+        total += measure(text, face.name, face.weight, px)
+        total += sum(advance(ch, face, px) for ch in text)
+    assert total == pytest.approx(case["width"], rel=0.01)

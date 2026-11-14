@@ -1113,6 +1113,7 @@ class Downloader:
                 platform=platform,
                 measure=nico_ass.pillow_measurer(platform),
                 metrics=nico_ass.font_metrics(platform),
+                advance=nico_ass.pseudo_bold_advancer(platform),
                 rng=random.Random(0),
             )
         except Exception as e:  # 失敗は danmaku2ass へ回す

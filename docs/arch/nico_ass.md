@@ -8,13 +8,14 @@
 
 ## 公開する関数
 
-- `convert(comments_json, *, width, height, font_scale_percent, opacity, platform, measure, metrics, rng) -> ConvertResult`: ASS の文字列（`ConvertResult.ass`）と、飛ばしたコメントの件数（`ConvertResult.skipped`）を返す。`comments_json` は JSON の文字列。ファイルの読み書きはしない。`platform` は `"windows"` / `"macos"` / `"other"`。`rng` は `random()` を持つオブジェクト（`random.Random` など）。
+- `convert(comments_json, *, width, height, font_scale_percent, opacity, platform, measure, metrics, advance, rng) -> ConvertResult`: ASS の文字列（`ConvertResult.ass`）と、飛ばしたコメントの件数（`ConvertResult.skipped`）を返す。`comments_json` は JSON の文字列。ファイルの読み書きはしない。`platform` は `"windows"` / `"macos"` / `"other"`。`rng` は `random()` を持つオブジェクト（`random.Random` など）。
 - `font_candidates(font, platform) -> tuple[FontFace, ...]`: コマンドのフォント（`defont` / `gothic` / `mincho`）と OS から、フォントの候補を返す純関数。`FontFace(name, weight)`。
 - `font_runs(text, font, platform) -> list[tuple[str, FontFace]]`: 1 行の文字列を、描くフォントごとの区間に分ける（隣り合う同じフォントの文字はまとめる）。
 - 測定器の型は `measure(text, font_name, weight, size_px) -> float`（`size_px` は CSS の em。戻り値は送り幅の px）。
 - 寸法の型は `metrics(font_name, weight) -> FontMetrics | None`。`FontMetrics(ascent, descent)` は `usWinAscent / unitsPerEm` と `usWinDescent / unitsPerEm`。`None` はフォントが見つからないとき。
 - `pillow_measurer(platform)` / `font_metrics(platform)`: 実行時の測定器と寸法を返す。Pillow は関数の中で遅延 import し、`ImportError` なら概算の測定器と、常に `None` を返す寸法を返す。結果はモジュール単位でキャッシュする。
 - `approx_measurer`: 概算の測定器（全角 1 文字分、半角 0.5 文字分。全角は `unicodedata.east_asian_width` の `F` / `W`）。
+- 増分の型は `advance(ch, face, font_px) -> float`（1 字に足す送り幅の CSS の px）。`pseudo_bold_advancer(platform)` が実行時の増分を、`no_advance` が常に 0 を返す。規則は `pseudo_bold_advance(ch, font_px)`。下の「擬似ボールドの増分」。
 
 ## 内部の継ぎ目（テストが固定する形）
 
@@ -24,7 +25,7 @@
 - `ass_color(color) -> str`: `&HBBGGRR&`。`#RGB` は各桁を 2 回並べて広げ、16 進として読めない値は白。
 - `char_size(size)` / `line_height(size)`: 舞台の単位。`char_size = 384 / doubleResized`、`line_height = (384 - char_size) / (default - 1)`。
 - `font_size_and_scale(char_size) -> (font_px, scale)`: niconicomments の `getFontSizeAndScale`。`char_size × 0.8` が 10 未満なら `(10, floor(char_size × 0.8) / 10)`（1 未満は floor しない）、それ以外は `(floor(char_size × 0.8), 1)`。
-- `measure_comment(lines, cmd, *, platform, measure, font_scale) -> Measured`: 行ごとの幅（舞台の単位、`ceil(送り幅の合計 × scale)`）を測り、上下固定の縮小を行う。`Measured(char_size, line_height, font_px, scale, line_widths, width, height)` の `width` / `height` はキャンバスの単位（舞台の値 × `1920 / 683` × `font_scale`）。`font_scale` は `font_scale_percent / 100`。縮小の判定は「舞台の幅 × `font_scale` > 512」。
+- `measure_comment(lines, cmd, *, platform, measure, advance, font_scale) -> Measured`: 行ごとの幅（舞台の単位、`ceil((送り幅 + 増分)の合計 × scale)`）を測り、上下固定の縮小を行う。`Measured(char_size, line_height, font_px, scale, line_widths, width, height)` の `width` / `height` はキャンバスの単位（舞台の値 × `1920 / 683` × `font_scale`）。`font_scale` は `font_scale_percent / 100`。縮小の判定は「舞台の幅 × `font_scale` > 512」。
 - `naka_speed(width, long)` / `naka_x(width, long, elapsed)`: キャンバスの単位。`elapsed` は `vpos` からの経過。
 - `layout(items, rng) -> list[float]`: `LayoutItem(loc, vpos, long, width, height, commands)`（キャンバスの単位、`commands` は元のコマンドの列）の並びに、キャンバスの `posY` を返す。`shita` の `posY` は下からの距離（niconicomments と同じ）。乱数は `floor(rng.random() × (1080 - height))` で引く。
 ## 座標系
@@ -54,6 +55,24 @@
 - フォント名は英語のファミリー名（`Arial`、`MS PGothic`、`Yu Gothic`、`Yu Mincho`、`Hiragino Sans` など）。フォントファイルは OS ごとの候補のパスから探し、`.ttc` は `getname()` でフェイスを照合して開く（index を決め打ちしない）。
 - 太さは `\b<weight>`（Style の Bold は 0）。測定器にも太さを渡し、太さ別のファイル（Arial Bold など）で測る。
 - ASS に書くフォントは変換した PC の OS のもの。MKV を別の OS で再生すると代わりのフォントになる。Linux など「その他」は Pillow で開けないので概算になる。
+
+## 擬似ボールドの増分
+
+Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600（`defont`）で描くとき擬似ボールドをかけ、送り幅も広げる。Web の幅に合わせるため、この増分を測定と ASS の両方に足す（[#391](https://github.com/f8924919/yt-gui/issues/391)。実測の記録は[タスクメモ](../task/archive/391-nico-pseudo-bold-width.md)）。
+
+- **差し込み口**: 増分は、測定器（`measure`）・寸法（`metrics`）と同じく、`measure_comment` と `convert` に引数 `advance(ch, face, font_px) -> float` で渡す。幅の測定と ASS の `\fsp` は同じ `advance` を呼ぶので、食い違わない。本番は `pseudo_bold_advancer(platform)`、増分を足さないときは `no_advance`（常に 0）を渡す。
+- **対象**（`pseudo_bold_advancer`）: `platform` が `"windows"`、区間のフォントが `FontFace("MS PGothic", 600)`、そのフォントのファイルが見つかった（`_resolve_font` が `None` でない）ときだけ、下の規則の値を返す。それ以外（Arial、`gothic` / `mincho` の太さ 400、macOS / その他、Pillow もフォントも無いとき）は 0。結果はモジュール単位でキャッシュする。
+- **1 字の増分**（`pseudo_bold_advance(ch, font_px)`。規則だけの純関数。`font_px` は `font_size_and_scale` の CSS の px で、縮小した後の値。縮小率 `scale` は掛けない）:
+  - ゼロ幅の書式文字（Unicode の一般カテゴリ `Cf`。U+200B、U+200D、U+FEFF など）は 0。
+  - `font_px` が 22 以下なら 1。空白も 1。
+  - 23 以上なら、空白（`str.isspace()`）は 0、それ以外は `font_px × 5 / 256`（MS PGothic の unitsPerEm は 256）。結合文字（U+3099 など）も、MS PGothic では幅のある字として描かれるので同じだけ増える。
+  - 22 / 23 の境目は、MS PGothic の埋め込みビットマップの大きさ（7〜22）と一致する。Chromium 156 / Windows 11 / devicePixelRatio 1.5 の canvas の `measureText` で測った規則で、ほかの devicePixelRatio は確かめていない。
+- **測定**: `measure_comment` は、区間ごとに `measure` の値と、区間の各字の `advance` の合計を足し、行で `ceil(合計 × scale)` にする。縮小の判定、衝突判定、流れる速さ、固定コメントの横位置のすべてに効く。`pillow_measurer` は Pillow の送り幅だけを返す（増分を足さない）。
+- **ASS**: libass には擬似ボールドの送り幅の増分が無いので、文字間隔 `\fsp` で同じ量を足す。値は `PlayRes` の単位で `advance × scale × c × k`（`\fs` の係数 `ascent + descent` は掛けない）。
+  - `convert` の中で、区間をさらに増分の値が同じ字の並びに分け、それぞれに `\fsp` を書く（`font_runs` の形は変えない）。
+  - 1 行に増分のある字が 1 つでもあれば、その行のすべての区間のタグに `\fsp` を書く（増分の無い区間は `\fsp0`。前の区間の値を持ち越さないため）。増分のある字が無い行には `\fsp` を書かない（出力は #391 の前と同じ）。
+- **再現しないもの**: 22px 以下では、太さ 400 の送り幅も Chrome が 1 字ずつ整数に丸める（ヒンティング）。ふつうの文で 0.1% 程度、半角カナ・句読点だけの文字列では ±2〜7% ずれるが、再現しない。
+- **MS PGothic に無い字**: 絵文字・ハングルの埋め字（U+3164 など）・点字の空白（U+2800）などは、Chrome が別のフォントで描き、増分はそのフォントによる（実測では 0。CJK 拡張 B の字は増える）。これらはもともとフォントが違うので幅が合っておらず、増分も区別しない（MS PGothic の字と同じ規則を当てる）。
 
 ## 処理の流れ
 
