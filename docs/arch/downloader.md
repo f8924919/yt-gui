@@ -192,7 +192,7 @@ danmaku2ass と ffmpeg（区間の切り出し・チャプターごとの切り�
 - `CREATE_NO_WINDOW` は単独で使う。自己更新（#253、撤去済み）では `DETACHED_PROCESS` と併用して PowerShell が起動直後に落ちた。
 - 定数は `subprocess.CREATE_NO_WINDOW` ではなく値を直書きする（Windows 以外の `subprocess` にはこの属性が無く、テストで `sys.platform` を差し替えて確かめるため）。
 - `yt_gui/` で `subprocess` の起動関数（`run` / `Popen` / `call` / `check_call` / `check_output`）と `os.system` / `os.popen` を呼べるのは `_run_external` の中だけ。`tests/test_downloader.py` のテストがソースを `ast` で読んで守る。
-- 確かめた範囲: コンソールを持たない親（`pythonw.exe`）から起動した子が、コンソールのウィンドウを持たないこと（Windows でだけ走るテスト）と、配布用のビルドの焼きこみでウィンドウが開かないこと（ユーザーの目視）。ほかの 4 つの経路は一瞬で終わるので目視しておらず、同じ関数を通ることで担保している。
+- 確かめた範囲: コンソールを持たない親（`pythonw.exe`）から起動した子が、コンソールのウィンドウを持たないこと（Windows でだけ走るテスト）。配布用のビルドの焼きこみでウィンドウが開かないかは、ユーザーの目視で確かめる（未確認）。ほかの 4 つの経路は一瞬で終わるので目視しておらず、同じ関数を通ることで担保している。
 
 ### バイナリパス解決
 

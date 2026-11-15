@@ -7,6 +7,8 @@
 
 受け入れ条件の正本は Issue。設計は [arch/downloader.md](../../arch/downloader.md) の「外部プログラムの起動（コンソールを出さない）」。1 PR で終わる小さなタスクなので archive に直接作った（docs-guide §4.2 の特例）。
 
+証跡の段へ移った日と主張（policy §8.0）: 2026-11-15、`_run_external` が Windows でだけ `CREATE_NO_WINDOW` を単独で付けること、`yt_gui/` で外部プログラムを起動するのがその関数だけであること、コンソールを持たない親から起動した子がウィンドウを持たないこと（arch の「外部プログラムの起動（コンソールを出さない）」）。
+
 ## 原因（3 点）
 
 - コード位置: `yt_gui/downloader.py` の `subprocess.run` 5 か所（danmaku2ass・区間の切り出し・チャプターごとの切り出し・MKV 統合・焼きこみ）。どれも `creationflags` を渡していない。
@@ -42,13 +44,45 @@ flag 0
 | M4 | 焼きこみの `_run_external(` を `subprocess.run(` に戻す | `started_only_via_run_external` |
 | M5 | `from subprocess import check_output` を足す | `started_only_via_run_external` |
 
+evaluator 1 巡目の指摘を受けて、同じ手順を `24b3479` で回し直したときの出力（M0 は変異なし。FAILED 行の理由は省いた）:
+
+```
+HEAD 24b3479 2026-11-15T17:43:23+09:00
+== M0
+5 passed, 154 deselected in 0.83s
+== M1
+FAILED tests/test_downloader.py::test_run_external_hides_console_only_on_windows[win32-expected0]
+FAILED tests/test_downloader.py::test_run_external_child_has_no_console_window_from_gui_parent
+2 failed, 3 passed, 154 deselected in 1.01s
+== M2
+FAILED tests/test_downloader.py::test_run_external_hides_console_only_on_windows[win32-expected0]
+FAILED tests/test_downloader.py::test_run_external_child_has_no_console_window_from_gui_parent
+2 failed, 3 passed, 154 deselected in 1.41s
+== M3
+FAILED tests/test_downloader.py::test_run_external_hides_console_only_on_windows[darwin-expected1]
+FAILED tests/test_downloader.py::test_run_external_hides_console_only_on_windows[linux-expected2]
+2 failed, 3 passed, 154 deselected in 0.96s
+== M4
+FAILED tests/test_downloader.py::test_external_programs_are_started_only_via_run_external
+1 failed, 4 passed, 154 deselected in 0.94s
+== M5
+FAILED tests/test_downloader.py::test_external_programs_are_started_only_via_run_external
+1 failed, 4 passed, 154 deselected in 0.95s
+```
+
 ## 訂正ログ
 
 | 日付 | 誤って書いたこと | 正しくは | 原因と再発防止 |
 |---|---|---|---|
 
+## 検証ゲート
+
+| 巡 | HEAD | verify | docs-check | evaluator |
+|---|---|---|---|---|
+| 1 | `24b3479` | green（949 passed、skip 0） | 指摘なし | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 2。arch が C4 を確認済みと書いていた・変異の FAILED 行が無かった。どちらもこの PR で直した） |
+
 ## 次にやること
 
-`/verify-gate` → 配布用のビルドをユーザーに確かめてもらう（C4）→ PR。
+配布用のビルド（`dist/yt-gui/yt-gui.exe`、`24b3479` と同じコード）の焼きこみをユーザーに確かめてもらう（C4）→ arch の「未確認」を直す → archive/index.md に行を足す → PR。
 
 訂正ログ: 0 件
