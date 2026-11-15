@@ -2603,3 +2603,121 @@ def test_cookie_file_is_actually_loaded_by_ytdlp(downloader, tmp_path):
     ydl = YoutubeDL({**opts, "quiet": True})
     names = [c.name for c in ydl.cookiejar]
     assert "user_session" in names
+
+
+# --- 外部プログラムの起動（#395） ---
+
+_CREATE_NO_WINDOW = 0x08000000
+_SPAWN_FUNCS = {
+    "subprocess": {"run", "Popen", "call", "check_call", "check_output"},
+    "os": {"system", "popen"},
+}
+
+
+@pytest.mark.parametrize(
+    ("platform", "expected"),
+    [("win32", {"creationflags": _CREATE_NO_WINDOW}), ("darwin", {}), ("linux", {})],
+)
+def test_run_external_hides_console_only_on_windows(monkeypatch, platform, expected):
+    """win32 でだけ CREATE_NO_WINDOW を単独で足し、他の引数はそのまま渡す。"""
+    from yt_gui import downloader
+
+    seen: list[tuple[list[str], dict]] = []
+
+    def _fake_run(cmd, **kwargs):
+        seen.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr("yt_gui.downloader.sys.platform", platform)
+    monkeypatch.setattr("yt_gui.downloader.subprocess.run", _fake_run)
+    downloader._run_external(["ffmpeg", "-y"], check=True, cwd="x")
+    assert seen == [(["ffmpeg", "-y"], {"check": True, "cwd": "x", **expected})]
+
+
+def _spawn_calls(tree):
+    """(呼び出し名, 囲む関数名) を返す。`from subprocess import run` 等も拾う。"""
+    import ast
+
+    found: list[tuple[str, str | None]] = []
+    stack: list[str] = []
+
+    class V(ast.NodeVisitor):
+        def _func(self, node):
+            stack.append(node.name)
+            self.generic_visit(node)
+            stack.pop()
+
+        visit_FunctionDef = _func
+        visit_AsyncFunctionDef = _func
+
+        def visit_ImportFrom(self, node):
+            names = _SPAWN_FUNCS.get(node.module or "", set())
+            for a in node.names:
+                if a.name in names or a.name == "*":
+                    found.append((f"from {node.module} import {a.name}", None))
+            self.generic_visit(node)
+
+        def visit_Attribute(self, node):
+            if isinstance(node.value, ast.Name) and node.attr in _SPAWN_FUNCS.get(
+                node.value.id, set()
+            ):
+                found.append(
+                    (f"{node.value.id}.{node.attr}", stack[-1] if stack else None)
+                )
+            self.generic_visit(node)
+
+    V().visit(tree)
+    return found
+
+
+def test_external_programs_are_started_only_via_run_external():
+    """yt_gui/ で外部プログラムを起動するのは `_run_external` の中だけ。"""
+    import ast
+
+    root = Path(__file__).resolve().parent.parent / "yt_gui"
+    files = sorted(root.rglob("*.py"))
+    assert len(files) > 5
+    hits = []
+    for f in files:
+        for name, func in _spawn_calls(ast.parse(f.read_text(encoding="utf-8"))):
+            hits.append((f.relative_to(root).as_posix(), name, func))
+    assert hits == [("downloader.py", "subprocess.run", "_run_external")]
+
+
+@pytest.mark.skipif(
+    __import__("sys").platform != "win32", reason="Windows のコンソール割り当て"
+)
+def test_run_external_child_has_no_console_window_from_gui_parent(tmp_path):
+    """コンソールを持たない親（pythonw）から起動した子がコンソールのウィンドウを持たない。
+
+    配布用のビルド（console=False）と同じ条件を pythonw で作る。対照（フラグ無しの
+    subprocess.run）が 0 なら、この環境ではウィンドウが割り当てられないので skip する。
+    """
+    import sys
+
+    exe = Path(sys.executable)
+    pythonw = exe.with_name("pythonw.exe")
+    if not pythonw.exists():
+        pytest.skip(f"pythonw.exe が無い: {pythonw}")
+    out = tmp_path / "out.json"
+    parent = tmp_path / "parent.py"
+    parent.write_text(
+        "import json, subprocess, sys\n"
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parent.parent)!r})\n"
+        "from yt_gui.downloader import _run_external\n"
+        "code = 'import ctypes; print(ctypes.windll.kernel32.GetConsoleWindow())'\n"
+        f"cmd = [{str(exe)!r}, '-c', code]\n"
+        "kw = dict(capture_output=True, text=True, check=True)\n"
+        "res = {'control': subprocess.run(cmd, **kw).stdout.strip(),\n"
+        "       'run_external': _run_external(cmd, **kw).stdout.strip()}\n"
+        f"open({str(out)!r}, 'w').write(json.dumps(res))\n",
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        [str(pythonw), str(parent)], capture_output=True, text=True, timeout=120
+    )
+    assert proc.returncode == 0, proc.stderr
+    res = json.loads(out.read_text())
+    if res["control"] == "0":
+        pytest.skip(f"対照でもウィンドウが割り当てられない: {res}")
+    assert res["run_external"] == "0", res
