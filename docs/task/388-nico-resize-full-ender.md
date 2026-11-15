@@ -12,7 +12,7 @@
 - [x] C1 行数の多いコメントの縮小（`isLineBreakResize`） — 証跡: `test_measure_comment_line_break_resize_at_threshold`（3 サイズ）、`test_measure_comment_no_line_break_resize_below_threshold`、`test_measure_comment_trailing_empty_line_counts`、`test_measure_comment_line_break_resize_applies_to_naka`（503d3d7）。Web は下の「C6」の 18.3 秒
 - [x] C2 縮小したコメントの上下固定の縮小（`resizedY` の分岐） — 証跡: `test_resize_y_then_x_grow_path_scales_unresized_base`・`…_shrink_path…`・`…_bisect_path…`（503d3d7）。Web は「設計レビューと…」の 42.17 秒と、「C6」の 29.9 秒
 - [x] C3 `ender` で複数行の縮小をしない — 証跡: `test_parse_commands_ender_full`、`test_measure_comment_ender_skips_line_break_resize`（3 サイズ、`ender` の有無だけを変えた対照）、`test_measure_comment_ender_keeps_width_resize`（503d3d7）
-- [x] C4 `full` で上下固定の幅の上限が 683 — 証跡: `test_measure_comment_full_width_limit`（512 以下・512〜683・683 超）、`…_full_limit_divided_by_font_scale`、`…_full_with_line_break_resize_uses_683`、`test_convert_full_does_not_change_naka`（503d3d7）。Web は「C6」の 29.9 秒の cyan
+- [x] C4 `full` で上下固定の幅の上限が 683 — 証跡: `test_measure_comment_full_width_limit`（512 以下・512〜683・683 超）、`…_full_limit_divided_by_font_scale`、`…_full_with_line_break_resize_uses_683`、`test_convert_full_does_not_change_naka`（503d3d7）。Web は「C6」の 79.4 秒の白いブロック
 - [x] C5 対象のコメントが無い入力の出力が変わらない — 証跡: `test_convert_output_unchanged_without_multiline_ender_full_windows`（windows、`4c2db41d…`）と、入力から `ender` / `full` を除いた `test_convert_output_unchanged_where_no_pseudo_bold`（macos・other・windows-gothic。#391 の期待値のまま）が、実装の前後とも pass（503d3d7）
 - [x] C6 `sm9560870` で焼きこみと Web を見比べる — 証跡: 下の「C6」
 - [x] C7 単体テストと変異 → red の死因の表 — 証跡: 下の「テスト先行の red」と「変異 → red」
@@ -25,7 +25,7 @@
 - 幅の測定は `utils/niconico.ts` の `measureWidth` が `getFontSizeAndScale(comment.charSize)` で行い、`measureText` が設定する `fontSize.resized` は使わない（`HTML5Comment.ts:232` で `charSize × 0.8` に上書きされる）。描画（`:508`）も文字サイズから出す。
 - `full`: `HTML5Comment.ts:250-267`（`_measureComment`）と `:269-` （`_processResizeX`）の幅の上限が `fullWidth`（html5 は 683）。`loc !== "naka"` の分岐の中だけなので、流れるコメントには効かない。
 - `ender` / `full` のコマンド: `utils/comment.ts:1110-1176`（`parseCommand`）が小文字にしてから、キーに一致すれば真にする。
-- 行数: `HTML5Comment.ts:45-61`（`clampHTML5Content`）。16,384 文字・256 行で切った後の改行の数 + 1。yt-gui の `_body_lines`（`yt_gui/nico_ass.py:995-998`）と同じ数え方。
+- 行数: `HTML5Comment.ts:45-61`（`clampHTML5Content`）。16,384 文字・256 行で切った後の改行の数 + 1。yt-gui の `_body_lines`（`yt_gui/nico_ass.py:1046-1049`、503d3d7 の行番号）と同じ数え方。
 - `compatSpacer.html5` は空で、`html5SpecialSpaceCompat` は `false`（`definition/initConfig.ts:253`、`:361-390`）。空白の字幅の補正は既定では無い。
 - 古い描画方式（Flash）: 2017-07-12 より前でフォント指定の無いコメントが対象（`utils/comment.ts:1230-1244`、`definition/initConfig.ts:230` の `flashThreshold: 1499871600`）。yt-dlp が取ったコメントの最古は `sm31143779` で 2019-08-20、`sm9560870` で 2018-08-15 で、対象は 0 件（全件の `postedAt` を数えた）。ユーザー判断で対象外。
 - コメントアートの層の分離（`utils/commentArt.ts` の `changeCALayer`）は `options.keepCA` が真のときだけ動き、既定は `false`。ユーザー判断で対象外。
@@ -68,9 +68,11 @@
 
 二分探索の経路のテストは、初めは許容誤差（相対 1e-6）の中で実装前の値（0.79999924）と期待値（0.79999943）が一致して pass したので、相対 1e-9 に絞って red を確かめた。期待値は、niconicomments の式を実装と独立に書き下ろした `ref388.py` の出力（本文は末尾の「プローブの本文」）。
 
-## 変異 → red（C7、503d3d7）
+## 変異 → red（C7、abb6d24）
 
-worktree のコピー（`503d3d7`）を 1 つずつ変異させ、`tests/test_nico_ass.py` と `tests/test_downloader.py` を走らせた。無変異のコピーは 438 passed、戻した後も 438 passed、狙ったテストは 15 変異すべてで落ちた（`ALL TARGETED KILLED`）。置換が 1 か所に当たらないときは止まる。script は `mutate388.py`、表は `mut_table.py`（#391 と同じ）でログから作った。
+worktree のコピー（`abb6d24`。`503d3d7` から `yt_gui` と `tests` は変わっていない）を 1 つずつ変異させ、`tests/test_nico_ass.py` と `tests/test_downloader.py` を走らせた。無変異のコピーは 438 passed、戻した後も 438 passed、狙ったテストは 16 変異すべてで落ちた（`ALL TARGETED KILLED`）。置換が 1 か所に当たらないときは止まる。script は `mutate388.py`、表は `mut_table.py`（#391 と同じ）でログから作った。
+
+- M1〜M15 は 1 巡目（`503d3d7`）でも回し、狙ったテストは全部落ちた。evaluator 1 巡目の指摘で、閾値未満で縮小しないことのテスト（`test_measure_comment_no_line_break_resize_below_threshold`）を殺す M16（閾値を 1 ずつ下げる）を足して回し直した。
 
 | 変異 | 件数 | 狙ったテスト | 落ちたテスト（全部） |
 |---|---|---|---|
@@ -89,26 +91,31 @@ worktree のコピー（`503d3d7`）を 1 つずつ変異させ、`tests/test_ni
 | M13 ender を読まない | 6 failed | `test_parse_commands_ender_full[ender]`（落ちた） | `test_parse_commands_ender_full[ender]`<br>`test_parse_commands_ender_full[both]`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_ender_keeps_width_resize` |
 | M14 full を読まない | 6 failed | `test_parse_commands_ender_full[full-upper]`（落ちた） | `test_parse_commands_ender_full[full-upper]`<br>`test_parse_commands_ender_full[both]`<br>`test_measure_comment_full_width_limit[full-under683]`<br>`test_measure_comment_full_width_limit[full-over683]`<br>`test_measure_comment_full_limit_divided_by_font_scale`<br>`test_measure_comment_full_with_line_break_resize_uses_683` |
 | M15 流れるコメントにも full の上限で横の縮小 | 6 failed | `test_convert_full_does_not_change_naka`（落ちた） | `test_resize_not_applied_to_naka`<br>`test_convert_output_unchanged_where_no_pseudo_bold[macos]`<br>`test_convert_output_unchanged_where_no_pseudo_bold[other]`<br>`test_convert_output_unchanged_where_no_pseudo_bold[windows-gothic]`<br>`test_convert_full_does_not_change_naka`<br>`test_convert_output_unchanged_without_multiline_ender_full_windows` |
+| M16 閾値を 1 ずつ下げる（big 2 / medium 4 / small 6） | 3 failed | `test_measure_comment_no_line_break_resize_below_threshold[small]`（落ちた） | `test_measure_comment_no_line_break_resize_below_threshold[big]`<br>`test_measure_comment_no_line_break_resize_below_threshold[medium]`<br>`test_measure_comment_no_line_break_resize_below_threshold[small]` |
 
 ## C6: `sm9560870` の焼きこみと Web（2026-11-15）
 
-- 焼きこみ: 実装（`503d3d7`）の `convert`（Windows の Pillow の測定・寸法・擬似ボールドの増分、1920 × 1080、不透明度 1.0、`random.Random(0)`）で、#388 の取得（230 件）から ASS を作り、黒地に libass で描いた（`frame388.py`）。インクの外接矩形と字の間隔は `cmp388.py`。
+- 焼きこみ: 実装（`503d3d7`。その後の変更は docs だけ）の `convert`（Windows の Pillow の測定・寸法・擬似ボールドの増分、1920 × 1080、不透明度 1.0、`random.Random(0)`）で、#388 の取得（230 件）から ASS を作り、黒地に libass で描いた（`frame388.py`）。インクの外接矩形と字の間隔は `cmp388.py`。
 - Web: 内蔵ブラウザ（Chromium 156、devicePixelRatio 1.5）のプレイヤーで、14 秒から再生し、18.301 / 23.204 / 29.905 秒にコメントの canvas（1365 × 768）を一時停止せずに写し取った。同じ判定（白 = RGB とも 200 超、cyan = R 120 未満・G / B 150 超、アルファ 128 超）で、1920 × 1080 に換算した。
 
 | 時刻・コメント | 種類 | Web | 焼きこみ |
 |---|---|---|---|
 | 18.3 秒「＜ああああああ」（上） | `ue medium`・13 行（15.45 秒開始。複数行の縮小） | x 925.5〜1192.8、y 396.7〜431.8 | x 926〜1196、y 398〜432 |
 | 18.3 秒「＜ああああああ」（下） | `ue medium`・12 行（17.76 秒開始。複数行の縮小） | x 827.1〜1094.3、y 603.4〜638.6 | x 825〜1094、y 590〜625 |
-| 29.9 秒「真夏の夜の淫夢」 | `ue big ender full`・10 行のコメントアート（上限 683 で横の縮小） | x 580.9〜1337.7、y 527.5〜627.3 | x 580〜1337、y 530〜629 |
+| 29.9 秒「真夏の夜の淫夢」 | `ue big ender full`・10 行のコメントアート（舞台の幅 273 で上限に届かず、横の縮小は起きない） | x 580.9〜1337.7、y 527.5〜627.3 | x 580〜1337、y 530〜629 |
 | 29.9 秒の投稿コメント | `ue medium`・5 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 64.7（中央値。1 行目は画面の両端からはみ出す） | 64.59（平均。同じく両端からはみ出す） |
 | 23.2 秒「あ」40 字 × 5 段 | 1 行の `ue medium` が 5 件（横の縮小で font_px 12 ほど） | 字の間隔 33.76、x 286.9〜1630.2 | 34.56（+2.4%）、x 272〜1645 |
-| 42.17 秒の投稿コメント | `ue big`・3 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 32.674（舞台） | 32.672（予測。「設計レビューと…」） |
+| 42.17 秒の投稿コメント | `ue big`・3 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 32.674（舞台） | 32.672（「設計レビューと…」の予測。実装の `measure_comment` も文字サイズ 43.44・font_px 34・幅 915 で予測と同じ） |
+| 23.2 秒「アンインストール」 | 22.58 秒の `ue big ender full`・10 行のコメントアート（文字は 6 行目） | x 535.9〜1389.7、上端 y 533.1 | x 536〜1390、上端 y 535 |
+| 79.4 秒の白いブロック 3 本 | 78.83 秒の `ue white big mincho full`・1 行 × 3 件（縮小前の舞台の幅は 1,560。`full` で上限 683 に合わせて 680（font_px 17）、`full` が無ければ上限 512 に合わせて 480（font_px 12）になる。実装の `measure_comment` で計算） | y 828.5〜852.4 / 860.8〜884.7 / 894.6〜917.1、x 423.4〜1763.9 / 〜1713.2 / 〜1637.3 | y 830〜853 / 862〜886 / 895〜918、x 424〜1764 / 〜1713 / 〜1637 |
 
-- 複数行の縮小（18.3 秒）、`full` の上限 683（29.9 秒の cyan）、2 つの縮小が両方かかるとき（29.9 秒・42.17 秒）は、幅と字の間隔が Web と 1% 以内で合った。
+- 複数行の縮小（18.3 秒）、`full`（79.4 秒の白いブロック）、2 つの縮小が両方かかるとき（29.9 秒・42.17 秒）、`ender` のコメントアート（23.2 秒・29.9 秒）は、幅と字の間隔が Web とおよそ 1% 以内（最大は 18.3 秒の上の行の幅 267.3 と 270 で 1.01%）で合った。
+- 行の高さ: 文字のある行が 2 行目以降のコメントでは、文字の上端の y が行の高さ × 行の番号で決まる。18.3 秒の上の行（13 行のうち 8 行目、複数行の縮小の行の高さ 15.02、キャンバスで 1 行 42.2 px）の上端は Web 396.7 / 焼きこみ 398、23.2 秒の「アンインストール」（10 行のうち 6 行目、`ender` で縮小前の行の高さ 45.24、1 行 127.2 px）の上端は Web 533.1 / 焼きこみ 535 で、差は 1.3 px と 1.9 px。行の高さが 1% 違えば、前者で約 3 px、後者で約 6 px ずれる位置。どちらも上固定で、コメントの上端が同じ位置にあるとみなした比較。
 - 違い 1: 18.3 秒の下の「＜ああ」（17.76 秒開始）は、焼きこみの y が Web より 13 px 上。原因は調べていない（分からない）。コメントの対応は、焼きこみの ASS の `Dialogue` の開始時刻と `\pos` で確かめた（`at388.py`）。
 - 違い 2: 29.9 秒の投稿コメントの縦位置は、Web が上端、焼きこみが y 687。乱数の種を変えると y が 687 / 357 / 26 と動く（`seed388.py`）ので、行が埋まったときのランダム配置で、Web（種の無い乱数）とは原理的に一致しない。
 - 違い 3: 23.2 秒の 1 行のコメントの字の間隔が 2.4% 広い。#388 の変更の対象外（1 行のコメントの横の縮小、#387 の経路）。字の大きさが 12px ほどで、Chrome が 22px 以下で幅を 1 字ずつ整数に丸めること（#391 で再現しないと決めた限界）で説明できる差と見ているが、確かめていない。
-- 22.58 秒の「アンインストール」（赤）は、canvas で色の判定に当たらなかった（暗い）ので数値では比べていない。目視では位置と大きさは同じ。
+- 22.58 秒の「アンインストール」は重なった色（赤・黒・cyan）が暗く、色の判定には当たらなかったので、いずれかの色が 60 を超える画素で、「＜ああ」と重ならない y 480〜600 の範囲の外接矩形を比べた（`art388.py`、Web は同じ判定の JS）。
+- 追加の撮り直し（evaluator 1 巡目の指摘を受けて、2026-11-15）: Web は 73 秒から再生し、79.446 秒に canvas を写し取った。白いインクを横帯に区切って比べた（`bands388.py`、Web は同じ判定の JS）。焼きこみは同じ時刻を `frame388.py` で描いた。
 
 ## プローブの本文
 
@@ -327,7 +334,7 @@ for size, body in (("big", "あ" * 28 + "\nあ\nあ"), ("medium", "あ" * 40 + "
 
 </details>
 
-<details><summary>mutate388.py（変異 → red（C7）、<code>2e666b8708e4db964aa1d0aec85a143bbf2cc3c9</code>）</summary>
+<details><summary>mutate388.py（変異 → red（C7）、<code>f7f814d86976ac36e082ff5ace188bcc6107a220</code>）</summary>
 
 ```python
 """#388 の変異 → red。worktree のコピーを変異させ、落ちたテスト名を集める。
@@ -392,6 +399,9 @@ MUTANTS = [
      "if cmd.loc != \"naka\" and max_width * font_scale > width_limit:",
      "if max_width * font_scale > width_limit:",
      "test_convert_full_does_not_change_naka"),
+    ("M16 閾値を 1 ずつ下げる（big 2 / medium 4 / small 6）", F,
+     '_LINE_BREAK_COUNT = {"big": 3, "medium": 5, "small": 7}', '_LINE_BREAK_COUNT = {"big": 2, "medium": 4, "small": 6}',
+     "test_measure_comment_no_line_break_resize_below_threshold[small]"),
 ]
 
 
@@ -706,13 +716,69 @@ for line in ass.splitlines():
 
 </details>
 
+<details><summary>bands388.py（C6 の横帯（79.4 秒）、<code>957dc980da6c13a60734219e7e16aa5e6698f7c6</code>）</summary>
+
+```python
+"""C6: 焼きこみの PNG（1920x1080）の白いインクを、横帯ごとに (y0, y1, x0, x1) で出す（Web の canvas と同じ判定）。"""
+
+import sys
+
+from PIL import Image
+
+img = Image.open(sys.argv[1]).convert("RGB")
+px = img.load()
+W, H = img.size
+bands, cur = [], None
+for y in range(H):
+    xs = [x for x in range(W) if min(px[x, y]) > 200]
+    if xs:
+        if cur is None:
+            cur = [y, y, xs[0], xs[-1]]
+        else:
+            cur[1] = y
+            cur[2] = min(cur[2], xs[0])
+            cur[3] = max(cur[3], xs[-1])
+    elif cur is not None:
+        bands.append(cur)
+        cur = None
+if cur is not None:
+    bands.append(cur)
+for b in bands:
+    print(b)
+```
+
+</details>
+
+<details><summary>art388.py（C6 のコメントアート（23.2 秒）、<code>c213e7340249e76f4f46a0a19890539e20f9700a</code>）</summary>
+
+```python
+"""C6: 22.58 秒のコメントアート（10 行、6 行目に文字）のインクの外接矩形（いずれかの色が 60 超、y 480-600）。"""
+
+import sys
+
+from PIL import Image
+
+img = Image.open(sys.argv[1]).convert("RGB")
+px = img.load()
+xs, ys = [], []
+for y in range(480, 600):
+    for x in range(300, 1700):
+        if max(px[x, y]) > 60:
+            xs.append(x)
+            ys.append(y)
+print(min(xs), max(xs), min(ys), max(ys))
+```
+
+</details>
+
 ## 訂正ログ
 
 | 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
 |---|---|---|---|
+| 2026-11-15 | C6 の表と進捗に、29.9 秒の「真夏の夜の淫夢」を「上限 683 で横の縮小」とし、`full` の Web での確認として書いた | このコメントは舞台の幅 273 で上限に届かず、`full` は効いていない。`full` が効くのは 78.83 秒の 3 件で、79.4 秒で比べ直した | `pick388.py` が出した幅はキャンバスの単位（`Measured.width`）で、舞台の単位と読み違えた。単位を出力に書くか、上限と比べる値（舞台の幅）を出していれば捕まえた（evaluator 1 巡目） |
 
 ## 次にやること
 
 C1〜C8 は証跡つきで完了。次は `/verify-gate`（verify → docs-check → evaluator）→ PR。
 
-訂正ログ: 0 件
+訂正ログ: 1 件
