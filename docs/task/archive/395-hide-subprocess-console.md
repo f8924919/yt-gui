@@ -1,7 +1,7 @@
 # Windows の配布用ビルドで外部プログラムの起動時にコンソールウィンドウを出さない
 
 > Issue: [#395](https://github.com/f8924919/yt-gui/issues/395)
-> ステータス: 進行中
+> ステータス: 完了（PR #396）
 > ブランチ: `bugfix/395-hide-subprocess-console`
 > 基点: `3922cdd`
 
@@ -20,7 +20,7 @@
 - [x] C1 起動を `_run_external` にまとめ、win32 では `creationflags=0x08000000` を単独で、他の OS では渡さない — 証跡: `test_run_external_hides_console_only_on_windows`（win32 / darwin / linux。渡った引数を等値で比べる）。既存の 5 経路のテストも green（949 passed、skip 0。8acc8fc）。変異 M1〜M3
 - [x] C2 `yt_gui/` で起動関数を直接呼ぶのが `_run_external` の中だけ（ast で読むテスト） — 証跡: `test_external_programs_are_started_only_via_run_external`（`yt_gui/**/*.py` を ast で読み、`subprocess.run/Popen/call/check_call/check_output`・`os.system/popen`・`from subprocess import …` を拾う）。変異 M4・M5
 - [x] C3 コンソールを持たない親から `_run_external` で起動した子がウィンドウを持たない（Windows でだけ走るテスト。対照が 0 なら skip） — 証跡: `test_run_external_child_has_no_console_window_from_gui_parent`（このセッションで skip されずに pass。`-rs` の出力に SKIPPED なし）。変異 M1・M2
-- [ ] C4 配布用のビルドの焼きこみでウィンドウが開かない（ユーザーの目視） — 証跡: 未
+- [x] C4 配布用のビルドの焼きこみでウィンドウが開かない（ユーザーの目視） — 証跡: ユーザーが `dist/yt-gui/yt-gui.exe`（`24b3479` と同じコードで `uv run pyinstaller yt-gui.spec` したもの）でニコニコのコメントの焼きこみを実行し、「コマンドプロンプトは開いていないようです」と報告（2026-11-15）。修正前の対照はユーザーの最初の報告（焼きこみでウィンドウが開いた）。ほかの 4 経路は目視していない
 - [x] C5 arch に起動のしかたを書く — 証跡: `docs/arch/downloader.md` の「外部プログラムの起動（コンソールを出さない）」（8acc8fc）
 
 ## プローブ（2026-11-15、探索の段）
@@ -83,6 +83,6 @@ FAILED tests/test_downloader.py::test_external_programs_are_started_only_via_run
 
 ## 次にやること
 
-配布用のビルド（`dist/yt-gui/yt-gui.exe`、`24b3479` と同じコード）の焼きこみをユーザーに確かめてもらう（C4）→ arch の「未確認」を直す → archive/index.md に行を足す → PR。
+完了（PR #396）。
 
 訂正ログ: 0 件

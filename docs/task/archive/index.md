@@ -59,6 +59,7 @@
 | [249-parallel-filename-race.md](249-parallel-filename-race.md) | 並列 DL 時の同名ファイル衝突（TOCTOU レース）をパス予約方式で修正。`(n)` 決定を「存在 or 予約中」のロック内原子判定に変更・中間パスも単一 n で予約・try/finally で全経路解除・キャンセル掃除 glob を `stem + ".*"` に厳密化（design-review で発見した兄弟アイテム巻き込みも解消）（Issue #249 / PR #250） | 2026-07-13 |
 | [372-comment-font-ratio.md](372-comment-font-ratio.md) | コメント・弾幕の ASS フォントサイズを動画の高さに対する比率で決める（ニコニコ 0.09 / ビリビリ 0.045）。px 指定を倍率指定へ置き換え、映像「自動」でも実ダウンロードの解像度を使う。実動画と Web の見比べで比率を確定（Issue #372 / PR #374）。メトリクス: コミット 11（PR #374）・訂正ログ 0 件・evaluator 4 巡 | 2026-11-01 |
 | [373-bilibili-danmaku-decision.md](373-bilibili-danmaku-decision.md) | ビリビリの弾幕の取得元を Web と同じ窓口へ変える案を調査し、非公開 API への依存を避けるため実装を見送った。yt-dlp の XML のままとし、制約を spec に記載（Issue #373 / PR #376）。メトリクス: コミット 2（PR #376）・訂正ログ 0 件・evaluator 0 巡 | 2026-11-03 |
+| [395-hide-subprocess-console.md](395-hide-subprocess-console.md) | Windows の配布用ビルドで ffmpeg・danmaku2ass の起動時（焼きこみなど）にコンソールウィンドウが開く不具合を修正。5 か所の `subprocess.run` を `_run_external` にまとめ、win32 でだけ `CREATE_NO_WINDOW` を単独で付ける。直接の起動を ast で禁じるテストと、`pythonw` を親にした実プロセスのテストを足した（Issue #395 / PR #396）。メトリクス: コミット 4（PR #396）・訂正ログ 0 件・evaluator 1 巡 | 2026-11-15 |
 
 ## ニコニコ動画コメント取得
 
