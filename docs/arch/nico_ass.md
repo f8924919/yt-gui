@@ -40,7 +40,7 @@
 
 ## 文字サイズ
 
-- niconicomments の `charSize`、`lineHeight`、`fontSize`（CSS の `font-size` 相当）を、舞台の高さ 384 の単位で移植し、キャンバスへは `1920 / 683` 倍で換算する。倍率（`font_scale_percent`）はキャンバスの文字サイズに掛ける。幅の上限（512）の判定は倍率を掛けた後の幅で行う。
+- niconicomments の `charSize`、`lineHeight`、`fontSize`（CSS の `font-size` 相当）を、舞台の高さ 384 の単位で移植し、キャンバスへは `1920 / 683` 倍で換算する。倍率（`font_scale_percent`）はキャンバスの文字サイズに掛ける。幅の上限（512、`full` なら 683）の判定は倍率を掛けた後の幅で行う。
 - 幅は、測った文字サイズ（CSS の em）での幅とする。小さいサイズのヒンティングの丸めを避けるため、大きいサイズ（100px）で測って比例で縮める。
 - ASS の `Fontsize` は、描くフォントの `(usWinAscent + usWinDescent) / unitsPerEm` を em に掛けた値にする（libass はこの高さを `Fontsize` として扱う）。これで測った幅と描く幅が一致する（Windows・`bin/ffmpeg` の libass・Pillow 13 の 4 フォントで 0.2% 以内を確認。macOS は未確認。記録は[タスクメモ](../task/archive/387-nico-ass-converter.md)）。係数はフォントファイルの OS/2 表から読む。フォントが見つからないときは、#372 の比率（`medium` で動画の高さの 0.09）に戻す。
 - この換算はニコニコだけで、ビリビリは #372 の `_comment_font_size` のまま。
@@ -79,12 +79,12 @@ Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600
 niconicomments の `HTML5Comment.ts` の `measureText`（`isLineBreakResize` の分岐）、`_measureComment`、`_processResizeX` の `resizedY` の分岐を移植する（[#388](https://github.com/f8924919/yt-gui/issues/388)）。単位は舞台。
 
 - **行数**: `_body_lines` の行の数（16,384 文字・256 行で切った後の改行の数 + 1。niconicomments の `clampHTML5Content` と同じ）。
-- **複数行の縮小**（`resizedY`）: 行数が big 3 / medium 5 / small 7（`lineBreakCount`）以上で、`ender` の無いコメント。行の高さを `resized_line_height(size) = (384 - char_size(size) × default / resized) / (resized - 1)`（`resized` は `html5LineCounts.resized` の big 16 / medium 25.4 / small 38、`default` は既存の行数）にし、文字サイズを `char_size(size) × resized_line_height(size) / line_height(size)` にする。流れるコメントにも効く。niconicomments がここで設定する `fontSize.resized` は、幅の測定にも描画にも使われない（文字サイズから `font_size_and_scale` で出し直す）ので扱わない。
+- **複数行の縮小**（`resizedY`）: 行数が big 3 / medium 5 / small 7（`lineBreakCount`）以上で、`ender` の無いコメント。行の高さを `(384 - char_size(size) × default / resized) / (resized - 1)`（`resized` は `html5LineCounts.resized` の big 16 / medium 25.4 / small 38、`default` は既存の行数）にし、文字サイズを `char_size(size) × 新しい行の高さ / line_height(size)` にする。流れるコメントにも効く。niconicomments がここで設定する `fontSize.resized` は、幅の測定にも描画にも使われない（文字サイズから `font_size_and_scale` で出し直す）ので扱わない。big は設定値 19.5 と、文字サイズから出し直した値 20 が違うが、niconicomments が使うのは後者。
 - **幅の上限**: 512（`commentStageSize.width`）、`full` なら 683（`fullWidth`。キャンバスでは `683 × 1920 / 683` = 1920 で、画面の全幅）。`font_scale` で割る扱いは同じ。上限を使うのは上下固定の縮小の判定だけで、流れるコメントは `full` の有無で変わらない。
 - **上下固定の縮小**（`_resize_x`）: 測り始めの文字サイズと行の高さは、複数行の縮小の後の値。`resizedY` のときは次の 2 か所が変わる（`resizedY` でないときは #387 のまま）。
   - 文字サイズを 1 ずつ動かす経路（縮小の比を掛けた文字サイズが 1 以上）: 求めた文字サイズ `r` から、比 `r / 測り始めの文字サイズ` を、`resizedY` でない基準の `char_size(size)` と `line_height(size)` に掛けた値を結果にする。経路の中の測定は `r` のまま（niconicomments と同じ）。
-  - 二分探索の経路（1 未満）: 候補 `n` の測定を `(n / 測り始めの文字サイズ) × char_size(size)` で行い、結果も同じ比を基準の文字サイズと行の高さに掛けた値にする。
-  - どちらも niconicomments の式どおりで、結果の幅が上限を超えることもある（直さない）。
+  - 二分探索の経路（1 未満）: 候補 `n` の測定を `(max(1e-6, n) / 測り始めの文字サイズ) × char_size(size)` で行い、結果も同じ比を基準の文字サイズと行の高さに掛けた値にする。
+  - 結果: 1 ずつ動かす経路は、幅を上限に合わせた比を `resizedY` でない基準に掛けるので、複数行の縮小を取り消したような大きさになり、幅は上限のおよそ 1.8〜1.9 倍で画面からはみ出す。二分探索の経路は上限に収まる。どちらも niconicomments の式どおりで、Web（公式のプレイヤー）も前者と同じく描くことを、投稿したコメントで確かめた（[タスクメモ](../task/388-nico-resize-full-ender.md)）。
 - **`ender`**: 複数行の縮小だけを止める。上下固定の縮小は `ender` があっても働く。
 
 ## 処理の流れ
