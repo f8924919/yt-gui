@@ -599,9 +599,9 @@ class Downloader:
                 raise
 
             # 区間指定があれば、取得済みファイルからローカル ffmpeg で切り出す。
-            # （yt-dlp のネイティブ区間 DL は https/DASH で ffmpeg にネットワーク
-            #  取得を任せる経路となりバンドル ffmpeg では不安定なため、フル取得後
-            #  に切り出す。）
+            # （yt-dlp のネイティブ区間 DL は ffmpeg にネットワーク取得を任せる
+            #  経路となり、取得中は一時停止・中止・進捗が効かないため、フル取得後
+            #  に切り出す。理由は arch/downloader.md の「区間ダウンロード」。）
             # 時間範囲とチャプター名は排他（build_job_spec が保証）。万一両方
             # セットされても時間範囲を優先する。
             if job.section_start and job.section_end:
