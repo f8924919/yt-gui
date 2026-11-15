@@ -60,6 +60,22 @@ _THUMBNAIL_EMBED_CONTAINERS = frozenset(
 _DOWNLOAD_PROGRESS_RE = re.compile(r"\[download\]\s+\d")
 
 
+# Windows の CREATE_NO_WINDOW。Windows 以外の subprocess に属性が無いので値で書く
+_CREATE_NO_WINDOW = 0x08000000
+
+
+def _run_external(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """外部プログラム（ffmpeg・danmaku2ass）を起動する唯一の入口。
+
+    配布用のビルドはコンソールを持たない GUI アプリなので、Windows で指定なしに
+    コンソールプログラムを起動するとコンソールウィンドウが開く（#395）。Windows でだけ
+    `CREATE_NO_WINDOW` を単独で足す（`DETACHED_PROCESS` との併用は #253 で落ちた）。
+    """
+    if sys.platform == "win32":
+        kwargs["creationflags"] = _CREATE_NO_WINDOW
+    return subprocess.run(cmd, **kwargs)
+
+
 def _comment_font_size(lang: str, width: int, height: int, scale_percent: int) -> float:
     """コメント/弾幕の `danmaku2ass -fs` に渡す文字サイズを返す。
 
@@ -1066,7 +1082,7 @@ class Downloader:
             src_path,
         ]
         try:
-            subprocess.run(
+            _run_external(
                 cmd,
                 check=True,
                 capture_output=True,
@@ -1196,7 +1212,7 @@ class Downloader:
             job.section_force_keyframes,
         )
         try:
-            subprocess.run(
+            _run_external(
                 cmd,
                 check=True,
                 capture_output=True,
@@ -1302,7 +1318,7 @@ class Downloader:
                 drop_chapters=True,
             )
             try:
-                subprocess.run(
+                _run_external(
                     cmd,
                     check=True,
                     capture_output=True,
@@ -1383,7 +1399,7 @@ class Downloader:
             out_path,
         ]
         try:
-            subprocess.run(
+            _run_external(
                 cmd,
                 check=True,
                 capture_output=True,
@@ -1489,7 +1505,7 @@ class Downloader:
             self._ffmpeg_path, video_path, ass_value, out_path
         )
         try:
-            subprocess.run(
+            _run_external(
                 cmd,
                 check=True,
                 capture_output=True,

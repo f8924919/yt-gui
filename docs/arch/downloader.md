@@ -184,6 +184,16 @@ SponsorBlock 有効時は、上記の `FFmpegMetadata` / `EmbedThumbnail` の直
 - ログ（生成完了・スキップ・失敗）は i18n キー経由（`status_nico_hardsub_created` / `warn_nico_hardsub_skip_missing` / `warn_nico_hardsub_skip_no_ffmpeg` / `warn_nico_hardsub_failed`）
 - 失敗（ffmpeg 欠如・入力ファイル欠如・サブプロセス非 0 終了）はいずれも非致命でログのみ
 
+### 外部プログラムの起動（コンソールを出さない）
+
+danmaku2ass と ffmpeg（区間の切り出し・チャプターごとの切り出し・MKV 統合・焼きこみ）は、すべてモジュール関数 `_run_external(cmd, **kwargs)` から起動する。`subprocess.run` に引数をそのまま渡し、Windows（`sys.platform == "win32"`）でだけ `creationflags=_CREATE_NO_WINDOW`（`0x08000000`）を足す。
+
+- 理由: 配布用のビルドはコンソールを持たない GUI アプリ（`yt-gui.spec` の `console=False`）なので、コンソールプログラムを指定なしで起動すると Windows が新しいコンソールウィンドウを開く（#395）。開発時（`uv run python -m yt_gui`）は親がコンソールを持つので起きない。yt-dlp が自分で ffmpeg を呼ぶときは、yt-dlp の `Popen` が `STARTUPINFO` でウィンドウを隠している。
+- `CREATE_NO_WINDOW` は単独で使う。自己更新（#253、撤去済み）では `DETACHED_PROCESS` と併用して PowerShell が起動直後に落ちた。
+- 定数は `subprocess.CREATE_NO_WINDOW` ではなく値を直書きする（Windows 以外の `subprocess` にはこの属性が無く、テストで `sys.platform` を差し替えて確かめるため）。
+- `yt_gui/` で `subprocess` の起動関数（`run` / `Popen` / `call` / `check_call` / `check_output`）と `os.system` / `os.popen` を呼べるのは `_run_external` の中だけ。`tests/test_downloader.py` のテストがソースを `ast` で読んで守る。
+- 確かめた範囲: コンソールを持たない親（`pythonw.exe`）から起動した子が、コンソールのウィンドウを持たないこと（Windows でだけ走るテスト）と、配布用のビルド（Windows）の焼きこみでコマンドプロンプトのウィンドウが開かないこと（ユーザーの目視、2026-11-15）。ほかの 4 つの経路は一瞬で終わるので目視しておらず、同じ関数を通ることで担保している。
+
 ### バイナリパス解決
 
 | バイナリ | パス |
