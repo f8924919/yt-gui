@@ -21,11 +21,11 @@
 
 テストは次の関数を直接呼ぶ。単位は、`stage` が舞台（高さ 384）、`canvas` がキャンバス（1920 × 1080）。
 
-- `parse_commands(commands, body, is_premium) -> Command`。`Command(loc, size, color, font, long, live, invisible)`。`loc` は `naka` / `ue` / `shita`、`size` は `big` / `medium` / `small`、`font` は `defont` / `gothic` / `mincho`（`gulim` / `simsun` は `defont`）、`long` は vpos 単位の整数、`color` は niconicomments と同じく大文字の文字列（色名は表の値、`#RGB` は `#RGB` のまま）。既定は `naka` / `medium` / `#FFFFFF` / `defont` / 300。
+- `parse_commands(commands, body, is_premium) -> Command`。`Command(loc, size, color, font, long, live, invisible, ender, full)`。`ender` / `full` はコマンドに含まれれば真（大文字小文字は区別しない）。`loc` は `naka` / `ue` / `shita`、`size` は `big` / `medium` / `small`、`font` は `defont` / `gothic` / `mincho`（`gulim` / `simsun` は `defont`）、`long` は vpos 単位の整数、`color` は niconicomments と同じく大文字の文字列（色名は表の値、`#RGB` は `#RGB` のまま）。既定は `naka` / `medium` / `#FFFFFF` / `defont` / 300。
 - `ass_color(color) -> str`: `&HBBGGRR&`。`#RGB` は各桁を 2 回並べて広げ、16 進として読めない値は白。
 - `char_size(size)` / `line_height(size)`: 舞台の単位。`char_size = 384 / doubleResized`、`line_height = (384 - char_size) / (default - 1)`。
 - `font_size_and_scale(char_size) -> (font_px, scale)`: niconicomments の `getFontSizeAndScale`。`char_size × 0.8` が 10 未満なら `(10, floor(char_size × 0.8) / 10)`（1 未満は floor しない）、それ以外は `(floor(char_size × 0.8), 1)`。
-- `measure_comment(lines, cmd, *, platform, measure, advance, font_scale) -> Measured`: 行ごとの幅（舞台の単位、`ceil((送り幅 + 増分)の合計 × scale)`）を測り、上下固定の縮小を行う。`Measured(char_size, line_height, font_px, scale, line_widths, width, height)` の `width` / `height` はキャンバスの単位（舞台の値 × `1920 / 683` × `font_scale`）。`font_scale` は `font_scale_percent / 100`。縮小の判定は「舞台の幅 × `font_scale` > 512」。
+- `measure_comment(lines, cmd, *, platform, measure, advance, font_scale) -> Measured`: 行ごとの幅（舞台の単位、`ceil((送り幅 + 増分)の合計 × scale)`）を測り、複数行の縮小と上下固定の縮小を行う（下の「複数行の縮小と `ender` / `full`」）。`Measured(char_size, line_height, font_px, scale, line_widths, width, height)` の `width` / `height` はキャンバスの単位（舞台の値 × `1920 / 683` × `font_scale`）。`font_scale` は `font_scale_percent / 100`。上下固定の縮小の判定は「舞台の幅 × `font_scale` > 幅の上限」（上限は 512、`full` なら 683）。
 - `naka_speed(width, long)` / `naka_x(width, long, elapsed)`: キャンバスの単位。`elapsed` は `vpos` からの経過。
 - `layout(items, rng) -> list[float]`: `LayoutItem(loc, vpos, long, width, height, commands)`（キャンバスの単位、`commands` は元のコマンドの列）の並びに、キャンバスの `posY` を返す。`shita` の `posY` は下からの距離（niconicomments と同じ）。乱数は `floor(rng.random() × (1080 - height))` で引く。
 ## 座標系
@@ -74,12 +74,25 @@ Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600
 - **再現しないもの**: 22px 以下では、太さ 400 の送り幅も Chrome が 1 字ずつ整数に丸める（ヒンティング）。ふつうの文で 0.1% 程度、半角カナ・句読点だけの文字列では ±2〜7% ずれるが、再現しない。
 - **MS PGothic に無い字**: 絵文字・ハングルの埋め字（U+3164 など）・点字の空白（U+2800）などは、Chrome が別のフォントで描き、増分はそのフォントによる（実測では 0。CJK 拡張 B の字は増える）。これらはもともとフォントが違うので幅が合っておらず、増分も区別しない（MS PGothic の字と同じ規則を当てる）。
 
+## 複数行の縮小と `ender` / `full`
+
+niconicomments の `HTML5Comment.ts` の `measureText`（`isLineBreakResize` の分岐）、`_measureComment`、`_processResizeX` の `resizedY` の分岐を移植する（[#388](https://github.com/f8924919/yt-gui/issues/388)）。単位は舞台。
+
+- **行数**: `_body_lines` の行の数（16,384 文字・256 行で切った後の改行の数 + 1。niconicomments の `clampHTML5Content` と同じ）。
+- **複数行の縮小**（`resizedY`）: 行数が big 3 / medium 5 / small 7（`lineBreakCount`）以上で、`ender` の無いコメント。行の高さを `resized_line_height(size) = (384 - char_size(size) × default / resized) / (resized - 1)`（`resized` は `html5LineCounts.resized` の big 16 / medium 25.4 / small 38、`default` は既存の行数）にし、文字サイズを `char_size(size) × resized_line_height(size) / line_height(size)` にする。流れるコメントにも効く。niconicomments がここで設定する `fontSize.resized` は、幅の測定にも描画にも使われない（文字サイズから `font_size_and_scale` で出し直す）ので扱わない。
+- **幅の上限**: 512（`commentStageSize.width`）、`full` なら 683（`fullWidth`。キャンバスでは `683 × 1920 / 683` = 1920 で、画面の全幅）。`font_scale` で割る扱いは同じ。上限を使うのは上下固定の縮小の判定だけで、流れるコメントは `full` の有無で変わらない。
+- **上下固定の縮小**（`_resize_x`）: 測り始めの文字サイズと行の高さは、複数行の縮小の後の値。`resizedY` のときは次の 2 か所が変わる（`resizedY` でないときは #387 のまま）。
+  - 文字サイズを 1 ずつ動かす経路（縮小の比を掛けた文字サイズが 1 以上）: 求めた文字サイズ `r` から、比 `r / 測り始めの文字サイズ` を、`resizedY` でない基準の `char_size(size)` と `line_height(size)` に掛けた値を結果にする。経路の中の測定は `r` のまま（niconicomments と同じ）。
+  - 二分探索の経路（1 未満）: 候補 `n` の測定を `(n / 測り始めの文字サイズ) × char_size(size)` で行い、結果も同じ比を基準の文字サイズと行の高さに掛けた値にする。
+  - どちらも niconicomments の式どおりで、結果の幅が上限を超えることもある（直さない）。
+- **`ender`**: 複数行の縮小だけを止める。上下固定の縮小は `ender` があっても働く。
+
 ## 処理の流れ
 
 1. **入力の解釈**: `body`、`commands`、`vposMs`、`isPremium`、`postedAt` を読む。型が合わないコメントと `postedAt` が読めないコメントは飛ばして数える。並びは `vpos`、`postedAt`（秒に切り捨てた UNIX 時刻。負は読めないものとして飛ばす）の昇順（niconicomments と同じ）で、それも同じなら入力の順。`invisible` のコメントは配置にも出力にも使わない。
 2. **コマンドの解釈**（`parse_commands`）: 小文字にしてから判定する。位置・大きさ・色・フォントは先に出たものが勝ち、`@秒数` は後に出たものが勝つ（niconicomments と同じ）。`#RRGGBB` / `#RGB` は `isPremium` が真のときだけ枠を取る。正規表現に合っても色として不正な値は白。`gulim` / `simsun` はフォントの枠を取り、`defont` として描く。`invisible` と本文が `/` で始まるものは出力しない。未知のコマンドと `nico:` で始まるものは無視する。
 3. **大きさと幅**: 上記の文字サイズで行ごとに幅を測り、最大の行幅をコメントの幅にする。
-4. **上下固定の縮小**: 幅が上限を超えた `ue` / `shita` は、niconicomments の `_processResizeX` と同じく文字サイズを調整する（調整は最大 20 回）。
+4. **縮小**: 行数の多いコメントは、文字サイズと行の高さを複数行用の値に切り替える。そのうえで幅が上限を超えた `ue` / `shita` は、niconicomments の `_processResizeX` と同じく文字サイズを調整する（調整は最大 20 回）。下の「複数行の縮小と `ender` / `full`」。
 5. **配置**（`layout`）: niconicomments の衝突判定を移植する。流れるコメントは左右の判定線（登録は余白 5 を含み、照会は含まない。5 vpos 刻み）と、長さの異なるコメントどうしの軌跡の交差。固定コメントは位置ごとに `long - 20` まで。行が足りないときは `rng` でランダムな位置に置く。乱数を引く回数と順序も niconicomments に合わせ、同じシードなら同じ位置になる。`posY` が負の相手は判定から外す。
 6. **ASS の生成**: 1 行を 1 つの `Dialogue` にし（`\N` は使わない）、下の「行の置き方」で位置を決める。流れるコメントは `\move`、固定は `\pos`。
 
@@ -121,7 +134,9 @@ Windows の Chrome は、太字の書体を持たない MS PGothic を太さ 600
 
 ## 対象外
 
-複数行の縮小、`full` / `ender`、コメントアート、2017-07-12 より前の古い描画方式（#388）。投稿者コメントとニコスクリプト、横位置の反転、`nico:` の拡張コマンド。
+- 2017-07-12 より前のコメントの古い描画方式（niconicomments の `FlashComment`。フォント指定の無い古いコメントが対象）。yt-dlp が取るコメントには、この日付より前のものが出てこなかった（2 本の動画で最古が 2018〜2019 年。[#388](https://github.com/f8924919/yt-gui/issues/388) のタスクメモ）。
+- コメントアートの層の分離（niconicomments の `changeCALayer`）。niconicomments の既定（`keepCA: false`）では動かないので、Web の既定に合わせて扱わない。
+- 投稿者コメントとニコスクリプト、横位置の反転、`nico:` の拡張コマンド、枠・縁の色のコマンド。
 
 ## ライセンス
 

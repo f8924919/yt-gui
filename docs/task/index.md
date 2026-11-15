@@ -16,6 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
+| [388-nico-resize-full-ender.md](388-nico-resize-full-ender.md) | 進行中 | ニコニコのコメントの複数行の自動縮小と ender / full を再現する（#388） | 2026-11-15 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
@@ -29,4 +30,3 @@
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
 | [#84](https://github.com/f8924919/yt-gui/issues/84) | 区間ダウンロード: ネイティブ `download_ranges` 経路のハング解消（通信量節約版）の検討 | [archive/81-download-sections.md](archive/81-download-sections.md) |
-| [#388](https://github.com/f8924919/yt-gui/issues/388) | ニコニコのコメントの自動縮小、ender / full、コメントアートを再現する（#387 の後） | [archive/372-comment-font-ratio.md](archive/372-comment-font-ratio.md) |
