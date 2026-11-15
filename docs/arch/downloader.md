@@ -231,7 +231,13 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
 
 ### 区間ダウンロード
 
-指定区間だけを取得する機能だが、**yt-dlp のネイティブ区間 DL（`download_ranges`）は使わない**。`download_ranges` は YouTube の `https` / DASH フォーマットでは部分取得を `FFmpegFD`（ffmpeg にネットワークから直接取得させる経路）に委ねるが、バンドル ffmpeg のネットワーク入力は不安定で、環境によってクラッシュ / ハングするため。
+指定区間だけを取得する機能だが、**yt-dlp のネイティブ区間 DL（`download_ranges`）は使わない**（#81 で決め、#84 で再検討して確定）。理由は次のとおり（yt-dlp 2026.10.26 のソースで確認）。
+
+- 区間指定があると、yt-dlp は `FFmpegFD`（ffmpeg にネットワークから直接取得させる経路）を選ぶ（`yt_dlp/downloader/__init__.py` の `_get_suitable_downloader`）。ほかのダウンローダで区間だけを取る経路は無く、`FFmpegFD` を使えなければ中止する（`YoutubeDL.process_info`）。
+- `FFmpegFD` は ffmpeg の終了を待つだけで、進捗フックは終わったときの 1 回しか呼ばない（`yt_dlp/downloader/external.py` の `FFmpegFD._call_downloader` と `ExternalFD.real_download`）。一時停止・中止は `_progress_hook` で `DownloadCancelled` を投げる仕組みなので、区間の取得中は効かず、ffmpeg が止まると中止もできない。
+- `FFmpegFD` が使えるかの判定は params の `ffmpeg_location` を見ず、contextvar（`FFmpegPostProcessor._ffmpeg_location`。CLI だけが設定する）だけを見る。API から使うには、ffmpeg の場所をワーカースレッドで設定する回避策が要る。
+
+#81 当時の同梱 ffmpeg では、この経路がクラッシュ / ハングした。ffmpeg の更新後の試行（取得速度・成否）は [タスクメモ #84](../task/archive/84-native-download-ranges.md) にある。
 
 代わりに **フル取得 → ローカル ffmpeg 切り出し** の 2 段構えで実装する。
 
@@ -242,7 +248,7 @@ PyInstaller バンドル時は `sys._MEIPASS` 直下、開発時は `bin/` サ�
   - `force_keyframes=True`: `-i infile -ss start -to end`（再エンコード）。出力側シークで指定時刻に正確だが遅い。
 - 一時ファイル `{stem}.section{final_ext}` に書き出し、成功時のみ `os.replace` で原本へ上書きする。前提ファイル不在・ffmpeg 欠如・切り出し失敗はいずれも**非致命**としてログのみ残し、フル動画は保持する。
 - 区間は動画固有・形式非依存の実行設定なので、`Downloader` のインスタンス状態ではなくキューアイテムの `JobSpec`（`section_start` / `section_end` / `section_chapter_regex` / `section_force_keyframes`）に持つ。プレイリストへの適用は UI 側（`App`）で取得後に弾く（[メインウィンドウ — 区間指定フィールド](../spec/screens/main-window.md#区間指定フィールドダウンロード範囲)）ため、downloader 側は単一動画前提でよい。
-- **トレードオフ**: フル動画をダウンロードしてから切り出すため**通信量の節約にはならない**。出力は区間クリップだが、取得量は動画全体。これは安定性（ネットワーク ffmpeg を避ける）を優先した結果。
+- **トレードオフ**: フル動画をダウンロードしてから切り出すため**通信量の節約にはならない**。出力は区間クリップだが、取得量は動画全体。これは安定性と、一時停止・中止・進捗が効くこと（ネットワーク ffmpeg を避ける）を優先した結果。
 
 #### チャプター名指定（#83）
 

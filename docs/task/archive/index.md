@@ -39,6 +39,7 @@
 | [app-update-phase-b.md](app-update-phase-b.md) | アプリ更新 Phase B の方式設計を確定する調査タスク。追加調査で tufup を棄却（timestamp 失効・鍵管理・macOS 非対応）し、自前アップデータ（Releases ＋ Sigstore attestation のアプリ内検証）・Windows 先行・手動適用を決定。design-review 反映の設計詳細を research/app-update.md に記録し、実装 Issue #252（B-1: コア PoC）/ #253（B-2: 差し替え・UI）を起票 | 2026-07-16 |
 | [252-self-update-core.md](252-self-update-core.md) | アプリ更新 Phase B-1: 実体更新コア `self_update.py` を新規実装（DL 進捗/キャンセル・attestation の fail-closed 検証・zip slip 対策付き展開・正規化結果型・sigstore 遅延 import）。PoC で sigstore の PyInstaller 同梱（+21.4 MB）・オフライン検証・実リリース E2E の成立を確認し、identity ピンを refs/heads/main 固定に修正（Issue #252） | 2026-07-16 |
 | [253-self-update-apply.md](253-self-update-apply.md) | アプリ更新 Phase B-2: Windows 実体更新の適用を実装。新版検出ダイアログに「更新して再起動」（プリフライト＋キュー実行中無効化）、モーダル進捗＋daemon ワーカー、差し替え PowerShell スクリプト（PID 名照合待機・指数バックオフ rename・.bak ロールバック・自己削除）、起動時の残骸掃除。実 PowerShell 実行テストと実リリース E2E（spawn フラグ不具合を検出・修正）で成立を確認（Issue #253 / PR #256） | 2026-07-17 |
+| [84-native-download-ranges.md](84-native-download-ranges.md) | 区間ダウンロードのネイティブ `download_ranges` 経路（通信量節約版）を再検討し、今のフル取得→ローカル ffmpeg 切り出しを正式採用として確定。旧 ffmpeg ではハングを再現しピン版 n9.0.2 では成功したが、取得中に一時停止・中止・進捗が効かず速度もビットレート並みのため不採用（ユーザー判断）。コード変更なし（Issue #84） メトリクス: コミット 1（PR #未定）・訂正ログ 0 件・evaluator 0 巡 | 2026-11-15 |
 
 ## バグ修正
 
@@ -202,7 +203,7 @@
 
 ### 区間ダウンロード
 
-[81-download-sections.md](81-download-sections.md) は ffmpeg による後処理切り出しで完了した。**ネイティブ `download_ranges` 経路はハングするため見送っており**、通信量を節約できる版の実現可否は [#84](https://github.com/f8924919/yt-gui/issues/84) に分離済み。着手時はまず当該タスクメモのハング再現条件から読み直すこと。
+[81-download-sections.md](81-download-sections.md) は ffmpeg による後処理切り出しで完了した。通信量を節約できるネイティブ `download_ranges` 経路は [84-native-download-ranges.md](84-native-download-ranges.md) で再検討し、**採用しないことを確定した**（取得中に一時停止・中止・進捗が効かない）。再検討するのは yt-dlp の `FFmpegFD` が取得中に進捗を返すようになったときで、そのときは同メモの試しの run（旧 ffmpeg との対照・速度・精度）から読み直すこと。
 
 ### 同梱バイナリのピン自動更新
 
