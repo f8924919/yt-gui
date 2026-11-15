@@ -37,7 +37,7 @@ flag 0
 | 変異 | 書き換え | 落ちたテスト |
 |---|---|---|
 | M1 | `kwargs["creationflags"] = _CREATE_NO_WINDOW` → `pass` | `hides_console_only_on_windows[win32]`、`child_has_no_console_window_from_gui_parent` |
-| M2 | `_CREATE_NO_WINDOW | 0x00000008`（`DETACHED_PROCESS` を併用） | 同上。実プロセスのテストは `{'control': '3345112', 'run_external': '3410648'}` で、併用すると子にウィンドウが付いた |
+| M2 | `_CREATE_NO_WINDOW \| 0x00000008`（`DETACHED_PROCESS` を併用） | 同上。実プロセスのテストは `{'control': '3345112', 'run_external': '3410648'}` で、併用すると子にウィンドウが付いた |
 | M3 | `if sys.platform == "win32":` → `if True:` | `hides_console_only_on_windows[darwin]`、`[linux]` |
 | M4 | 焼きこみの `_run_external(` を `subprocess.run(` に戻す | `started_only_via_run_external` |
 | M5 | `from subprocess import check_output` を足す | `started_only_via_run_external` |
