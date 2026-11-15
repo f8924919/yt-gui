@@ -107,7 +107,7 @@ worktree のコピー（`abb6d24`。`503d3d7` から `yt_gui` と `tests` は変
 | 23.2 秒「あ」40 字 × 5 段 | 1 行の `ue medium` が 5 件（横の縮小で font_px 12 ほど） | 字の間隔 33.76、x 286.9〜1630.2 | 34.56（+2.4%）、x 272〜1645 |
 | 42.17 秒の投稿コメント | `ue big`・3 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 32.674（舞台） | 32.672（「設計レビューと…」の予測。実装の `measure_comment` も文字サイズ 43.44・font_px 34・幅 915 で予測と同じ） |
 | 23.2 秒「アンインストール」 | 22.58 秒の `ue big ender full`・10 行のコメントアート（文字は 6 行目） | x 535.9〜1389.7、上端 y 533.1 | x 536〜1390、上端 y 535 |
-| 79.4 秒の白いブロック 3 本 | 78.83 秒の `ue white big mincho full`・1 行 × 3 件（縮小前の舞台の幅は 1,560。`full` で上限 683 に合わせて 680（font_px 17）、`full` が無ければ上限 512 に合わせて 480（font_px 12）になる。実装の `measure_comment` で計算） | y 828.5〜852.4 / 860.8〜884.7 / 894.6〜917.1、x 423.4〜1763.9 / 〜1713.2 / 〜1637.3 | y 830〜853 / 862〜886 / 895〜918、x 424〜1764 / 〜1713 / 〜1637 |
+| 79.4 秒の白いブロック 3 本 | 78.83 秒の `ue white big mincho full`・1 行 × 3 件（実際の本文（75 文字）から実装の `measure_comment` で計算すると、縮小前の舞台の幅は 2,899。`full` で上限 683 に合わせて 669（文字サイズ 11.599、font_px 10、scale 0.9）、`full` が無ければ上限 512 に合わせて 446（文字サイズ 8.695、font_px 10、scale 0.6）。`full388.py`） | y 828.5〜852.4 / 860.8〜884.7 / 894.6〜917.1、x 423.4〜1763.9 / 〜1713.2 / 〜1637.3 | y 830〜853 / 862〜886 / 895〜918、x 424〜1764 / 〜1713 / 〜1637 |
 
 - 複数行の縮小（18.3 秒）、`full`（79.4 秒の白いブロック）、2 つの縮小が両方かかるとき（29.9 秒・42.17 秒）、`ender` のコメントアート（23.2 秒・29.9 秒）は、幅と字の間隔が Web とおよそ 1% 以内（最大は 18.3 秒の上の行の幅 267.3 と 270 で 1.01%）で合った。
 - 行の高さ: 文字のある行が 2 行目以降のコメントでは、文字の上端の y が行の高さ × 行の番号で決まる。18.3 秒の上の行（13 行のうち 8 行目、複数行の縮小の行の高さ 15.02、キャンバスで 1 行 42.2 px）の上端は Web 396.7 / 焼きこみ 398、23.2 秒の「アンインストール」（10 行のうち 6 行目、`ender` で縮小前の行の高さ 45.24、1 行 127.2 px）の上端は Web 533.1 / 焼きこみ 535 で、差は 1.3 px と 1.9 px。行の高さが 1% 違えば、前者で約 3 px、後者で約 6 px ずれる位置。どちらも上固定で、コメントの上端が同じ位置にあるとみなした比較。
@@ -122,6 +122,7 @@ worktree のコピー（`abb6d24`。`503d3d7` から `yt_gui` と `tests` は変
 | 巡 | HEAD | verify | docs-check | evaluator |
 |---|---|---|---|---|
 | 1 | `abb6d24` | green（944 passed、skip 0） | 限定句 1 件（arch、直した） | FAIL（[欠陥] 2 / [証跡・文言] 3） |
+| 2 | `4765152` | green（944 passed） | —（docs だけの変更） | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 1。78.83 秒の数値の誤りで、この PR で直した。訂正ログ 2 件目で止まり、ユーザーに方針を確認した） |
 
 evaluator 1 巡目の指摘と閉じ方:
 
@@ -787,14 +788,61 @@ print(min(xs), max(xs), min(ys), max(ys))
 
 </details>
 
+<details><summary>full388.py（C6 の 78.83 秒の幅、<code>121bcd803e8ff74f17fb078beea38be6e00eb0b4</code>）</summary>
+
+```python
+"""78.83 秒の `ue white big mincho full` 3 件を、実際の本文で full あり / なし / 縮小前の幅を計算する。"""
+
+import json
+import sys
+
+sys.path.insert(0, r"C:\Users\f8924\Documents\claude\yt-gui")
+from yt_gui import nico_ass as n  # noqa: E402
+
+data = json.load(open(sys.argv[1], encoding="utf-8-sig"))
+rows = []
+
+
+def walk(o):
+    if isinstance(o, dict):
+        if "commands" in o and "body" in o:
+            rows.append(o)
+        else:
+            for v in o.values():
+                walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+
+
+walk(data)
+measure = n.pillow_measurer("windows")
+advance = n.pseudo_bold_advancer("windows")
+for r in rows:
+    if r["vposMs"] != 78830:
+        continue
+    lines = n._body_lines(r["body"])
+    print("本文の長さ", len(r["body"]), "行", len(lines))
+    for cmds in (r["commands"], [c for c in r["commands"] if c != "full"]):
+        cmd = n.parse_commands(cmds, r["body"], False)
+        m = n.measure_comment(lines, cmd, platform="windows", measure=measure, advance=advance, font_scale=1)
+        print("  full" if cmd.full else "  なし", round(m.char_size, 3), m.font_px, round(m.scale, 3), max(m.line_widths))
+    cmd = n.parse_commands(r["commands"], r["body"], False)._replace(loc="naka")
+    m = n.measure_comment(lines, cmd, platform="windows", measure=measure, advance=advance, font_scale=1)
+    print("  縮小前", max(m.line_widths))
+```
+
+</details>
+
 ## 訂正ログ
 
 | 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
 |---|---|---|---|
+| 2026-11-15 | C6 の表の 78.83 秒の行に、縮小前 1,560、`full` で 680（font_px 17）、無しで 480（font_px 12）と書いた | 実際の本文では縮小前 2,899、`full` で 669（font_px 10、scale 0.9）、無しで 446（font_px 10、scale 0.6） | 表示が途中で切れた本文から入力を組み立て直して計算した。実データを読むスクリプト（`full388.py`）の出力から転記すれば捕まえた（evaluator 2 巡目）。1 件目と同じく、数値を一次資料から出さずに書いた。以後、メモの数値は実データを読むスクリプトの出力だけから転記し、単位を出力に含める（ユーザー確認、2026-11-15） |
 | 2026-11-15 | C6 の表と進捗に、29.9 秒の「真夏の夜の淫夢」を「上限 683 で横の縮小」とし、`full` の Web での確認として書いた | このコメントは舞台の幅 273 で上限に届かず、`full` は効いていない。`full` が効くのは 78.83 秒の 3 件で、79.4 秒で比べ直した | `pick388.py` が出した幅はキャンバスの単位（`Measured.width`）で、舞台の単位と読み違えた。単位を出力に書くか、上限と比べる値（舞台の幅）を出していれば捕まえた（evaluator 1 巡目） |
 
 ## 次にやること
 
-C1〜C8 は証跡つきで完了。次は `/verify-gate`（verify → docs-check → evaluator）→ PR。
+C1〜C8 は証跡つきで完了し、evaluator は 2 巡目で PASS（follow-up あり。指摘 1 件はこの PR で直した）。次は PR。
 
-訂正ログ: 1 件
+訂正ログ: 2 件
