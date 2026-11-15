@@ -1,7 +1,7 @@
 # 区間ダウンロード: ネイティブ `download_ranges` 経路の再検討（通信量節約版は採用しない）
 
 > Issue: [#84](https://github.com/f8924919/yt-gui/issues/84)
-> ステータス: 完了（Issue の方向性のうち「現行の方式を正式採用として確定し、本 Issue をクローズする」を選んだ）
+> ステータス: 完了（PR #398。Issue の方向性のうち「現行の方式を正式採用として確定し、本 Issue をクローズする」を選んだ）
 > ブランチ: `docs/84-section-native-ranges-decision`
 > 基点: `63138b9`
 
