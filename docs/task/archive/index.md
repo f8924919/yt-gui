@@ -70,6 +70,7 @@
 | [niconico-comments-phase3.md](niconico-comments-phase3.md) | フェーズ 3: ffmpeg で動画 + ASS を MKV ソフトサブとして統合する | 2026-05-24 |
 | [387-nico-ass-converter.md](387-nico-ass-converter.md) | ニコニコのコメントの ASS 変換を自作し（niconicomments の HTML5 描画を移植）、コマンド・表示時間・衝突判定・上下固定の縮小・フォントの寸法からの文字サイズを Web に合わせる。danmaku2ass は失敗時とビリビリだけ。実動画と Web の見比べで確定し、MS Pゴシックの幅の差と `_live` は #391 へ（Issue #387 / PR #392）。メトリクス: コミット 18（PR #392）・訂正ログ 0 件・evaluator 3 巡 | 2026-11-14 |
 | [391-nico-pseudo-bold-width.md](391-nico-pseudo-bold-width.md) | ニコニコのコメントの MS Pゴシック（太さ 600）に、Windows の Chrome の擬似ボールドの送り幅の増分（22px 以下は 1px、23px 以上は 大きさ × 5/256）を幅の測定と ASS の `\fsp` に足し、Web との幅の差を 1% 前後に縮める。`_live` の見え方と流れるコメントの段も Web と見比べた（Issue #391 / PR #393）。メトリクス: コミット 10（PR #393）・訂正ログ 1 件・evaluator 2 巡 | 2026-11-14 |
+| [388-nico-resize-full-ender.md](388-nico-resize-full-ender.md) | ニコニコのコメントの複数行の自動縮小（big 3 / medium 5 / small 7 行以上）と `ender` / `full`（上下固定の幅の上限 683）を niconicomments から移植する。2 つの縮小が両方かかると画面からはみ出す描き方も、投稿したコメントで Web と見比べて式どおりにした。古い描画方式（Flash）とコメントアートの層の分離は対象外（Issue #388 / PR #394）。メトリクス: コミット 8（PR #394）・訂正ログ 2 件・evaluator 2 巡 | 2026-11-15 |
 
 ## リファクタリング（フェーズ 1–7）
 

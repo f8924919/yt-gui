@@ -16,7 +16,6 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [388-nico-resize-full-ender.md](388-nico-resize-full-ender.md) | 進行中 | ニコニコのコメントの複数行の自動縮小と ender / full を再現する（#388） | 2026-11-15 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |

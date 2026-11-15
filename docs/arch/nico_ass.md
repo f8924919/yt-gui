@@ -84,7 +84,7 @@ niconicomments の `HTML5Comment.ts` の `measureText`（`isLineBreakResize` の
 - **上下固定の縮小**（`_resize_x`）: 測り始めの文字サイズと行の高さは、複数行の縮小の後の値。`resizedY` のときは次の 2 か所が変わる（`resizedY` でないときは #387 のまま）。
   - 文字サイズを 1 ずつ動かす経路（縮小の比を掛けた文字サイズが 1 以上）: 求めた文字サイズ `r` から、比 `r / 測り始めの文字サイズ` を、`resizedY` でない基準の `char_size(size)` と `line_height(size)` に掛けた値を結果にする。経路の中の測定は `r` のまま（niconicomments と同じ）。
   - 二分探索の経路（1 未満）: 候補 `n` の測定を `(max(1e-6, n) / 測り始めの文字サイズ) × char_size(size)` で行い、結果も同じ比を基準の文字サイズと行の高さに掛けた値にする。
-  - 結果: 1 ずつ動かす経路は、幅を上限に合わせた比を `resizedY` でない基準に掛けるので、複数行の縮小を取り消したような大きさになり、幅は上限のおよそ 1.8〜1.9 倍で画面からはみ出す。二分探索の経路は上限に収まる。どちらも niconicomments の式どおりで、Web（公式のプレイヤー）も前者と同じく描くことを、投稿した 2 件のコメント（big の 3 行と medium の 5 行）で確かめた（Chromium 156 / Windows 11 / devicePixelRatio 1.5 での確認。[タスクメモ](../task/388-nico-resize-full-ender.md)）。
+  - 結果: 1 ずつ動かす経路は、幅を上限に合わせた比を `resizedY` でない基準に掛けるので、複数行の縮小を取り消したような大きさになり、幅は上限のおよそ 1.8〜1.9 倍で画面からはみ出す。二分探索の経路は上限に収まる。どちらも niconicomments の式どおりで、Web（公式のプレイヤー）も前者と同じく描くことを、投稿した 2 件のコメント（big の 3 行と medium の 5 行）で確かめた（Chromium 156 / Windows 11 / devicePixelRatio 1.5 での確認。[タスクメモ](../task/archive/388-nico-resize-full-ender.md)）。
 - **`ender`**: 複数行の縮小だけを止める。上下固定の縮小は `ender` があっても働く。
 
 ## 処理の流れ

@@ -1,11 +1,11 @@
 # ニコニコのコメントの複数行の自動縮小と ender / full を再現する
 
 > Issue: [#388](https://github.com/f8924919/yt-gui/issues/388)
-> ステータス: 進行中
+> ステータス: 完了（PR #394）
 > ブランチ: `feature/388-nico-resize-full-ender`
 > 基点: `03d4b3e`
 
-受け入れ条件の正本は Issue。設計は [arch/nico_ass.md](../arch/nico_ass.md) の「複数行の縮小と `ender` / `full`」。前のタスクは [#387](archive/387-nico-ass-converter.md)・[#391](archive/391-nico-pseudo-bold-width.md)。
+受け入れ条件の正本は Issue。設計は [arch/nico_ass.md](../../arch/nico_ass.md) の「複数行の縮小と `ender` / `full`」。前のタスクは [#387](387-nico-ass-converter.md)・[#391](391-nico-pseudo-bold-width.md)。
 
 ## 進捗
 
@@ -843,6 +843,6 @@ for r in rows:
 
 ## 次にやること
 
-C1〜C8 は証跡つきで完了し、evaluator は 2 巡目で PASS（follow-up あり。指摘 1 件はこの PR で直した）。次は PR。
+完了（[PR #394](https://github.com/f8924919/yt-gui/pull/394)）。C1〜C8 は証跡つきで完了し、evaluator は 2 巡目で PASS（follow-up あり。指摘 1 件はこの PR で直した）。
 
 訂正ログ: 2 件
