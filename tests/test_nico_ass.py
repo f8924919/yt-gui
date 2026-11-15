@@ -1208,10 +1208,16 @@ def _full_fixture_rows() -> list[dict]:
     ids=["macos", "other", "windows-gothic"],
 )
 def test_convert_output_unchanged_where_no_pseudo_bold(platform, add_command, expected):
-    # 基準は #391 の前（HEAD 554fc5a）の出力。増分の無い経路は 1 バイトも変わらない
+    # 基準は #391 の前（HEAD 554fc5a）の出力。増分の無い経路は 1 バイトも変わらない。
+    # ender / full は #388 で効くようになったので入力から除く（#391 の前は無視していた）
     import hashlib
 
-    rows = _full_fixture_rows()
+    rows = [
+        dict(
+            r, commands=[c for c in r["commands"] if c.lower() not in ("ender", "full")]
+        )
+        for r in _full_fixture_rows()
+    ]
     if add_command:
         rows = [dict(r, commands=[*r["commands"], add_command]) for r in rows]
     nico_ass.pseudo_bold_advancer.cache_clear()
@@ -1255,3 +1261,203 @@ def test_pillow_width_with_pseudo_bold_matches_chrome_within_1pct(case):
         total += measure(text, face.name, face.weight, px)
         total += sum(advance(ch, face, px) for ch in text)
     assert total == pytest.approx(case["width"], rel=0.01)
+
+
+# ---------------------------------------------------------------------------
+# 複数行の縮小と ender / full（#388）
+# 期待値は niconicomments（899203436285）の式から実装と独立に計算した値
+# （HTML5Comment.ts:211-224 measureText、:250-267 _measureComment、:269-430
+# _processResizeX、utils/niconico.ts:24-44 getLineHeight、:216- getFontSizeAndScale、
+# utils/comment.ts:593-599 isLineBreakResize。計算の script はタスクメモ）
+# ---------------------------------------------------------------------------
+
+# 複数行の縮小の後の (文字サイズ, 行の高さ, font_px)
+RESIZED_Y = {
+    "big": (25.983710407239823, 23.876923076923074, 20),
+    "medium": (17.64416565365197, 15.019413738232672, 14),
+    "small": (12.86265534838775, 10.032871171742446, 10),
+}
+BASE = {
+    "big": (49.23076923076923, 45.239085239085234, 39),
+    "medium": (33.98230088495575, 28.927082571491262, 27),
+    "small": (23.132530120481924, 18.043373493975903, 18),
+}
+LINE_BREAK = {"big": 3, "medium": 5, "small": 7}
+
+
+def _lines_measure(k: float, offset: float = 0.0):
+    """1 行 1 区間の測定器: 文字数 × size_px × k + offset。"""
+
+    def measure(text: str, font_name: str, weight: int, size_px: float) -> float:
+        return len(text) * size_px * k + offset
+
+    return measure
+
+
+@pytest.mark.parametrize(
+    ("commands", "expected"),
+    [
+        (["ender"], (True, False)),
+        (["FULL"], (False, True)),
+        (["Ender", "full"], (True, True)),
+    ],
+    ids=["ender", "full-upper", "both"],
+)
+def test_parse_commands_ender_full(commands, expected):
+    cmd = nico_ass.parse_commands(commands, "abc", False)
+    assert (cmd.ender, cmd.full) == expected
+
+
+def test_parse_commands_ender_full_default_false():
+    cmd = nico_ass.parse_commands([], "abc", False)
+    assert (cmd.ender, cmd.full) == (False, False)
+
+
+@pytest.mark.parametrize("size", ["big", "medium", "small"])
+def test_measure_comment_line_break_resize_at_threshold(size):
+    n = LINE_BREAK[size]
+    m = _measure(["あ"] * n, [size])
+    c, lh, font_px = RESIZED_Y[size]
+    assert m.char_size == pytest.approx(c)
+    assert m.line_height == pytest.approx(lh)
+    assert (m.font_px, m.scale) == (font_px, 1)
+    assert m.line_widths == [font_px] * n
+    assert m.width == pytest.approx(font_px * C0)
+    assert m.height == pytest.approx((lh * (n - 1) + c) * C0)
+
+
+@pytest.mark.parametrize("size", ["big", "medium", "small"])
+def test_measure_comment_no_line_break_resize_below_threshold(size):
+    n = LINE_BREAK[size] - 1
+    m = _measure(["あ"] * n, [size])
+    c, lh, font_px = BASE[size]
+    assert m.char_size == pytest.approx(c)
+    assert m.line_height == pytest.approx(lh)
+    assert m.font_px == font_px
+
+
+def test_measure_comment_trailing_empty_line_counts():
+    # 末尾の改行も 1 行（clampHTML5Content と同じ）
+    lines = nico_ass._body_lines("あ\nあ\n")
+    assert lines == ["あ", "あ", ""]
+    m = _measure(lines, ["big"])
+    assert m.char_size == pytest.approx(RESIZED_Y["big"][0])
+
+
+@pytest.mark.parametrize("size", ["big", "medium", "small"])
+def test_measure_comment_ender_skips_line_break_resize(size):
+    n = LINE_BREAK[size]
+    plain = _measure(["あ"] * n, [size])
+    ender = _measure(["あ"] * n, [size, "ender"])
+    assert plain.char_size == pytest.approx(RESIZED_Y[size][0])
+    assert ender.char_size == pytest.approx(BASE[size][0])
+    assert ender.line_height == pytest.approx(BASE[size][1])
+
+
+def test_measure_comment_ender_keeps_width_resize():
+    # 5 行の medium に ender: 複数行の縮小はしないが、幅 540 > 512 の横の縮小は働く
+    m = _measure(["あ" * 20, "あ", "あ", "あ", "あ"], ["ue", "ender"])
+    assert m.char_size == pytest.approx(32.22025565388397)
+    assert m.line_height == pytest.approx(27.42715977148801)
+    assert m.line_widths == [500, 25, 25, 25, 25]
+
+
+def test_measure_comment_line_break_resize_applies_to_naka():
+    m = _measure(["あ"] * 3, ["big", "naka"])
+    assert m.char_size == pytest.approx(RESIZED_Y["big"][0])
+
+
+def test_resize_y_then_x_grow_path_scales_unresized_base():
+    # 縮小後 25.98 で幅 600 > 512。r = 22.17（幅 510）から広げると 540 で止まり、
+    # 結果は r / 25.98 を縮小前の基準 49.23 / 45.24 に掛けた値
+    # （HTML5Comment.ts:350-353）
+    m = _measure(["あ" * 30, "あ", "あ"], ["ue", "big"])
+    assert m.char_size == pytest.approx(42.01025641025642)
+    assert m.line_height == pytest.approx(38.604019404019404)
+    assert (m.font_px, m.scale) == (33, 1)
+    assert m.line_widths == [990, 33, 33]
+    assert m.height == pytest.approx(119.21829521829522 * C0)
+
+
+def test_resize_y_then_x_shrink_path_scales_unresized_base():
+    m = _measure(["あ" * 30, "あ", "あ"], ["ue", "big"], measure=_lines_measure(1, 40))
+    assert m.char_size == pytest.approx(37.489937201277414)
+    assert m.line_height == pytest.approx(34.450212563335995)
+    assert m.font_px == 29
+    assert m.line_widths == [910, 69, 69]
+
+
+def test_resize_y_then_x_bisect_path_measures_scaled_candidates():
+    # 基準が 1 未満（25.98 × 512 / 16000）で二分探索。候補の測定にも比を掛ける
+    # （HTML5Comment.ts:367-423）ので、結果は上限に収まる
+    m = _measure(["あ" * 20, "あ", "あ"], ["ue", "big"], measure=_lines_measure(40))
+    # resizedY でない二分探索も上限の近くに収束するので、その差が見える精度で比べる
+    assert m.char_size == pytest.approx(0.7999994301348792, rel=1e-9)
+    assert m.line_height == pytest.approx(0.7351346114752942, rel=1e-9)
+    assert m.font_px == 10
+    assert m.scale == pytest.approx(0.06399995441079034)
+    assert m.line_widths == [512, 26, 26]
+
+
+@pytest.mark.parametrize(
+    ("chars", "full", "expected_char", "expected_width"),
+    [
+        (18, True, BASE["medium"][0], 486),  # 512 以下: どちらも縮小しない
+        (20, False, 32.22025565388397, 500),  # 540 > 512: 縮小する
+        (20, True, BASE["medium"][0], 540),  # 512 < 540 <= 683: full は縮小しない
+        (26, True, 33.062552000605095, 676),  # 702 > 683: 683 に合わせる
+        (26, False, 24.784812041449207, 494),
+    ],
+    ids=["under512", "over512", "full-under683", "full-over683", "nofull-702"],
+)
+def test_measure_comment_full_width_limit(chars, full, expected_char, expected_width):
+    commands = ["ue", "full"] if full else ["ue"]
+    m = _measure(["あ" * chars], commands)
+    assert m.char_size == pytest.approx(expected_char)
+    assert m.line_widths == [expected_width]
+
+
+def test_measure_comment_full_limit_divided_by_font_scale():
+    # 540 × 1.5 = 810 > 683 なので、full でも倍率を掛けた幅で縮小する
+    m = _measure(["あ" * 20], ["ue", "full"], font_scale=1.5)
+    assert m.char_size == pytest.approx(28.65421173385775)
+    assert m.line_widths == [440]
+
+
+def test_measure_comment_full_with_line_break_resize_uses_683():
+    # 複数行の縮小後の幅 600 は 512 を超えるが 683 以下なので、full なら横の縮小をしない
+    m = _measure(["あ" * 30, "あ", "あ"], ["ue", "big", "full"])
+    assert m.char_size == pytest.approx(RESIZED_Y["big"][0])
+    assert m.line_widths == [600, 20, 20]
+
+
+def test_convert_full_does_not_change_naka():
+    body = "あ" * 40
+    plain = run([row(body=body)]).ass
+    full = run([row(body=body, commands=["full"])]).ass
+    assert plain == full
+
+
+def test_convert_multiline_resize_changes_dialogue_font_size():
+    text = fields(
+        dialogues(run([row(body="あ\nあ\nあ", commands=["ue", "big"])]).ass)[0]
+    )[2]
+    # 縮小後の em: font_px 20 × scale 1 × C0、MS PGothic の係数 0.8 + 0.2
+    assert runs_of(text)[0][1] == pytest.approx(20 * C0 * 1.0, abs=0.006)
+
+
+def test_convert_output_unchanged_without_multiline_ender_full_windows():
+    # C5（#388）: 3 行以上・ender・full の無い入力は、#388 の前（03d4b3e）と同じ出力
+    import hashlib
+
+    rows = [
+        dict(
+            r, commands=[c for c in r["commands"] if c.lower() not in ("ender", "full")]
+        )
+        for r in _full_fixture_rows()
+    ]
+    result = run(rows, platform="windows", rng=random.Random(42))
+    assert (
+        hashlib.sha256(result.ass.encode()).hexdigest()
+        == "4c2db41db76460aee8a315c0795104483675f93a8eade313eb94badad49bd270"
+    )

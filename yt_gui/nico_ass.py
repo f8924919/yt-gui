@@ -65,6 +65,8 @@ class Command(NamedTuple):
     long: int
     live: bool
     invisible: bool
+    ender: bool = False
+    full: bool = False
 
 
 class Measured(NamedTuple):
@@ -156,14 +158,19 @@ _SIZES = ("big", "medium", "small")
 _FONTS = ("defont", "gothic", "mincho")
 _FLASH_FONTS = ("gulim", "simsun")  # defont の枠を取り、defont として描く
 
-# ts: definition/initConfig.ts:74（commentStageSize.html5: width 512 / height 384）
+# ts: definition/initConfig.ts:74（commentStageSize.html5:
+# width 512 / fullWidth 683 / height 384）
 _STAGE_WIDTH = 512
+_STAGE_FULL_WIDTH = 683
 _STAGE_HEIGHT = 384
 # ts: definition/initConfig.ts:66（commentScale.html5 = 1920 / 683）
 _COMMENT_SCALE = 1920 / 683
 # ts: definition/initConfig.ts:124-（html5LineCounts）
 _DEFAULT_LINE_COUNT = {"big": 8.4, "medium": 13.1, "small": 21}
 _DOUBLE_RESIZED_LINE_COUNT = {"big": 7.8, "medium": 11.3, "small": 16.6}
+_RESIZED_LINE_COUNT = {"big": 16, "medium": 25.4, "small": 38}
+# ts: definition/initConfig.ts:319-323（lineBreakCount）
+_LINE_BREAK_COUNT = {"big": 3, "medium": 5, "small": 7}
 # ts: definition/initConfig.ts:150（html5MinFontSize）
 _MIN_FONT_SIZE = 10
 # ts: comments/HTML5Comment.ts:32-33
@@ -230,6 +237,8 @@ def parse_commands(commands: Sequence[str], body: str, is_premium: bool) -> Comm
     long_value: float | None = None
     live = False
     invisible = False
+    ender = False
+    full = False
     for raw in commands[:_MAX_COMMANDS]:
         if len(raw) > _MAX_COMMAND_CHARS:
             continue
@@ -263,6 +272,10 @@ def parse_commands(commands: Sequence[str], body: str, is_premium: bool) -> Comm
             live = True
         elif command == "invisible":
             invisible = True
+        elif command == "ender":
+            ender = True
+        elif command == "full":
+            full = True
     if body.startswith("/"):
         invisible = True
     return Command(
@@ -273,6 +286,8 @@ def parse_commands(commands: Sequence[str], body: str, is_premium: bool) -> Comm
         long=_normalize_long(long_value),
         live=live,
         invisible=invisible,
+        ender=ender,
+        full=full,
     )
 
 
@@ -298,6 +313,15 @@ def char_size(size: str) -> float:
 def line_height(size: str) -> float:
     base = _STAGE_HEIGHT / _DOUBLE_RESIZED_LINE_COUNT[size]
     return (_STAGE_HEIGHT - base) / (_DEFAULT_LINE_COUNT[size] - 1)
+
+
+def _resized_line_height(size: str) -> float:
+    """ts: utils/niconico.ts:24-44（getLineHeight の resized）。"""
+    base = _STAGE_HEIGHT / _DOUBLE_RESIZED_LINE_COUNT[size]
+    resized = _RESIZED_LINE_COUNT[size]
+    return (_STAGE_HEIGHT - base * (_DEFAULT_LINE_COUNT[size] / resized)) / (
+        resized - 1
+    )
 
 
 def font_size_and_scale(size: float) -> tuple[int, float]:
@@ -382,15 +406,24 @@ def measure_comment(
 
     cur_char = base_char
     cur_height = base_line_height
+    # ts: comments/HTML5Comment.ts:211-224（isLineBreakResize の分岐）
+    resized_y = not cmd.ender and len(lines) >= _LINE_BREAK_COUNT[cmd.size]
+    if resized_y:
+        new_height = _resized_line_height(cmd.size)
+        cur_char = cur_char * (new_height / cur_height)
+        cur_height = new_height
     widths = widths_at(cur_char)
     max_width = max(widths)
-    if cmd.loc != "naka" and max_width * font_scale > _STAGE_WIDTH:
+    # ts: comments/HTML5Comment.ts:250-267（_measureComment、full は fullWidth）
+    width_limit = _STAGE_FULL_WIDTH if cmd.full else _STAGE_WIDTH
+    if cmd.loc != "naka" and max_width * font_scale > width_limit:
         cur_char, cur_height = _resize_x(
             lambda size: max(widths_at(size)),
             max_width,
-            base_char,
-            base_line_height,
-            _STAGE_WIDTH / font_scale,
+            cur_char,
+            cur_height,
+            width_limit / font_scale,
+            unresized=(base_char, base_line_height) if resized_y else None,
         )
         widths = widths_at(cur_char)
     font_px, scale = font_size_and_scale(cur_char)
@@ -412,10 +445,15 @@ def _resize_x(
     char0: float,
     line_height0: float,
     limit: float,
+    *,
+    unresized: tuple[float, float] | None = None,
 ) -> tuple[float, float]:
-    """ts: `_processResizeX`。複数行の縮小（resizedY）は扱わない。
+    """ts: `_processResizeX`（comments/HTML5Comment.ts:269-430）。
 
-    戻り値は (文字サイズ, 行高)。幅は文字サイズだけで決まる。
+    戻り値は (文字サイズ, 行高)。幅は文字サイズだけで決まる。`char0` / `line_height0`
+    は測り始めの値。複数行の縮小（resizedY）のときは `unresized` に、縮小前の基準
+    （`char_size(size)`, `line_height(size)`）を渡す（arch の「複数行の縮小と
+    `ender` / `full`」）。
     """
     ratio = limit / width
     current_char = max(_MIN_RESIZE_CHAR_SIZE, char0)
@@ -453,10 +491,19 @@ def _resize_x(
                 result = max_width_at(resized_char)
             resized_char = last_char
             resized_height = last_height
+        if unresized is not None:
+            # ts: :350-353。経路の中の測定は resized_char のまま、
+            # 結果だけ比を基準に掛ける
+            k = resized_char / char0
+            return k * unresized[0], k * unresized[1]
         return resized_char, resized_height
 
     def measured_at(next_char: float) -> float:
-        return max_width_at(max(_MIN_RESIZE_CHAR_SIZE, next_char))
+        next_char = max(_MIN_RESIZE_CHAR_SIZE, next_char)
+        if unresized is not None:
+            # ts: :367-379。候補の測定にも比を掛ける
+            return max_width_at(next_char / current_char * unresized[0])
+        return max_width_at(next_char)
 
     best = base_char
     if measured_at(base_char) > limit:
@@ -489,6 +536,10 @@ def _resize_x(
                 low = mid
             else:
                 high = mid
+    if unresized is not None:
+        # ts: :416-420
+        k = best / current_char
+        return k * unresized[0], k * unresized[1]
     return best, base_height * (best / base_char)
 
 
