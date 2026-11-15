@@ -9,14 +9,14 @@
 
 ## 進捗
 
-- [ ] C1 行数の多いコメントの縮小（`isLineBreakResize`） — 証跡: 未
-- [ ] C2 縮小したコメントの上下固定の縮小（`resizedY` の分岐） — 証跡: 未
-- [ ] C3 `ender` で複数行の縮小をしない — 証跡: 未
-- [ ] C4 `full` で上下固定の幅の上限が 683 — 証跡: 未
-- [ ] C5 対象のコメントが無い入力の出力が変わらない — 証跡: 未
-- [ ] C6 `sm9560870` で焼きこみと Web を見比べる — 証跡: 未
-- [ ] C7 単体テストと変異 → red の死因の表 — 証跡: 未
-- [ ] C8 spec / arch の更新（コマンドと対象外） — 証跡: 未
+- [x] C1 行数の多いコメントの縮小（`isLineBreakResize`） — 証跡: `test_measure_comment_line_break_resize_at_threshold`（3 サイズ）、`test_measure_comment_no_line_break_resize_below_threshold`、`test_measure_comment_trailing_empty_line_counts`、`test_measure_comment_line_break_resize_applies_to_naka`（503d3d7）。Web は下の「C6」の 18.3 秒
+- [x] C2 縮小したコメントの上下固定の縮小（`resizedY` の分岐） — 証跡: `test_resize_y_then_x_grow_path_scales_unresized_base`・`…_shrink_path…`・`…_bisect_path…`（503d3d7）。Web は「設計レビューと…」の 42.17 秒と、「C6」の 29.9 秒
+- [x] C3 `ender` で複数行の縮小をしない — 証跡: `test_parse_commands_ender_full`、`test_measure_comment_ender_skips_line_break_resize`（3 サイズ、`ender` の有無だけを変えた対照）、`test_measure_comment_ender_keeps_width_resize`（503d3d7）
+- [x] C4 `full` で上下固定の幅の上限が 683 — 証跡: `test_measure_comment_full_width_limit`（512 以下・512〜683・683 超）、`…_full_limit_divided_by_font_scale`、`…_full_with_line_break_resize_uses_683`、`test_convert_full_does_not_change_naka`（503d3d7）。Web は「C6」の 29.9 秒の cyan
+- [x] C5 対象のコメントが無い入力の出力が変わらない — 証跡: `test_convert_output_unchanged_without_multiline_ender_full_windows`（windows、`4c2db41d…`）と、入力から `ender` / `full` を除いた `test_convert_output_unchanged_where_no_pseudo_bold`（macos・other・windows-gothic。#391 の期待値のまま）が、実装の前後とも pass（503d3d7）
+- [x] C6 `sm9560870` で焼きこみと Web を見比べる — 証跡: 下の「C6」
+- [x] C7 単体テストと変異 → red の死因の表 — 証跡: 下の「テスト先行の red」と「変異 → red」
+- [x] C8 spec / arch の更新（コマンドと対象外） — 証跡: `docs/arch/nico_ass.md` の「複数行の縮小と `ender` / `full`」と「対象外」、`docs/spec/screens/original-format-panel.md` の「対応するコマンド」「行数の多いコメント」「再現しない」（233458b、9c92a9b）
 
 ## 着手時の調べ（2026-11-15）
 
@@ -41,6 +41,671 @@
 - 決定: niconicomments の式どおり（B）に移植する（ユーザーの案 A「投稿して見比べてから決める」の結果）。
 - 既存の `test_convert_output_unchanged_where_no_pseudo_bold`（#391）は、入力の `sm31143779` に `ue full` の medium が 2 件あり、#388 で必ず値が変わる。期待値は撮り直さず、入力から `ender` / `full` を取り除く形に変え、C5 の windows の基準も同じテストに入れる。
 
+## テスト先行の red（C7、2026-11-15）
+
+実装前（`9c92a9b`、テストだけを足した作業ツリー）で `tests/test_nico_ass.py` は 20 failed, 264 passed。落ちたテスト:
+
+- `test_parse_commands_ender_full[ender]`
+- `test_parse_commands_ender_full[full-upper]`
+- `test_parse_commands_ender_full[both]`
+- `test_parse_commands_ender_full_default_false`
+- `test_measure_comment_line_break_resize_at_threshold[big]`
+- `test_measure_comment_line_break_resize_at_threshold[medium]`
+- `test_measure_comment_line_break_resize_at_threshold[small]`
+- `test_measure_comment_trailing_empty_line_counts`
+- `test_measure_comment_ender_skips_line_break_resize[big]`
+- `test_measure_comment_ender_skips_line_break_resize[medium]`
+- `test_measure_comment_ender_skips_line_break_resize[small]`
+- `test_measure_comment_line_break_resize_applies_to_naka`
+- `test_resize_y_then_x_grow_path_scales_unresized_base`
+- `test_resize_y_then_x_shrink_path_scales_unresized_base`
+- `test_resize_y_then_x_bisect_path_measures_scaled_candidates`
+- `test_measure_comment_full_width_limit[full-under683]`
+- `test_measure_comment_full_width_limit[full-over683]`
+- `test_measure_comment_full_limit_divided_by_font_scale`
+- `test_measure_comment_full_with_line_break_resize_uses_683`
+- `test_convert_multiline_resize_changes_dialogue_font_size`
+
+二分探索の経路のテストは、初めは許容誤差（相対 1e-6）の中で実装前の値（0.79999924）と期待値（0.79999943）が一致して pass したので、相対 1e-9 に絞って red を確かめた。期待値は、niconicomments の式を実装と独立に書き下ろした `ref388.py` の出力（本文は末尾の「プローブの本文」）。
+
+## 変異 → red（C7、503d3d7）
+
+worktree のコピー（`503d3d7`）を 1 つずつ変異させ、`tests/test_nico_ass.py` と `tests/test_downloader.py` を走らせた。無変異のコピーは 438 passed、戻した後も 438 passed、狙ったテストは 15 変異すべてで落ちた（`ALL TARGETED KILLED`）。置換が 1 か所に当たらないときは止まる。script は `mutate388.py`、表は `mut_table.py`（#391 と同じ）でログから作った。
+
+| 変異 | 件数 | 狙ったテスト | 落ちたテスト（全部） |
+|---|---|---|---|
+| M1 big の閾値 3 → 4 | 9 failed | `test_measure_comment_line_break_resize_at_threshold[big]`（落ちた） | `test_measure_comment_line_break_resize_at_threshold[big]`<br>`test_measure_comment_trailing_empty_line_counts`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_line_break_resize_applies_to_naka`<br>`test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base`<br>`test_resize_y_then_x_bisect_path_measures_scaled_candidates`<br>`test_measure_comment_full_with_line_break_resize_uses_683`<br>`test_convert_multiline_resize_changes_dialogue_font_size` |
+| M2 行数の判定 >= → > | 13 failed | `test_measure_comment_line_break_resize_at_threshold[medium]`（落ちた） | `test_measure_comment_line_break_resize_at_threshold[big]`<br>`test_measure_comment_line_break_resize_at_threshold[medium]`<br>`test_measure_comment_line_break_resize_at_threshold[small]`<br>`test_measure_comment_trailing_empty_line_counts`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_line_break_resize_applies_to_naka`<br>`test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base`<br>`test_resize_y_then_x_bisect_path_measures_scaled_candidates`<br>`test_measure_comment_full_with_line_break_resize_uses_683`<br>`test_convert_multiline_resize_changes_dialogue_font_size` |
+| M3 ender の判定を外す | 4 failed | `test_measure_comment_ender_skips_line_break_resize[small]`（落ちた） | `test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_ender_keeps_width_resize` |
+| M4 resized の行の高さの式（比を逆に） | 13 failed | `test_measure_comment_line_break_resize_at_threshold[big]`（落ちた） | `test_measure_comment_line_break_resize_at_threshold[big]`<br>`test_measure_comment_line_break_resize_at_threshold[medium]`<br>`test_measure_comment_line_break_resize_at_threshold[small]`<br>`test_measure_comment_trailing_empty_line_counts`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_line_break_resize_applies_to_naka`<br>`test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base`<br>`test_resize_y_then_x_bisect_path_measures_scaled_candidates`<br>`test_measure_comment_full_with_line_break_resize_uses_683`<br>`test_convert_multiline_resize_changes_dialogue_font_size` |
+| M5 文字サイズを行の高さの比で縮めない | 13 failed | `test_measure_comment_line_break_resize_at_threshold[small]`（落ちた） | `test_measure_comment_line_break_resize_at_threshold[big]`<br>`test_measure_comment_line_break_resize_at_threshold[medium]`<br>`test_measure_comment_line_break_resize_at_threshold[small]`<br>`test_measure_comment_trailing_empty_line_counts`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_line_break_resize_applies_to_naka`<br>`test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base`<br>`test_resize_y_then_x_bisect_path_measures_scaled_candidates`<br>`test_measure_comment_full_with_line_break_resize_uses_683`<br>`test_convert_multiline_resize_changes_dialogue_font_size` |
+| M6 683 → 512 | 4 failed | `test_measure_comment_full_width_limit[full-under683]`（落ちた） | `test_measure_comment_full_width_limit[full-under683]`<br>`test_measure_comment_full_width_limit[full-over683]`<br>`test_measure_comment_full_limit_divided_by_font_scale`<br>`test_measure_comment_full_with_line_break_resize_uses_683` |
+| M7 full を見ない | 4 failed | `test_measure_comment_full_with_line_break_resize_uses_683`（落ちた） | `test_measure_comment_full_width_limit[full-under683]`<br>`test_measure_comment_full_width_limit[full-over683]`<br>`test_measure_comment_full_limit_divided_by_font_scale`<br>`test_measure_comment_full_with_line_break_resize_uses_683` |
+| M8 上限を font_scale で割らない | 2 failed | `test_measure_comment_full_limit_divided_by_font_scale`（落ちた） | `test_resize_judges_width_after_font_scale`<br>`test_measure_comment_full_limit_divided_by_font_scale` |
+| M9 縮小前の基準を渡さない | 3 failed | `test_resize_y_then_x_grow_path_scales_unresized_base`（落ちた） | `test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base`<br>`test_resize_y_then_x_bisect_path_measures_scaled_candidates` |
+| M10 1 ずつの経路の resizedY を外す | 2 failed | `test_resize_y_then_x_shrink_path_scales_unresized_base`（落ちた） | `test_resize_y_then_x_grow_path_scales_unresized_base`<br>`test_resize_y_then_x_shrink_path_scales_unresized_base` |
+| M11 二分探索の候補に比を掛けない | 1 failed | `test_resize_y_then_x_bisect_path_measures_scaled_candidates`（落ちた） | `test_resize_y_then_x_bisect_path_measures_scaled_candidates` |
+| M12 二分探索の結果に比を掛けない | 1 failed | `test_resize_y_then_x_bisect_path_measures_scaled_candidates`（落ちた） | `test_resize_y_then_x_bisect_path_measures_scaled_candidates` |
+| M13 ender を読まない | 6 failed | `test_parse_commands_ender_full[ender]`（落ちた） | `test_parse_commands_ender_full[ender]`<br>`test_parse_commands_ender_full[both]`<br>`test_measure_comment_ender_skips_line_break_resize[big]`<br>`test_measure_comment_ender_skips_line_break_resize[medium]`<br>`test_measure_comment_ender_skips_line_break_resize[small]`<br>`test_measure_comment_ender_keeps_width_resize` |
+| M14 full を読まない | 6 failed | `test_parse_commands_ender_full[full-upper]`（落ちた） | `test_parse_commands_ender_full[full-upper]`<br>`test_parse_commands_ender_full[both]`<br>`test_measure_comment_full_width_limit[full-under683]`<br>`test_measure_comment_full_width_limit[full-over683]`<br>`test_measure_comment_full_limit_divided_by_font_scale`<br>`test_measure_comment_full_with_line_break_resize_uses_683` |
+| M15 流れるコメントにも full の上限で横の縮小 | 6 failed | `test_convert_full_does_not_change_naka`（落ちた） | `test_resize_not_applied_to_naka`<br>`test_convert_output_unchanged_where_no_pseudo_bold[macos]`<br>`test_convert_output_unchanged_where_no_pseudo_bold[other]`<br>`test_convert_output_unchanged_where_no_pseudo_bold[windows-gothic]`<br>`test_convert_full_does_not_change_naka`<br>`test_convert_output_unchanged_without_multiline_ender_full_windows` |
+
+## C6: `sm9560870` の焼きこみと Web（2026-11-15）
+
+- 焼きこみ: 実装（`503d3d7`）の `convert`（Windows の Pillow の測定・寸法・擬似ボールドの増分、1920 × 1080、不透明度 1.0、`random.Random(0)`）で、#388 の取得（230 件）から ASS を作り、黒地に libass で描いた（`frame388.py`）。インクの外接矩形と字の間隔は `cmp388.py`。
+- Web: 内蔵ブラウザ（Chromium 156、devicePixelRatio 1.5）のプレイヤーで、14 秒から再生し、18.301 / 23.204 / 29.905 秒にコメントの canvas（1365 × 768）を一時停止せずに写し取った。同じ判定（白 = RGB とも 200 超、cyan = R 120 未満・G / B 150 超、アルファ 128 超）で、1920 × 1080 に換算した。
+
+| 時刻・コメント | 種類 | Web | 焼きこみ |
+|---|---|---|---|
+| 18.3 秒「＜ああああああ」（上） | `ue medium`・13 行（15.45 秒開始。複数行の縮小） | x 925.5〜1192.8、y 396.7〜431.8 | x 926〜1196、y 398〜432 |
+| 18.3 秒「＜ああああああ」（下） | `ue medium`・12 行（17.76 秒開始。複数行の縮小） | x 827.1〜1094.3、y 603.4〜638.6 | x 825〜1094、y 590〜625 |
+| 29.9 秒「真夏の夜の淫夢」 | `ue big ender full`・10 行のコメントアート（上限 683 で横の縮小） | x 580.9〜1337.7、y 527.5〜627.3 | x 580〜1337、y 530〜629 |
+| 29.9 秒の投稿コメント | `ue medium`・5 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 64.7（中央値。1 行目は画面の両端からはみ出す） | 64.59（平均。同じく両端からはみ出す） |
+| 23.2 秒「あ」40 字 × 5 段 | 1 行の `ue medium` が 5 件（横の縮小で font_px 12 ほど） | 字の間隔 33.76、x 286.9〜1630.2 | 34.56（+2.4%）、x 272〜1645 |
+| 42.17 秒の投稿コメント | `ue big`・3 行（閾値ちょうど、2 つの縮小が両方かかる） | 字の間隔 32.674（舞台） | 32.672（予測。「設計レビューと…」） |
+
+- 複数行の縮小（18.3 秒）、`full` の上限 683（29.9 秒の cyan）、2 つの縮小が両方かかるとき（29.9 秒・42.17 秒）は、幅と字の間隔が Web と 1% 以内で合った。
+- 違い 1: 18.3 秒の下の「＜ああ」（17.76 秒開始）は、焼きこみの y が Web より 13 px 上。原因は調べていない（分からない）。コメントの対応は、焼きこみの ASS の `Dialogue` の開始時刻と `\pos` で確かめた（`at388.py`）。
+- 違い 2: 29.9 秒の投稿コメントの縦位置は、Web が上端、焼きこみが y 687。乱数の種を変えると y が 687 / 357 / 26 と動く（`seed388.py`）ので、行が埋まったときのランダム配置で、Web（種の無い乱数）とは原理的に一致しない。
+- 違い 3: 23.2 秒の 1 行のコメントの字の間隔が 2.4% 広い。#388 の変更の対象外（1 行のコメントの横の縮小、#387 の経路）。字の大きさが 12px ほどで、Chrome が 22px 以下で幅を 1 字ずつ整数に丸めること（#391 で再現しないと決めた限界）で説明できる差と見ているが、確かめていない。
+- 22.58 秒の「アンインストール」（赤）は、canvas で色の判定に当たらなかった（暗い）ので数値では比べていない。目視では位置と大きさは同じ。
+
+## プローブの本文
+
+追跡しない scratchpad の script。`git hash-object` は記録した数値を出したときの本文のもの。証跡の段へ移った日と主張（policy §8.0）: 2026-11-15、arch の「複数行の縮小と `ender` / `full`」の式と、2 つの縮小が両方かかるときに Web がはみ出して描くこと、C6 の数値。
+
+<details><summary>ref388.py（テストの期待値（C1〜C4）、<code>c5ffc9c0cadf9bd9b75b9c820e94d70e56bb4c50</code>）</summary>
+
+```python
+"""#388 のテストの期待値を、niconicomments の式（HTML5Comment.ts / niconico.ts）から実装と独立に計算する。
+
+nico_ass を import しない。測定器はテストと同じ形（行の文字数 × font_px × 係数 + 足し分）を自前で持つ。
+"""
+
+import math
+
+H = 384
+DEFAULT = {"big": 8.4, "medium": 13.1, "small": 21}
+RESIZED = {"big": 16, "medium": 25.4, "small": 38}
+DOUBLE = {"big": 7.8, "medium": 11.3, "small": 16.6}
+
+
+def char_size(s):  # niconico.ts getCharSize
+    return H / DOUBLE[s]
+
+
+def line_height(s, resized=False):  # niconico.ts getLineHeight
+    lh = H / DOUBLE[s]
+    if resized:
+        return (H - lh * (DEFAULT[s] / RESIZED[s])) / (RESIZED[s] - 1)
+    return (H - lh) / (DEFAULT[s] - 1)
+
+
+def fsas(c):  # niconico.ts getFontSizeAndScale
+    c *= 0.8
+    if c < 10:
+        if c >= 1:
+            c = math.floor(c)
+        return 10, c / 10
+    return math.floor(c), 1
+
+
+def make_width(counts, k, offset):
+    def width(c):
+        fp, sc = fsas(c)
+        return max(math.ceil((n * fp * k + offset) * sc) for n in counts)
+    return width
+
+
+def resize_y(s):
+    lh0, c0 = line_height(s), char_size(s)
+    lh1 = line_height(s, True)
+    return c0 * (lh1 / lh0), lh1
+
+
+def process_resize_x(s, width_at, cur_c, cur_lh, limit, resized_y):  # HTML5Comment.ts:269-430
+    base_c, base_lh = char_size(s), line_height(s)
+    w = width_at(cur_c)
+    scale = limit / w
+    current_c = max(1e-6, cur_c)
+    current_lh = max(1e-6, cur_lh)
+    raw_c, raw_lh = current_c * scale, current_lh * scale
+    bc, blh = max(1e-6, raw_c), max(1e-6, raw_lh)
+    lc, llh = max(1, raw_c), max(1, raw_lh)
+    path = None
+    if bc >= 1:
+        r, rlh = lc, llh
+        res = width_at(r)
+        if res > limit:
+            path = "shrink"
+            it = 20
+            while res > limit and r > 1 and it > 0:
+                it -= 1
+                o = r
+                r = max(1, r - 1)
+                rlh *= r / o
+                res = width_at(r)
+        else:
+            path = "grow"
+            last, lastlh = r, rlh
+            it = 20
+            while res < limit and it > 0:
+                it -= 1
+                last, lastlh = r, rlh
+                o = r
+                r += 1
+                rlh *= r / o
+                res = width_at(r)
+            r, rlh = last, lastlh
+        if resized_y:
+            k = r / cur_c
+            return k * base_c, k * base_lh, path
+        return r, rlh, path
+
+    def measured(n):
+        n = max(1e-6, n)
+        if resized_y:
+            return width_at((n / current_c) * base_c)
+        return width_at(n)
+
+    best = bc
+    if measured(bc) > limit:
+        low, high, it = 1e-6, bc, 20
+        best = low
+        if measured(low) <= limit:
+            while it > 0 and low < high:
+                it -= 1
+                cand = (low + high) / 2
+                if measured(cand) <= limit:
+                    best, low = cand, cand
+                else:
+                    high = cand
+    else:
+        low, high, it = bc, current_c, 20
+        while it > 0 and low < high:
+            it -= 1
+            mid = (low + high) / 2
+            if measured(mid) <= limit:
+                best, low = mid, mid
+            else:
+                high = mid
+    if resized_y:
+        k = best / current_c
+        return k * base_c, k * base_lh, "bisect"
+    return best, blh * (best / bc), "bisect"
+
+
+def show(name, s, counts, k, offset, limit=512, multi=True):
+    width_at = make_width(counts, k, offset)
+    c, lh = resize_y(s) if multi else (char_size(s), line_height(s))
+    w = width_at(c)
+    print(f"{name}: 縮小前 c={c!r} lh={lh!r} 幅 {w}")
+    if w > limit:
+        c, lh, path = process_resize_x(s, width_at, c, lh, limit, multi)
+        fp, sc = fsas(c)
+        n_lines = len(counts)
+        print(f"  {path}: c={c!r} lh={lh!r} font_px={fp} scale={sc!r} widths={[math.ceil((n * fp * k + offset) * sc) for n in counts]} height={lh * (n_lines - 1) + c!r}")
+
+
+for s in ("big", "medium", "small"):
+    c, lh = resize_y(s)
+    print(s, "char", char_size(s), "lh", line_height(s), "resized char", c, "resized lh", lh, "fsas", fsas(c))
+show("C2 grow (big, 30字+1+1, k=1)", "big", [30, 1, 1], 1, 0)
+show("C2 shrink (big, 30字+1+1, k=1, +40)", "big", [30, 1, 1], 1, 40)
+show("C2 bisect (big, 20字+1+1, k=40)", "big", [20, 1, 1], 40, 0)
+show("C4 full (medium 26字, 683)", "medium", [26], 1, 0, limit=683, multi=False)
+show("C4 no full (medium 26字, 512)", "medium", [26], 1, 0, limit=512, multi=False)
+show("C3 ender ue wide (medium 20字×5行 単一でなく)", "medium", [20, 1, 1, 1, 1], 1, 0, multi=False)
+show("C4 full+multi (big 30字+1+1, 683)", "big", [30, 1, 1], 1, 0, limit=683)
+show("C4 no full (medium 20字, 512)", "medium", [20], 1, 0, limit=512, multi=False)
+show("C4 full 20字 font_scale 1.5 (683/1.5)", "medium", [20], 1, 0, limit=683 / 1.5, multi=False)
+```
+
+</details>
+
+<details><summary>both_predict.py（2 つの縮小が両方かかるときの予測、<code>03639cd9fd8d1032f465b4d13e7c4cc5f6afdc5d</code>）</summary>
+
+```python
+"""投稿してもらったコメントで、2 つの縮小が両方かかったときの結果を ts どおり（B）と、収まる式（C）で計算する。"""
+
+import math
+import sys
+from pathlib import Path
+
+sys.path.insert(0, r"C:\Users\f8924\Documents\claude\yt-gui")
+from yt_gui import nico_ass as n  # noqa: E402
+
+RESIZED = {"big": 16, "medium": 25.4, "small": 38}
+measure = n.pillow_measurer("windows")
+advance = n.pseudo_bold_advancer("windows")
+
+
+def width_at(lines, size_char):
+    font_px, scale = n.font_size_and_scale(size_char)
+    out = []
+    for line in lines:
+        total = 0.0
+        for t, f in n.font_runs(line, "defont", "windows"):
+            total += measure(t, f.name, f.weight, font_px) + sum(advance(ch, f, font_px) for ch in t)
+        out.append(math.ceil(total * scale))
+    return max(out)
+
+
+for size, body in (("big", "あ" * 28 + "\nあ\nあ"), ("medium", "あ" * 40 + "\nあ\nあ\nあ\nあ")):
+    lines = body.split("\n")
+    base_c, base_lh = n.char_size(size), n.line_height(size)
+    rlh = (384 - base_c * (n._DEFAULT_LINE_COUNT[size] / RESIZED[size])) / (RESIZED[size] - 1)
+    rc = base_c * rlh / base_lh
+    w = width_at(lines, rc)
+    # legacy 経路（ts の 1 ずつ動かす経路）
+    ratio = 512 / w
+    r = max(1, rc * ratio)
+    res = width_at(lines, r)
+    if res > 512:
+        it = 20
+        while res > 512 and r > 1 and it > 0:
+            it -= 1
+            r = max(1, r - 1)
+            res = width_at(lines, r)
+    else:
+        last = r
+        it = 20
+        while res < 512 and it > 0:
+            it -= 1
+            last = r
+            r += 1
+            res = width_at(lines, r)
+        r = last
+    s = r / rc
+    b_char, b_lh = s * base_c, s * base_lh
+    c = n._COMMENT_SCALE
+    print(f"{size}: 縮小前 char {base_c:.2f} / 複数行の縮小後 char {rc:.2f} lh {rlh:.2f} 幅 {w}")
+    print(f"  B（ts どおり）: char {b_char:.2f} lh {b_lh:.2f} 幅 {width_at(lines, b_char)} → キャンバス {width_at(lines, b_char) * c:.0f} px、高さ {(b_lh * (len(lines) - 1) + b_char) * c:.0f} px")
+    print(f"  C（収まる）  : char {r:.2f} lh {rlh * r / rc:.2f} 幅 {width_at(lines, r)} → キャンバス {width_at(lines, r) * c:.0f} px、高さ {(rlh * r / rc * (len(lines) - 1) + r) * c:.0f} px")
+    print(f"  参考: 複数行の縮小なしで上下固定の縮小だけ（#387 の今の動き）")
+```
+
+</details>
+
+<details><summary>mutate388.py（変異 → red（C7）、<code>2e666b8708e4db964aa1d0aec85a143bbf2cc3c9</code>）</summary>
+
+```python
+"""#388 の変異 → red。worktree のコピーを変異させ、落ちたテスト名を集める。
+
+使い方: python mutate388.py <worktree のパス>
+無変異のコピーが green でなければ止まる。変異が当たらない（置換 1 件以外）ときも止まる（fail-closed）。
+"""
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+WT = Path(sys.argv[1])
+TESTS = ["tests/test_nico_ass.py", "tests/test_downloader.py"]
+F = "yt_gui/nico_ass.py"
+
+MUTANTS = [
+    ("M1 big の閾値 3 → 4", F,
+     '_LINE_BREAK_COUNT = {"big": 3,', '_LINE_BREAK_COUNT = {"big": 4,',
+     "test_measure_comment_line_break_resize_at_threshold[big]"),
+    ("M2 行数の判定 >= → >", F,
+     "len(lines) >= _LINE_BREAK_COUNT[cmd.size]", "len(lines) > _LINE_BREAK_COUNT[cmd.size]",
+     "test_measure_comment_line_break_resize_at_threshold[medium]"),
+    ("M3 ender の判定を外す", F,
+     "resized_y = not cmd.ender and len(lines)", "resized_y = len(lines)",
+     "test_measure_comment_ender_skips_line_break_resize[small]"),
+    ("M4 resized の行の高さの式（比を逆に）", F,
+     "base * (_DEFAULT_LINE_COUNT[size] / resized)", "base * (resized / _DEFAULT_LINE_COUNT[size])",
+     "test_measure_comment_line_break_resize_at_threshold[big]"),
+    ("M5 文字サイズを行の高さの比で縮めない", F,
+     "cur_char = cur_char * (new_height / cur_height)", "cur_char = cur_char",
+     "test_measure_comment_line_break_resize_at_threshold[small]"),
+    ("M6 683 → 512", F,
+     "_STAGE_FULL_WIDTH = 683", "_STAGE_FULL_WIDTH = 512",
+     "test_measure_comment_full_width_limit[full-under683]"),
+    ("M7 full を見ない", F,
+     "width_limit = _STAGE_FULL_WIDTH if cmd.full else _STAGE_WIDTH", "width_limit = _STAGE_WIDTH",
+     "test_measure_comment_full_with_line_break_resize_uses_683"),
+    ("M8 上限を font_scale で割らない", F,
+     "            width_limit / font_scale,\n", "            width_limit,\n",
+     "test_measure_comment_full_limit_divided_by_font_scale"),
+    ("M9 縮小前の基準を渡さない", F,
+     "unresized=(base_char, base_line_height) if resized_y else None", "unresized=None",
+     "test_resize_y_then_x_grow_path_scales_unresized_base"),
+    ("M10 1 ずつの経路の resizedY を外す", F,
+     "        if unresized is not None:\n            # ts: :350-353", "        if False:\n            # ts: :350-353",
+     "test_resize_y_then_x_shrink_path_scales_unresized_base"),
+    ("M11 二分探索の候補に比を掛けない", F,
+     "        if unresized is not None:\n            # ts: :367-379", "        if False:\n            # ts: :367-379",
+     "test_resize_y_then_x_bisect_path_measures_scaled_candidates"),
+    ("M12 二分探索の結果に比を掛けない", F,
+     "    if unresized is not None:\n        # ts: :416-420", "    if False:\n        # ts: :416-420",
+     "test_resize_y_then_x_bisect_path_measures_scaled_candidates"),
+    ("M13 ender を読まない", F,
+     'elif command == "ender":', 'elif command == "enderx":',
+     "test_parse_commands_ender_full[ender]"),
+    ("M14 full を読まない", F,
+     'elif command == "full":', 'elif command == "fullx":',
+     "test_parse_commands_ender_full[full-upper]"),
+    ("M15 流れるコメントにも full の上限で横の縮小", F,
+     "if cmd.loc != \"naka\" and max_width * font_scale > width_limit:",
+     "if max_width * font_scale > width_limit:",
+     "test_convert_full_does_not_change_naka"),
+]
+
+
+def run_tests() -> tuple[int, list[str], str]:
+    p = subprocess.run(
+        ["uv", "run", "pytest", *TESTS, "-q", "-p", "no:cacheprovider", "-rf"],
+        cwd=WT, capture_output=True, text=True, encoding="utf-8",
+    )
+    failed = re.findall(r"^FAILED (\S+)", p.stdout, re.M)
+    summary = (p.stdout.strip().splitlines() or [""])[-1]
+    return p.returncode, failed, summary
+
+
+code, failed, summary = run_tests()
+print("unmutated:", summary)
+if code != 0 or failed or "passed" not in summary:
+    sys.exit("無変異のコピーが green でない")
+
+ok = True
+for name, rel, old, new, target in MUTANTS:
+    path = WT / rel
+    src = path.read_text(encoding="utf-8")
+    if src.count(old) != 1:
+        print(f"{name}: 変異が当たらない（{src.count(old)} 件）")
+        ok = False
+        continue
+    path.write_text(src.replace(old, new), encoding="utf-8", newline="\n")
+    try:
+        code, failed, summary = run_tests()
+    finally:
+        path.write_text(src, encoding="utf-8", newline="\n")
+    names = [f.split("::", 1)[1] for f in failed]
+    hit = target in names
+    ok = ok and hit and code != 0
+    print(f"{name}: {summary} / 狙い {'落ちた' if hit else '落ちない'}: {target}")
+    for n in names:
+        print(f"    - {n}")
+
+code, failed, summary = run_tests()
+print("restored:", summary)
+print("ALL TARGETED KILLED" if ok and code == 0 else "NG")
+```
+
+</details>
+
+<details><summary>mut_table.py（死因の表（C7）、<code>2fe2ce089b5799bb055090607d35a915573d9281</code>）</summary>
+
+```python
+"""mutate391 のログから、死因の表（変異ごとに落ちたテストを全部）を markdown で出す。"""
+
+import re
+import sys
+
+lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+rows = []
+cur = None
+for line in lines:
+    m = re.match(r"^(M\d+) (.+?): (\d+) failed.*/ 狙い (\S+): (.+)$", line)
+    if m:
+        cur = {"id": m[1], "name": m[2], "n": m[3], "hit": m[4], "target": m[5], "tests": []}
+        rows.append(cur)
+    elif line.startswith("    - ") and cur is not None:
+        name = line[6:].encode().decode("unicode_escape") if "\\u" in line else line[6:]
+        cur["tests"].append(name)
+print("| 変異 | 件数 | 狙ったテスト | 落ちたテスト（全部） |")
+print("|---|---|---|---|")
+for r in rows:
+    assert len(r["tests"]) == int(r["n"]), r["id"]
+    target = r["target"].encode().decode("unicode_escape") if "\\u" in r["target"] else r["target"]
+    tests = "<br>".join(f"`{t}`" for t in r["tests"])
+    print(f"| {r['id']} {r['name']} | {r['n']} failed | `{target}`（{r['hit']}） | {tests} |")
+```
+
+</details>
+
+<details><summary>pick388.py（C6 のコメントの選び出し、<code>758c873f5ed9aaf254bd3feeb6480117a89d637d</code>）</summary>
+
+```python
+"""C6: sm9560870 のコメントを、複数行の縮小・ender・full・上下固定の縮小の別に並べる。"""
+
+import json
+import sys
+
+sys.path.insert(0, r"C:\Users\f8924\Documents\claude\yt-gui")
+from yt_gui import nico_ass as n  # noqa: E402
+
+data = json.load(open(sys.argv[1], encoding="utf-8-sig"))
+rows = []
+
+
+def walk(o):
+    if isinstance(o, dict):
+        if "commands" in o and "body" in o:
+            rows.append(o)
+        else:
+            for v in o.values():
+                walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+
+
+walk(data)
+measure = n.pillow_measurer("windows")
+advance = n.pseudo_bold_advancer("windows")
+for r in sorted(rows, key=lambda r: r["vposMs"]):
+    cmd = n.parse_commands(r["commands"], r["body"], r.get("isPremium", False))
+    if cmd.invisible:
+        continue
+    lines = n._body_lines(r["body"])
+    m = n.measure_comment(lines, cmd, platform="windows", measure=measure, advance=advance, font_scale=1)
+    ry = not cmd.ender and len(lines) >= n._LINE_BREAK_COUNT[cmd.size]
+    if not (ry or cmd.ender or cmd.full) or len(lines) < 2:
+        continue
+    tag = ("Y" if ry else "-") + ("E" if cmd.ender else "-") + ("F" if cmd.full else "-")
+    print(f"{r['vposMs'] / 1000:7.2f} {tag} {cmd.loc:5} {cmd.size:6} {cmd.color:8} 行{len(lines):3} char {m.char_size:6.2f} font {m.font_px:2} 幅 {m.width:7.1f} 高 {m.height:7.1f} {r['body'][:12]!r}")
+```
+
+</details>
+
+<details><summary>frame388.py（C6 の焼きこみのフレーム、<code>8f1315377eb823c205b32c800898c398aa2382b2</code>）</summary>
+
+```python
+"""C6: sm9560870（#388 の取得）から 1920x1080 の ASS を作り、指定の時刻を黒地に描く。
+
+使い方: python frame388.py <出力先> <comments.json> <時刻>...
+"""
+
+import json
+import random
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(r"C:\Users\f8924\Documents\claude\yt-gui")
+sys.path.insert(0, str(ROOT))
+from yt_gui import nico_ass  # noqa: E402
+
+OUT = Path(sys.argv[1])
+OUT.mkdir(exist_ok=True)
+FFMPEG = str(ROOT / "bin" / "ffmpeg" / "ffmpeg.exe")
+data = json.load(open(sys.argv[2], encoding="utf-8-sig"))
+rows = []
+
+
+def walk(o):
+    if isinstance(o, dict):
+        if "commands" in o and "body" in o:
+            rows.append(o)
+        else:
+            for v in o.values():
+                walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+
+
+walk(data)
+ass = nico_ass.convert(
+    json.dumps(rows, ensure_ascii=False), width=1920, height=1080, font_scale_percent=100,
+    opacity=1.0, platform="windows", measure=nico_ass.pillow_measurer("windows"),
+    metrics=nico_ass.font_metrics("windows"), advance=nico_ass.pseudo_bold_advancer("windows"),
+    rng=random.Random(0),
+).ass
+(OUT / "sm9560870.ass").write_text(ass, encoding="utf-8-sig")
+for t in sys.argv[3:]:
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+         f"color=black:s=1920x1080:d={float(t) + 1}", "-vf", "ass=sm9560870.ass", "-ss", t,
+         "-frames:v", "1", f"ours_{t}.png"],
+        cwd=OUT, check=True,
+    )
+    print(OUT / f"ours_{t}.png")
+```
+
+</details>
+
+<details><summary>cmp388.py（C6 の外接矩形と字の間隔、<code>28465d2bf82d79b0375ae11708075ed1bbfa08d4</code>）</summary>
+
+```python
+"""C6: 焼きこみ（1920x1080 の PNG）で、Web と同じ判定のインクの外接矩形と字の間隔を出す。"""
+
+import sys
+from pathlib import Path
+
+from PIL import Image
+
+D = Path(sys.argv[1])
+
+
+def load(t):
+    return Image.open(D / f"ours_{t}.png").convert("RGB")
+
+
+def box(img, pred, x0, y0, x1, y1):
+    px = img.load()
+    xs, ys = [], []
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if pred(px[x, y]):
+                xs.append(x)
+                ys.append(y)
+    return (min(xs), max(xs), min(ys), max(ys)) if xs else None
+
+
+def pitch(img, y0, y1):
+    px = img.load()
+    col = [sum(1 for y in range(y0, y1) if min(px[x, y]) > 200) for x in range(1920)]
+    starts, gap = [], 99
+    for x, n in enumerate(col):
+        if n:
+            if gap >= 2:
+                starts.append(x)
+            gap = 0
+        else:
+            gap += 1
+    diffs = sorted(b - a for a, b in zip(starts, starts[1:]))
+    return {"n": len(starts), "median": diffs[len(diffs) // 2], "first": starts[0], "last": starts[-1],
+            "mean": round((starts[-1] - starts[0]) / (len(starts) - 1), 2)}
+
+
+white = lambda p: p[0] > 200 and p[1] > 200 and p[2] > 200  # noqa: E731
+cyan = lambda p: p[0] < 120 and p[1] > 150 and p[2] > 150  # noqa: E731
+i18, i23, i29 = load("18.3"), load("23.2"), load("29.9")
+print("18.3 white upper", box(i18, white, 700, 300, 1300, 520))
+print("18.3 white lower", box(i18, white, 700, 520, 1300, 720))
+print("23.2 white block", box(i23, white, 0, 0, 1920, 260))
+print("29.9 white line (ours y 680-770)", box(i29, white, 0, 680, 1920, 770))
+print("29.9 cyan", box(i29, cyan, 0, 400, 1920, 800))
+print("23.2 block row1 pitch", pitch(i23, 8, 50))
+print("29.9 line pitch (ours y 680-770)", pitch(i29, 680, 770))
+```
+
+</details>
+
+<details><summary>seed388.py（C6 のランダム配置の確かめ、<code>92fe93fef3065b1b8c0b8cb4b3e525272b49331d</code>）</summary>
+
+```python
+"""C6: 投稿してもらった 29.35 秒の medium・5 行の位置が、乱数の種で変わるか（ランダム配置か）。"""
+
+import json
+import random
+import re
+import sys
+
+sys.path.insert(0, r"C:\Users\f8924\Documents\claude\yt-gui")
+from yt_gui import nico_ass as n  # noqa: E402
+
+data = json.load(open(sys.argv[1], encoding="utf-8-sig"))
+rows = []
+
+
+def walk(o):
+    if isinstance(o, dict):
+        if "commands" in o and "body" in o:
+            rows.append(o)
+        else:
+            for v in o.values():
+                walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            walk(v)
+
+
+walk(data)
+for seed in (0, 1, 2):
+    ass = n.convert(
+        json.dumps(rows, ensure_ascii=False), width=1920, height=1080, font_scale_percent=100,
+        opacity=1.0, platform="windows", measure=n.pillow_measurer("windows"),
+        metrics=n.font_metrics("windows"), advance=n.pseudo_bold_advancer("windows"),
+        rng=random.Random(seed),
+    ).ass
+    ys = [
+        re.search(r"\\pos\(([^)]*)\)", line).group(1)
+        for line in ass.splitlines()
+        if line.startswith("Dialogue: 0,0:00:29.35") and "あ" * 12 in line
+    ]
+    print(seed, ys)
+```
+
+</details>
+
+<details><summary>at388.py（C6 のコメントの対応、<code>bf97ebab7e4c657f8b10077c665fdd16081f3ed6</code>）</summary>
+
+```python
+"""C6: 焼きこみの ASS で、指定の時刻に出ている「＜ああ」の Dialogue を並べる。"""
+
+import re
+import sys
+
+ass = open(sys.argv[1], encoding="utf-8-sig").read()
+t = float(sys.argv[2])
+
+
+def sec(v):
+    h, m, s = v.split(":")
+    return int(h) * 3600 + int(m) * 60 + float(s)
+
+
+for line in ass.splitlines():
+    if not line.startswith("Dialogue:"):
+        continue
+    p = line.split(",", 9)
+    if not sec(p[1]) <= t < sec(p[2]):
+        continue
+    body = re.sub(r"\{[^}]*\}", "", p[9])
+    if "ああ" in body and ("＜" in body or "<" in body):
+        pos = re.search(r"\\(pos|move)\(([^)]*)\)", p[9])
+        an = re.search(r"\\an(\d)", p[9]).group(1)
+        print(p[1], p[2], f"an{an}", pos.group(1), pos.group(2), body[:20])
+```
+
+</details>
+
 ## 訂正ログ
 
 | 日付 | 何を誤って書いたか | 正しくは | どの検査・手順なら捕まえたか |
@@ -48,6 +713,6 @@
 
 ## 次にやること
 
-設計を arch / spec に書き、design-review と Web の見比べを反映した。次はテスト先行 → 実装。
+C1〜C8 は証跡つきで完了。次は `/verify-gate`（verify → docs-check → evaluator）→ PR。
 
 訂正ログ: 0 件
