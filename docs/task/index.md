@@ -16,7 +16,6 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
-| [412-arm64-pin-staleness.md](412-arm64-pin-staleness.md) | 進行中 | macOS arm64 の ffmpeg ピン（osxexperts.net）の古さを、ページ上の表示とピンの比較で週次に検知し、失敗で知らせる（真正性は人が確認。#412） | 2026-11-28 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |

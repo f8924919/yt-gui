@@ -1,11 +1,11 @@
 # macOS arm64 の ffmpeg ピンの古さを週次で検知する
 
 > Issue: [#412](https://github.com/f8924919/yt-gui/issues/412)
-> ステータス: 進行中
+> ステータス: 完了（PR #PRNUM）
 > ブランチ: `feature/412-arm64-pin-staleness`
 > 基点: `dd66c0d`
 
-受け入れ条件の正本は Issue（2026-11-28 に criteria-review とユーザー確認を経て書き直した版）。設計は [build.md](../build.md) の「更新運用」「同梱バイナリのピン自動更新（GitHub Actions）」。
+受け入れ条件の正本は Issue（2026-11-28 に criteria-review とユーザー確認を経て書き直した版）。設計は [build.md](../../build.md) の「更新運用」「同梱バイナリのピン自動更新（GitHub Actions）」。
 
 ## 進捗
 
@@ -211,7 +211,7 @@
 evaluator が独立の変異で生き残らせた `OSError` の捕捉の除去は、テストを足して塞いだ（`test_url_ok_error_on_raw_oserror`、e7c3cc7、変異 M23）。`html.lower()` の除去は、2 巡目の指摘（D2）で M28 として塞いだ。
 ## 次にやること
 
-- evaluator の 3 巡目（2 巡目の指摘と閉じ方の対応表を渡す）→ archive 移動 → PR
+- なし（完了）。マージ後に main で `update-binaries.yml` を 1 回手動実行し、ランナーから検査が通る（警告 0 件）ことを確かめる（下の archive/index.md の申し送り）
 
 訂正ログ: 2 件（止まった: 2026-11-28。ユーザーの判断は「このまま続ける」（ページ取得のリトライを含める））
 読み直した結果: 2 件とも外部の事実（配布元の命名・失敗の原因）を確かめないまま書いた誤りで、設計の柱（知らせ方・版の照合・x86_64 との差を判定に使わない）には響かない。2 件目の観測からリトライを足したことだけが設計の変更で、Issue の方針も改訂した。
