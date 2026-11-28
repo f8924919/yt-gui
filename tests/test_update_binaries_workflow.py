@@ -144,3 +144,93 @@ def test_pr_body_is_annotated_when_pat_is_missing(
     # `--summary-out` の指定とも一致する文字列なので、書き換え先の一時ファイルまで見る。
     assert body_file in run
     assert ".annotated." in run, "本文ファイルの書き換えが失われている"
+
+
+# --- macOS arm64 のピンの古さの検知（#412） ---------------------------------
+# 仕様: docs/build.md「macOS arm64 のピンの古さの検知」。警告があっても PR 作成は
+# 止めず、PR 作成の後のステップでジョブを失敗させる。
+
+FAIL_STEP_NAME = "Fail if arm64 pin needs attention"
+ALERTS_OPTION = "--alerts-out"
+
+
+@pytest.fixture(scope="module")
+def refresh_step(steps: list[dict[str, Any]]) -> dict[str, Any]:
+    """`scripts/refresh_pins.py` を走らせるステップを返す。"""
+    matched = [s for s in steps if "scripts/refresh_pins.py" in str(s.get("run", ""))]
+    assert len(matched) == 1, (
+        "refresh_pins.py を走らせるステップが 1 つだけ存在すること"
+    )
+    return matched[0]
+
+
+@pytest.fixture(scope="module")
+def fail_step(steps: list[dict[str, Any]]) -> dict[str, Any]:
+    """arm64 の警告でジョブを失敗させるステップを返す。"""
+    matched = [s for s in steps if s.get("name") == FAIL_STEP_NAME]
+    assert len(matched) == 1, f"「{FAIL_STEP_NAME}」ステップが失われている"
+    return matched[0]
+
+
+def _alerts_path(refresh_step: dict[str, Any]) -> str:
+    run = str(refresh_step["run"])
+    assert ALERTS_OPTION in run, "refresh_pins.py に警告ファイルの出力先を渡していない"
+    return run.split(ALERTS_OPTION, 1)[1].split()[0].strip("\"'")
+
+
+def test_refresh_step_writes_alerts_file(refresh_step: dict[str, Any]) -> None:
+    """Refresh pins が警告ファイルを書き出し、id で結果を参照できること。"""
+    assert _alerts_path(refresh_step)
+    assert refresh_step.get("id") == "refresh"
+
+
+def test_fail_step_reads_same_alerts_file(
+    refresh_step: dict[str, Any], fail_step: dict[str, Any]
+) -> None:
+    """失敗ステップが、Refresh pins の書き出し先と同じファイルを読むこと。
+
+    パスがずれると、警告があっても失敗ステップは「ファイルが無い」を見るだけになる。
+    """
+    assert _alerts_path(refresh_step) in str(fail_step["run"])
+
+
+def test_fail_step_comes_after_pr_creation(
+    steps: list[dict[str, Any]],
+    fail_step: dict[str, Any],
+    create_pr_step: dict[str, Any],
+) -> None:
+    """PR 作成の後にあること。
+
+    前にあると、警告のある週に他のピンの PR が作られない。
+    """
+    assert steps.index(create_pr_step) < steps.index(fail_step)
+
+
+def test_fail_step_runs_even_if_pr_creation_failed(fail_step: dict[str, Any]) -> None:
+    """PR 作成が失敗した週も走ること（取り消し時だけ走らない）。"""
+    assert "!cancelled()" in str(fail_step.get("if", ""))
+
+
+def test_fail_step_fails_on_alerts_with_error_annotation(
+    fail_step: dict[str, Any],
+) -> None:
+    """警告ファイルが空でなければ、1 行ずつ ::error:: を出して失敗すること。"""
+    run = str(fail_step["run"])
+    assert "-s " in run, "空でないかの判定が失われている"
+    assert "::error::" in run
+    assert "read -r" in run, "1 行ずつ読む処理が失われている"
+    assert "exit 1" in run
+
+
+def test_fail_step_treats_missing_file_after_success_as_failure(
+    fail_step: dict[str, Any],
+) -> None:
+    """Refresh pins が成功したのに警告ファイルが無いときは、不備として失敗すること。
+
+    この判定が無いと、`--alerts-out` の指定が消えても失敗ステップは常に通る（偽 PASS）。
+    """
+    run = str(fail_step["run"])
+    assert "steps.refresh.outcome" in run or "steps.refresh.outcome" in str(
+        fail_step.get("env", "")
+    )
+    assert "-f " in run or "-e " in run, "ファイルの存在の判定が失われている"

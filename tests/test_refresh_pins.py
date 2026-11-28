@@ -4,6 +4,7 @@
 """
 
 import importlib.util
+import json
 import os
 import sys
 
@@ -327,3 +328,450 @@ def test_build_summary_does_not_mention_removed_supplier():
     """johnvansickle 廃止（#272）後の定型文に旧取得元が残っていない。"""
     out = refresh_pins._build_summary([], ["deno: v2.8.1（変更なし）"])
     assert "johnvansickle" not in out
+
+
+# --- macOS arm64 のピンの古さの検査（#412） ---------------------------------
+# 仕様: docs/build.md「macOS arm64 のピンの古さの検知」。フィクスチャは実物の
+# osxexperts.net のページから切り出したもの（出所は各ファイルの先頭に記載）。
+
+_DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+_URL91_FFMPEG = "https://www.osxexperts.net/ffmpeg91arm.zip"
+_URL91_FFPROBE = "https://www.osxexperts.net/ffprobe91arm.zip"
+_SHA91_FFMPEG = "f3cc9de031a39020b7285a62667b951949a0377483b7cbf708c7126234fda34f"
+_SHA91_FFPROBE = "a663dbfafcd144f441834bc4af50077ccb969b635775612e5eddb6574f2caed0"
+_SHA90_FFMPEG = "591260c945d0eef150e3bf82b0ef988bd36a9cecc18ff05d6679617159f0a95e"
+_SHA90_FFPROBE = "e11c17e8200b3ee4c4c186d245e2b4053f01d56957336c1817fca0b997469106"
+
+
+def _page(version: str) -> str:
+    with open(
+        os.path.join(_DATA, f"osxexperts_arm64_{version}.html"), encoding="utf-8"
+    ) as f:
+        return f.read()
+
+
+def _arm_pin_91() -> dict:
+    return {
+        "version": "9.1",
+        "source": "osxexperts.net",
+        "verify": "binary",
+        "ffmpeg": {"url": _URL91_FFMPEG, "sha256": _SHA91_FFMPEG},
+        "ffprobe": {"url": _URL91_FFPROBE, "sha256": _SHA91_FFPROBE},
+    }
+
+
+def _check(pin: dict, page: str, url_ok=lambda url: "ok") -> list[str]:
+    # refresh_pins は importlib で読むため型は Any になる。戻り値の型をここで固める。
+    alerts: list[str] = refresh_pins.check_ffmpeg_mac_arm64(
+        pin, fetch_text=lambda url: page, url_ok=url_ok
+    )
+    return alerts
+
+
+def _stale(alerts: list[str]) -> list[str]:
+    return [a for a in alerts if a.startswith(refresh_pins._ALERT_STALE)]
+
+
+def _unchecked(alerts: list[str]) -> list[str]:
+    return [a for a in alerts if a.startswith(refresh_pins._ALERT_UNCHECKED)]
+
+
+# C1 版の読み取り
+
+
+def test_parse_osxexperts_reads_apple_silicon_91():
+    """現行ページ（9.1）から Apple Silicon 版の版と URL を読む。
+
+    Intel 版と ffplay は拾わない。
+    """
+    got = refresh_pins._parse_osxexperts_arm64(_page("9.1"))
+    assert got == {
+        "ffmpeg": ("9.1", _URL91_FFMPEG),
+        "ffprobe": ("9.1", _URL91_FFPROBE),
+    }
+
+
+def test_parse_osxexperts_accepts_dropped_trailing_zero_in_link():
+    """9.0 はリンクが `ffmpeg9arm.zip`（末尾 .0 を省く）でも一致とみなす。"""
+    got = refresh_pins._parse_osxexperts_arm64(_page("9.0"))
+    assert got == {
+        "ffmpeg": ("9.0", "https://www.osxexperts.net/ffmpeg9arm.zip"),
+        "ffprobe": ("9.0", "https://www.osxexperts.net/ffprobe9arm.zip"),
+    }
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        # リンクだけ（文言が無い）
+        lambda h: h.replace("Download ffmpeg 9.1 (Apple Silicon)", "Download"),
+        # 文言だけ（リンクが無い）
+        lambda h: h.replace("ffmpeg91arm.zip", "ffmpeg-latest.zip"),
+        # リンクと文言の版が食い違う
+        lambda h: h.replace("ffmpeg91arm.zip", "ffmpeg92arm.zip"),
+        # Apple Silicon 版のリンクが 2 本ある
+        lambda h: h.replace("ffmpeg80intel.zip", "ffmpeg91arm.zip"),
+    ],
+    ids=["link_only", "text_only", "link_text_mismatch", "duplicate_link"],
+)
+def test_parse_osxexperts_rejects_broken_structure(mutate):
+    """リンクと文言がそろわない・食い違う・重複するときは ArmPageError。"""
+    with pytest.raises(refresh_pins.ArmPageError):
+        refresh_pins._parse_osxexperts_arm64(mutate(_page("9.1")))
+
+
+def test_same_version_ignores_trailing_zero():
+    assert refresh_pins._same_version("9", "9.0")
+    assert refresh_pins._same_version("9.0", "9")
+    assert refresh_pins._same_version("9.1", "9.1")
+    assert not refresh_pins._same_version("9.1", "9.0")
+    assert not refresh_pins._same_version("10", "1.0")
+
+
+# C2 古さの判定 / C12 sha256 がページに載っているか
+
+
+def test_check_arm64_current_pin_has_no_alerts():
+    """#411 後のピン（9.1）と現行ページの組では警告しない。"""
+    assert _check(_arm_pin_91(), _page("9.1")) == []
+
+
+def test_check_arm64_pin_90_written_as_9_matches_90_page():
+    """ピンの版が "9"、ページが 9.0 でも同じ版とみなす。"""
+    pin = {
+        "version": "9",
+        "ffmpeg": {
+            "url": "https://www.osxexperts.net/ffmpeg9arm.zip",
+            "sha256": _SHA90_FFMPEG,
+        },
+        "ffprobe": {
+            "url": "https://www.osxexperts.net/ffprobe9arm.zip",
+            "sha256": _SHA90_FFPROBE,
+        },
+    }
+    assert _check(pin, _page("9.0")) == []
+
+
+def test_check_arm64_old_pin_is_stale():
+    """ピンが 9.0 のままでページが 9.1 なら「古い」。ページとピンの版を出す。"""
+    pin = {
+        "version": "9.0",
+        "ffmpeg": {
+            "url": "https://www.osxexperts.net/ffmpeg9arm.zip",
+            "sha256": _SHA90_FFMPEG,
+        },
+        "ffprobe": {
+            "url": "https://www.osxexperts.net/ffprobe9arm.zip",
+            "sha256": _SHA90_FFPROBE,
+        },
+    }
+    alerts = _check(pin, _page("9.1"))
+    stale = _stale(alerts)
+    assert stale, alerts
+    assert any("9.1" in a and "9.0" in a for a in stale)
+    assert not _unchecked(alerts)
+
+
+def test_check_arm64_url_differs_from_page_is_stale():
+    """版は同じでもピンの URL がページの URL と違えば「古い」。"""
+    pin = _arm_pin_91()
+    pin["ffprobe"]["url"] = "https://www.osxexperts.net/ffprobe91arm-old.zip"
+    stale = _stale(_check(pin, _page("9.1")))
+    assert any("ffprobe" in a for a in stale)
+
+
+def test_check_arm64_sha_missing_from_page_is_stale():
+    """ピンの sha256 がページに載っていなければ「古い（差し替えの可能性）」。"""
+    pin = _arm_pin_91()
+    pin["ffmpeg"]["sha256"] = "0" * 64
+    stale = _stale(_check(pin, _page("9.1")))
+    assert any("ffmpeg" in a and "sha256" in a for a in stale)
+
+
+def test_check_arm64_sha_comparison_is_case_insensitive():
+    pin = _arm_pin_91()
+    pin["ffmpeg"]["sha256"] = _SHA91_FFMPEG.upper()
+    assert _check(pin, _page("9.1")) == []
+
+
+def test_check_arm64_ffmpeg_ffprobe_version_split_is_reported():
+    """ページ上で ffmpeg と ffprobe の版が違えば、その旨が分かる警告を出す。"""
+    page = (
+        _page("9.1")
+        .replace("ffprobe91arm.zip", "ffprobe92arm.zip")
+        .replace(
+            "Download ffprobe 9.1 (Apple Silicon)",
+            "Download ffprobe 9.2 (Apple Silicon)",
+        )
+    )
+    alerts = _check(_arm_pin_91(), page)
+    assert any("ffmpeg" in a and "ffprobe" in a and "9.2" in a for a in alerts)
+
+
+def test_refresh_ffmpeg_mac_notes_arch_version_difference(monkeypatch):
+    """x86_64 と arm64 の版の差は状況欄の注記だけで、arm64 は書き換えない。"""
+    info = {
+        "version": "9.2",
+        "download": {"zip": {"url": "https://evermeet.cx/ffmpeg/x-9.2.zip", "size": 1}},
+    }
+    monkeypatch.setattr(refresh_pins, "_http_json", lambda url, headers=None: info)
+    monkeypatch.setattr(refresh_pins, "_hashes_of_url", lambda url: ("d" * 64, 1))
+    old = {
+        "x86_64": {
+            "version": "9.1",
+            "ffmpeg": {"url": "u", "sha256": "e" * 64},
+            "ffprobe": {"url": "u", "sha256": "e" * 64},
+        },
+        "arm64": _arm_pin_91(),
+    }
+    new, summary = refresh_pins.refresh_ffmpeg_mac(old)
+    assert new["arm64"] == _arm_pin_91()
+    assert "x86_64 と版が異なる" in summary
+
+
+# C3 URL の生存
+
+
+class _Resp:
+    def __init__(self, url: str, status: int = 200, ctype: str = "application/zip"):
+        self._url = url
+        self.status = status
+        self.headers = {"Content-Type": ctype}
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, n: int = -1) -> bytes:
+        return b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _http_error(url: str, code: int):
+    import urllib.error
+
+    return urllib.error.HTTPError(url, code, "x", {}, None)  # type: ignore[arg-type]
+
+
+def _opener(responses: dict):
+    """urlopen の代わり。method ごとに応答（_Resp か例外）を返し、method を記録する。"""
+    calls: list[str] = []
+
+    def fake(req, timeout=None):
+        method = req.get_method()
+        calls.append(method)
+        r = responses[method]
+        if isinstance(r, BaseException):
+            raise r
+        return r
+
+    return fake, calls
+
+
+def test_url_ok_head_200_zip():
+    fake, calls = _opener({"HEAD": _Resp(_URL91_FFMPEG)})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "ok"
+    assert calls == ["HEAD"]
+
+
+@pytest.mark.parametrize("code", [404, 410])
+def test_url_ok_gone_on_404_410(code):
+    fake, _ = _opener({"HEAD": _http_error(_URL91_FFMPEG, code)})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "gone"
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        _http_error(_URL91_FFMPEG, 500),
+        _http_error(_URL91_FFMPEG, 503),
+        TimeoutError("timed out"),
+        OSError("connection refused"),
+    ],
+    ids=["500", "503", "timeout", "oserror"],
+)
+def test_url_ok_error_on_server_or_network_failure(exc):
+    import urllib.error
+
+    excs = {"HEAD": exc, "GET": exc}
+    if isinstance(exc, OSError) and not isinstance(exc, urllib.error.HTTPError):
+        excs = {"HEAD": urllib.error.URLError(exc), "GET": urllib.error.URLError(exc)}
+    fake, _ = _opener(excs)
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "error"
+
+
+def test_url_ok_redirect_to_other_url_is_gone():
+    """取り下げた zip がトップページへリダイレクトされる形を「古い」とみなす。"""
+    fake, _ = _opener({"HEAD": _Resp("https://www.osxexperts.net/", ctype="text/html")})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "gone"
+
+
+def test_url_ok_non_zip_response_is_gone():
+    fake, _ = _opener({"HEAD": _Resp(_URL91_FFMPEG, ctype="text/html; charset=utf-8")})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "gone"
+
+
+def test_url_ok_falls_back_to_range_get_when_head_not_allowed():
+    fake, calls = _opener(
+        {"HEAD": _http_error(_URL91_FFMPEG, 405), "GET": _Resp(_URL91_FFMPEG, 206)}
+    )
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "ok"
+    assert calls == ["HEAD", "GET"]
+
+
+@pytest.mark.parametrize("tool", ["ffmpeg", "ffprobe"])
+def test_check_arm64_gone_url_is_stale_per_tool(tool):
+    """ffmpeg だけ・ffprobe だけの URL が消えたときも「古い」とし、ツール名を出す。"""
+    gone = _arm_pin_91()[tool]["url"]
+    alerts = _check(
+        _arm_pin_91(), _page("9.1"), url_ok=lambda u: "gone" if u == gone else "ok"
+    )
+    stale = _stale(alerts)
+    assert len(stale) == 1 and tool in stale[0], alerts
+    assert not _unchecked(alerts)
+
+
+def test_check_arm64_url_check_error_is_unchecked():
+    alerts = _check(_arm_pin_91(), _page("9.1"), url_ok=lambda u: "error")
+    assert _unchecked(alerts) and not _stale(alerts)
+
+
+# C4 検査不能の区別 / C13 警告文に入れるもの
+
+
+def test_check_arm64_fetch_failure_is_unchecked():
+    def boom(url):
+        raise OSError("<html>blocked</html>\n::error::injected %0A")
+
+    alerts = refresh_pins.check_ffmpeg_mac_arm64(
+        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok"
+    )
+    assert len(_unchecked(alerts)) == 1 and not _stale(alerts)
+    assert "OSError" in alerts[0]
+    # 例外メッセージの生の文字列（第三者の HTML）は流さない
+    assert "<html>" not in alerts[0] and "::error::" not in alerts[0]
+
+
+def test_check_arm64_structure_change_is_unchecked_and_does_not_leak_html():
+    page = "<html><script>alert(1)</script>no links here\n::error::x</html>"
+    alerts = _check(_arm_pin_91(), page)
+    assert len(_unchecked(alerts)) == 1 and not _stale(alerts)
+    assert "<script>" not in alerts[0] and "::error::" not in alerts[0]
+
+
+def test_check_arm64_unexpected_exception_becomes_unchecked():
+    """想定外の入力（ピンのキー欠落など）でも例外を外へ出さず「検査できなかった」にする。"""
+    alerts = _check({"version": "9.1"}, _page("9.1"))
+    assert len(_unchecked(alerts)) == 1
+    assert "KeyError" in alerts[0]
+
+
+def test_alerts_are_single_line():
+    alerts = _check({"version": "9.1"}, _page("9.1"))
+    alerts += _check(_arm_pin_91(), _page("9.1"), url_ok=lambda u: "gone")
+    assert alerts
+    assert all("\n" not in a and "\r" not in a for a in alerts)
+
+
+def test_write_alerts_uses_lf_and_creates_empty_file(tmp_path):
+    path = tmp_path / "alerts.txt"
+    refresh_pins._write_alerts(str(path), [])
+    assert path.exists() and path.read_bytes() == b""
+    refresh_pins._write_alerts(str(path), ["a\r\nb", "c"])
+    assert path.read_bytes() == b"a b\nc\n"
+
+
+# C6 警告の出力
+
+
+def test_build_summary_puts_alerts_first():
+    alerts = [f"{refresh_pins._ALERT_STALE}: ffmpeg（ページ 9.2 / ピン 9.1）"]
+    out = refresh_pins._build_summary([], ["deno: v2.8.1（変更なし）"], alerts)
+    assert "[!CAUTION]" in out
+    assert out.index("[!CAUTION]") < out.index("更新はありません")
+    assert alerts[0] in out
+    assert "bin/pins.json" in out and "ffmpeg-mac.arm64" in out
+
+
+def test_build_summary_without_alerts_has_no_caution():
+    out = refresh_pins._build_summary([], ["deno: v2.8.1（変更なし）"], [])
+    assert "[!CAUTION]" not in out
+
+
+# C5 検査を先に行い先に書く / C8 sha256 を書き換えない
+
+
+def _pins_for_run() -> dict:
+    return {
+        "deno": {"v": 1},
+        "ffmpeg-win": {"v": 1},
+        "ffmpeg-mac": {"x86_64": {"version": "9.1"}, "arm64": _arm_pin_91()},
+        "ffmpeg-linux": {"v": 1},
+    }
+
+
+def test_run_checks_and_writes_alerts_before_refresh(monkeypatch, tmp_path):
+    """再ピンが例外になっても、arm64 の警告は先に書き出されている。"""
+    order: list[str] = []
+    alert = f"{refresh_pins._ALERT_STALE}: ffmpeg"
+
+    def fake_check(pin, **kw):
+        order.append("check")
+        return [alert]
+
+    def fake_refresh(pins):
+        order.append("refresh")
+        raise RuntimeError("BtbN down")
+
+    monkeypatch.setattr(refresh_pins, "check_ffmpeg_mac_arm64", fake_check)
+    monkeypatch.setattr(refresh_pins, "refresh_pins", fake_refresh)
+    path = tmp_path / "alerts.txt"
+    with pytest.raises(RuntimeError):
+        refresh_pins.run(_pins_for_run(), alerts_out=str(path))
+    assert order == ["check", "refresh"]
+    assert path.read_text(encoding="utf-8") == alert + "\n"
+
+
+def test_run_passes_refresh_result_through_and_keeps_arm64(monkeypatch):
+    """警告があっても再ピンの結果はそのまま。arm64 のピンは書き換えない。"""
+    pins = _pins_for_run()
+    before = json.loads(json.dumps(pins))
+    sentinel = ({"new": True}, ["c"], ["s"])
+    monkeypatch.setattr(refresh_pins, "check_ffmpeg_mac_arm64", lambda pin, **kw: ["x"])
+    monkeypatch.setattr(refresh_pins, "refresh_pins", lambda p: sentinel)
+    new_pins, changes, statuses, alerts = refresh_pins.run(pins)
+    assert (new_pins, changes, statuses) == sentinel
+    assert alerts == ["x"]
+    assert pins == before
+
+
+def test_run_with_real_check_does_not_touch_arm64_pin(monkeypatch):
+    """実際の検査（古い判定あり）を通しても、arm64 のピンは不変。"""
+    pins = _pins_for_run()
+    pins["ffmpeg-mac"]["arm64"]["ffmpeg"]["sha256"] = "0" * 64
+    before = json.loads(json.dumps(pins))
+    monkeypatch.setattr(
+        refresh_pins, "_http_text", lambda url, headers=None: _page("9.1")
+    )
+    monkeypatch.setattr(refresh_pins, "_url_ok", lambda url, **kw: "ok")
+    monkeypatch.setattr(refresh_pins, "refresh_pins", lambda p: (p, [], []))
+    new_pins, _c, _s, alerts = refresh_pins.run(pins)
+    assert _stale(alerts)
+    assert pins == before
+    assert new_pins["ffmpeg-mac"]["arm64"] == before["ffmpeg-mac"]["arm64"]
+
+
+def test_real_pins_json_arm64_matches_fixture_page():
+    """実物の bin/pins.json の arm64 ピンが、実物から切り出した現行ページと一致する。
+
+    A3（実物との突き合わせ）。arm64 のピンを手で更新したら、フィクスチャ
+    `tests/data/osxexperts_arm64_<版>.html` も実物から取り直す（docs/build.md）。
+    """
+    import download_binaries as db
+
+    arm = db._load_pins()["ffmpeg-mac"]["arm64"]
+    assert _check(arm, _page("9.1")) == []

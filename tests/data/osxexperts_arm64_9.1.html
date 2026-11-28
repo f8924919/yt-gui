@@ -1,0 +1,75 @@
+<!--
+osxexperts.net トップページのダウンロード部分（85-153 行目）を切り出したもの（#412 のテスト用）。
+出所: https://www.osxexperts.net/ を 2026-11-28T03:47:04Z に取得（UA yt-gui-pin-refresh）。
+ページ全体の sha256: cadec69ed157ec5ac29e9c623a382f86121a5b428103940c1eab25f0009fa60c（36168 バイト）。
+Apple Silicon 版は 9.1（ffmpeg91arm.zip / ffprobe91arm.zip）、Intel 版は 8.0。
+-->
+		<div class="row">
+			<div class="col-md-6 text-left">
+				<a href="https://www.osxexperts.net/ffmpeg91arm.zip" class="btn btn-c-5861" target="_blank">Download ffmpeg 9.1 (Apple Silicon)</a>
+				<p class="p-bloc-1-style">
+					<br>SHA256 checksum of FFmpeg file : f3cc9de031a39020b7285a62667b951949a0377483b7cbf708c7126234fda34f<br>Source used to compile : <a href="https://github.com/FFmpeg/FFmpeg/tree/release/6.1" target="_blank">here</a><br>
+				</p>
+			</div>
+			<div class="col-md-6 text-left">
+				<a href="https://www.osxexperts.net/ffmpeg80intel.zip" class="btn btn-c-5861" target="_blank">Download ffmpeg 8.0 (Intel)</a>
+				<p class="p-2-style">
+					<br>SHA256 checksum of FFmpeg file: df3f1e3facdc1ae0ad0bd898cdfb072fbc9641bf47b11f172844525a05db8d11<br>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- bloc-1 END -->
+
+<!-- bloc-2 -->
+<div class="bloc l-bloc" id="bloc-2">
+	<div class="container bloc-lg bloc-no-padding-lg">
+		<div class="row">
+			<div class="col-md-6 text-left">
+				<h3 class="mb-4 h3-1-style">
+					ffprobe static build for macOS
+				</h3><a href="https://www.osxexperts.net/ffprobe91arm.zip" class="btn btn-c-5861" target="_blank">Download ffprobe 9.1 (Apple Silicon)</a>
+				<p class="p-bloc-1-style">
+					<br>SHA256 checksum of ffprobe file : a663dbfafcd144f441834bc4af50077ccb969b635775612e5eddb6574f2caed0<br>Source used to compile : <a href="https://github.com/FFmpeg/FFmpeg/tree/release/6.1" target="_blank">here</a><br>
+				</p>
+			</div>
+			<div class="col-md-6 text-left">
+				<h3 class="mb-4 h3-2-style">
+					<br>
+				</h3><a href="https://www.osxexperts.net/ffprobe80intel.zip" class="btn btn-c-5861" target="_blank">Download ffprobe 8.0 (Intel)</a>
+				<p class="p-2-style">
+					<br>SHA256 checksum of ffprobe file: 5228e651e2bd67bb55819b27f6138351587b16d2b87446007bf35b7cf930d891<br>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- bloc-2 END -->
+
+<!-- bloc-2 -->
+<div class="bloc l-bloc" id="bloc-2">
+	<div class="container bloc-lg bloc-no-padding-lg">
+		<div class="row">
+			<div class="col-md-6 text-left ">
+				<h3 class="mb-4 h3-1-style">
+					ffplay static build for macOS
+				</h3><a href="https://www.osxexperts.net/ffplay91arm.zip" class="btn btn-c-5861" target="_blank">Download ffplay 9.1 (Apple Silicon)</a>
+				<p class="p-bloc-1-style">
+					<br>SHA256 checksum of ffplay file : b2dff6ea96ca4240cfb449c5fd221d79df84df09bdc251ceb5c830808001afcc<br>Source used to compile : <a href="https://github.com/FFmpeg/FFmpeg/tree/release/6.1" target="_blank">here</a><br>
+				</p>
+				<label class="label-style">
+					<br>For macOS 10.15 or higher you need to remove the file from quarantine.<br>You can do this in the Terminal:<br>xattr -dr com.apple.quarantine &lt;pathtotheffmpegfile><br><br>Apple Silicon devices can only run signed files.<br>If needed you can ad-hoc sign the downloaded file in the Terminal:<br>xattr -cr &lt;pathtotheffmpegfile>
+				</label>
+				<pathtotheffmpegfile>
+					<br>codesign -s - &lt;pathtotheffmpegfile>&nbsp;<br>
+					
+				</pathtotheffmpegfile><br>Note:<br>The provided ffmpeg, ffplay and ffprobe files are for educational purposes only.<br><br>
+			</div>
+			<div class="col-md-6 text-left">
+				<h3 class="mb-4 h3-2-style">
+					<br>
+				</h3><a href="https://www.osxexperts.net/ffplay80intel.zip" class="btn btn-c-5861" target="_blank">Download ffplay 8.0 (Intel)</a>
+				<p class="p-2-style">
+					<br>SHA256 checksum of ffplay file:<br>6db4421b3e3ef051175c4ead722c15e833949a642e97b53d7bbe35b90ac1e50b<br><br>
+				</p>
