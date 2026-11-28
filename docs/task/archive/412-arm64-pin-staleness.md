@@ -1,7 +1,7 @@
 # macOS arm64 の ffmpeg ピンの古さを週次で検知する
 
 > Issue: [#412](https://github.com/f8924919/yt-gui/issues/412)
-> ステータス: 完了（PR #PRNUM）
+> ステータス: 完了（PR #415）
 > ブランチ: `feature/412-arm64-pin-staleness`
 > 基点: `dd66c0d`
 
