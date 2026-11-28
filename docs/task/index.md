@@ -16,6 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
+| [413-download-retry-after.md](413-download-retry-after.md) | 進行中 | 同梱バイナリの取得で HTTP 429 / 503 に Retry-After で待って取り直し、macOS arm64 の取得にもリトライを効かせる（#413） | 2026-11-28 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
@@ -28,4 +29,3 @@
 | Issue | 概要 | 着手時に読むもの |
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
-| [#413](https://github.com/f8924919/yt-gui/issues/413) | 同梱バイナリの取得で HTTP 429 / 503 に Retry-After で待ってリトライする | [build.md](../build.md)・[265-download-retry.md](archive/265-download-retry.md) |
