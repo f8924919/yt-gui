@@ -196,7 +196,7 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | 検証 | deno は上流 `.sha256sum` と照合。BtbN（win / linux）は最新の不変 `autobuild-*` タグのアセットを取得し sha256 算出（`latest` ローリングは使わない。win / linux は同一タグ・同一バージョンに揃える）、evermeet（mac x86_64）は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
 | 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
 | 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg の再ピン（osxexperts.net・API/署名無しのため手動更新。古さの検知だけは行う） |
-| arm64 の古さの検知 | ページ上の Apple Silicon 版とピンを比べ、古い・検査できないときは PR は通常どおり作ったうえでジョブを失敗させる（後述） |
+| arm64 の古さの検知 | ページ上の Apple Silicon 版とピンを比べ、古い・検査できないときは PR は通常どおり作ったうえでジョブを失敗させる。見るのはページ上の表示とピンの一致だけで、zip の中身の真正性は人がページの公開 sha256 で確認する（後述） |
 | 権限 | `contents: write` / `pull-requests: write` |
 | PR 作成トークン | secret `PIN_UPDATE_TOKEN`（fine-grained PAT）。未設定時は `GITHUB_TOKEN` にフォールバックし、警告を出す（後述） |
 
