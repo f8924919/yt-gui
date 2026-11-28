@@ -25,6 +25,8 @@ import os
 import re
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -182,6 +184,8 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
     # API も署名サイドカーも無く、公開値はページ HTML 上の展開後バイナリ sha256 の
     # ため自動スクレイピングはせず、更新はページの公開値を人手で確認する運用とする
     # （docs/research/binary-supply-chain.md §5）。ここでは arm64 を現状維持する。
+    # ただしピンが古くなったことは別途検知して知らせる（#412。docs/build.md
+    # 「macOS arm64 のピンの古さの検知」）。
     new = dict(old)
     old_x86 = old["x86_64"]
     x86 = dict(old_x86)
@@ -205,7 +209,11 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
             )
             changed = changed or x86[tool]["sha256"] != old_x86[tool].get("sha256")
     new["x86_64"] = x86
-    arm_note = f"arm64={old['arm64']['version']}（osxexperts.net・手動更新）"
+    arm_version = old["arm64"]["version"]
+    arm_note = f"arm64={arm_version}（osxexperts.net・手動更新）"
+    if not _same_version(x86["version"], arm_version):
+        # 版の差は判定に使わない（osxexperts の追従待ちの間は正当にずれる。#412）
+        arm_note += "（x86_64 と版が異なる: osxexperts の追従待ちの可能性）"
     if not changed:
         return new, f"ffmpeg-mac: x86_64={old_x86['version']}（変更なし） / {arm_note}"
     return new, (
@@ -250,6 +258,225 @@ def refresh_ffmpeg_linux(old: dict, release: dict) -> tuple[dict, str]:
     return new, f"ffmpeg-linux: {old.get('version')} → {version} {note}"
 
 
+# --- macOS arm64（osxexperts.net）のピンの古さの検査（#412） -----------------
+# 再ピンはしない（sha256 は人がページの公開値で確認して登録する）。ここでは
+# ページ上の Apple Silicon 版とピンを比べ、古い・検査できないときに警告を返す。
+# 仕様: docs/build.md「macOS arm64 のピンの古さの検知」。
+#
+# 警告文には、正規表現で絞った値（版・固定ホストの URL・sha256・HTTP の結果・
+# 例外の型名）と固定の文言だけを入れる。第三者のページの HTML や例外メッセージの
+# 生の文字列は、ジョブログ（`::error::`）と PR 本文に流れるので入れない。
+
+_OSXEXPERTS_URL = "https://www.osxexperts.net/"
+_ARM64_TOOLS = ("ffmpeg", "ffprobe")
+_ALERT_STALE = "arm64 のピンが古い"
+_ALERT_UNCHECKED = "arm64 のピンを検査できなかった"
+_RERUN_HINT = "一時的な失敗なら workflow_dispatch で再実行して再現するか確認する"
+# ページ取得の一時的な失敗（5xx・429・接続失敗）で取得し直すまでの待ち秒数（計 3 回）
+_PAGE_RETRY_WAITS = (10.0, 30.0)
+
+
+class ArmPageError(RuntimeError):
+    """osxexperts.net のページから Apple Silicon 版を読めない。
+
+    ページの構造の変化か、ランナーへのブロック。
+    """
+
+
+def _strip_trailing_zero(version: str) -> str:
+    return version[:-2] if version.endswith(".0") else version
+
+
+def _same_version(a: str, b: str) -> bool:
+    """末尾の `.0` の有無を区別せずに版を比べる（9 と 9.0 は同じ）。"""
+    return _strip_trailing_zero(a) == _strip_trailing_zero(b)
+
+
+def _arm_link_tokens(version: str) -> set[str]:
+    """版に対応するリンクの数字の候補（9.1 → 91、9.0 → 90 または 9）。
+
+    osxexperts は 9.0 を `ffmpeg9arm.zip`、9.1 を `ffmpeg91arm.zip` と名付けている。
+    """
+    return {version.replace(".", ""), _strip_trailing_zero(version).replace(".", "")}
+
+
+def _parse_osxexperts_arm64(html: str) -> dict[str, tuple[str, str]]:
+    """ページから Apple Silicon 版の ffmpeg / ffprobe の `(版, URL)` を読む。
+
+    ツールごとに、リンク `href="https://www.osxexperts.net/<tool><数字>arm.zip"` と
+    文言 `Download <tool> <版> (Apple Silicon)` をちょうど 1 件ずつ探し、リンクの数字が
+    文言の版に対応するときだけ採用する（版は文言を正とする）。見つからない・複数ある・
+    食い違うときは `ArmPageError`。Intel 版（`...intel.zip` / `(Intel)`）と ffplay は
+    ツール名と `arm.zip` / `(Apple Silicon)` で絞るので拾わない。
+    """
+    result = {}
+    for tool in _ARM64_TOOLS:
+        links = re.findall(
+            r'href="(https://www\.osxexperts\.net/' + tool + r'(\d+)arm\.zip)"', html
+        )
+        texts = re.findall(
+            r"Download " + tool + r" (\d+(?:\.\d+)*) \(Apple Silicon\)", html
+        )
+        if len(links) != 1 or len(texts) != 1:
+            raise ArmPageError(
+                f"{tool}: Apple Silicon 版のリンク {len(links)} 件・"
+                f"文言 {len(texts)} 件"
+            )
+        (url, token), version = links[0], texts[0]
+        if token not in _arm_link_tokens(version):
+            raise ArmPageError(
+                f"{tool}: リンクの数字 {token} と文言の版 {version} が食い違う"
+            )
+        result[tool] = (version, url)
+    return result
+
+
+def _url_ok(url: str, open_fn: Callable[..., Any] = urllib.request.urlopen) -> str:
+    """ピンの URL が取れるかを、本体を落とさずに確かめる。
+
+    HEAD（405 / 501 なら `Range: bytes=0-0` の GET）で問い合わせ、
+    `"ok"`（取れる zip）/ `"gone"`（404・410、別 URL へのリダイレクト、zip でない応答）/
+    `"error"`（タイムアウト・5xx・接続失敗など。古いとは言えない）を返す。
+    """
+    attempts = (
+        urllib.request.Request(url, headers=_UA, method="HEAD"),
+        urllib.request.Request(
+            url, headers={**_UA, "Range": "bytes=0-0"}, method="GET"
+        ),
+    )
+    for i, req in enumerate(attempts):
+        try:
+            with open_fn(req, timeout=60) as resp:
+                ctype = str(resp.headers.get("Content-Type", "")).split(";")[0].strip()
+                if resp.geturl() != url or ctype != "application/zip":
+                    return "gone"
+                return "ok"
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                return "gone"
+            if e.code in (405, 501) and i == 0:
+                continue  # HEAD 非対応 → Range GET
+            return "error"
+        except urllib.error.URLError, OSError:
+            return "error"
+    return "error"
+
+
+def _is_transient(e: BaseException) -> bool:
+    """取得し直せば直りうる失敗か（5xx・429・接続失敗・タイムアウト）。"""
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code == 429 or e.code >= 500
+    return isinstance(e, (urllib.error.URLError, OSError))
+
+
+def _fetch_page(fetch: Callable[[str], str], sleep: Callable[[float], None]) -> str:
+    """osxexperts.net のページを取得する。一時的な失敗だけ待って取得し直す。
+
+    手元でページ取得が HTTP 503 になったことがある（状態コードで確かめたのは 1 回。
+    #412 のタスクメモ「C9」）。直後の取得はキャッシュ（Varnish）から 200 だったので、
+    キャッシュが切れて配布元へ取りに行ったときの一時的な失敗とみられる。週次の実行は
+    ランナーからの初回アクセスで、この条件に当たりやすいと考え、`_PAGE_RETRY_WAITS`
+    の秒数だけ待って取得し直す。404 などの
+    恒久的な失敗と、待ち尽くした最後の失敗はそのまま送出する。
+    """
+    for wait in (*_PAGE_RETRY_WAITS, None):
+        try:
+            return fetch(_OSXEXPERTS_URL)
+        except Exception as e:
+            if wait is None or not _is_transient(e):
+                raise
+            sleep(wait)
+    raise AssertionError("unreachable")
+
+
+def check_ffmpeg_mac_arm64(
+    arm_pin: dict,
+    fetch_text: Callable[[str], str] | None = None,
+    url_ok: Callable[[str], str] | None = None,
+    sleep: Callable[[float], None] | None = None,
+) -> list[str]:
+    """arm64 のピンを osxexperts.net のページと比べ、警告の文字列のリストを返す。
+
+    警告は `_ALERT_STALE`（古い）か `_ALERT_UNCHECKED`（検査できなかった）で始まる
+    1 行の文字列。例外は外へ出さず、型名だけを入れた「検査できなかった」警告に変える
+    （黙って通さない）。ピンは書き換えない。
+    """
+    fetch = fetch_text or _http_text
+    check_url = url_ok or _url_ok
+    try:
+        try:
+            html = _fetch_page(fetch, sleep or time.sleep)
+        except Exception as e:
+            # HTTPError は状態コードを入れる（429 / 403 / 503 の切り分け用。#412 の C9）
+            detail = (
+                f"HTTP {e.code}"
+                if isinstance(e, urllib.error.HTTPError)
+                else type(e).__name__
+            )
+            return [
+                f"{_ALERT_UNCHECKED}: {_OSXEXPERTS_URL} を取得できない"
+                f"（{detail}）。{_RERUN_HINT}"
+            ]
+        try:
+            page = _parse_osxexperts_arm64(html)
+        except ArmPageError:
+            return [
+                f"{_ALERT_UNCHECKED}: ページから Apple Silicon 版の"
+                f"リンクと文言を読めない"
+                f"（ページの構造の変化、またはブロック。応答 {len(html)} 文字・sha256 "
+                f"{hashlib.sha256(html.encode('utf-8')).hexdigest()}）"
+            ]
+        alerts = []
+        pin_version = arm_pin["version"]
+        page_versions = {tool: page[tool][0] for tool in _ARM64_TOOLS}
+        if not _same_version(page_versions["ffmpeg"], page_versions["ffprobe"]):
+            alerts.append(
+                f"{_ALERT_STALE}: ページ上で ffmpeg（{page_versions['ffmpeg']}）と "
+                f"ffprobe（{page_versions['ffprobe']}）の版が違う"
+                f"（ピンの version は 1 つなので、両方の公開値を確認して更新する）"
+            )
+        lowered = html.lower()
+        for tool in _ARM64_TOOLS:
+            page_version, page_url = page[tool]
+            pin_url = arm_pin[tool]["url"]
+            pin_sha = str(arm_pin[tool]["sha256"]).lower()
+            if not _same_version(page_version, pin_version):
+                alerts.append(
+                    f"{_ALERT_STALE}: {tool}"
+                    f"（ページ {page_version} / ピン {pin_version}）"
+                )
+            elif page_url != pin_url:
+                alerts.append(
+                    f"{_ALERT_STALE}: {tool} の URL がページと違う"
+                    f"（ページ {page_version} {page_url} / ピン {pin_version}）"
+                )
+            if not re.fullmatch(r"[0-9a-f]{64}", pin_sha) or pin_sha not in lowered:
+                alerts.append(
+                    f"{_ALERT_STALE}: {tool} のピンの sha256 がページに無い"
+                    f"（同じファイル名のまま配布物が差し替わった可能性）"
+                )
+            status = check_url(pin_url)
+            if status == "gone":
+                alerts.append(
+                    f"{_ALERT_STALE}: {tool} のピンの URL が取得できない（404 など）"
+                )
+            elif status != "ok":
+                alerts.append(
+                    f"{_ALERT_UNCHECKED}: {tool} のピンの URL を確かめられない"
+                    f"（タイムアウト・5xx など）。{_RERUN_HINT}"
+                )
+        return alerts
+    except Exception as e:
+        return [f"{_ALERT_UNCHECKED}: 検査中に想定外の例外（{type(e).__name__}）"]
+
+
+def _write_alerts(path: str, alerts: list[str]) -> None:
+    """警告を 1 行 1 件・LF 改行で書く。警告が無くても空ファイルを作る。"""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        for alert in alerts:
+            f.write(re.sub(r"[\r\n]+", " ", alert) + "\n")
+
+
 # 値のシグネチャは fn(old) または fn(old, release)（BtbN 系のみ）の 2 種のため
 # Callable[..., ...] で受ける。呼び分けは refresh_pins() が _BTBN_KEYS で行う。
 _REFRESHERS: dict[str, Callable[..., tuple[dict, str]]] = {
@@ -288,8 +515,42 @@ def refresh_pins(pins: dict) -> tuple[dict, list[str], list[str]]:
     return new_pins, changes, statuses
 
 
-def _build_summary(changes: list[str], statuses: list[str]) -> str:
+def run(
+    pins: dict, alerts_out: str | None = None
+) -> tuple[dict, list[str], list[str], list[str]]:
+    """arm64 の検査 → 警告の書き出し → 再ピン、の順に行う（IO は警告ファイルだけ）。
+
+    検査と書き出しを再ピンより先に行うので、他の配布元の障害で `refresh_pins()` が
+    例外になった週でも、arm64 の警告は警告ファイルに残る（#412）。
+    """
+    alerts = check_ffmpeg_mac_arm64(pins["ffmpeg-mac"]["arm64"])
+    if alerts_out:
+        _write_alerts(alerts_out, alerts)
+    new_pins, changes, statuses = refresh_pins(pins)
+    return new_pins, changes, statuses, alerts
+
+
+def _build_summary(
+    changes: list[str], statuses: list[str], alerts: list[str] | tuple = ()
+) -> str:
     lines = ["## 同梱バイナリのピン更新", ""]
+    if alerts:
+        lines.append("> [!CAUTION]")
+        lines.append(
+            "> **macOS arm64 の ffmpeg / ffprobe のピン（osxexperts.net）に"
+            "問題があります**。"
+            "このワークフローは失敗として終わります。"
+        )
+        lines.append(">")
+        lines += [f"> - {a}" for a in alerts]
+        lines.append(">")
+        lines.append(
+            "> osxexperts.net のページで公開値（URL・展開後バイナリの sha256）を"
+            "確認して "
+            "`bin/pins.json` の `ffmpeg-mac.arm64` を手で更新すること"
+            "（docs/build.md「macOS arm64 のピンの古さの検知」）。"
+        )
+        lines.append("")
     if changes:
         lines.append(
             "以下のコンポーネントを更新しました。**マージ前に上流の真正性を確認してください**。"
@@ -311,10 +572,21 @@ def _build_summary(changes: list[str], statuses: list[str]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--summary-out", help="PR 本文用サマリ Markdown の出力先パス")
+    parser.add_argument(
+        "--alerts-out",
+        help=(
+            "macOS arm64 のピンの警告（1 行 1 件）の出力先パス。"
+            "警告が無くても空ファイルを作る"
+        ),
+    )
     args = parser.parse_args()
 
     pins = db._load_pins()
-    new_pins, changes, statuses = refresh_pins(pins)
+    new_pins, changes, statuses, alerts = run(pins, alerts_out=args.alerts_out)
+    for alert in alerts:
+        # 行頭が `::` にならないよう前置きを付ける
+        # （ワークフローコマンドとして解釈させない）
+        print(f"[arm64] {alert}")
 
     if new_pins != pins:
         with open(db.PINS_PATH, "w", encoding="utf-8") as f:
@@ -324,7 +596,7 @@ def main() -> int:
     else:
         print("[refresh] 更新はありません")
 
-    summary = _build_summary(changes, statuses)
+    summary = _build_summary(changes, statuses, alerts)
     print(summary)
     if args.summary_out:
         with open(args.summary_out, "w", encoding="utf-8") as f:

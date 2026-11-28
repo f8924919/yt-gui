@@ -46,8 +46,11 @@ jobs:
       - run: uv sync
 
       # 上流を解決・検証して bin/pins.json を更新する。検証失敗時はここで停止し PR は作らない。
+      # macOS arm64（osxexperts.net）のピンの古さの警告は、再ピンより先に --alerts-out へ
+      # 書き出す（警告があってもこのステップは失敗させない。最後のステップで失敗させる。#412）。
       - name: Refresh pins
-        run: uv run python scripts/refresh_pins.py --summary-out "${RUNNER_TEMP}/pin-update-body.md"
+        id: refresh
+        run: uv run python scripts/refresh_pins.py --summary-out "${RUNNER_TEMP}/pin-update-body.md" --alerts-out "${RUNNER_TEMP}/pin-alerts.txt"
 
       # PAT 未設定（secret が空）のときは GITHUB_TOKEN にフォールバックするが、そのままだと
       # 必須 CI が発火しない状態（#284 の症状）へ静かに戻る。ログと PR 本文の両方で可視化する。
@@ -80,3 +83,27 @@ jobs:
           commit-message: "chore: 同梱バイナリのピン (bin/pins.json) を上流最新へ更新"
           labels: enhancement
           delete-branch: true
+
+      # macOS arm64 のピンが古い・検査できないときは、他のピンの PR を作った後でジョブを
+      # 失敗させて知らせる（直すまで毎週失敗する。docs/build.md「macOS arm64 のピンの古さの
+      # 検知」）。PR 作成が失敗した週も走らせる。Refresh pins が成功したのに警告ファイルが
+      # 無いのは --alerts-out の指定漏れなど仕組みの不備なので、それも失敗にする（偽 PASS 防止）。
+      - name: Fail if arm64 pin needs attention
+        if: ${{ !cancelled() }}
+        env:
+          REFRESH_OUTCOME: ${{ steps.refresh.outcome }}
+        run: |
+          f="${RUNNER_TEMP}/pin-alerts.txt"
+          if [ ! -f "$f" ]; then
+            if [ "$REFRESH_OUTCOME" = "success" ]; then
+              echo "::error::警告ファイル $f がありません（steps.refresh.outcome=success なのに --alerts-out が書かれていない）"
+              exit 1
+            fi
+            exit 0  # Refresh pins 自体が失敗している（ジョブはすでに失敗）
+          fi
+          if [ -s "$f" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              printf '::error::%s\n' "$line"
+            done < "$f"
+            exit 1
+          fi
