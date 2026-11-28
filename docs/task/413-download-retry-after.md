@@ -9,18 +9,18 @@
 
 ## 進捗
 
-- [ ] C1 共通のリトライ（`_download_verified` と arm64 が同じ関数・429/503 とそれ以外の分類） — 証跡: 未
-- [ ] C2 Retry-After の秒数（本物の HTTPError・429 と 503・既定の待ちが下限・数字以外は不正） — 証跡: 未
-- [ ] C3 Retry-After の HTTP 日付（現在時刻の注入・過去・0 以下・不正値） — 証跡: 未
-- [ ] C4 Retry-After が無いときの待ちの列（30・60・120・120） — 証跡: 未
-- [ ] C5 上限（1 回 120 秒・120 と 121 の境界・最大 5 回・最悪 480 秒 / 混在で 7 回・486 秒） — 証跡: 未
-- [ ] C6 対象外の失敗は今のまま（502 + Retry-After・408・404・混在・既存 6 本） — 証跡: 未
-- [ ] C7 取り尽くしたとき（最後の例外・状態・待った合計） — 証跡: 未
-- [ ] C8 macOS arm64（取得と壊れた zip は取り直す・展開後の不一致と未設定は取り直さない） — 証跡: 未
-- [ ] C9 sha256 の扱いは不変 — 証跡: 未
-- [ ] C10 実物との突き合わせ（ローカルの http.server） — 証跡: 未
-- [ ] C11 変異 → red — 証跡: 未
-- [ ] C12 docs — 証跡: 未
+- [x] C1 共通のリトライ（`_download_verified` と arm64 が同じ関数・429/503 とそれ以外の分類） — 証跡: `_download_retrying` を `_download_verified` と `_download_ffmpeg_macos` の `verify: binary` 経路が呼ぶ（9dff740）。分類は C2・C6 のテスト。下の「変異 → red」の M7・M8
+- [x] C2 Retry-After の秒数（本物の HTTPError・429 と 503・既定の待ちが下限・数字以外は不正） — 証跡: `test_retry_after_seconds_longer_than_default_is_used`（429・503）、`test_retry_after_shorter_than_default_uses_default`（429・503）、`test_retry_after_unparseable_uses_default`（7 値）、`test_retry_after_sec_parses_digits_with_surrounding_space`（9dff740）。M1・M2
+- [x] C3 Retry-After の HTTP 日付（現在時刻の注入・過去・0 以下・不正値） — 証跡: `test_retry_after_sec_http_date`（6 ケース。タイムゾーン無しを含む）、`test_retry_after_sec_rounds_up_fraction`、`test_retry_after_sec_returns_none_without_header`（3 ケース）、`test_retry_after_http_date_goes_through_retry`（9dff740）。M6
+- [x] C4 Retry-After が無いときの待ちの列（30・60・120・120） — 証跡: `test_throttle_default_waits`（429・503）、`test_throttle_constants`（リテラル）（9dff740）。M3
+- [x] C5 上限（1 回 120 秒・120 と 121 の境界・最大 5 回・最悪 480 秒 / 混在で 7 回・486 秒） — 証跡: `test_throttle_wait_is_capped`（120・121）、`test_throttle_wait_cap_applies_to_http_date`、`test_throttle_gives_up_after_five_attempts`、`test_mixed_failures_worst_case_is_seven_attempts`（9dff740）。下の「最悪の値」。M4・M5
+- [x] C6 対象外の失敗は今のまま（502 + Retry-After・408・404・混在・既存 6 本） — 証跡: `test_other_http_errors_keep_short_retry`（502 + Retry-After・408・404・410）、`test_mixed_failures_other_failures_still_stop_at_three`（9dff740）。既存のリトライのテスト 6 本は期待値を変えずに pass（下の「テスト先行の red」で実装前も pass）。M7
+- [x] C7 取り尽くしたとき（最後の例外・状態・待った合計） — 証跡: `test_exhausted_throttle_reports_status_retry_after_and_total`、`test_exhausted_without_http_status_reports_none`（8bbc038 で毎試行の行を固有の書き方で確かめるよう直した）、`test_retry_after_raw_is_sanitized`、`test_throttle_gives_up_after_five_attempts`（最後の例外が 429 の HTTPError）。M12・M13
+- [x] C8 macOS arm64（取得と壊れた zip は取り直す・展開後の不一致と未設定は取り直さない） — 証跡: `test_mac_arm64_retries_throttled_download`、`…_retries_short_failure`、`…_retries_broken_zip`（bad_crc・missing_member・truncated）、`…_sha_mismatch_after_extract_is_not_retried`、`…_missing_sha_is_not_retried`（9dff740）。M8・M9・M10
+- [x] C9 sha256 の扱いは不変 — 証跡: 既存の `test_verify_sha256_*` 4 本と `test_download_verified_missing_expected_does_not_retry` が期待値を変えずに pass、`test_pin_config_error_is_runtime_error`、`test_missing_expected_after_throttle_still_aborts_without_retry`（9dff740）。M11
+- [x] C10 実物との突き合わせ（ローカルの http.server） — 証跡: `test_download_verified_over_real_http_429`（9dff740）。下の「実物との突き合わせ」
+- [x] C11 変異 → red — 証跡: 下の「変異 → red」（13 変異すべて、狙ったテストが落ちた）
+- [x] C12 docs — 証跡: `docs/build.md`「ピン留めと sha256 検証」のリトライの段落（c1cc884、9439bfa）
 
 ## 設計（2026-11-28。design-review の指摘を反映）
 
@@ -42,6 +42,96 @@
   - `_download_ffmpeg_macos`: `verify: binary` の経路を `_download_retrying(url, tmp, label, check=lambda: _check_zip(tmp, tool))` に替える。展開と展開後の `_verify_sha256` は今のまま（取り直さない）。
 - 共通化: `refresh_pins.py` の `_is_transient` / `_fetch_page`（#412）とは分類が違う（refresh_pins は 5xx 全般・429 を一時的とみなす）ので、今回は共通化しない。
 - テスト: `tests/test_download_binaries.py`。既存の `_FakeDownload` に本物の `urllib.error.HTTPError`（`headers` は `email.message.Message`）を渡す。C3 は `_download_retrying` か `_retry_after_sec` を直接呼んで `now` を注入する。C8 は `_download_ffmpeg_macos` を `BIN_DIR`・`_load_pins`・`_download` を差し替えて呼び、本物の zip（`zipfile` で作る）と壊した zip を使う。C10 はローカルの `http.server` を `127.0.0.1`・ポート 0・daemon スレッドで立て、`NO_PROXY` を設定し、`_DOWNLOAD_TIMEOUT_SEC` を数秒に縮め、`sleep` は偽物を注入して `_download` をそのまま通す。
+## テスト先行の red（2026-11-28）
+
+実装前のコード（HEAD `9439bfa`＝設計の docs だけを入れた時点の `scripts/download_binaries.py`）に、`8bbc038` の `tests/test_download_binaries.py` を当てて走らせた（scratchpad に一時的な作業ツリーを作り、本体の `.venv` の Python で `pytest -q -rfE`。終わった後に作業ツリーは消した）。要約行は `47 failed, 20 passed in 1.31s`。落ちたのは新しく足したテストだけで、既存の 20 本はすべて pass（既存の 6 本のリトライのテストの期待値は変えていない）。
+
+<details><summary>FAILED / ERROR の行（47 件）</summary>
+
+  - `FAILED tests/test_download_binaries.py::test_throttle_constants`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_seconds_longer_than_default_is_used[429]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_seconds_longer_than_default_is_used[503]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_shorter_than_default_uses_default[429]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_shorter_than_default_uses_default[503]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[+7]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[1_000]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[7.5]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[abc]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[-5]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_unparseable_uses_default[0]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_parses_digits_with_surrounding_space`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[Sat, 28 Nov 2026 05:00:40 GMT-40.0]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[Sat, 28 Nov 2026 05:00:40 -0000-40.0]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[Sat, 28 Nov 2026 05:00:39 GMT-39.0]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[Sat, 28 Nov 2026 04:59:00 GMT-None]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[Sat, 28 Nov 2026 05:00:00 GMT-None]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_http_date[not a date-None]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_rounds_up_fraction`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_returns_none_without_header[headers_none]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_returns_none_without_header[no_header]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_sec_returns_none_without_header[not_http_error]`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_http_date_goes_through_retry`
+  - `FAILED tests/test_download_binaries.py::test_throttle_default_waits[429]`
+  - `FAILED tests/test_download_binaries.py::test_throttle_default_waits[503]`
+  - `FAILED tests/test_download_binaries.py::test_throttle_wait_is_capped[120-120.0]`
+  - `FAILED tests/test_download_binaries.py::test_throttle_wait_is_capped[121-120.0]`
+  - `FAILED tests/test_download_binaries.py::test_throttle_wait_cap_applies_to_http_date`
+  - `FAILED tests/test_download_binaries.py::test_throttle_gives_up_after_five_attempts`
+  - `FAILED tests/test_download_binaries.py::test_mixed_failures_worst_case_is_seven_attempts`
+  - `FAILED tests/test_download_binaries.py::test_mixed_failures_other_failures_still_stop_at_three`
+  - `FAILED tests/test_download_binaries.py::test_other_http_errors_keep_short_retry[502_with_retry_after]`
+  - `FAILED tests/test_download_binaries.py::test_other_http_errors_keep_short_retry[408]`
+  - `FAILED tests/test_download_binaries.py::test_other_http_errors_keep_short_retry[404]`
+  - `FAILED tests/test_download_binaries.py::test_other_http_errors_keep_short_retry[410]`
+  - `FAILED tests/test_download_binaries.py::test_exhausted_throttle_reports_status_retry_after_and_total`
+  - `FAILED tests/test_download_binaries.py::test_exhausted_without_http_status_reports_none`
+  - `FAILED tests/test_download_binaries.py::test_retry_after_raw_is_sanitized`
+  - `FAILED tests/test_download_binaries.py::test_pin_config_error_is_runtime_error`
+  - `FAILED tests/test_download_binaries.py::test_missing_expected_after_throttle_still_aborts_without_retry`
+  - `FAILED tests/test_download_binaries.py::test_mac_arm64_retries_throttled_download`
+  - `FAILED tests/test_download_binaries.py::test_mac_arm64_retries_short_failure`
+  - `FAILED tests/test_download_binaries.py::test_mac_arm64_retries_broken_zip[bad_crc]`
+  - `FAILED tests/test_download_binaries.py::test_mac_arm64_retries_broken_zip[missing_member]`
+  - `FAILED tests/test_download_binaries.py::test_mac_arm64_retries_broken_zip[truncated]`
+  - `FAILED tests/test_download_binaries.py::test_download_verified_over_real_http_429`
+
+</details>
+
+## 実物との突き合わせ（C10）
+
+`test_download_verified_over_real_http_429` が、ローカルの `http.server`（`127.0.0.1`・ポート 0・daemon スレッド、`NO_PROXY=*`、`_DOWNLOAD_TIMEOUT_SEC=5`）に対して `_download_verified` をそのまま呼ぶ。サーバーは 1 回目に `429` と `Retry-After: 1`、2 回目に本体を返す。`_download` の `urlopen` が本物の `HTTPError`（`headers` は `http.client.HTTPMessage`）を送出し、`Retry-After` を読んで既定の下限 30 秒が `sleep` に渡り、2 回目で取得・照合に成功することを確かめる。手元（Windows）で pass。evermeet.cx などの実際の配布元に 429 を出させることはできないので、配布元が実際に `Retry-After` を返すかは確かめていない（v0.8.2 の失敗のログからは、ヘッダの有無が読めなかった）。
+
+## 最悪の値（C5）
+
+定数（`scripts/download_binaries.py` の `_THROTTLE_WAITS_SEC = (30.0, 60.0, 120.0, 120.0)`・`_THROTTLE_MAX_WAIT_SEC = 120.0`・`_THROTTLE_ATTEMPTS = len(_THROTTLE_WAITS_SEC) + 1`）と `_download_verified` の既定（`retries=3`・`backoff_initial_sec=2.0`）から、1 ファイルあたり:
+
+- 429 / 503 だけが続く: 取得 5 回、待ちの合計は既定の待ちなら 330 秒、Retry-After が上限を超えるなら 120 × 4 = 480 秒
+- 他の失敗と混ざる: 取得は最大 (5 − 1) + (3 − 1) + 1 = 7 回、待ちは最大 480 + 2 + 4 = 486 秒（`test_mixed_failures_worst_case_is_seven_attempts`）
+- macOS は ffmpeg と ffprobe を順に取るので、ジョブではその倍。1 回の取得ごとに socket の timeout（`_DOWNLOAD_TIMEOUT_SEC = 300`）もある。`release.yml` にジョブの `timeout-minutes` は無い（既定 360 分）
+
+## 変異 → red（2026-11-28、基点 `8bbc038`）
+
+作業用のハーネス（scratchpad の `mutate413.py`。追跡しない）が、1 変異ずつ置換を 1 か所だけ当て（当たり 0 件・2 件以上はハーネスの失敗として止める）、`tests/test_download_binaries.py` を走らせて落ちたテストを集め、`git checkout` で戻して `git diff --quiet` を確かめた。無変異は `passed=67`、戻した後も `passed=67`。同じ HEAD で全体は `1064 passed`（`uv run pytest -q`）。
+
+| 変異 | 書き換え | 落ちたテスト |
+|---|---|---|
+| M1 | Retry-After を無視する（`hinted = 0.0`） | `test_retry_after_seconds_longer_than_default_is_used[429]`、`test_retry_after_seconds_longer_than_default_is_used[503]`、`test_retry_after_http_date_goes_through_retry`、`test_throttle_wait_is_capped[120-120.0]`、`test_throttle_wait_is_capped[121-120.0]`、`test_throttle_wait_cap_applies_to_http_date` |
+| M2 | 既定の待ちの下限を外す（`max(hinted, …)` → `(hinted or …)`） | `test_retry_after_shorter_than_default_uses_default[429]`、`test_retry_after_shorter_than_default_uses_default[503]`、`test_download_verified_over_real_http_429` |
+| M3 | 既定の長い待ちを短い待ちに戻す（`(2.0, 4.0, 8.0, 16.0)`） | `test_throttle_constants`、`test_retry_after_shorter_than_default_uses_default[429]`、`test_retry_after_shorter_than_default_uses_default[503]`、`test_retry_after_unparseable_uses_default[+7]`、`test_retry_after_unparseable_uses_default[1_000]`、`test_retry_after_unparseable_uses_default[7.5]`、`test_retry_after_unparseable_uses_default[abc]`、`test_retry_after_unparseable_uses_default[]`、`test_retry_after_unparseable_uses_default[-5]`、`test_retry_after_unparseable_uses_default[0]`、`test_throttle_default_waits[429]`、`test_throttle_default_waits[503]`、`test_throttle_gives_up_after_five_attempts`、`test_mixed_failures_worst_case_is_seven_attempts`、`test_mixed_failures_other_failures_still_stop_at_three`、`test_missing_expected_after_throttle_still_aborts_without_retry`、`test_mac_arm64_retries_throttled_download`、`test_download_verified_over_real_http_429` |
+| M4 | 1 回の上限を外す（`float('inf')`） | `test_throttle_wait_is_capped[121-120.0]`、`test_throttle_wait_cap_applies_to_http_date` |
+| M5 | 429・503 の最大回数を 3 に戻す | `test_throttle_constants`、`test_throttle_default_waits[429]`、`test_throttle_default_waits[503]`、`test_throttle_gives_up_after_five_attempts`、`test_mixed_failures_worst_case_is_seven_attempts` |
+| M6 | HTTP 日付の引き算の向きを逆にする | `test_retry_after_sec_rounds_up_fraction`、`test_retry_after_http_date_goes_through_retry`、`test_throttle_wait_cap_applies_to_http_date` |
+| M7 | 502 も 429 / 503 と同じ扱いにする（Retry-After を読む） | `test_throttle_constants`、`test_other_http_errors_keep_short_retry[502_with_retry_after]` |
+| M8 | arm64 を直接の取得（`_download`）に戻す | `test_mac_arm64_retries_throttled_download`、`test_mac_arm64_retries_short_failure`、`test_mac_arm64_retries_broken_zip[bad_crc]`、`test_mac_arm64_retries_broken_zip[missing_member]`、`test_mac_arm64_retries_broken_zip[truncated]` |
+| M9 | arm64 の zip の検査を外す（`check=None`） | `test_mac_arm64_retries_broken_zip[bad_crc]`、`test_mac_arm64_retries_broken_zip[missing_member]`、`test_mac_arm64_retries_broken_zip[truncated]` |
+| M10 | arm64 で展開後の sha256 不一致も取り直す（展開と照合を `check` に入れる） | `test_mac_arm64_sha_mismatch_after_extract_is_not_retried` |
+| M11 | sha256 未設定でも取り直す（`except PinConfigError: raise` を消す） | `test_download_verified_missing_expected_does_not_retry`、`test_missing_expected_after_throttle_still_aborts_without_retry` |
+| M12 | 毎試行の診断から状態の表示を消す | `test_exhausted_throttle_reports_status_retry_after_and_total`、`test_exhausted_without_http_status_reports_none` |
+| M13 | 待った合計を足さない（`waited += wait` → `pass`） | `test_exhausted_throttle_reports_status_retry_after_and_total`、`test_exhausted_without_http_status_reports_none` |
+
+経緯: 最初の実行（基点 `9dff740`）では M12 が生き残った。テストが見ていた「状態=429」が、取り尽くしたときの「最後の状態=429」の行にも含まれていたため。毎試行の行に固有の書き方（` 状態=429 Retry-After=45 `）で確かめるよう直した（8bbc038）。
+
 ## 訂正ログ
 
 | 日付 | 誤って書いたこと | 正しくは | 原因と再発防止 |
@@ -49,6 +139,6 @@
 
 ## 次にやること
 
-- テスト先行（`tests/test_download_binaries.py`）
+- `/verify-gate`（verify → docs-check → evaluator）→ archive 移動 → PR
 
 訂正ログ: 0 件
