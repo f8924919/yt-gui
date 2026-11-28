@@ -890,3 +890,16 @@ def test_run_writes_empty_alerts_file_when_no_alerts(monkeypatch, tmp_path):
     )
     assert alerts == []
     assert path.exists() and path.read_bytes() == b""
+
+
+def test_check_arm64_version_mismatch_alone_is_stale():
+    """URL・sha256 がページと同じでも、ピンの version が違えば「古い」。
+
+    版の比較を外すと、URL の比較では拾えない（URL は一致している）。
+    """
+    pin = _arm_pin_91()
+    pin["version"] = "9.0"
+    stale = _stale(_check(pin, _page("9.1")))
+    assert len(stale) == 2, stale  # ffmpeg・ffprobe
+    assert all("ページ 9.1" in a and "ピン 9.0" in a for a in stale)
+    assert not any("URL" in a for a in stale)
