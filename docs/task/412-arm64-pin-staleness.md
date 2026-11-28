@@ -9,19 +9,19 @@
 
 ## 進捗
 
-- [ ] C1 版の読み取り（リンクと文言の両方・末尾 `.0` の省略・Intel と ffplay を拾わない） — 証跡: 未
-- [ ] C2 古さの判定（x86_64 との差だけでは警告しない） — 証跡: 未
-- [ ] C3 URL の生存（HEAD / Range、404・410 と 5xx の区別、リダイレクト・非 zip） — 証跡: 未
-- [ ] C4 検査不能の区別（取得失敗・リンクだけ・文言だけ・食い違い） — 証跡: 未
-- [ ] C5 他の再ピンを止めない・検査を先に行い先に書く — 証跡: 未
-- [ ] C6 警告の出力（サマリの先頭・警告ファイル） — 証跡: 未
-- [ ] C7 ジョブの失敗（PR 作成の後・PR 作成失敗でも走る・ファイル欠落は不備） — 証跡: 未
-- [ ] C8 sha256 を書き換えない — 証跡: 未
-- [ ] C9 実物との突き合わせ — 証跡: 未
-- [ ] C10 変異 → red — 証跡: 未
-- [ ] C12 sha256 がページに載っているか — 証跡: 未
-- [ ] C13 警告文に入れるもの（絞った値と固定文・LF） — 証跡: 未
-- [ ] C11 docs — 証跡: 未
+- [x] C1 版の読み取り（リンクと文言の両方・末尾 `.0` の省略・Intel と ffplay を拾わない） — 証跡: `test_parse_osxexperts_reads_apple_silicon_91`、`…_accepts_dropped_trailing_zero_in_link`（9.0 の実物断片）、`…_rejects_broken_structure`（link_only・text_only・link_text_mismatch・duplicate_link）、`test_check_arm64_ffmpeg_ffprobe_version_split_is_reported`（a2ee01b）。下の「変異 → red」の M2・M8・M9
+- [x] C2 古さの判定（x86_64 との差だけでは警告しない） — 証跡: `test_check_arm64_current_pin_has_no_alerts`、`…_old_pin_is_stale`、`…_url_differs_from_page_is_stale`、`…_pin_90_written_as_9_matches_90_page`、`test_same_version_ignores_trailing_zero`、`test_refresh_ffmpeg_mac_notes_arch_version_difference`（a2ee01b）。M1・M3
+- [x] C3 URL の生存（HEAD / Range、404・410 と 5xx の区別、リダイレクト・非 zip） — 証跡: `test_url_ok_*`（6 関数・10 ケース）、`test_check_arm64_gone_url_is_stale_per_tool`（ffmpeg・ffprobe）、`…_url_check_error_is_unchecked`（a2ee01b）。実物で、ピンの 2 本は ok、取り下げ済みの `ffmpeg9arm.zip` は gone（下の「C9」）。M4
+- [x] C4 検査不能の区別（取得失敗・リンクだけ・文言だけ・食い違い） — 証跡: `test_check_arm64_fetch_failure_is_unchecked`、`…_structure_change_is_unchecked_and_does_not_leak_html`、`…_unexpected_exception_becomes_unchecked`、C1 の構造のテスト（a2ee01b）。M5・M6・M7
+- [x] C5 他の再ピンを止めない・検査を先に行い先に書く — 証跡: `test_run_checks_and_writes_alerts_before_refresh`、`test_run_passes_refresh_result_through_and_keeps_arm64`（a2ee01b）。M11
+- [x] C6 警告の出力（サマリの先頭・警告ファイル） — 証跡: `test_build_summary_puts_alerts_first`、`…_without_alerts_has_no_caution`、`test_write_alerts_uses_lf_and_creates_empty_file`（a2ee01b）
+- [x] C7 ジョブの失敗（PR 作成の後・PR 作成失敗でも走る・ファイル欠落は不備） — 証跡: `tests/test_update_binaries_workflow.py` の `test_refresh_step_writes_alerts_file`・`test_fail_step_*`（構造 5 本）と、スクリプトを bash で実行する `test_fail_step_script_behaviour`（4 ケース。f1e4d75）。M12〜M15
+- [x] C8 sha256 を書き換えない — 証跡: `test_run_passes_refresh_result_through_and_keeps_arm64`、`test_run_with_real_check_does_not_touch_arm64_pin`、`test_refresh_ffmpeg_mac_notes_arch_version_difference`（arm64 不変）（a2ee01b）
+- [x] C9 実物との突き合わせ — 証跡: 下の「C9」と、実物の `bin/pins.json` を読む `test_real_pins_json_arm64_matches_fixture_page`
+- [x] C10 変異 → red — 証跡: 下の「変異 → red」（15 変異すべて、狙ったテストが落ちた）
+- [x] C12 sha256 がページに載っているか — 証跡: `test_check_arm64_sha_missing_from_page_is_stale`、`…_sha_comparison_is_case_insensitive`（a2ee01b）。M10
+- [x] C13 警告文に入れるもの（絞った値と固定文・LF） — 証跡: `test_check_arm64_fetch_failure_is_unchecked`・`…_structure_change_…`（HTML・`::error::` を流さない）、`test_alerts_are_single_line`、`test_write_alerts_uses_lf_and_creates_empty_file`（a2ee01b）
+- [x] C11 docs — 証跡: `docs/build.md`「macOS arm64 のピンの古さの検知」と更新運用・ピン自動更新の表、`docs/research/binary-supply-chain.md` §5 の追記、`bin/pins.json` の arm64 の `comment`（7053e70、4a8d434、このコミット）
 
 ## 設計（2026-11-28。design-review の指摘を反映）
 
@@ -41,6 +41,45 @@
 - フィクスチャ: 現行ページ（9.1）と、Wayback の 2026-10-18 版（9.0、`ffmpeg9arm.zip`）から Apple Silicon と Intel の部分を切り出す。出所（URL・取得日時・sha256）をフィクスチャの先頭に書く。
 - C9 は手元からの取得で確かめる。ランナーからの実行は、ワークフローを手動で回すとピン更新 PR が実際に作られうるため、マージ後の週次実行で確かめる。
 
+## テスト先行の red（2026-11-28、HEAD `4a8d434`＝実装前）
+
+`uv run pytest tests/test_refresh_pins.py tests/test_update_binaries_workflow.py -q` の要約行: `40 failed, 26 passed, 5 errors`。失敗はすべて新しいテスト（`AttributeError`: `_parse_osxexperts_arm64` などが未実装、ワークフローは `--alerts-out` が無い・失敗ステップが無い）。既存のテストは 26 本とも pass。
+
+## C9 実物との突き合わせ（2026-11-28、HEAD `4a8d434`、`scripts/refresh_pins.py` は a2ee01b と同じ作業ツリー）
+
+- 取得: `https://www.osxexperts.net/` を 2026-11-28T03:52:04Z に取得（UA `yt-gui-pin-refresh`、Windows の手元から）。36,168 バイト、sha256 `cadec69ed157ec5ac29e9c623a382f86121a5b428103940c1eab25f0009fa60c`（フィクスチャ `tests/data/osxexperts_arm64_9.1.html` の切り出し元と同じハッシュ）
+- 生の行:
+  - `<a href="https://www.osxexperts.net/ffmpeg91arm.zip" class="btn btn-c-5861" target="_blank">Download ffmpeg 9.1 (Apple Silicon)</a>`
+  - `</h3><a href="https://www.osxexperts.net/ffprobe91arm.zip" class="btn btn-c-5861" target="_blank">Download ffprobe 9.1 (Apple Silicon)</a>`
+- 抽出: ffmpeg `('9.1', 'https://www.osxexperts.net/ffmpeg91arm.zip')`、ffprobe `('9.1', 'https://www.osxexperts.net/ffprobe91arm.zip')`
+- ピン（`bin/pins.json` の `ffmpeg-mac.arm64`）: version `9.1`、ffmpeg `https://www.osxexperts.net/ffmpeg91arm.zip`、ffprobe `https://www.osxexperts.net/ffprobe91arm.zip`
+- `_url_ok`: ffmpeg `ok`、ffprobe `ok`、取り下げ済みの `https://www.osxexperts.net/ffmpeg9arm.zip` は `gone`
+- `check_ffmpeg_mac_arm64(ピン)`: 1 回目は `arm64 のピンを検査できなかった: … を取得できない（HTTPError）` になった。直後に 3 回続けて取得するとすべて成功し、もう一度検査すると警告 0 件（`[]`）。1 回目は、数十秒のうちにページの取得と HEAD を繰り返した後だったので、一時的な制限とみられる（状態コードは控えていない）。週次の実行は 1 回だけ取得するが、同じことがランナーで起きればその週は「検査できなかった」で失敗する（設計どおり。警告文で再実行を促す）
+- ランナーからの実行はしていない（手動でワークフローを回すとピン更新 PR が作られうるため）。マージ後の週次実行で確かめる
+
+## 変異 → red（2026-11-28、基点 `cbcae87`）
+
+作業用のハーネス（scratchpad の `mutate.py`。追跡しない）が、1 変異ずつ置換を 1 か所だけ当て（当たり 0 件・2 件以上はハーネスの失敗として止める）、`tests/test_refresh_pins.py`・`tests/test_update_binaries_workflow.py` を走らせて落ちたテストを集め、`git checkout` で戻して `git diff --quiet` を確かめた。無変異は `passed=75`、戻した後も `passed=75`。
+
+| 変異 | 書き換え | 落ちたテスト |
+|---|---|---|
+| M1 | 版の比較を常に一致扱い（`if not _same_version(page_version, pin_version):` → `if False:`） | `test_check_arm64_old_pin_is_stale` |
+| M2 | リンクの末尾 `.0` の正規化を外す | `test_parse_osxexperts_accepts_dropped_trailing_zero_in_link`、`test_check_arm64_pin_90_written_as_9_matches_90_page` |
+| M3 | 版の比較の末尾 `.0` の正規化を外す（`return a == b`） | `test_same_version_ignores_trailing_zero`、`test_check_arm64_pin_90_written_as_9_matches_90_page` |
+| M4 | URL の生存確認を無効にする（`status = "ok"`） | `test_check_arm64_gone_url_is_stale_per_tool[ffmpeg]`・`[ffprobe]`、`test_check_arm64_url_check_error_is_unchecked` |
+| M5 | 構造の変化を握りつぶす（`return [] and [`） | `test_check_arm64_structure_change_is_unchecked_and_does_not_leak_html` |
+| M6 | 取得失敗を握りつぶす | `test_check_arm64_fetch_failure_is_unchecked` |
+| M7 | 想定外の例外を握りつぶす | `test_check_arm64_unexpected_exception_becomes_unchecked` |
+| M8 | Intel 版も拾う（`arm\.zip` → `(?:arm\|intel)\.zip`） | 14 件（`test_parse_osxexperts_reads_apple_silicon_91`、`…_accepts_dropped_trailing_zero_in_link`、`test_real_pins_json_arm64_matches_fixture_page` ほか） |
+| M9 | リンクと文言の照合を外す | `test_parse_osxexperts_rejects_broken_structure[link_text_mismatch]` |
+| M10 | sha256 の確認を外す | `test_check_arm64_sha_missing_from_page_is_stale`、`test_run_with_real_check_does_not_touch_arm64_pin` |
+| M11 | 検査を再ピンの後に回す | `test_run_checks_and_writes_alerts_before_refresh` |
+| M12 | 失敗ステップを消す | 9 件（`test_fail_step_*` の構造 5 本と `test_fail_step_script_behaviour` 4 ケース） |
+| M13 | 失敗ステップの条件を `success()` にする | `test_fail_step_runs_even_if_pr_creation_failed` |
+| M14 | ファイル欠落の判定を消す（`if [ "$REFRESH_OUTCOME" = "success" ]` → `if false`） | `test_fail_step_script_behaviour[missing_after_success]` |
+| M15 | `--alerts-out` を外す | `test_refresh_step_writes_alerts_file`、`test_fail_step_reads_same_alerts_file` |
+
+M14 は、最初のハーネス実行（基点 `a2ee01b`）では**生き残った**（構造のテストが文字列の有無しか見ていなかった）。失敗ステップのスクリプトを bash で実際に走らせる `test_fail_step_script_behaviour` を足して（f1e4d75）、上の表の結果になった。
 ## 訂正ログ
 
 | 日付 | 誤って書いたこと | 正しくは | 原因と再発防止 |
@@ -49,6 +88,6 @@
 
 ## 次にやること
 
-- テスト先行（`tests/test_refresh_pins.py`・`tests/test_update_binaries_workflow.py`）。フィクスチャの切り出しから
+- `/verify-gate`（verify → docs-check → evaluator）→ PR
 
 訂正ログ: 1 件

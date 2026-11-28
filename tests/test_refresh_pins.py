@@ -774,4 +774,5 @@ def test_real_pins_json_arm64_matches_fixture_page():
     import download_binaries as db
 
     arm = db._load_pins()["ffmpeg-mac"]["arm64"]
-    assert _check(arm, _page("9.1")) == []
+    # ピンの版のフィクスチャを読む（ピンを上げたのにフィクスチャが無ければここで落ちる）
+    assert _check(arm, _page(arm["version"])) == []
