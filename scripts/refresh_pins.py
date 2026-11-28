@@ -372,9 +372,11 @@ def _is_transient(e: BaseException) -> bool:
 def _fetch_page(fetch: Callable[[str], str], sleep: Callable[[float], None]) -> str:
     """osxexperts.net のページを取得する。一時的な失敗だけ待って取得し直す。
 
-    キャッシュ（Varnish）が切れたときに配布元が 503 を返すことを手元で 2 回観測した
-    （#412 のタスクメモ「C9」）。週次の実行はランナーからの初回アクセスでこの条件に
-    当たりやすいので、`_PAGE_RETRY_WAITS` の秒数だけ待って取得し直す。404 などの
+    手元でページ取得が HTTP 503 になったことがある（状態コードで確かめたのは 1 回。
+    #412 のタスクメモ「C9」）。直後の取得はキャッシュ（Varnish）から 200 だったので、
+    キャッシュが切れて配布元へ取りに行ったときの一時的な失敗とみられる。週次の実行は
+    ランナーからの初回アクセスで、この条件に当たりやすいと考え、`_PAGE_RETRY_WAITS`
+    の秒数だけ待って取得し直す。404 などの
     恒久的な失敗と、待ち尽くした最後の失敗はそのまま送出する。
     """
     for wait in (*_PAGE_RETRY_WAITS, None):

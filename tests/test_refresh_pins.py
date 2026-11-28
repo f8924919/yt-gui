@@ -963,3 +963,23 @@ def test_check_arm64_does_not_retry_permanent_failure():
     )
     assert len(_unchecked(alerts)) == 1 and "HTTP 404" in alerts[0]
     assert calls["n"] == 1 and waits == []
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "f3cc9de0", "z" * 64], ids=["empty", "truncated", "non_hex"]
+)
+def test_check_arm64_malformed_pin_sha_is_stale(bad):
+    """C12: ピンの sha256 が 64 桁の 16 進でなければ「ページに無い」と警告する。
+
+    部分一致（空文字や途中で切れた値はページのどこかに含まれる）で通さない。
+    """
+    pin = _arm_pin_91()
+    pin["ffmpeg"]["sha256"] = bad
+    stale = _stale(_check(pin, _page("9.1")))
+    assert any("ffmpeg" in a and "sha256" in a for a in stale), stale
+
+
+def test_check_arm64_page_sha_in_uppercase_still_matches():
+    """C12: ページ側の sha256 が大文字でも、小文字のピンと一致とみなす。"""
+    page = _page("9.1").replace(_SHA91_FFMPEG, _SHA91_FFMPEG.upper())
+    assert _check(_arm_pin_91(), page) == []
