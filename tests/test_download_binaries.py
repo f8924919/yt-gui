@@ -478,9 +478,18 @@ def test_retry_after_shorter_than_default_uses_default(tmp_path, monkeypatch, co
     assert sleeps == [30.0]
 
 
-@pytest.mark.parametrize("value", ["+7", "1_000", "7.5", "abc", "", "-5", "0"])
+@pytest.mark.parametrize(
+    "value", ["+7", "1_000", "7.5", "abc", "", "-5", "0", "+45", "45.5", "-45", "1_045"]
+)
 def test_retry_after_unparseable_uses_default(tmp_path, monkeypatch, value):
-    """数字だけでない値・0 以下は解釈できない値として、既定の待ちだけを使う。"""
+    """数字だけでない値・0 以下は解釈できない値として、既定の待ちだけを使う。
+
+    下限（30 秒）より大きい値（`+45` など）も含め、受け付けたら結果が変わる形で
+    確かめる。
+    """
+    assert (
+        download_binaries._retry_after_sec(_http_error(429, value), lambda: 0.0) is None
+    )
     _fake, sleeps = _run_retrying(
         tmp_path, monkeypatch, [_http_error(429, value), b"ok"]
     )
@@ -516,6 +525,41 @@ def test_retry_after_sec_http_date(value, expected):
         download_binaries._retry_after_sec(_http_error(429, value), lambda: _NOW)
         == expected
     )
+
+
+class _NaiveDate:
+    """タイムゾーンの無い datetime の代わり。`.timestamp()` は呼ばせない。
+
+    本物の naive な datetime の `.timestamp()` はホストのローカル時刻として解釈する
+    ので、
+    UTC のホストでは「UTC とみなす」処理を外しても結果が変わらない。代わりに、
+    UTC を付けたときだけ本物の時刻になる偽物で、ホストのタイムゾーンによらず確かめる。
+    """
+
+    tzinfo = None
+
+    def __init__(self, aware: datetime.datetime) -> None:
+        self._aware = aware
+
+    def replace(self, *, tzinfo):
+        assert tzinfo is datetime.UTC
+        return self._aware
+
+    def timestamp(self):
+        raise AssertionError("タイムゾーンの無い日付を UTC とみなさずに使った")
+
+
+def test_retry_after_sec_naive_date_is_utc_regardless_of_host_tz(monkeypatch):
+    aware = datetime.datetime(2026, 11, 28, 5, 0, 40, tzinfo=datetime.UTC)
+    monkeypatch.setattr(
+        download_binaries.email.utils,
+        "parsedate_to_datetime",
+        lambda value: _NaiveDate(aware),
+    )
+    got = download_binaries._retry_after_sec(
+        _http_error(429, "Sat, 28 Nov 2026 05:00:40 -0000"), lambda: _NOW
+    )
+    assert got == 40.0
 
 
 def test_retry_after_sec_rounds_up_fraction():
@@ -569,14 +613,39 @@ def test_throttle_wait_is_capped(tmp_path, monkeypatch, value, expected):
     assert sleeps == [expected]
 
 
-def test_throttle_wait_cap_applies_to_http_date(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "value",
+    [
+        "Sat, 28 Nov 2026 05:02:00 GMT",  # 120 秒後
+        "Sat, 28 Nov 2026 05:02:01 GMT",  # 121 秒後
+        "Sat, 28 Nov 2026 05:10:00 GMT",  # 600 秒後
+    ],
+)
+def test_throttle_wait_cap_applies_to_http_date(tmp_path, monkeypatch, value):
     _fake, sleeps = _run_retrying(
         tmp_path,
         monkeypatch,
-        [_http_error(429, "Sat, 28 Nov 2026 05:10:00 GMT"), b"ok"],
+        [_http_error(429, value), b"ok"],
         now=lambda: _NOW,
     )
     assert sleeps == [120.0]
+
+
+def test_throttle_gives_up_raising_the_last_error(tmp_path, monkeypatch):
+    """取り尽くしたときは、最初ではなく最後の例外を送出する。"""
+    errors = [_http_error(429, str(i)) for i in range(5)]
+    _fake, _sleeps, info = _run_retrying_raises(
+        tmp_path, monkeypatch, list(errors), urllib.error.HTTPError
+    )
+    assert info.value is errors[-1]
+
+
+def test_mixed_failures_raise_the_last_error(tmp_path, monkeypatch):
+    errors = [OSError("a"), _http_error(429), OSError("b"), OSError("c")]
+    _fake, _sleeps, info = _run_retrying_raises(
+        tmp_path, monkeypatch, list(errors), OSError
+    )
+    assert info.value is errors[-1]
 
 
 def test_throttle_gives_up_after_five_attempts(tmp_path, monkeypatch):
@@ -646,6 +715,10 @@ def test_exhausted_throttle_reports_status_retry_after_and_total(
     assert "最後の状態=429" in out
     assert f"待った合計={sum(sleeps):g} 秒" in out
     assert "取得を断念" in out
+    # 毎試行の「次の待ち」（Retry-After 45 は 1 回目の既定 30 より長い）
+    assert "次の待ち=45 秒" in out
+    assert "次の待ち=60 秒" in out  # 2 回目の既定 60 は 45 より長い
+    assert "次の待ち=なし" in out
 
 
 def test_exhausted_without_http_status_reports_none(tmp_path, monkeypatch, capsys):
@@ -832,7 +905,7 @@ class _ThrottleOnceHandler(http.server.BaseHTTPRequestHandler):
         type(self).hits.append(self.path)
         if len(type(self).hits) == 1:
             self.send_response(429)
-            self.send_header("Retry-After", "1")
+            self.send_header("Retry-After", "45")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -869,4 +942,4 @@ def test_download_verified_over_real_http_429(tmp_path, monkeypatch):
         server.server_close()
     assert dest.read_bytes() == _ThrottleOnceHandler.body
     assert len(_ThrottleOnceHandler.hits) == 2
-    assert sleeps == [30.0]  # Retry-After: 1 は既定の待ち（30 秒）が下限
+    assert sleeps == [45.0]  # 応答の Retry-After を読んだ（既定の 30 秒より長い）
