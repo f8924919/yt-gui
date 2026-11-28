@@ -183,6 +183,8 @@
 | 2 | `3d1ec87` | 主エージェントが確認（1011 passed） | — | FAIL（[欠陥] 2 / [証跡・文言] 3。1 巡目の 9 件はすべて閉じていると確認） |
 | 3 | `35c5296` | evaluator が確認（1015 passed、ruff・mypy green） | — | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 5。2 巡目の 5 件はすべて閉じていると確認。5 件はすべてこの PR で直した: 変異の数の書き違い・`html.lower()` の記述の矛盾・C9 の鮮度の注記・build.md の更新運用の行の限定句・止め規則の読み直しの 1 行） |
 
+PR #415 の CI で `test-windows` の `test_fail_step_script_behaviour[missing_after_success]` が落ちた。ランナーの既定の文字コード（cp1252）で bash の出力を読み、日本語の `::error::` 行を読めなかった（手元の Python は UTF-8 で動いていたので通っていた）。`subprocess.run` に `encoding="utf-8"` を渡して直した。
+
 1 巡目の指摘と閉じ方:
 
 | # | 区分 | 指摘 | 閉じ方 | 証跡・コミット |

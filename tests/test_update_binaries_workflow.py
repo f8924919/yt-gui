@@ -294,7 +294,13 @@ def test_fail_step_script_behaviour(
     script.write_bytes(str(fail_step["run"]).encode("utf-8"))
     env = {**os.environ, "RUNNER_TEMP": tmp_path.as_posix(), "REFRESH_OUTCOME": outcome}
     proc = subprocess.run(
-        [bash, script.as_posix()], capture_output=True, text=True, env=env, check=False
+        [bash, script.as_posix()],
+        capture_output=True,
+        # 既定の文字コード（Windows のランナーは cp1252）では日本語の ::error:: 行を
+        # 読めない。スクリプトの出力は UTF-8 なので明示する
+        encoding="utf-8",
+        env=env,
+        check=False,
     )
     assert proc.returncode == expected_code, proc.stdout + proc.stderr
     errors = [ln for ln in proc.stdout.splitlines() if ln.startswith("::error::")]
