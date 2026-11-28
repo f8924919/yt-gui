@@ -1,7 +1,7 @@
 # 同梱バイナリの取得で HTTP 429 / 503 に Retry-After で待ってリトライする
 
 > Issue: [#413](https://github.com/f8924919/yt-gui/issues/413)
-> ステータス: 完了（PR #PRNUM）
+> ステータス: 完了（PR #417）
 > ブランチ: `feature/413-download-retry-after`
 > 基点: `3da4cbe`
 

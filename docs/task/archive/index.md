@@ -102,7 +102,7 @@
 | [272-ffmpeg-linux-btbn.md](272-ffmpeg-linux-btbn.md) | ffmpeg-linux の取得元を johnvansickle（CI ブロック・更新停止）から BtbN の不変 `autobuild-*` タグへ切替。win と同一タグ・同一バージョンを構造的に保証（共有リリース注入）、release.yml に workflow_dispatch ドライラン＋ffmpeg スモーク（glibc コア whitelist）を恒久追加（Issue #272） | 2026-07-20 |
 | [284-pin-update-pr-ci.md](284-pin-update-pr-ci.md) | ピン更新 PR で必須 CI が発火せずマージできない問題を fine-grained PAT（secret `PIN_UPDATE_TOKEN`）で解消。未設定・失効時は `GITHUB_TOKEN` へフォールバックしつつ `::warning::` と PR 本文注記で可視化（静かな再発防止）。workflow yml を検証する回帰テストを新設し 9 変異で検証力を実測（Issue #284 / PR #291） | 2026-08-04 |
 | [412-arm64-pin-staleness.md](412-arm64-pin-staleness.md) | macOS arm64 の ffmpeg ピン（osxexperts.net）の古さを週次で検知する。ページのリンクと文言の両方から Apple Silicon 版を読み（末尾 `.0` の省略を許す）、版・URL・sha256 の掲載・URL の生存をピンと比べる。警告があっても他のピンの PR は作り、最後のステップでジョブを失敗させる。検知はページ上の表示とピンの比較だけで、真正性は人が確認する（Issue #412 / PR #415）。メトリクス: コミット 17（PR #415）・訂正ログ 2 件・evaluator 3 巡 | 2026-11-28 |
-| [413-download-retry-after.md](413-download-retry-after.md) | 同梱バイナリの取得のリトライを `_download_retrying` に切り出し、HTTP 429 / 503 は既定の待ちと Retry-After（秒数・HTTP 日付）の長いほうだけ待って（1 回 120 秒まで）最大 5 回取り直す。他の失敗は今の短いリトライのまま。sha256 未設定は `PinConfigError` で即時中断。macOS arm64 も同じリトライを通し、転送中に壊れた zip は取り直し、展開後の sha256 不一致は取り直さない（Issue #413 / PR #PRNUM）。メトリクス: コミット 8（PR #PRNUM）・訂正ログ 0 件・evaluator 2 巡 | 2026-11-28 |
+| [413-download-retry-after.md](413-download-retry-after.md) | 同梱バイナリの取得のリトライを `_download_retrying` に切り出し、HTTP 429 / 503 は既定の待ちと Retry-After（秒数・HTTP 日付）の長いほうだけ待って（1 回 120 秒まで）最大 5 回取り直す。他の失敗は今の短いリトライのまま。sha256 未設定は `PinConfigError` で即時中断。macOS arm64 も同じリトライを通し、転送中に壊れた zip は取り直し、展開後の sha256 不一致は取り直さない（Issue #413 / PR #417）。メトリクス: コミット 8（PR #417）・訂正ログ 0 件・evaluator 2 巡 | 2026-11-28 |
 
 ## テスト基盤
 
