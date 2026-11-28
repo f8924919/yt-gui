@@ -478,6 +478,8 @@ def test_check_arm64_url_differs_from_page_is_stale():
     pin["ffprobe"]["url"] = "https://www.osxexperts.net/ffprobe91arm-old.zip"
     stale = _stale(_check(pin, _page("9.1")))
     assert any("ffprobe" in a for a in stale)
+    # C2: ページの版・ピンの版を含む（版が同じで URL だけ違うときも）
+    assert any("ページ 9.1" in a and "ピン 9.1" in a for a in stale), stale
 
 
 def test_check_arm64_sha_missing_from_page_is_stale():
@@ -836,3 +838,55 @@ def test_main_exits_zero_with_alerts_and_wires_outputs(monkeypatch, tmp_path):
     assert received["alerts_out"] == str(alerts_path)
     body = summary_path.read_text(encoding="utf-8")
     assert "[!CAUTION]" in body and alert in body
+
+
+def test_url_ok_redirect_to_other_zip_is_gone():
+    """別の zip の URL へリダイレクトされた場合も「古い」。
+
+    Content-Type が zip でも、着いた URL が違えば古いとみなす。
+    """
+    fake, _ = _opener({"HEAD": _Resp("https://www.osxexperts.net/ffmpeg92arm.zip")})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "gone"
+
+
+@pytest.mark.parametrize(
+    "exc", [TimeoutError("timed out"), ConnectionResetError("reset")], ids=str
+)
+def test_url_ok_error_on_raw_oserror(exc):
+    """URLError に包まれない生の OSError（読み取り中のタイムアウトなど）も "error"。"""
+    fake, _ = _opener({"HEAD": exc, "GET": exc})
+    assert refresh_pins._url_ok(_URL91_FFMPEG, open_fn=fake) == "error"
+
+
+def _run_with_real_check(monkeypatch, pins: dict, alerts_out: str | None = None):
+    monkeypatch.setattr(
+        refresh_pins, "_http_text", lambda url, headers=None: _page("9.1")
+    )
+    monkeypatch.setattr(refresh_pins, "_url_ok", lambda url, **kw: "ok")
+    monkeypatch.setattr(refresh_pins, "refresh_pins", lambda p: (p, [], []))
+    return refresh_pins.run(pins, alerts_out=alerts_out)
+
+
+def test_run_does_not_alert_on_x86_arm_version_difference_alone(monkeypatch):
+    """C2: x86_64 が先行して版が違うだけなら警告しない。
+
+    arm64 のピンはページと一致している。
+    """
+    pins = _pins_for_run()
+    pins["ffmpeg-mac"]["x86_64"]["version"] = "9.2"
+    _new, _c, _s, alerts = _run_with_real_check(monkeypatch, pins)
+    assert alerts == []
+
+
+def test_run_writes_empty_alerts_file_when_no_alerts(monkeypatch, tmp_path):
+    """C6: 警告が無いときも、run() は空の警告ファイルを作る。
+
+    作らないと、ワークフローの失敗ステップが「成功したのにファイルが無い」と
+    判定して、警告の無い週も毎週失敗する。
+    """
+    path = tmp_path / "alerts.txt"
+    _new, _c, _s, alerts = _run_with_real_check(
+        monkeypatch, _pins_for_run(), alerts_out=str(path)
+    )
+    assert alerts == []
+    assert path.exists() and path.read_bytes() == b""

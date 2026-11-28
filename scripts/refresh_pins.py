@@ -416,7 +416,8 @@ def check_ffmpeg_mac_arm64(
                 )
             elif page_url != pin_url:
                 alerts.append(
-                    f"{_ALERT_STALE}: {tool} の URL がページと違う（ページ {page_url}）"
+                    f"{_ALERT_STALE}: {tool} の URL がページと違う"
+                    f"（ページ {page_version} {page_url} / ピン {pin_version}）"
                 )
             if not re.fullmatch(r"[0-9a-f]{64}", pin_sha) or pin_sha not in lowered:
                 alerts.append(
