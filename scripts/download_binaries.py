@@ -4,10 +4,14 @@ Called automatically when running: pyinstaller yt-gui.spec
 Can also be run manually.
 """
 
+import datetime
+import email.utils
 import hashlib
 import json
+import math
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -15,6 +19,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -81,14 +86,22 @@ def _sha256_of(path: str) -> str:
     return h.hexdigest()
 
 
+class PinConfigError(RuntimeError):
+    """bin/pins.json の設定エラー（sha256 未設定など）。
+
+    取り直しても直らないので、取得のリトライは即時に中断する。
+    """
+
+
 def _verify_sha256(path: str, expected: str, label: str) -> None:
     """取得物の sha256 を台帳の期待値と照合する。
 
-    不一致・期待値未設定のときは取得物を削除して `RuntimeError` を送出し中断する
-    （改ざんまたは上流更新を検知。サイレントに続行しない）。
+    不一致のときは取得物を削除して `RuntimeError` を、期待値未設定のときは
+    `PinConfigError` を送出し中断する（改ざんまたは上流更新を検知。サイレントに
+    続行しない）。
     """
     if not expected:
-        raise RuntimeError(
+        raise PinConfigError(
             f"[{label}] bin/pins.json に sha256 が未設定です。ネット接続環境で取得物の "
             f"sha256 を上流チェックサム／署名で確認のうえ台帳へ登録してください。"
         )
@@ -102,26 +115,92 @@ def _verify_sha256(path: str, expected: str, label: str) -> None:
         )
 
 
-def _download_verified(
+# --- 取得のリトライ（#265、#413） ------------------------------------------
+# 仕様: docs/build.md「ピン留めと sha256 検証」のリトライの段落。
+# 429 / 503 は配布元の回数制限・過負荷なので、既定の長い待ちと Retry-After の
+# 長いほうだけ待ち（1 回は上限で切る）、取得の回数も増やす。それ以外の失敗は
+# 短い指数バックオフ。2 種類の失敗は別々に数え、それぞれの上限で止まる。
+_THROTTLE_STATUSES = frozenset({429, 503})
+_THROTTLE_WAITS_SEC = (30.0, 60.0, 120.0, 120.0)
+_THROTTLE_MAX_WAIT_SEC = 120.0
+# 429 / 503 のときの取得の最大回数（待ちの列の長さから導く）
+_THROTTLE_ATTEMPTS = len(_THROTTLE_WAITS_SEC) + 1
+
+
+def _is_throttle(exc: BaseException) -> bool:
+    return isinstance(exc, urllib.error.HTTPError) and exc.code in _THROTTLE_STATUSES
+
+
+def _retry_after_sec(exc: BaseException, now) -> float | None:
+    """`Retry-After`（秒数・HTTP 日付）を秒に換算する。読めなければ `None`。
+
+    例外処理の中で呼ぶので、どんな入力でも例外を出さない。秒数は数字だけ
+    （RFC 9110 の delay-seconds）を受け付け、日付はタイムゾーンが無ければ
+    UTC とみなす。0 以下・過去の日付は `None`。
+    """
+    try:
+        if not isinstance(exc, urllib.error.HTTPError) or exc.headers is None:
+            return None
+        value = exc.headers.get("Retry-After")
+        if value is None:
+            return None
+        value = str(value).strip()
+        if re.fullmatch(r"[0-9]+", value):
+            seconds = float(int(value))
+        else:
+            when = email.utils.parsedate_to_datetime(value)
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=datetime.UTC)
+            seconds = float(math.ceil(when.timestamp() - now()))
+        return seconds if seconds > 0 else None
+    except ValueError, TypeError, OverflowError, AttributeError:
+        return None
+
+
+def _retry_after_raw(exc: BaseException) -> str:
+    """診断用の `Retry-After` の生の値（印字できる ASCII だけ・40 文字まで）。"""
+    try:
+        if isinstance(exc, urllib.error.HTTPError) and exc.headers is not None:
+            value = exc.headers.get("Retry-After")
+            if value is not None:
+                return re.sub(r"[^\x20-\x7e]", "", str(value))[:40]
+    except Exception:  # 診断用。失敗しても元の例外を隠さない
+        pass
+    return "なし"
+
+
+def _download_retrying(
     url: str,
     dest: str,
-    expected: str,
     label: str,
     *,
+    check=None,
     retries: int = 3,
     backoff_initial_sec: float = 2.0,
-    sleep=time.sleep,
+    sleep=None,
+    now=None,
 ) -> None:
-    """ダウンロード後に sha256 を検証する。一時的な失敗はリトライする（#265）。
+    """`url` を `dest` へ取得し、`check()`（あれば）を通す。失敗は待って取り直す。
 
-    リトライ対象は取得時の例外全般と sha256 不一致。sha256 未設定（台帳の
-    設定エラー。`_verify_sha256` の `if not expected` 判定と一致させること）は
-    恒久エラーのためリトライせず即時中断する。全滅時は最後の例外を送出して
-    従来どおりビルドを中断する（fail-closed は `_verify_sha256` 側で維持）。
+    - `PinConfigError`（台帳の設定エラー）は取り直さず即時に送出する。
+    - 429 / 503 は `_THROTTLE_ATTEMPTS` 回まで取得し、既定の待ちと Retry-After の
+      長いほう（`_THROTTLE_MAX_WAIT_SEC` で切る）だけ待つ。
+    - それ以外の失敗（他の HTTP エラー・接続失敗・timeout・`check` の失敗）は
+      `retries` 回まで取得し、`backoff_initial_sec` からの指数バックオフで待つ。
+
+    取り尽くしたら、最後の状態と待った秒の合計を出してから最後の例外を送出する。
     毎試行の失敗時に、取得破損の切り分け用診断（取得バイト数・応答の
-    Content-Length・ファイル先頭 16 バイト hex）を出力する。
+    Content-Length・ファイル先頭 16 バイト hex・HTTP の状態・Retry-After・
+    次に待つ秒数）を出力する。
     """
-    for attempt in range(1, retries + 1):
+    sleep = sleep or time.sleep
+    now = now or time.time
+    throttled = 0
+    others = 0
+    waited = 0.0
+    attempt = 0
+    while True:
+        attempt += 1
         # 前試行の部分ファイルを掃除してから再取得する。
         if os.path.exists(dest):
             os.remove(dest)
@@ -135,19 +214,94 @@ def _download_verified(
                 size = os.path.getsize(dest)
                 with open(dest, "rb") as f:
                     head = f.read(16).hex()
-            _verify_sha256(dest, expected, label)
+            if check is not None:
+                check()
             return
+        except PinConfigError:
+            raise  # 台帳の設定エラー: 取り直しても直らない
         except Exception as exc:
-            if isinstance(exc, RuntimeError) and not expected:
-                raise  # sha256 未設定は設定エラー: リトライ無意味
+            status = exc.code if isinstance(exc, urllib.error.HTTPError) else "なし"
+            raw = _retry_after_raw(exc)
+            if isinstance(exc, urllib.error.HTTPError):
+                exc.close()
+            if _is_throttle(exc):
+                throttled += 1
+                give_up = throttled >= _THROTTLE_ATTEMPTS
+                wait = 0.0
+                if not give_up:
+                    hinted = _retry_after_sec(exc, now) or 0.0
+                    wait = min(
+                        max(hinted, _THROTTLE_WAITS_SEC[throttled - 1]),
+                        _THROTTLE_MAX_WAIT_SEC,
+                    )
+            else:
+                others += 1
+                give_up = others >= retries
+                wait = 0.0 if give_up else backoff_initial_sec * 2 ** (others - 1)
             print(
-                f"  [{label}] 試行 {attempt}/{retries} 失敗"
+                f"  [{label}] 試行 {attempt} 失敗"
+                f"（429/503 {throttled}/{_THROTTLE_ATTEMPTS}・"
+                f"その他 {others}/{retries}）"
                 f" ({type(exc).__name__}): サイズ={size}"
                 f" Content-Length={content_length} 先頭={head}"
+                f" 状態={status} Retry-After={raw}"
+                f" 次の待ち={'なし' if give_up else f'{wait:g} 秒'}"
             )
-            if attempt >= retries:
+            if give_up:
+                print(
+                    f"  [{label}] 取得を断念: 最後の状態={status}"
+                    f" 待った合計={waited:g} 秒"
+                )
                 raise
-            sleep(backoff_initial_sec * 2 ** (attempt - 1))
+            sleep(wait)
+            waited += wait
+
+
+def _download_verified(
+    url: str,
+    dest: str,
+    expected: str,
+    label: str,
+    *,
+    retries: int = 3,
+    backoff_initial_sec: float = 2.0,
+    sleep=None,
+) -> None:
+    """ダウンロード後に zip などの sha256 を検証する。失敗は取り直す（#265、#413）。
+
+    取り直しの規則は `_download_retrying`。sha256 不一致は取り直し、sha256 未設定
+    （`PinConfigError`）は即時中断する。全滅時は最後の例外を送出して従来どおり
+    ビルドを中断する（fail-closed は `_verify_sha256` 側で維持）。
+    """
+    _download_retrying(
+        url,
+        dest,
+        label,
+        check=lambda: _verify_sha256(dest, expected, label),
+        retries=retries,
+        backoff_initial_sec=backoff_initial_sec,
+        sleep=sleep,
+    )
+
+
+def _check_zip(path: str, tool: str) -> None:
+    """取得した zip が壊れていない（CRC が合い、対象のファイルがある）ことを確かめる。
+
+    転送中に壊れた zip を取得ごと取り直すための検査（#413）。壊れていれば
+    `zipfile.BadZipFile` を送出する。
+    """
+    with zipfile.ZipFile(path) as z:
+        bad = z.testzip()
+        if bad is not None:
+            raise zipfile.BadZipFile(f"CRC が合わない: {bad}")
+        if not any(_is_tool_entry(n, tool) for n in z.namelist()):
+            raise zipfile.BadZipFile(f"{tool} が zip に無い")
+
+
+def _is_tool_entry(name: str, tool: str) -> bool:
+    """zip の entry が対象のツールの実体か（`__MACOSX/._<tool>` は除く）。"""
+    base = os.path.basename(name)
+    return base == tool and not base.startswith("._") and "__MACOSX" not in name
 
 
 def _is_license_name(name: str) -> bool:
@@ -273,15 +427,14 @@ def _download_ffmpeg_macos(ffmpeg_dir, ffmpeg_path, ffprobe_path):
         if verify_mode == "zip":
             _download_verified(url, tmp, expected, label)
         else:
-            _download(url, tmp)
+            # 照合は展開後なので、取り直すのは取得と zip の破損だけ（#413）。
+            # 展開後の sha256 不一致は差し替え・改ざんの疑いなので取り直さない。
+            _download_retrying(
+                url, tmp, label, check=lambda t=tmp, n=tool: _check_zip(t, n)
+            )
         with zipfile.ZipFile(tmp) as z:
             # __MACOSX/._<tool>（AppleDouble）を除外して実体エントリを選ぶ
-            entry = next(
-                n
-                for n in z.namelist()
-                if os.path.basename(n) == tool
-                and not os.path.basename(n).startswith("._")
-            )
+            entry = next(n for n in z.namelist() if _is_tool_entry(n, tool))
             z.extract(entry, ffmpeg_dir)
             extracted = os.path.join(ffmpeg_dir, entry)
             if extracted != out_path:
