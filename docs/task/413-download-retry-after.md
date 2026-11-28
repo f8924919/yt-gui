@@ -20,7 +20,7 @@
 - [x] C9 sha256 の扱いは不変 — 証跡: 既存の `test_verify_sha256_*` 4 本と `test_download_verified_missing_expected_does_not_retry` が期待値を変えずに pass、`test_pin_config_error_is_runtime_error`、`test_missing_expected_after_throttle_still_aborts_without_retry`（9dff740）。M11
 - [x] C10 実物との突き合わせ（ローカルの http.server） — 証跡: `test_download_verified_over_real_http_429`（9dff740）。下の「実物との突き合わせ」
 - [x] C11 変異 → red — 証跡: 下の「変異 → red」（19 変異すべて、狙ったテストが落ちた）
-- [x] C12 docs — 証跡: `docs/build.md`「ピン留めと sha256 検証」のリトライの段落（c1cc884、9439bfa）
+- [x] C12 docs — 証跡: `docs/build.md`「ピン留めと sha256 検証」のリトライの段落（c1cc884、9439bfa、3db76ce）
 
 ## 設計（2026-11-28。design-review の指摘を反映）
 
@@ -29,7 +29,7 @@
 - `scripts/download_binaries.py`
   - 定数（正本）: `_THROTTLE_STATUSES = frozenset({429, 503})`、`_THROTTLE_WAITS_SEC = (30.0, 60.0, 120.0, 120.0)`、`_THROTTLE_MAX_WAIT_SEC = 120.0`、`_THROTTLE_ATTEMPTS = len(_THROTTLE_WAITS_SEC) + 1`（同じ事実を 2 か所に書かない）。
   - `class PinConfigError(RuntimeError)`: `_verify_sha256` が sha256 未設定のときに送出する。`_download_retrying` はこれを種類を問わず即座に送出する（取り直さない）。`RuntimeError` の子なので、既存テストの `pytest.raises(RuntimeError, match=r"pins\.json")` は通る。今の `isinstance(exc, RuntimeError) and not expected` の 2 か所の結び付きをなくす。
-  - `_retry_after_sec(exc, now) -> float | None`: どんな入力でも例外を出さない（例外処理の中で呼ぶため）。`HTTPError` でない・`headers` が `None`・ヘッダが無いなら `None`。値が `\d+`（前後の空白は除く）なら整数の秒、そうでなければ `email.utils.parsedate_to_datetime` で日付として読み、タイムゾーンが無ければ UTC とみなして（日付 − `now()`）秒を切り上げる。`ValueError` / `TypeError` / `OverflowError` と 0 以下は `None`。
+  - `_retry_after_sec(exc, now) -> float | None`: どんな入力でも例外を出さない（例外処理の中で呼ぶため）。`HTTPError` でない・`headers` が `None`・ヘッダが無いなら `None`。値が `[0-9]+`（ASCII の数字だけ。前後の空白は除く）なら整数の秒、そうでなければ `email.utils.parsedate_to_datetime` で日付として読み、タイムゾーンが無ければ UTC とみなして（日付 − `now()`）秒を切り上げる。`ValueError` / `TypeError` / `OverflowError` / `AttributeError` と 0 以下は `None`。
   - `_retry_after_raw(exc) -> str`: 診断用のヘッダの生の値（印字できる ASCII だけ・40 文字まで。無ければ「なし」）。
   - `_download_retrying(url, dest, label, *, check=None, retries=3, backoff_initial_sec=2.0, sleep=None, now=None) -> None`（`None` は呼ぶときに `time.sleep` / `time.time` に読み替える。テストが `time.sleep` を差し替えられるように）: 試行のたびに前の部分ファイルを消して `_download`、診断用にサイズ・先頭 16 バイトを読み（照合の前。`_verify_sha256` は不一致のとき取得物を消すため）、続けて `check()`（与えられていれば）。失敗したら、`HTTPError` なら `close()` し、
     - `PinConfigError` は即座に送出。
@@ -38,8 +38,8 @@
     - 毎試行の診断: 試行の番号・429 / 503 と他の失敗の回数とそれぞれの上限・サイズ・Content-Length・先頭 16 バイト・HTTP の状態（無ければ「なし」）・`Retry-After` の生の値・次に待つ秒数。送出の前に、最後の状態と待った秒の合計を出す。
     - 最悪の値: 1 ファイルあたり取得 `(_THROTTLE_ATTEMPTS − 1) + (retries − 1) + 1` = 7 回、待ち `4 × 120 + (2 + 4)` = 486 秒（429 / 503 だけなら 480 秒）。macOS は ffmpeg と ffprobe を順に取るのでジョブではその倍。
   - `_download_verified(url, dest, expected, label, *, retries=3, backoff_initial_sec=2.0, sleep=None)`: 引数の名前と並びは変えない（`sleep` の既定だけ `time.sleep` から `None` に変えた。挙動は同じ）。`_download_retrying(..., check=lambda: _verify_sha256(dest, expected, label))`。sha256 未設定は取得 1 回の後に `PinConfigError` で即時中断（今と同じ。取得の失敗は取り直す）。
-  - `_check_zip(path, member_basename)`: `zipfile.ZipFile(path).testzip()` が `None`（CRC が合う）で、対象のファイル（`__MACOSX/` を除く）があることを確かめる。壊れていれば `zipfile.BadZipFile` などを送出する（それ以外の失敗として短いリトライに入る）。
-  - `_download_ffmpeg_macos`: `verify: binary` の経路を `_download_retrying(url, tmp, label, check=lambda: _check_zip(tmp, tool))` に替える。展開と展開後の `_verify_sha256` は今のまま（取り直さない）。
+  - `_check_zip(path, tool)`: `zipfile.ZipFile(path).testzip()` が `None`（CRC が合う）で、対象のファイル（`__MACOSX/` を除く）があることを確かめる。壊れていれば `zipfile.BadZipFile` などを送出する（それ以外の失敗として短いリトライに入る）。
+  - `_download_ffmpeg_macos`: `verify: binary` の経路を `_download_retrying(url, tmp, label, check=lambda t=tmp, n=tool: _check_zip(t, n))`（ループ変数を default 引数で束縛する） に替える。展開と展開後の `_verify_sha256` は今のまま（取り直さない）。
 - 共通化: `refresh_pins.py` の `_is_transient` / `_fetch_page`（#412）とは分類が違う（refresh_pins は 5xx 全般・429 を一時的とみなす）ので、今回は共通化しない。
 - テスト: `tests/test_download_binaries.py`。既存の `_FakeDownload` に本物の `urllib.error.HTTPError`（`headers` は `email.message.Message`）を渡す。C3 は `_download_retrying` か `_retry_after_sec` を直接呼んで `now` を注入する。C8 は `_download_ffmpeg_macos` を `BIN_DIR`・`_load_pins`・`_download` を差し替えて呼び、本物の zip（`zipfile` で作る）と壊した zip を使う。C10 はローカルの `http.server` を `127.0.0.1`・ポート 0・daemon スレッドで立て、`NO_PROXY` を設定し、`_DOWNLOAD_TIMEOUT_SEC` を数秒に縮め、`sleep` は偽物を注入して `_download` をそのまま通す。
 ## テスト先行の red（2026-11-28）
@@ -157,6 +157,7 @@
 | 巡 | HEAD | verify | docs-check | evaluator |
 |---|---|---|---|---|
 | 1 | `3bdbfaf` | green（1064 passed、skip 0） | 指摘なし | FAIL（[欠陥] 5 / [証跡・文言] 8） |
+| 2 | `3db76ce` | evaluator が確認（1073 passed、ruff・mypy green） | — | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 3。1 巡目の 13 件のうち E6 の一部と E8 以外は閉じていると確認。3 件はこの PR で直した: 設計節の `[0-9]+`・`AttributeError`・`_check_zip` の引数名・lambda の書き方、C12 の証跡のコミット、最悪の値は PR 本文に書いた） |
 
 1 巡目の指摘と閉じ方:
 
