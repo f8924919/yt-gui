@@ -244,7 +244,7 @@ def _bash() -> str | None:
     import os
     import shutil
 
-    # sys.platform で分けると mypy が実行中の OS 以外の枝を到達不能と判定するため os.name
+    # sys.platform で分けると、mypy が実行中の OS 以外の枝を到達不能と判定する
     if os.name == "nt":
         for root in (r"C:\Program Files\Git\bin", r"C:\Program Files (x86)\Git\bin"):
             candidate = Path(root) / "bash.exe"
