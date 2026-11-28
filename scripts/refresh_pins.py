@@ -183,6 +183,8 @@ def refresh_ffmpeg_mac(old: dict) -> tuple[dict, str]:
     # API も署名サイドカーも無く、公開値はページ HTML 上の展開後バイナリ sha256 の
     # ため自動スクレイピングはせず、更新はページの公開値を人手で確認する運用とする
     # （docs/research/binary-supply-chain.md §5）。ここでは arm64 を現状維持する。
+    # ただしピンが古くなったことは別途検知して知らせる（#412。docs/build.md
+    # 「macOS arm64 のピンの古さの検知」）。
     new = dict(old)
     old_x86 = old["x86_64"]
     x86 = dict(old_x86)
