@@ -18,7 +18,7 @@
 - [x] C7 ジョブの失敗（PR 作成の後・PR 作成失敗でも走る・ファイル欠落は不備） — 証跡: `tests/test_update_binaries_workflow.py` の `test_refresh_step_writes_alerts_file`・`test_fail_step_*`（構造 5 本）と、スクリプトを bash で実行する `test_fail_step_script_behaviour`（4 ケース。f1e4d75）。M12〜M15
 - [x] C8 sha256 を書き換えない — 証跡: `test_run_passes_refresh_result_through_and_keeps_arm64`、`test_run_with_real_check_does_not_touch_arm64_pin`、`test_refresh_ffmpeg_mac_notes_arch_version_difference`（arm64 不変）（a2ee01b）
 - [x] C9 実物との突き合わせ — 証跡: 下の「C9」と、実物の `bin/pins.json` を読む `test_real_pins_json_arm64_matches_fixture_page`
-- [x] C10 変異 → red — 証跡: 下の「変異 → red」（26 変異すべて、狙ったテストが落ちた）
+- [x] C10 変異 → red — 証跡: 下の「変異 → red」（28 変異すべて、狙ったテストが落ちた）
 - [x] C12 sha256 がページに載っているか — 証跡: `test_check_arm64_sha_missing_from_page_is_stale`、`…_sha_comparison_is_case_insensitive`（a2ee01b）、`…_malformed_pin_sha_is_stale`（empty・truncated・non_hex）・`…_page_sha_in_uppercase_still_matches`（a177b99）。M10・M27・M28
 - [x] C13 警告文に入れるもの（絞った値と固定文・LF） — 証跡: `test_check_arm64_fetch_failure_is_unchecked`・`…_structure_change_…`（HTML・`::error::` を流さない）、`test_alerts_are_single_line`、`test_write_alerts_uses_lf_and_creates_empty_file`（a2ee01b）
 - [x] C11 docs — 証跡: `docs/build.md`「macOS arm64 のピンの古さの検知」と更新運用・ピン自動更新の表、`docs/research/binary-supply-chain.md` §5 の追記、`bin/pins.json` の arm64 の `comment`（7053e70、4a8d434、このコミット）
@@ -128,7 +128,7 @@
 - `check_ffmpeg_mac_arm64(ピン)`: 1 回目は `arm64 のピンを検査できなかった: … を取得できない（HTTPError）` になった。直後に 3 回続けて取得するとすべて成功し、もう一度検査すると警告 0 件（`[]`）。1 回目は、数十秒のうちにページの取得と HEAD を繰り返した後だったので、一時的な制限とみられる（状態コードは控えていない）と書いたが、誤り（訂正ログ 2 件目。下の取り直しで HTTP 503 を確かめた）。
 - 再現の確認（2026-11-28T03:59:06Z〜、HEAD `bdfe5da`）: 検査と同じ順（ページ GET → ffmpeg HEAD → ffprobe HEAD）を 6 回、続けて既定の取得関数での検査を 3 回、間を空けずに行った。ページ GET 9 回・HEAD 18 回の計 27 回はすべて 200 で、警告は毎回 0 件。原因は特定できなかった。次に起きたときに切り分けられるよう、警告に HTTP の状態コードを入れた（4cbde5f）。
 - 取り直し（2026-11-28T04:16:29Z、HEAD `b8dc053`）: ページ 36,168 バイト・sha256 `cadec69e…`（上と同じ）、生の行・抽出・ピン・`_url_ok` の結果は上と同じ。ただし検査そのもの（2 回目のページ取得）が `arm64 のピンを検査できなかった: … を取得できない（HTTP 503）` になった。直後（04:17:25Z）に 1 秒おきに 12 回取得すると、すべて 200 で、応答はキャッシュ（Varnish。`Age` が 33 から 55 へ増え、`X-Varnish` に 2 つの ID）から返っていた。キャッシュが切れて配布元へ取りに行ったときに 503 が返るとみられる。週次の実行はランナーからの初回アクセスでこの条件に当たりやすいので、ページ取得の一時的な失敗だけ取得し直すようにした（2176eb9。`test_check_arm64_retries_page_fetch_on_503_then_succeeds` ほか）
-- 取り直し（2026-11-28T04:20:45Z、HEAD `2176eb9`、コードの作業ツリーは clean）: ページ 36,168 バイト・sha256 `cadec69ed157ec5ac29e9c623a382f86121a5b428103940c1eab25f0009fa60c`、生の行・抽出（ffmpeg / ffprobe とも 9.1・`…91arm.zip`）・ピン（9.1）は上と同じ。`_url_ok` はピンの 2 本が ok、`ffmpeg9arm.zip` が gone。`check_ffmpeg_mac_arm64(ピン)` は警告 0 件（`[]`）
+- 取り直し（2026-11-28T04:20:45Z、HEAD `2176eb9`、コードの作業ツリーは clean）: ページ 36,168 バイト・sha256 `cadec69ed157ec5ac29e9c623a382f86121a5b428103940c1eab25f0009fa60c`、生の行・抽出（ffmpeg / ffprobe とも 9.1・`…91arm.zip`）・ピン（9.1）は上と同じ。`_url_ok` はピンの 2 本が ok、`ffmpeg9arm.zip` が gone。`check_ffmpeg_mac_arm64(ピン)` は警告 0 件（`[]`）。その後の HEAD までに `scripts/refresh_pins.py` が変わったのは a177b99 の `_fetch_page` の docstring 5 行だけで（`git diff 2176eb9 HEAD -- scripts bin tests/data .github`）、挙動は変わっていない
 - ランナーからの実行はしていない（手動でワークフローを回すとピン更新 PR が作られうるため）。マージ後の週次実行で確かめる
 
 ## 変異 → red（2026-11-28、基点 `a177b99`）
@@ -181,6 +181,7 @@
 |---|---|---|---|---|
 | 1 | `76f24c7` | green（1000 passed、skip 0） | 1 件を修正（`refresh_ffmpeg_mac` の冒頭コメントに古さの検知を追記。76f24c7） | FAIL（[欠陥] 4 / [証跡・文言] 5） |
 | 2 | `3d1ec87` | 主エージェントが確認（1011 passed） | — | FAIL（[欠陥] 2 / [証跡・文言] 3。1 巡目の 9 件はすべて閉じていると確認） |
+| 3 | `35c5296` | evaluator が確認（1015 passed、ruff・mypy green） | — | PASS（follow-up あり。[欠陥] 0 / [証跡・文言] 5。2 巡目の 5 件はすべて閉じていると確認。5 件はすべてこの PR で直した: 変異の数の書き違い・`html.lower()` の記述の矛盾・C9 の鮮度の注記・build.md の更新運用の行の限定句・止め規則の読み直しの 1 行） |
 
 1 巡目の指摘と閉じ方:
 
@@ -207,9 +208,10 @@
 | 4 | 証跡・文言 | build.md の「対象外」の行に限定句が無い | 限定句と次の行への参照を足した | a177b99 |
 | 5 | 証跡・文言 | M23 のテスト ID が `[timed` で切れている | `[timed out]` に直した | 上の「変異 → red」 |
 
-evaluator が独立の変異で生き残らせた `OSError` の捕捉の除去は、テストを足して塞いだ（`test_url_ok_error_on_raw_oserror`、e7c3cc7、変異 M23）。`html.lower()` の除去は受け入れ条件の外なので対象にしていない。
+evaluator が独立の変異で生き残らせた `OSError` の捕捉の除去は、テストを足して塞いだ（`test_url_ok_error_on_raw_oserror`、e7c3cc7、変異 M23）。`html.lower()` の除去は、2 巡目の指摘（D2）で M28 として塞いだ。
 ## 次にやること
 
 - evaluator の 3 巡目（2 巡目の指摘と閉じ方の対応表を渡す）→ archive 移動 → PR
 
 訂正ログ: 2 件（止まった: 2026-11-28。ユーザーの判断は「このまま続ける」（ページ取得のリトライを含める））
+読み直した結果: 2 件とも外部の事実（配布元の命名・失敗の原因）を確かめないまま書いた誤りで、設計の柱（知らせ方・版の照合・x86_64 との差を判定に使わない）には響かない。2 件目の観測からリトライを足したことだけが設計の変更で、Issue の方針も改訂した。
