@@ -19,7 +19,7 @@
 - [x] C8 sha256 を書き換えない — 証跡: `test_run_passes_refresh_result_through_and_keeps_arm64`、`test_run_with_real_check_does_not_touch_arm64_pin`、`test_refresh_ffmpeg_mac_notes_arch_version_difference`（arm64 不変）（a2ee01b）
 - [x] C9 実物との突き合わせ — 証跡: 下の「C9」と、実物の `bin/pins.json` を読む `test_real_pins_json_arm64_matches_fixture_page`
 - [x] C10 変異 → red — 証跡: 下の「変異 → red」（26 変異すべて、狙ったテストが落ちた）
-- [x] C12 sha256 がページに載っているか — 証跡: `test_check_arm64_sha_missing_from_page_is_stale`、`…_sha_comparison_is_case_insensitive`（a2ee01b）。M10
+- [x] C12 sha256 がページに載っているか — 証跡: `test_check_arm64_sha_missing_from_page_is_stale`、`…_sha_comparison_is_case_insensitive`（a2ee01b）、`…_malformed_pin_sha_is_stale`（empty・truncated・non_hex）・`…_page_sha_in_uppercase_still_matches`（a177b99）。M10・M27・M28
 - [x] C13 警告文に入れるもの（絞った値と固定文・LF） — 証跡: `test_check_arm64_fetch_failure_is_unchecked`・`…_structure_change_…`（HTML・`::error::` を流さない）、`test_alerts_are_single_line`、`test_write_alerts_uses_lf_and_creates_empty_file`（a2ee01b）
 - [x] C11 docs — 証跡: `docs/build.md`「macOS arm64 のピンの古さの検知」と更新運用・ピン自動更新の表、`docs/research/binary-supply-chain.md` §5 の追記、`bin/pins.json` の arm64 の `comment`（7053e70、4a8d434、このコミット）
 
@@ -37,15 +37,15 @@
   - `_build_summary(changes, statuses, alerts=())`: 警告があれば先頭に `> [!CAUTION]` の欄（警告の箇条書きと手で更新する手順）を出す。
   - `main()`: `--alerts-out` を足す。警告が無くても空ファイルを必ず作る。1 警告 1 行、`newline="\n"` で書く。終了コードは 0 のまま（PR 作成を止めない）。
 - `.github/workflows/update-binaries.yml`: Refresh pins に `id: refresh` と `--alerts-out "${RUNNER_TEMP}/pin-alerts.txt"` を足す。PR 作成の後に「Fail if arm64 pin needs attention」ステップを置き、`if: ${{ !cancelled() }}`。Refresh pins が成功（`steps.refresh.outcome == 'success'`）なのにファイルが無ければ不備として失敗。ファイルが空でなければ `while IFS= read -r line || [ -n "$line" ]` で 1 行ずつ `printf '::error::%s\n'` を出して `exit 1`。
-- ページの取得は、一時的な失敗（5xx・429・接続失敗・タイムアウト）のときだけ 10 秒・30 秒と待って計 3 回まで取得し直す（`_fetch_page`・`_PAGE_RETRY_WAITS`。2176eb9）。当初は「リトライしない」としていたが、手元で 503 を 2 回観測したので変えた（下の「C9」）。取得し尽くしても失敗した警告文に HTTP の状態コードを入れ、`workflow_dispatch` による再実行を促す。
+- ページの取得は、一時的な失敗（5xx・429・接続失敗・タイムアウト）のときだけ 10 秒・30 秒と待って計 3 回まで取得し直す（`_fetch_page`・`_PAGE_RETRY_WAITS`。2176eb9）。当初は「リトライしない」としていたが、手元で HTTP 503 を観測したので変えた（状態コードで確かめたのは 1 回。下の「C9」）。2026-11-28 にユーザーの確認を得て、Issue の方針も改訂した。取得し尽くしても失敗した警告文に HTTP の状態コードを入れ、`workflow_dispatch` による再実行を促す。
 - フィクスチャ: 現行ページ（9.1）と、Wayback の 2026-10-18 版（9.0、`ffmpeg9arm.zip`）から Apple Silicon と Intel の部分を切り出す。出所（URL・取得日時・sha256）をフィクスチャの先頭に書く。
 - C9 は手元からの取得で確かめる。ランナーからの実行は、ワークフローを手動で回すとピン更新 PR が実際に作られうるため、マージ後の週次実行で確かめる。
 
 ## テスト先行の red（2026-11-28）
 
-実装前のコード（HEAD `4a8d434` の `scripts/refresh_pins.py`・`.github/workflows/update-binaries.yml`）に、`2176eb9` のテストとフィクスチャを当てて走らせた（scratchpad に一時的な作業ツリーを作り、本体の `.venv` の Python で `pytest -q -rfE`。終わった後に作業ツリーは消した）。要約行は `53 failed, 26 passed, 9 errors in 0.72s`。落ちたのは新しく足したテストだけで、既存の 26 本はすべて pass。テストを書いた直後（4a8d434 の時点のテスト）の要約行は `40 failed, 26 passed, 5 errors` で、その後に足したテストの分だけ増えている。
+実装前のコード（HEAD `4a8d434` の `scripts/refresh_pins.py`・`.github/workflows/update-binaries.yml`）に、`a177b99` のテストとフィクスチャを当てて走らせた（scratchpad に一時的な作業ツリーを作り、本体の `.venv` の Python で `pytest -q -rfE`。終わった後に作業ツリーは消した）。要約行は `57 failed, 26 passed, 9 errors in 0.79s`。落ちたのは新しく足したテストだけで、既存の 26 本はすべて pass。テストを書いた直後（4a8d434 の時点のテスト）の要約行は `40 failed, 26 passed, 5 errors` で、その後に足したテストの分だけ増えている。
 
-<details><summary>FAILED / ERROR の行（62 件）</summary>
+<details><summary>FAILED / ERROR の行（66 件）</summary>
 
   - `FAILED tests/test_refresh_pins.py::test_parse_osxexperts_reads_apple_silicon_91`
   - `FAILED tests/test_refresh_pins.py::test_parse_osxexperts_accepts_dropped_trailing_zero_in_link`
@@ -99,6 +99,10 @@
   - `FAILED tests/test_refresh_pins.py::test_check_arm64_gives_up_after_retries_and_reports[429]`
   - `FAILED tests/test_refresh_pins.py::test_check_arm64_gives_up_after_retries_and_reports[timeout]`
   - `FAILED tests/test_refresh_pins.py::test_check_arm64_does_not_retry_permanent_failure`
+  - `FAILED tests/test_refresh_pins.py::test_check_arm64_malformed_pin_sha_is_stale[empty]`
+  - `FAILED tests/test_refresh_pins.py::test_check_arm64_malformed_pin_sha_is_stale[truncated]`
+  - `FAILED tests/test_refresh_pins.py::test_check_arm64_malformed_pin_sha_is_stale[non_hex]`
+  - `FAILED tests/test_refresh_pins.py::test_check_arm64_page_sha_in_uppercase_still_matches`
   - `FAILED tests/test_update_binaries_workflow.py::test_refresh_step_writes_alerts_file`
   - `ERROR tests/test_update_binaries_workflow.py::test_fail_step_reads_same_alerts_file`
   - `ERROR tests/test_update_binaries_workflow.py::test_fail_step_comes_after_pr_creation`
@@ -127,9 +131,9 @@
 - 取り直し（2026-11-28T04:20:45Z、HEAD `2176eb9`、コードの作業ツリーは clean）: ページ 36,168 バイト・sha256 `cadec69ed157ec5ac29e9c623a382f86121a5b428103940c1eab25f0009fa60c`、生の行・抽出（ffmpeg / ffprobe とも 9.1・`…91arm.zip`）・ピン（9.1）は上と同じ。`_url_ok` はピンの 2 本が ok、`ffmpeg9arm.zip` が gone。`check_ffmpeg_mac_arm64(ピン)` は警告 0 件（`[]`）
 - ランナーからの実行はしていない（手動でワークフローを回すとピン更新 PR が作られうるため）。マージ後の週次実行で確かめる
 
-## 変異 → red（2026-11-28、基点 `2176eb9`）
+## 変異 → red（2026-11-28、基点 `a177b99`）
 
-作業用のハーネス（scratchpad の `mutate.py`。追跡しない）が、1 変異ずつ置換を 1 か所だけ当て（当たり 0 件・2 件以上はハーネスの失敗として止める）、`tests/test_refresh_pins.py`・`tests/test_update_binaries_workflow.py` を走らせて落ちたテストを集め、`git checkout` で戻して `git diff --quiet` を確かめた。無変異は `passed=88`、戻した後も `passed=88`。同じ HEAD で全体は `1011 passed`（`uv run pytest -q`）。
+作業用のハーネス（scratchpad の `mutate.py`。追跡しない）が、1 変異ずつ置換を 1 か所だけ当て（当たり 0 件・2 件以上はハーネスの失敗として止める）、`tests/test_refresh_pins.py`・`tests/test_update_binaries_workflow.py` を走らせて落ちたテストを集め、`git checkout` で戻して `git diff --quiet` を確かめた。無変異は `passed=92`、戻した後も `passed=92`。同じ HEAD で全体は `1015 passed`（`uv run pytest -q`）。
 
 | 変異 | 書き換え | 落ちたテスト |
 |---|---|---|
@@ -140,7 +144,7 @@
 | M5 | 構造の変化を握りつぶす（`return [] and [`） | `test_check_arm64_structure_change_is_unchecked_and_does_not_leak_html` |
 | M6 | 取得失敗を握りつぶす | `test_check_arm64_fetch_failure_is_unchecked`、`test_check_arm64_fetch_http_error_reports_status_code`、`test_check_arm64_gives_up_after_retries_and_reports[503]`、`test_check_arm64_gives_up_after_retries_and_reports[429]`、`test_check_arm64_gives_up_after_retries_and_reports[timeout]`、`test_check_arm64_does_not_retry_permanent_failure` |
 | M7 | 想定外の例外を握りつぶす | `test_check_arm64_unexpected_exception_becomes_unchecked` |
-| M8 | Intel 版も拾う（`arm\.zip` → `(?:arm\|intel)\.zip`） | `test_parse_osxexperts_reads_apple_silicon_91`、`test_parse_osxexperts_accepts_dropped_trailing_zero_in_link`、`test_check_arm64_current_pin_has_no_alerts`、`test_check_arm64_pin_90_written_as_9_matches_90_page`、`test_check_arm64_old_pin_is_stale`、`test_check_arm64_url_differs_from_page_is_stale`、`test_check_arm64_sha_missing_from_page_is_stale`、`test_check_arm64_sha_comparison_is_case_insensitive`、`test_check_arm64_ffmpeg_ffprobe_version_split_is_reported`、`test_check_arm64_gone_url_is_stale_per_tool[ffmpeg]`、`test_check_arm64_gone_url_is_stale_per_tool[ffprobe]`、`test_check_arm64_unexpected_exception_becomes_unchecked`、`test_run_with_real_check_does_not_touch_arm64_pin`、`test_real_pins_json_arm64_matches_fixture_page`、`test_run_does_not_alert_on_x86_arm_version_difference_alone`、`test_run_writes_empty_alerts_file_when_no_alerts`、`test_check_arm64_version_mismatch_alone_is_stale`、`test_check_arm64_retries_page_fetch_on_503_then_succeeds` |
+| M8 | Intel 版も拾う（`arm\.zip` → `(?:arm\|intel)\.zip`） | `test_parse_osxexperts_reads_apple_silicon_91`、`test_parse_osxexperts_accepts_dropped_trailing_zero_in_link`、`test_check_arm64_current_pin_has_no_alerts`、`test_check_arm64_pin_90_written_as_9_matches_90_page`、`test_check_arm64_old_pin_is_stale`、`test_check_arm64_url_differs_from_page_is_stale`、`test_check_arm64_sha_missing_from_page_is_stale`、`test_check_arm64_sha_comparison_is_case_insensitive`、`test_check_arm64_ffmpeg_ffprobe_version_split_is_reported`、`test_check_arm64_gone_url_is_stale_per_tool[ffmpeg]`、`test_check_arm64_gone_url_is_stale_per_tool[ffprobe]`、`test_check_arm64_unexpected_exception_becomes_unchecked`、`test_run_with_real_check_does_not_touch_arm64_pin`、`test_real_pins_json_arm64_matches_fixture_page`、`test_run_does_not_alert_on_x86_arm_version_difference_alone`、`test_run_writes_empty_alerts_file_when_no_alerts`、`test_check_arm64_version_mismatch_alone_is_stale`、`test_check_arm64_retries_page_fetch_on_503_then_succeeds`、`test_check_arm64_malformed_pin_sha_is_stale[empty]`、`test_check_arm64_malformed_pin_sha_is_stale[truncated]`、`test_check_arm64_malformed_pin_sha_is_stale[non_hex]`、`test_check_arm64_page_sha_in_uppercase_still_matches` |
 | M9 | リンクと文言の照合を外す | `test_parse_osxexperts_rejects_broken_structure[link_text_mismatch]` |
 | M10 | sha256 の確認を外す | `test_check_arm64_sha_missing_from_page_is_stale`、`test_run_with_real_check_does_not_touch_arm64_pin` |
 | M11 | 検査を再ピンの後に回す | `test_run_checks_and_writes_alerts_before_refresh` |
@@ -155,12 +159,14 @@
 | M20 | リダイレクトの判定を外す（Content-Type だけを見る） | `test_url_ok_redirect_to_other_zip_is_gone` |
 | M21 | x86_64 との版の差を警告に足す | `test_run_does_not_alert_on_x86_arm_version_difference_alone` |
 | M22 | 警告が無いときは警告ファイルを作らない（`if alerts_out and alerts:`） | `test_run_writes_empty_alerts_file_when_no_alerts` |
-| M23 | 生の `OSError` を捕まえない（`except urllib.error.URLError:`） | `test_url_ok_error_on_raw_oserror[timed`、`test_url_ok_error_on_raw_oserror[reset]` |
+| M23 | 生の `OSError` を捕まえない（`except urllib.error.URLError:`） | `test_url_ok_error_on_raw_oserror[timed out]`、`test_url_ok_error_on_raw_oserror[reset]` |
 | M24 | URL だけ違う警告から版を外す | `test_check_arm64_url_differs_from_page_is_stale` |
 | M25 | ページ取得を取得し直さない（`for wait in (None,):`） | `test_check_arm64_retries_page_fetch_on_503_then_succeeds`、`test_check_arm64_gives_up_after_retries_and_reports[503]`、`test_check_arm64_gives_up_after_retries_and_reports[429]`、`test_check_arm64_gives_up_after_retries_and_reports[timeout]` |
 | M26 | 恒久的な失敗も取得し直す（`if wait is None:`） | `test_check_arm64_does_not_retry_permanent_failure` |
+| M27 | ピンの sha256 の形（64 桁の 16 進）の確認を外す | `test_check_arm64_malformed_pin_sha_is_stale[empty]`、`test_check_arm64_malformed_pin_sha_is_stale[truncated]` |
+| M28 | ページの sha256 を小文字にしない（`lowered = html`） | `test_check_arm64_page_sha_in_uppercase_still_matches` |
 
-経緯: 最初の実行（基点 `a2ee01b`、M1〜M15）では M14 が生き残った（構造のテストが文字列の有無しか見ていなかった）ので、失敗ステップのスクリプトを bash で実際に走らせる `test_fail_step_script_behaviour` を足した（f1e4d75）。M16〜M18 は `main()` を走らせるテストが無く生き残る形だったので、`test_main_exits_zero_with_alerts_and_wires_outputs` を足した（4cbde5f）。M20〜M24 は evaluator（1 巡目）が scratchpad のコピーで生き残らせたもので、テストを足した（e7c3cc7）。その修正で URL が違うときの警告にも版を入れたため M1 が生き残り、版だけが違うピンのテストを足した（b8dc053）。M25・M26 はページ取得のリトライ（2176eb9）に合わせて足した。evaluator が挙げた `html.lower()` の除去（ページ側の sha256 が大文字の場合）は受け入れ条件の外なので掛けていない。
+経緯: 最初の実行（基点 `a2ee01b`、M1〜M15）では M14 が生き残った（構造のテストが文字列の有無しか見ていなかった）ので、失敗ステップのスクリプトを bash で実際に走らせる `test_fail_step_script_behaviour` を足した（f1e4d75）。M16〜M18 は `main()` を走らせるテストが無く生き残る形だったので、`test_main_exits_zero_with_alerts_and_wires_outputs` を足した（4cbde5f）。M20〜M24 は evaluator（1 巡目）が scratchpad のコピーで生き残らせたもので、テストを足した（e7c3cc7）。その修正で URL が違うときの警告にも版を入れたため M1 が生き残り、版だけが違うピンのテストを足した（b8dc053）。M25・M26 はページ取得のリトライ（2176eb9）に合わせて足した。M27・M28 は evaluator（2 巡目）が生き残らせたもので、テストを足した（a177b99）。M27 で `non_hex` のケースが落ちないのは、16 進でない値はページに含まれず、sha256 がページに無いという同じ警告が別の条件で出るため（狙いの `empty`・`truncated` は落ちる）。
 
 ## 訂正ログ
 
@@ -174,6 +180,7 @@
 | 巡 | HEAD | verify | docs-check | evaluator |
 |---|---|---|---|---|
 | 1 | `76f24c7` | green（1000 passed、skip 0） | 1 件を修正（`refresh_ffmpeg_mac` の冒頭コメントに古さの検知を追記。76f24c7） | FAIL（[欠陥] 4 / [証跡・文言] 5） |
+| 2 | `3d1ec87` | 主エージェントが確認（1011 passed） | — | FAIL（[欠陥] 2 / [証跡・文言] 3。1 巡目の 9 件はすべて閉じていると確認） |
 
 1 巡目の指摘と閉じ方:
 
@@ -189,10 +196,20 @@
 | 8 | 証跡・文言 | 「戻した状態で全テストが green」が対象 2 ファイルだけ | 全体の結果（1011 passed）を HEAD つきで追記した | 上の「変異 → red」 |
 | 9 | 証跡・文言 | 限定句の伝播漏れ（build.md の表の行、`docs/task/index.md`） | 限定句を足した | `docs/build.md` の「arm64 の古さの検知」の行、`docs/task/index.md` の #412 の行 |
 
+
+2 巡目の指摘と閉じ方:
+
+| # | 区分 | 指摘 | 閉じ方 | 証跡・コミット |
+|---|---|---|---|---|
+| D1 | 欠陥（要判断） | ページ取得のリトライが Issue 本文の方針（リトライしない）と食い違う | ユーザーの確認（「このまま続ける」。リトライを含める）を得て、Issue 本文の方針を改訂し、経緯をコメントに残した | Issue #412 の本文と 2026-11-28 のコメント、このメモの末尾の「止まった」 |
+| D2 | 欠陥 | sha256 の確認の `re.fullmatch` の守りと `html.lower()` を外す変異が生き残る | テストを足した | `test_check_arm64_malformed_pin_sha_is_stale`・`test_check_arm64_page_sha_in_uppercase_still_matches`（a177b99）、変異 M27・M28 |
+| 3 | 証跡・文言 | 「503 を 2 回観測」が実測（状態コードで確かめたのは 1 回）を上回る。原因を事実の形で書いている | build.md・`_fetch_page` の docstring・このメモを「確かめたのは 1 回」「とみられる」に直した | a177b99、このコミット |
+| 4 | 証跡・文言 | build.md の「対象外」の行に限定句が無い | 限定句と次の行への参照を足した | a177b99 |
+| 5 | 証跡・文言 | M23 のテスト ID が `[timed` で切れている | `[timed out]` に直した | 上の「変異 → red」 |
+
 evaluator が独立の変異で生き残らせた `OSError` の捕捉の除去は、テストを足して塞いだ（`test_url_ok_error_on_raw_oserror`、e7c3cc7、変異 M23）。`html.lower()` の除去は受け入れ条件の外なので対象にしていない。
 ## 次にやること
 
-- 訂正ログが 2 件になったので、止まって方針をユーザーに確認する（git-workflow §5.2）
-- そのあと evaluator の 2 巡目（1 巡目の指摘と閉じ方の対応表を渡す）→ archive 移動 → PR
+- evaluator の 3 巡目（2 巡目の指摘と閉じ方の対応表を渡す）→ archive 移動 → PR
 
-訂正ログ: 2 件
+訂正ログ: 2 件（止まった: 2026-11-28。ユーザーの判断は「このまま続ける」（ページ取得のリトライを含める））
