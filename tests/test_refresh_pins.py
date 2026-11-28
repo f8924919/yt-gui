@@ -360,6 +360,10 @@ def _arm_pin_91() -> dict:
     }
 
 
+def _no_sleep(seconds: float) -> None:
+    """ページ取得のリトライで実際には待たない。"""
+
+
 def _check(pin: dict, page: str, url_ok=lambda url: "ok") -> list[str]:
     # refresh_pins は importlib で読むため型は Any になる。戻り値の型をここで固める。
     alerts: list[str] = refresh_pins.check_ffmpeg_mac_arm64(
@@ -650,7 +654,7 @@ def test_check_arm64_fetch_failure_is_unchecked():
         raise OSError("<html>blocked</html>\n::error::injected %0A")
 
     alerts = refresh_pins.check_ffmpeg_mac_arm64(
-        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok"
+        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok", sleep=_no_sleep
     )
     assert len(_unchecked(alerts)) == 1 and not _stale(alerts)
     assert "OSError" in alerts[0]
@@ -790,7 +794,7 @@ def test_check_arm64_fetch_http_error_reports_status_code():
         raise _http_error(url, 429)
 
     alerts = refresh_pins.check_ffmpeg_mac_arm64(
-        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok"
+        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok", sleep=_no_sleep
     )
     assert len(_unchecked(alerts)) == 1
     assert "HTTP 429" in alerts[0]
@@ -903,3 +907,59 @@ def test_check_arm64_version_mismatch_alone_is_stale():
     assert len(stale) == 2, stale  # ffmpeg・ffprobe
     assert all("ページ 9.1" in a and "ピン 9.0" in a for a in stale)
     assert not any("URL" in a for a in stale)
+
+
+# ページ取得のリトライ（5xx・429・接続失敗だけ。手元で 503 を観測。タスクメモ「C9」）
+
+
+def _flaky(failures: list[BaseException], page: str):
+    """先頭から順に例外を投げ、尽きたら page を返す取得関数。呼ばれた回数を数える。"""
+    calls = {"n": 0}
+
+    def fetch(url):
+        calls["n"] += 1
+        if failures:
+            raise failures.pop(0)
+        return page
+
+    return fetch, calls
+
+
+def test_check_arm64_retries_page_fetch_on_503_then_succeeds():
+    waits: list[float] = []
+    fetch, calls = _flaky(
+        [_http_error(refresh_pins._OSXEXPERTS_URL, 503)], _page("9.1")
+    )
+    alerts = refresh_pins.check_ffmpeg_mac_arm64(
+        _arm_pin_91(), fetch_text=fetch, url_ok=lambda u: "ok", sleep=waits.append
+    )
+    assert alerts == []
+    assert calls["n"] == 2
+    assert waits == [refresh_pins._PAGE_RETRY_WAITS[0]]
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [_http_error("u", 503), _http_error("u", 429), TimeoutError("t")],
+    ids=["503", "429", "timeout"],
+)
+def test_check_arm64_gives_up_after_retries_and_reports(exc):
+    waits: list[float] = []
+    fetch, calls = _flaky([exc, exc, exc, exc], _page("9.1"))
+    alerts = refresh_pins.check_ffmpeg_mac_arm64(
+        _arm_pin_91(), fetch_text=fetch, url_ok=lambda u: "ok", sleep=waits.append
+    )
+    assert len(_unchecked(alerts)) == 1 and not _stale(alerts)
+    assert calls["n"] == len(refresh_pins._PAGE_RETRY_WAITS) + 1
+    assert waits == list(refresh_pins._PAGE_RETRY_WAITS)
+
+
+def test_check_arm64_does_not_retry_permanent_failure():
+    """404 などは待っても直らないので取得し直さない。"""
+    waits: list[float] = []
+    fetch, calls = _flaky([_http_error("u", 404)], _page("9.1"))
+    alerts = refresh_pins.check_ffmpeg_mac_arm64(
+        _arm_pin_91(), fetch_text=fetch, url_ok=lambda u: "ok", sleep=waits.append
+    )
+    assert len(_unchecked(alerts)) == 1 and "HTTP 404" in alerts[0]
+    assert calls["n"] == 1 and waits == []

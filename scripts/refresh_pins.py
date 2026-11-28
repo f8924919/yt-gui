@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -271,6 +272,8 @@ _ARM64_TOOLS = ("ffmpeg", "ffprobe")
 _ALERT_STALE = "arm64 のピンが古い"
 _ALERT_UNCHECKED = "arm64 のピンを検査できなかった"
 _RERUN_HINT = "一時的な失敗なら workflow_dispatch で再実行して再現するか確認する"
+# ページ取得の一時的な失敗（5xx・429・接続失敗）で取得し直すまでの待ち秒数（計 3 回）
+_PAGE_RETRY_WAITS = (10.0, 30.0)
 
 
 class ArmPageError(RuntimeError):
@@ -359,10 +362,36 @@ def _url_ok(url: str, open_fn: Callable[..., Any] = urllib.request.urlopen) -> s
     return "error"
 
 
+def _is_transient(e: BaseException) -> bool:
+    """取得し直せば直りうる失敗か（5xx・429・接続失敗・タイムアウト）。"""
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code == 429 or e.code >= 500
+    return isinstance(e, (urllib.error.URLError, OSError))
+
+
+def _fetch_page(fetch: Callable[[str], str], sleep: Callable[[float], None]) -> str:
+    """osxexperts.net のページを取得する。一時的な失敗だけ待って取得し直す。
+
+    キャッシュ（Varnish）が切れたときに配布元が 503 を返すことを手元で 2 回観測した
+    （#412 のタスクメモ「C9」）。週次の実行はランナーからの初回アクセスでこの条件に
+    当たりやすいので、`_PAGE_RETRY_WAITS` の秒数だけ待って取得し直す。404 などの
+    恒久的な失敗と、待ち尽くした最後の失敗はそのまま送出する。
+    """
+    for wait in (*_PAGE_RETRY_WAITS, None):
+        try:
+            return fetch(_OSXEXPERTS_URL)
+        except Exception as e:
+            if wait is None or not _is_transient(e):
+                raise
+            sleep(wait)
+    raise AssertionError("unreachable")
+
+
 def check_ffmpeg_mac_arm64(
     arm_pin: dict,
     fetch_text: Callable[[str], str] | None = None,
     url_ok: Callable[[str], str] | None = None,
+    sleep: Callable[[float], None] | None = None,
 ) -> list[str]:
     """arm64 のピンを osxexperts.net のページと比べ、警告の文字列のリストを返す。
 
@@ -374,7 +403,7 @@ def check_ffmpeg_mac_arm64(
     check_url = url_ok or _url_ok
     try:
         try:
-            html = fetch(_OSXEXPERTS_URL)
+            html = _fetch_page(fetch, sleep or time.sleep)
         except Exception as e:
             # HTTPError は状態コードを入れる（429 / 403 / 503 の切り分け用。#412 の C9）
             detail = (
