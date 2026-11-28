@@ -1,11 +1,11 @@
 # 同梱バイナリの取得で HTTP 429 / 503 に Retry-After で待ってリトライする
 
 > Issue: [#413](https://github.com/f8924919/yt-gui/issues/413)
-> ステータス: 進行中
+> ステータス: 完了（PR #PRNUM）
 > ブランチ: `feature/413-download-retry-after`
 > 基点: `3da4cbe`
 
-受け入れ条件の正本は Issue（2026-11-28 に criteria-review とユーザー確認を経て書き直した版）。設計は [build.md](../build.md) の「ピン留めと sha256 検証」のリトライの段落。前のタスクは [#265](archive/265-download-retry.md)（取得リトライの導入）と [#412](archive/412-arm64-pin-staleness.md)（`refresh_pins.py` のページ取得のリトライ）。
+受け入れ条件の正本は Issue（2026-11-28 に criteria-review とユーザー確認を経て書き直した版）。設計は [build.md](../../build.md) の「ピン留めと sha256 検証」のリトライの段落。前のタスクは [#265](265-download-retry.md)（取得リトライの導入）と [#412](412-arm64-pin-staleness.md)（`refresh_pins.py` のページ取得のリトライ）。
 
 ## 進捗
 
@@ -178,6 +178,6 @@
 | E8 | 証跡・文言 | 最悪の値を PR に書く（PR がまだ無い） | PR 本文に書く | PR 本文 |
 ## 次にやること
 
-- `/verify-gate`（verify → docs-check → evaluator）→ archive 移動 → PR
+- なし（完了）
 
 訂正ログ: 0 件
