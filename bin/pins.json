@@ -38,7 +38,7 @@
       "version": "9.1",
       "source": "osxexperts.net",
       "verify": "binary",
-      "comment": "osxexperts.net の Apple Silicon 静的ビルド。ページが公開する sha256 は zip ではなく展開後バイナリのハッシュのため、展開後に検証する。x86_64（evermeet）が 9.1 へ上がった際に手動で追従し、mac の arch 間バージョンを揃えている。osxexperts は旧版の zip を残さない（9.1 公開時に ffmpeg9arm.zip が 404 になり v0.8.1 のリリースビルドが失敗した）。",
+      "comment": "osxexperts.net の Apple Silicon 静的ビルド。ページが公開する sha256 は zip ではなく展開後バイナリのハッシュのため、展開後に検証する。再ピンは人手（ページの公開値を確認して更新）だが、osxexperts は新版の公開時に旧版の zip を消すため、scripts/refresh_pins.py が週次でページとピンを比べ、古い・検査できないときはワークフローを失敗させる（#412。docs/build.md「macOS arm64 のピンの古さの検知」）。x86_64（evermeet）との版の一致は必須ではない（osxexperts の追従待ちの間は版が違ってよい）。",
       "ffmpeg": {
         "url": "https://www.osxexperts.net/ffmpeg91arm.zip",
         "sha256": "f3cc9de031a39020b7285a62667b951949a0377483b7cbf708c7126234fda34f"

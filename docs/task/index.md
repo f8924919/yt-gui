@@ -16,6 +16,7 @@
 
 | タスク | ステータス | 概要 | 更新日 |
 |---|---|---|---|
+| [412-arm64-pin-staleness.md](412-arm64-pin-staleness.md) | 進行中 | macOS arm64 の ffmpeg ピン（osxexperts.net）の古さを週次で検知し、失敗で知らせる（#412） | 2026-11-28 |
 
 <!-- タスク追加時の記入例:
 | [task-slug.md](task-slug.md) | 未着手 | 1 行サマリ | YYYY-MM-DD |
@@ -28,5 +29,4 @@
 | Issue | 概要 | 着手時に読むもの |
 |---|---|---|
 | [#39](https://github.com/f8924919/yt-gui/issues/39) | 配布バイナリのコード署名・公証（Windows Authenticode / macOS 公証） | [build.md](../build.md) |
-| [#412](https://github.com/f8924919/yt-gui/issues/412) | macOS arm64 の ffmpeg ピン（osxexperts.net）が古くなったことを週次で検知する | [build.md](../build.md)・[binary-supply-chain.md](../research/binary-supply-chain.md) §4・§5 |
 | [#413](https://github.com/f8924919/yt-gui/issues/413) | 同梱バイナリの取得で HTTP 429 / 503 に Retry-After で待ってリトライする | [build.md](../build.md)・[265-download-retry.md](archive/265-download-retry.md) |

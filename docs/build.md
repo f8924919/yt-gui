@@ -80,7 +80,7 @@ python scripts/download_binaries.py --update
 
 ピン留めの目的は更新の停止ではなく、**更新を「毎ビルド可変取得」から「レビュー可能な PR 差分」へ移す**ことにある。更新は `bin/pins.json` の差分を含む PR として行い、レビュアはバージョンと sha256 の変化を確認して承認する。
 
-- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名・公開チェックサム（Deno `.sha256sum`）と照合する。BtbN（win / linux）は不変 `autobuild-*` タグのアセットを取得して sha256 を算出する（タグの不変性が参照の固定を担保）。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。macOS arm64（osxexperts.net）はページが**展開後バイナリ**の sha256 を公開するため、展開後バイナリと公開値の一致を確認して登録する（`verify: binary`）。osxexperts は API・署名サイドカーが無いため週次自動追従の対象外とし、更新時はページの公開値を人手で確認する。
+- **更新時の信頼の確立**: 新しい sha256 は取得物から計算してそのまま採用しない。上流の署名・公開チェックサム（Deno `.sha256sum`）と照合する。BtbN（win / linux）は不変 `autobuild-*` タグのアセットを取得して sha256 を算出する（タグの不変性が参照の固定を担保）。チェックサム非公開の項目（evermeet）は GPG `.sig` 検証や別経路での再取得一致で TOFU を補完する。macOS arm64（osxexperts.net）はページが**展開後バイナリ**の sha256 を公開するため、展開後バイナリと公開値の一致を確認して登録する（`verify: binary`）。osxexperts は API・署名サイドカーが無いため週次自動追従の対象外とし、更新時はページの公開値を人手で確認する。ただし**ピンが古くなったことは週次で検知して知らせる**（osxexperts は新版の公開時に旧版の zip を消すため、放置するとリリースビルドが 404 で壊れる。後述「[macOS arm64 のピンの古さの検知](#macos-arm64-のピンの古さの検知)」）。
 - **自動追従（週次）**: `.github/workflows/update-binaries.yml` が毎週 `scripts/refresh_pins.py` を実行し、上流最新を解決・検証して `bin/pins.json` を更新する PR を自動起票する（差分が無ければ PR は作らない）。検証根拠（旧→新・上流チェックサム照合結果）は PR 本文に出力されるため、レビュアは差分の確認だけで承認できる。
 - **手動での差し替え手順**: ①`scripts/refresh_pins.py` を実行（または手動で上流バージョン URL を確認）→ ②上流チェックサム／署名で真正性を確認 → ③`bin/pins.json` の `version` / `url` / `sha256` を更新 → ④PR でレビュー。重大 CVE 時は週次を待たず手動で実施する。
 - **ffmpeg-win / ffmpeg-linux の不変ピン（ドリフト対策）**: BtbN の `latest` はローリングタグで、同一バージョン（例 `n8.1`）でも上流が再ビルドするたびに同名アセットの中身＝ sha256 が変わる。これを `pins.json` に固定するとリリース CI が sha256 不一致で失敗するため、**日付固定の不変 `autobuild-YYYY-MM-DD-HH-MM` タグ配下のアセット URL にピンする**。`refresh_pins.py` は `releases/latest` ではなく最新の `autobuild-*` リリースを解決し（`_select_latest_autobuild`）、その中の最新ブランチの gpl アセット（win: `ffmpeg-nX.Y.Z-<N>-g<hash>-win64-gpl-X.Y.zip`、linux: 同形式の `linux64-gpl` / `linuxarm64-gpl` tar.xz）を選んで不変 URL を書き込む（`_select_btbn_versioned_asset`）。**win と linux はリリース一覧の取得・タグ解決を `refresh_pins()` で 1 回だけ行い、解決済みリリースを両 refresher へ引数で渡すことで、同一実行内で必ず同一タグ・同一バージョンへ揃える**。linux の amd64 / arm64 もバージョントークンの一致を検証し、不一致・アセット欠落時は例外で中断する（fail-closed。その週の週次 refresh は PR 不作成で止まる）。新バージョン追従時もこの仕組みで自動的に新しい不変タグへ再ピンされる。johnvansickle.com（旧・Linux 取得元）は GitHub ランナーからの取得ブロックと上流更新停止のため #272 で廃止した。
@@ -195,11 +195,24 @@ gh attestation verify <ダウンロードしたファイル> --repo f8924919/yt-
 | トリガー | `schedule`（週次）+ `workflow_dispatch`（手動） |
 | 検証 | deno は上流 `.sha256sum` と照合。BtbN（win / linux）は最新の不変 `autobuild-*` タグのアセットを取得し sha256 算出（`latest` ローリングは使わない。win / linux は同一タグ・同一バージョンに揃える）、evermeet（mac x86_64）は info API のサイズ・GPG `.sig` 有無を確認（TOFU） |
 | 冪等性 | `bin/pins.json` に差分があるときだけ PR を作成（`peter-evans/create-pull-request`）。検証失敗時は例外で停止し PR を作らない |
-| 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg（osxexperts.net・API/署名無しのため手動更新） |
+| 対象外 | danmaku2ass（git の SHA 固定のため）、macOS arm64 ffmpeg の再ピン（osxexperts.net・API/署名無しのため手動更新。古さの検知だけは行う） |
+| arm64 の古さの検知 | ページ上の Apple Silicon 版とピンを比べ、古い・検査できないときは PR は通常どおり作ったうえでジョブを失敗させる（後述） |
 | 権限 | `contents: write` / `pull-requests: write` |
 | PR 作成トークン | secret `PIN_UPDATE_TOKEN`（fine-grained PAT）。未設定時は `GITHUB_TOKEN` にフォールバックし、警告を出す（後述） |
 
 > **前提設定 1**: GITHUB_TOKEN で PR を作成する経路が残るため、リポジトリの Settings > Actions > General > **「Allow GitHub Actions to create and approve pull requests」を有効化**しておくこと。
+
+### macOS arm64 のピンの古さの検知
+
+macOS arm64 の ffmpeg / ffprobe（`ffmpeg-mac.arm64`、取得元 osxexperts.net）は再ピンしないが、`refresh_pins.py` が毎回**古さの検査**をする（#412）。osxexperts は新版を公開すると旧版の zip を消すので、ピンが古いまま気づかないと次のリリースビルドが 404 で壊れる（v0.8.1 で実際に発生し、#411 で手で直した）。
+
+- **読み方**: osxexperts.net のトップページから、ツールごとに Apple Silicon 版の**リンクのファイル名**（`<tool><数字>arm.zip`）と**ボタン文言**（`Download <tool> <版> (Apple Silicon)`）の両方を読み、両者が一致したときだけその版と URL を採用する（`_parse_osxexperts_arm64`）。Intel 版のリンク・文言は拾わない。
+- **古いと判定する条件**: ページの版がピンの `version` と違う、ページの URL がピンの URL と違う、またはピンの URL が取得できない（404 など）。**x86_64（evermeet）との版の差は判定に使わない** — evermeet が先に新版を出し、osxexperts が追いつくまでの間は、差があってもピンは有効でビルドも壊れないため。差は PR 本文の状況欄に情報として出すだけにする。
+- **検査できないとき**: ページの取得に失敗した、またはリンク・文言が見つからない・食い違う（ページの構造が変わった）ときは、「古い」とは別の「検査できなかった」警告にする。黙って通さない。ページの取得は 1 回だけで、一時的な失敗でもその週は失敗として知らせ、翌週に再検査する。
+- **知らせ方**: 警告があっても**他のピン（deno / win / linux / x86_64）の再ピンと PR 作成は止めない**（例外で止めると、BtbN の古いタグ削除で win / linux のピンまで失効するため。上の「再ピンは…」参照）。警告は PR 本文の先頭に載せ、`--alerts-out` のファイルにも書き出す。ワークフローは PR 作成の後の「Fail if arm64 pin needs attention」ステップで、このファイルが空でなければ警告を `::error::` で出して**ジョブを失敗させる**。他のピンに変更が無く PR が作られない週でも、失敗の通知が届く。
+- **直すまで毎週失敗する**: 意図どおりの挙動。失敗の通知を見たら、osxexperts.net のページで Apple Silicon 版の URL と公開 sha256（展開後バイナリの値）を確認して、`bin/pins.json` の `ffmpeg-mac.arm64` を手で更新する PR を出す（手順は上の「手動での差し替え手順」）。
+- **限定**: この検査は**ページ上の表示とピンの一致を見るだけ**で、zip の中身の真正性は確かめない。真正性は、更新のときに人がページの公開 sha256 で確認し、ビルド時に `download_binaries.py` が展開後の sha256 を照合することで担保する。
+
 
 ### PR 作成トークン（secret `PIN_UPDATE_TOKEN`）
 
