@@ -641,8 +641,9 @@ def test_exhausted_throttle_reports_status_retry_after_and_total(
         tmp_path, monkeypatch, [_http_error(429, "45")] * 5, urllib.error.HTTPError
     )
     out = capsys.readouterr().out
-    assert "状態=429" in out
-    assert "Retry-After=45" in out
+    # 毎試行の行（「最後の状態=」の行とは別に確かめる）
+    assert " 状態=429 Retry-After=45 " in out
+    assert "最後の状態=429" in out
     assert f"待った合計={sum(sleeps):g} 秒" in out
     assert "取得を断念" in out
 
@@ -652,8 +653,8 @@ def test_exhausted_without_http_status_reports_none(tmp_path, monkeypatch, capsy
         tmp_path, monkeypatch, [OSError("x")] * 3, OSError
     )
     out = capsys.readouterr().out
-    assert "状態=なし" in out
-    assert "Retry-After=なし" in out
+    assert " 状態=なし Retry-After=なし " in out
+    assert "最後の状態=なし" in out
     assert "待った合計=6 秒" in out
 
 
