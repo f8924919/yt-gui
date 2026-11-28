@@ -13,10 +13,10 @@
     }
   },
   "ffmpeg-win": {
-    "version": "n9.0.2-62-gac1c6e003f",
+    "version": "n9.0.2-982-g836df4e858",
     "comment": "BtbN/FFmpeg-Builds の win64-gpl ビルド。日付固定の不変 autobuild-* タグにピンしているため上流の latest 再ビルドでも sha256 がドリフトしない（#72）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。zip 取得後に sha256 を算出して照合。",
-    "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-23-12-43/ffmpeg-n9.0.2-62-gac1c6e003f-win64-gpl-9.0.zip",
-    "sha256": "c33e49c5d1e5d5b7c138de9470a414aeb75a9bcba0670622fd111d10946c7b37"
+    "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-27-12-42/ffmpeg-n9.0.2-982-g836df4e858-win64-gpl-9.0.zip",
+    "sha256": "a9c7e217d2fdbac732c90aa080bda550a75240f2c290ecb7d09cc78a5ef17679"
   },
   "ffmpeg-mac": {
     "_comment": "macOS は arch 別に取得元が異なる。x86_64=evermeet.cx（zip の sha256 を検証）、arm64=osxexperts.net（evermeet と同一作者 Helmut Tessarek の Apple Silicon 静的ビルド。ページが公開するのは展開後バイナリの sha256 のため verify=binary で展開後に検証）。いずれも個人運営の第三者ビルドのため TOFU。更新時は各サイトの公開値で照合する。",
@@ -50,16 +50,16 @@
     }
   },
   "ffmpeg-linux": {
-    "version": "n9.0.2-62-gac1c6e003f",
+    "version": "n9.0.2-982-g836df4e858",
     "comment": "BtbN/FFmpeg-Builds の linux64-gpl / linuxarm64-gpl ビルド。ffmpeg-win と同一の日付固定・不変 autobuild-* タグにピンし、win/linux で同一タグ・同一バージョンに揃える（#272）。scripts/refresh_pins.py が実行のたびに最新 autobuild タグへ再ピンする（バージョン不変でも行う。BtbN が古い autobuild タグを削除するため。docs/build.md「再ピンは『ffmpeg のバージョンが変わったとき』だけではない」参照）。tar.xz 取得後に sha256 を算出して照合。",
     "assets": {
       "amd64": {
-        "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-23-12-43/ffmpeg-n9.0.2-62-gac1c6e003f-linux64-gpl-9.0.tar.xz",
-        "sha256": "17cf42701de208afbf8de9ae4cd016122c875d95beedc6c4b37894d35a523063"
+        "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-27-12-42/ffmpeg-n9.0.2-982-g836df4e858-linux64-gpl-9.0.tar.xz",
+        "sha256": "a236601b679237dece06c8dbf1662cdb138f197c8109c9fa4ae5f0e884d61ffb"
       },
       "arm64": {
-        "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-23-12-43/ffmpeg-n9.0.2-62-gac1c6e003f-linuxarm64-gpl-9.0.tar.xz",
-        "sha256": "ae8581be1b2d9c42879c7645ca9392144829b7f85844355cbd4a95c470732ae3"
+        "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-27-12-42/ffmpeg-n9.0.2-982-g836df4e858-linuxarm64-gpl-9.0.tar.xz",
+        "sha256": "c384a7a2bc6268a51b0a4d2d79ac647cd5e0360379f13db563646262dd3525da"
       }
     }
   },
