@@ -374,9 +374,15 @@ def check_ffmpeg_mac_arm64(
         try:
             html = fetch(_OSXEXPERTS_URL)
         except Exception as e:
+            # HTTPError は状態コードを入れる（429 / 403 / 503 の切り分け用。#412 の C9）
+            detail = (
+                f"HTTP {e.code}"
+                if isinstance(e, urllib.error.HTTPError)
+                else type(e).__name__
+            )
             return [
                 f"{_ALERT_UNCHECKED}: {_OSXEXPERTS_URL} を取得できない"
-                f"（{type(e).__name__}）。{_RERUN_HINT}"
+                f"（{detail}）。{_RERUN_HINT}"
             ]
         try:
             page = _parse_osxexperts_arm64(html)

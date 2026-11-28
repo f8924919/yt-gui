@@ -776,3 +776,63 @@ def test_real_pins_json_arm64_matches_fixture_page():
     arm = db._load_pins()["ffmpeg-mac"]["arm64"]
     # ピンの版のフィクスチャを読む（ピンを上げたのにフィクスチャが無ければここで落ちる）
     assert _check(arm, _page(arm["version"])) == []
+
+
+def test_check_arm64_fetch_http_error_reports_status_code():
+    """ページ取得の HTTPError は状態コードを警告に入れる。
+
+    429 / 403 / 503 を切り分けるため。
+    """
+
+    def boom(url):
+        raise _http_error(url, 429)
+
+    alerts = refresh_pins.check_ffmpeg_mac_arm64(
+        _arm_pin_91(), fetch_text=boom, url_ok=lambda u: "ok"
+    )
+    assert len(_unchecked(alerts)) == 1
+    assert "HTTP 429" in alerts[0]
+
+
+# main()（警告があっても終了コード 0・本文に載せる・--alerts-out を渡す）
+
+
+def test_main_exits_zero_with_alerts_and_wires_outputs(monkeypatch, tmp_path):
+    """警告があっても main() は 0 で終わる（PR 作成を止めない）。
+
+    止めるのはワークフローの最後のステップ。
+
+    警告は PR 本文用サマリの先頭に載り、`--alerts-out` の指定は run() へ渡る。
+    """
+    pins = _pins_for_run()
+    pins_path = tmp_path / "pins.json"
+    pins_path.write_text(json.dumps(pins), encoding="utf-8")
+    summary_path = tmp_path / "body.md"
+    alerts_path = tmp_path / "alerts.txt"
+    alert = f"{refresh_pins._ALERT_STALE}: ffmpeg（ページ 9.2 / ピン 9.1）"
+    received: dict = {}
+
+    def fake_run(p, alerts_out=None):
+        received["alerts_out"] = alerts_out
+        return p, [], ["deno（変更なし）"], [alert]
+
+    monkeypatch.setattr(
+        refresh_pins.db, "_load_pins", lambda: json.loads(json.dumps(pins))
+    )
+    monkeypatch.setattr(refresh_pins.db, "PINS_PATH", str(pins_path))
+    monkeypatch.setattr(refresh_pins, "run", fake_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "refresh_pins.py",
+            "--summary-out",
+            str(summary_path),
+            "--alerts-out",
+            str(alerts_path),
+        ],
+    )
+    assert refresh_pins.main() == 0
+    assert received["alerts_out"] == str(alerts_path)
+    body = summary_path.read_text(encoding="utf-8")
+    assert "[!CAUTION]" in body and alert in body
